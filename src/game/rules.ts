@@ -104,11 +104,35 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
       message: 'Ate some berries.'
     };
   }
+  if (action.type === 'stokeFire') {
+    if (!atCamp(state)) return { state, message: 'Return to camp to tend the fire.' };
+    if (state.inventory.wood < 1) return { state, message: 'You need wood for the fire.' };
+    return {
+      state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood - 1 }, fireFuel: state.fireFuel + BALANCE.fireSecondsPerWood },
+      message: 'The fire burns brighter.'
+    };
+  }
+  if (action.type === 'build') {
+    if (!atCamp(state)) return { state, message: 'Return to camp to build.' };
+    if (state.structures[action.structureId]) return { state, message: 'Already built.' };
+    if (action.structureId === 'bed' && !state.structures.shelter) return { state, message: 'Build a shelter first.' };
+    const cost = BALANCE.buildCosts[action.structureId];
+    if (state.inventory.wood < cost) return { state, message: `Need ${cost} wood to build this.` };
+    return {
+      state: {
+        ...state,
+        inventory: { ...state.inventory, wood: state.inventory.wood - cost },
+        player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.buildEnergyCost) },
+        structures: { ...state.structures, [action.structureId]: true }
+      },
+      message: `Built the ${action.structureId}.`
+    };
+  }
   if (action.type === 'rest') {
     if (!atCamp(state)) return { state, message: 'Return to camp to rest.' };
     const rested = advanceTime(state, BALANCE.restSeconds);
     return {
-      state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + BALANCE.restEnergyGain) } },
+      state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + (rested.structures.bed ? BALANCE.bedRestEnergyGain : BALANCE.restEnergyGain)) } },
       message: 'You take a short rest.'
     };
   }

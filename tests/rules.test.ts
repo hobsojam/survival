@@ -124,3 +124,71 @@ describe('time and gentle survival', () => {
     expect(rested.timeOfDay).toBe(20);
   });
 });
+
+describe('fire and camp upgrades', () => {
+  it('uses one wood to fuel the fire for 90 seconds', async () => {
+    const { advanceTime } = await import('../src/game/rules');
+    const state = createGame();
+    state.inventory.wood = 1;
+    const lit = applyAction(state, { type: 'stokeFire' }).state;
+    expect(lit.inventory.wood).toBe(0);
+    expect(lit.fireFuel).toBe(90);
+    expect(advanceTime(lit, 100).fireFuel).toBe(0);
+  });
+
+  it('builds the shelter with six wood and six energy', () => {
+    const state = createGame();
+    state.inventory.wood = 6;
+    const built = applyAction(state, { type: 'build', structureId: 'shelter' }).state;
+    expect(built.structures.shelter).toBe(true);
+    expect(built.inventory.wood).toBe(0);
+    expect(built.player.energy).toBe(94);
+  });
+
+  it('bed improves rest and costs four wood', () => {
+    const state = createGame();
+    state.structures.shelter = true;
+    state.inventory.wood = 4;
+    state.player.energy = 20;
+    const built = applyAction(state, { type: 'build', structureId: 'bed' }).state;
+    expect(built.structures.bed).toBe(true);
+    expect(built.inventory.wood).toBe(0);
+    expect(applyAction(built, { type: 'rest' }).state.player.energy).toBe(64);
+  });
+
+  it('crate costs four wood and raises carrying capacity to sixteen', () => {
+    const state = createGame();
+    state.inventory.wood = 4;
+    const built = applyAction(state, { type: 'build', structureId: 'crate' }).state;
+    expect(built.structures.crate).toBe(true);
+    expect(built.inventory.wood).toBe(0);
+    built.inventory.wood = 8;
+    expect(applyAction(built, { type: 'gather', nodeId: 'branch-0' }).state.inventory.wood).toBe(9);
+  });
+
+  it('does not build twice, overspend, or build away from camp', () => {
+    const state = createGame();
+    expect(applyAction(state, { type: 'build', structureId: 'shelter' }).state.structures.shelter).toBe(false);
+    state.inventory.wood = 8;
+    state.player.x = 0;
+    expect(applyAction(state, { type: 'build', structureId: 'shelter' }).state.inventory.wood).toBe(8);
+    state.player.x = 20;
+    const built = applyAction(state, { type: 'build', structureId: 'shelter' }).state;
+    expect(applyAction(built, { type: 'build', structureId: 'shelter' }).state.inventory.wood).toBe(2);
+  });
+
+  it('shelter and fire reduce cold exposure at camp', async () => {
+    const { advanceTime } = await import('../src/game/rules');
+    const state = createGame();
+    state.timeOfDay = 160;
+    state.player.warmth = 50;
+    const outdoors = advanceTime(state, 4).player.warmth;
+    state.structures.shelter = true;
+    const sheltered = advanceTime(state, 4).player.warmth;
+    state.fireFuel = 10;
+    const byFire = advanceTime(state, 4).player.warmth;
+    expect(outdoors).toBe(48);
+    expect(sheltered).toBe(49);
+    expect(byFire).toBe(52);
+  });
+});
