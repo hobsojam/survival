@@ -4,7 +4,10 @@ export type GameAction =
   | { type: 'gather'; nodeId: string }
   | { type: 'build'; structureId: StructureId }
   | { type: 'move'; dx: number; dy: number }
-  | { type: 'eat' | 'stokeFire' | 'rest' };
+  | { type: 'eat' | 'stokeFire' | 'rest' | 'sleep' };
+
+/** Awake time tires the survivor; work already costs energy, and resting doesn't. */
+export type Activity = 'awake' | 'working' | 'resting';
 
 export interface ActionResult {
   state: GameState;
@@ -23,7 +26,15 @@ export function movementFactor(state: GameState): number {
   return state.player.energy <= 20 || state.player.hunger <= 20 || state.player.warmth <= 20 ? 0.65 : 1;
 }
 
-export function advanceTime(state: GameState, seconds: number): GameState {
+/** Why the survivor can't sleep right now, or null if they can. */
+export function sleepBlocker(state: GameState): string | null {
+  if (state.timeOfDay < BALANCE.nightStart) return 'You can sleep once night falls. Rest (R) for a short break.';
+  if (!isAtCamp(state)) return 'Return to the marked camp area to sleep.';
+  if (!state.structures.shelter) return 'Build a shelter to sleep through the night.';
+  return null;
+}
+
+export function advanceTime(state: GameState, seconds: number, activity: Activity = 'awake'): GameState {
   if (!Number.isFinite(seconds) || seconds <= 0) return state;
   let next: GameState = {
     ...state,
@@ -37,6 +48,7 @@ export function advanceTime(state: GameState, seconds: number): GameState {
     const camp = isAtCamp(next);
     const lit = next.fireFuel > 0;
     next.player.hunger = Math.max(0, next.player.hunger - step / 8);
+    if (activity === 'awake') next.player.energy = Math.max(0, next.player.energy - step * BALANCE.energyDrainPerSecond);
     const warmthChange = night
       ? camp && lit ? step / 2 : camp && next.structures.shelter ? -step / 4 : -step / 2
       : step / 10;
@@ -89,7 +101,7 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
         player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.gatherEnergyCost) },
         inventory: { ...state.inventory, [resource]: state.inventory[resource] + 1 },
         nodes
-      }, BALANCE.gatherSeconds),
+      }, BALANCE.gatherSeconds, 'working'),
       message: resource === 'wood' ? 'Collected wood.' : 'Picked berries.'
     };
   }
@@ -124,16 +136,27 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
         inventory: { ...state.inventory, wood: state.inventory.wood - cost },
         player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.buildEnergyCost) },
         structures: { ...state.structures, [action.structureId]: true }
-      }, BALANCE.buildSeconds),
+      }, BALANCE.buildSeconds, 'working'),
       message: `Built the ${action.structureId}.`
     };
   }
   if (action.type === 'rest') {
     if (!isAtCamp(state)) return { state, message: 'Return to the marked camp area to rest.' };
-    const rested = advanceTime(state, BALANCE.restSeconds);
+    const rested = advanceTime(state, BALANCE.restSeconds, 'resting');
     return {
       state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + (rested.structures.bed ? BALANCE.bedRestEnergyGain : BALANCE.restEnergyGain)) } },
       message: 'You take a short rest.'
+    };
+  }
+  if (action.type === 'sleep') {
+    const blocked = sleepBlocker(state);
+    if (blocked) return { state, message: blocked };
+    const slept = advanceTime(state, BALANCE.daySeconds - state.timeOfDay, 'resting');
+    const energy = state.structures.bed ? 100 : Math.min(100, slept.player.energy + BALANCE.sleepEnergyGain);
+    const fireDied = state.fireFuel > 0 && slept.fireFuel <= 0;
+    return {
+      state: { ...slept, player: { ...slept.player, energy } },
+      message: fireDied ? 'You sleep until morning. The fire burned out in the night.' : 'You sleep until morning.'
     };
   }
   return { state, message: 'That action is not available yet.' };

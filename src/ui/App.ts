@@ -2,7 +2,8 @@ import Phaser from 'phaser';
 import { BALANCE, createGame, type GameState, type StructureId } from '../game/state';
 import { GameScene } from '../scene/GameScene';
 import { loadGame, saveGame, type LoadResult } from '../game/save';
-import { isAtCamp } from '../game/rules';
+import { isAtCamp, sleepBlocker } from '../game/rules';
+import { dayPhase, formatClock, nextChange } from '../game/clock';
 
 const buildOptions: { id: StructureId; name: string; description: string }[] = [
   { id: 'shelter', name: 'Shelter', description: 'A roof against the night cold' },
@@ -35,20 +36,20 @@ export class App {
       <div class="shell">
         <header class="topbar">
           <div class="brand"><span class="brand-icon">✦</span><div><strong>Hearthwild</strong><small>A little place to begin again</small></div></div>
-          <div class="top-actions"><span id="save-status" class="save-status">Local save</span><button id="restart-game" class="restart-button" hidden>New game</button><div class="day-pill" id="day-pill">Day 1 · Morning</div></div>
+          <div class="top-actions"><span id="save-status" class="save-status">Local save</span><button id="restart-game" class="restart-button" hidden>New game</button><div class="day-pill" id="day-pill"><span id="day-label">Day 1 · Morning</span><span class="day-dial" aria-hidden="true"><span class="day-dial-night" style="left: ${BALANCE.nightStart / BALANCE.daySeconds * 100}%"></span><span id="day-dial-hand" class="day-dial-hand"></span></span><span id="day-countdown" class="day-countdown"></span></div></div>
         </header>
         <div class="layout">
           <main class="game-panel">
             <div class="game-frame"><div id="game-canvas"></div><div class="prompt" id="prompt">WASD / arrows  Move</div></div>
             <div class="message" id="message">Gather a few branches. Your camp is waiting.</div>
-            <div class="shortcuts"><span><kbd>WASD</kbd> Move</span><span><kbd>E</kbd> Gather</span><span><kbd>F</kbd> Fire</span><span><kbd>R</kbd> Rest</span><span><kbd>Q</kbd> Eat</span></div>
+            <div class="shortcuts"><span><kbd>WASD</kbd> Move</span><span><kbd>E</kbd> Gather</span><span><kbd>F</kbd> Fire</span><span><kbd>R</kbd> Rest</span><span><kbd>Q</kbd> Eat</span><span><kbd>Z</kbd> Sleep</span></div>
           </main>
           <aside class="sidebar">
             <section class="panel"><p class="eyebrow">YOUR SURVIVOR</p><h2>Take it one day at a time</h2>
               <div class="meter"><div class="meter-title"><span>Energy</span><b id="energy-value">100</b></div><div class="track"><div id="energy-bar" class="fill energy"></div></div></div>
               <div class="meter"><div class="meter-title"><span>Hunger</span><b id="hunger-value">100</b></div><div class="track"><div id="hunger-bar" class="fill hunger"></div></div></div>
               <div class="meter"><div class="meter-title"><span>Warmth</span><b id="warmth-value">100</b></div><div class="track"><div id="warmth-bar" class="fill warmth"></div></div></div>
-              <div class="quick-actions"><button data-action="eat">Eat berries</button><button data-action="rest">Rest</button><button data-action="stokeFire">Feed fire</button></div>
+              <div class="quick-actions"><button data-action="eat">Eat berries</button><button data-action="rest">Rest</button><button data-action="stokeFire">Feed fire</button><button data-action="sleep" id="sleep-button">Sleep</button></div>
             </section>
             <section class="panel"><p class="eyebrow">IN YOUR BAG</p><div class="supplies"><div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small></div><div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small></div><div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small>Carried</small></div></div><div class="fire-status" id="fire-status">The fire is unlit</div></section>
             <section class="panel build-panel"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand inside the marked camp circle to build.</p><div id="build-list">${buildMarkup}</div></section>
@@ -58,7 +59,7 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'rest' | 'stokeFire';
+        const type = button.dataset.action as 'eat' | 'rest' | 'stokeFire' | 'sleep';
         this.scene?.perform({ type });
       });
     });
@@ -152,8 +153,15 @@ export class App {
 
   private render(): void {
     const { player, inventory, structures } = this.state;
-    const phase = this.state.timeOfDay >= BALANCE.nightStart ? 'Night' : this.state.timeOfDay >= 110 ? 'Afternoon' : 'Morning';
-    this.setText('day-pill', `Day ${this.state.day} · ${phase}`);
+    const { timeOfDay } = this.state;
+    const phase = dayPhase(timeOfDay);
+    const change = nextChange(timeOfDay);
+    this.setText('day-label', `Day ${this.state.day} · ${phase}`);
+    this.setText('day-countdown', `${change.event} in ${formatClock(change.seconds)}`);
+    this.root.querySelector('#day-pill')?.classList.toggle('night', phase === 'Night');
+    const hand = this.root.querySelector<HTMLElement>('#day-dial-hand');
+    if (hand) hand.style.left = `${timeOfDay / BALANCE.daySeconds * 100}%`;
+    this.root.querySelector('#sleep-button')?.classList.toggle('ready', !sleepBlocker(this.state));
     for (const key of ['energy', 'hunger', 'warmth'] as const) {
       const value = Math.round(player[key]);
       this.setText(`${key}-value`, String(value));
