@@ -209,6 +209,63 @@ function drawCrate(g: Phaser.GameObjects.Graphics, built: boolean): void {
   g.fillCircle(x + 17, y + 11, 2);
 }
 
+function drawDryingRack(g: Phaser.GameObjects.Graphics, built: boolean): void {
+  const x = worldX(BALANCE.campX + 2);
+  const y = worldY(BALANCE.campY - 2);
+  g.fillStyle(0x3d382c, 0.22);
+  g.fillEllipse(x + 4, y + 13, 67, 20);
+  if (!built) {
+    g.lineStyle(2, 0xdac492, 0.8);
+    g.lineBetween(x - 27, y - 11, x + 27, y - 11);
+    g.lineBetween(x - 27, y + 15, x + 27, y + 15);
+    for (const dx of [-27, 27]) for (const dy of [-11, 15]) {
+      g.fillStyle(0x866a48);
+      g.fillCircle(x + dx, y + dy, 3);
+    }
+    return;
+  }
+  g.lineStyle(7, 0x573423);
+  g.lineBetween(x - 27, y + 14, x - 27, y - 30);
+  g.lineBetween(x + 27, y + 14, x + 27, y - 30);
+  g.lineStyle(4, 0xb07a47);
+  g.lineBetween(x - 31, y - 30, x + 31, y - 30);
+  g.lineBetween(x - 27, y - 9, x + 27, y - 9);
+  for (const dx of [-17, -5, 7, 19]) {
+    g.lineStyle(2, 0xd9a86a);
+    g.lineBetween(x + dx, y - 28, x + dx, y - 14);
+    g.fillStyle(0xb83a45);
+    g.fillCircle(x + dx, y - 13, 4);
+    g.fillStyle(0xffc2a8);
+    g.fillCircle(x + dx - 1, y - 15, 1);
+  }
+}
+
+function drawWindbreak(g: Phaser.GameObjects.Graphics, built: boolean): void {
+  const x = worldX(BALANCE.campX - 2);
+  const y = worldY(BALANCE.campY + 2);
+  g.fillStyle(0x3d382c, 0.22);
+  g.fillEllipse(x + 4, y + 13, 86, 19);
+  if (!built) {
+    g.lineStyle(2, 0xdac492, 0.8);
+    g.lineBetween(x - 38, y + 9, x + 38, y + 9);
+    for (const dx of [-38, -19, 0, 19, 38]) {
+      g.fillStyle(0x866a48);
+      g.fillCircle(x + dx, y + 9, 3);
+    }
+    return;
+  }
+  g.fillStyle(0x573423);
+  g.fillRoundedRect(x - 41, y - 24, 82, 31, 4);
+  for (const dx of [-35, -18, -1, 16, 33]) {
+    g.fillStyle(dx % 2 ? 0x85512f : 0x9b653b);
+    g.fillRoundedRect(x + dx - 7, y - 22, 13, 31, 2);
+    g.lineStyle(2, 0xd9a86a, 0.65);
+    g.lineBetween(x + dx - 4, y - 20, x + dx - 4, y + 4);
+  }
+  g.lineStyle(5, 0x573423);
+  g.lineBetween(x - 43, y + 7, x + 43, y + 7);
+}
+
 function drawFire(g: Phaser.GameObjects.Graphics, fuel: number, time: number, hearth: boolean): void {
   const x = worldX(BALANCE.campX);
   const y = worldY(BALANCE.campY);
@@ -256,6 +313,8 @@ export function drawObjects(g: Phaser.GameObjects.Graphics, state: GameState, ti
   }
   drawShelter(g, state.structures.shelter, state.structures.bed);
   drawCrate(g, state.structures.crate);
+  drawDryingRack(g, state.structures.dryingRack);
+  drawWindbreak(g, state.structures.windbreak);
   drawFire(g, state.fireFuel, time, state.structures.hearth);
 }
 

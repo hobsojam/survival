@@ -180,6 +180,10 @@ Sizes are in art pixels (W × H). The anchor is bottom-centre unless noted.
 | Shelter | 48 × 40 | `built`, `built-bed` | A-frame or lean-to of `canvas` over `wood` poles, open doorway facing down (toward the camera). `built-bed` shows a bedroll inside the doorway. |
 | Crate site | 16 × 16 | 1 | Ground decal: four corner pegs and a chalk-like `earth4` cross. |
 | Crate | 16 × 16 | 1 | Wooden crate, plank lines, top face visible. |
+| Drying rack site | 32 × 16 | 1 | Four stakes marking a small frame northeast of the fire. |
+| Drying rack | 32 × 32 | 1 | Two upright posts, crossbar, and hanging berry clusters. |
+| Windbreak site | 48 × 16 | 1 | A curved row of short stakes southwest of the fire. |
+| Windbreak | 48 × 32 | 1 | Short woven timber wall, with the front face and top edge visible. |
 | Log seat (decorative) | 24 × 12 | 1 | One or two by the fire. Purely decorative, makes the camp feel lived in. |
 
 ### Survivor
@@ -213,7 +217,7 @@ The HTML sidebar and top bar keep their current layout and fonts. Replace the Un
 | Icon | Size |
 |---|---|
 | Wood, food, bag capacity | 16 × 16 |
-| Shelter, bed, crate (build list) | 16 × 16 |
+| Shelter, bed, crate, hearth, drying rack, windbreak (build list) | 16 × 16 |
 | Energy, hunger, warmth (meter labels) | 8 × 8 |
 
 Align the sidebar's accent colors with the palette: energy bar in `grass3`/`grass4`, hunger in `scarf3`/`scarf4`, warmth in `fire2`/`fire3`, wood text in `wood2`, berries in `berry2`.
@@ -224,7 +228,7 @@ Each phase is one PR, keeps the game playable, and keeps all existing tests pass
 
 1. **Pipeline:** palette, sprite format, texture generation, contact sheet page, art tests, pixel-perfect scaling and the 16 px `TILE`. Temporarily show the existing art scaled to the new grid if needed. No new art yet beyond a test sprite or two.
 2. **Terrain and map composition:** grass, autotiled camp clearing and paths, decoration, rim stones, trees with y-sorting, forest border and groves.
-3. **Nodes and camp:** branch piles, berry bushes, fire pit, build sites, shelter, bed, crate, log seat. Remove halos, dotted circle and translucent ellipses.
+3. **Nodes and camp:** branch piles, berry bushes, fire pit, build sites, shelter, bed, crate, drying rack, windbreak, log seat. Remove halos, dotted circle and translucent ellipses.
 4. **Survivor:** directional walk, idle, gather and rest animations.
 5. **Wildlife and effects:** birds, fox, fireflies, gather pops, smoke, sparks.
 6. **Lighting:** the time-of-day lighting layer, stepped lights, fire radius tied to fuel. Remove the old night rectangle and additive glow.

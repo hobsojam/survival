@@ -67,8 +67,7 @@ export const BALANCE = {
   coldNightFailureEnergy: 25,
   coldNightFailureMorningLoss: 30,
   interactionRadius: 2,
-  campRadius: 4,
-  buildCosts: Object.fromEntries(Object.entries(BUILDINGS).map(([id, definition]) => [id, definition.cost])) as Record<StructureId, number>
+  campRadius: 4
 } as const;
 
 const branchPositions = [
