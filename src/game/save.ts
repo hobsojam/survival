@@ -1,7 +1,7 @@
 import { BALANCE, createGame, type GameState } from './state';
 
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 3;
 export type SaveResult = { ok: true } | { ok: false; error: string };
 export type LoadResult = { kind: 'empty' } | { kind: 'loaded'; state: GameState } | { kind: 'invalid'; reason: string };
 
@@ -31,7 +31,7 @@ function validCore(value: unknown): boolean {
   });
 }
 
-function validState(value: unknown): value is GameState {
+function validV2State(value: unknown): boolean {
   if (!validCore(value) || !object(value) || !object(value.structures) || !object(value.progress)) return false;
   const { structures, progress } = value;
   if (typeof structures.hearth !== 'boolean' || typeof progress.hearthUnlocked !== 'boolean') return false;
@@ -41,13 +41,29 @@ function validState(value: unknown): value is GameState {
     && progress.nextStormDay >= (value.day as number);
 }
 
+function validState(value: unknown): value is GameState {
+  return validV2State(value) && object(value) && object(value.structures)
+    && typeof value.structures.dryingRack === 'boolean'
+    && typeof value.structures.windbreak === 'boolean';
+}
+
 function migrateLegacy(value: unknown): GameState | null {
   if (!validCore(value)) return null;
-  const legacy = value as Omit<GameState, 'progress' | 'structures'> & { structures: Omit<GameState['structures'], 'hearth'> };
+  const legacy = value as Omit<GameState, 'progress' | 'structures'> & { structures: Pick<GameState['structures'], 'shelter' | 'bed' | 'crate'> };
   const migrated: GameState = {
     ...legacy,
-    structures: { ...legacy.structures, hearth: false },
+    structures: { ...legacy.structures, hearth: false, dryingRack: false, windbreak: false },
     progress: { nextStormDay: Math.max(BALANCE.coldNightStartDay, legacy.day + 2), hearthUnlocked: false }
+  };
+  return validState(migrated) ? migrated : null;
+}
+
+function migrateV2(value: unknown): GameState | null {
+  if (!validV2State(value)) return null;
+  const legacy = value as Omit<GameState, 'structures'> & { structures: Omit<GameState['structures'], 'dryingRack' | 'windbreak'> };
+  const migrated: GameState = {
+    ...legacy,
+    structures: { ...legacy.structures, dryingRack: false, windbreak: false }
   };
   return validState(migrated) ? migrated : null;
 }
@@ -80,10 +96,13 @@ export function loadGame(storage: Storage): LoadResult {
   } catch {
     return { kind: 'invalid', reason: 'The local save is not valid JSON.' };
   }
-  if (!object(parsed) || (parsed.version !== SAVE_VERSION && parsed.version !== 1)) {
+  if (!object(parsed) || (parsed.version !== SAVE_VERSION && parsed.version !== 2 && parsed.version !== 1)) {
     return { kind: 'invalid', reason: 'This save uses an unsupported version.' };
   }
-  const state = parsed.version === 1 ? migrateLegacy(parsed.state) : validState(parsed.state) ? parsed.state : null;
+  let state: GameState | null = null;
+  if (parsed.version === 1) state = migrateLegacy(parsed.state);
+  else if (parsed.version === 2) state = migrateV2(parsed.state);
+  else if (validState(parsed.state)) state = parsed.state;
   if (!state) return { kind: 'invalid', reason: 'The local save contains invalid game data.' };
   return { kind: 'loaded', state };
 }
