@@ -1,7 +1,7 @@
 import { BALANCE, createGame, type GameState } from './state';
 
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 1;
+const SAVE_VERSION = 2;
 export type SaveResult = { ok: true } | { ok: false; error: string };
 export type LoadResult = { kind: 'empty' } | { kind: 'loaded'; state: GameState } | { kind: 'invalid'; reason: string };
 
@@ -11,7 +11,7 @@ const finite = (value: unknown): value is number => typeof value === 'number' &&
 const meter = (value: unknown): boolean => finite(value) && value >= 0 && value <= 100;
 const whole = (value: unknown): value is number => Number.isInteger(value) && finite(value);
 
-function validState(value: unknown): value is GameState {
+function validCore(value: unknown): boolean {
   if (!object(value) || !object(value.player) || !object(value.inventory) || !object(value.structures) || !Array.isArray(value.nodes)) return false;
   const { player, inventory, structures, nodes } = value;
   if (!whole(value.day) || value.day < 1 || !finite(value.timeOfDay) || value.timeOfDay < 0 || value.timeOfDay >= BALANCE.daySeconds) return false;
@@ -29,6 +29,27 @@ function validState(value: unknown): value is GameState {
       && whole(node.amount) && (node.amount === 0 || node.amount === 1)
       && whole(node.readyDay) && node.readyDay >= 1 && node.readyDay <= (value.day as number) + 1;
   });
+}
+
+function validState(value: unknown): value is GameState {
+  if (!validCore(value) || !object(value) || !object(value.structures) || !object(value.progress)) return false;
+  const { structures, progress } = value;
+  if (typeof structures.hearth !== 'boolean' || typeof progress.hearthUnlocked !== 'boolean') return false;
+  if (structures.hearth && !progress.hearthUnlocked) return false;
+  if (progress.hearthUnlocked) return progress.nextStormDay === null;
+  return whole(progress.nextStormDay) && progress.nextStormDay >= BALANCE.coldNightStartDay
+    && progress.nextStormDay >= (value.day as number);
+}
+
+function migrateLegacy(value: unknown): GameState | null {
+  if (!validCore(value)) return null;
+  const legacy = value as Omit<GameState, 'progress' | 'structures'> & { structures: Omit<GameState['structures'], 'hearth'> };
+  const migrated: GameState = {
+    ...legacy,
+    structures: { ...legacy.structures, hearth: false },
+    progress: { nextStormDay: Math.max(BALANCE.coldNightStartDay, legacy.day + 2), hearthUnlocked: false }
+  };
+  return validState(migrated) ? migrated : null;
 }
 
 function errorText(error: unknown): string {
@@ -59,9 +80,10 @@ export function loadGame(storage: Storage): LoadResult {
   } catch {
     return { kind: 'invalid', reason: 'The local save is not valid JSON.' };
   }
-  if (!object(parsed) || parsed.version !== SAVE_VERSION) {
+  if (!object(parsed) || (parsed.version !== SAVE_VERSION && parsed.version !== 1)) {
     return { kind: 'invalid', reason: 'This save uses an unsupported version.' };
   }
-  if (!validState(parsed.state)) return { kind: 'invalid', reason: 'The local save contains invalid game data.' };
-  return { kind: 'loaded', state: parsed.state };
+  const state = parsed.version === 1 ? migrateLegacy(parsed.state) : validState(parsed.state) ? parsed.state : null;
+  if (!state) return { kind: 'invalid', reason: 'The local save contains invalid game data.' };
+  return { kind: 'loaded', state };
 }

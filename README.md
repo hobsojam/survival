@@ -1,6 +1,6 @@
 # Hearthwild
 
-A small, single-player browser survival game about making a wilderness camp feel like home. You control one survivor, gather branches and berries, keep a fire burning, and build a shelter, bed, and storage crate. Survival is gentle: cold and hunger slow you down, but they never end the game.
+A small, single-player browser survival game about making a wilderness camp feel like home. You control one survivor, gather branches and berries, keep a fire burning, and build a shelter, bed, storage crate, and eventually a stone hearth. Survival is gentle: cold and hunger slow you down, but they never end the game.
 
 **Play it online:** <https://hobsojam.github.io/survival/>. Every merge to `main` redeploys it.
 
@@ -25,9 +25,13 @@ Open the local address printed by Vite, usually <http://localhost:5173/>. For a 
 | R | Rest at camp for a short break |
 | Z | Sleep until morning (at night, at camp, once the shelter is built) |
 | Q | Eat one carried food |
+| C | Cook one berry at a lit campfire after dark |
+| G | Watch the stars at camp after dark |
 | Build buttons | Spend wood on camp upgrades |
 
 The buttons beside the game also let you eat, rest, feed the fire, and sleep. If the keyboard does not respond, click the game area once to focus it.
+
+At night, the **After dark** panel offers two optional ways to spend a little time. Cook one berry at a lit campfire for a warmer, more filling meal; it takes eight seconds and restores 35 hunger and 10 warmth, in addition to the warmth you gain while near the fire. Or watch the stars at camp for twelve seconds and regain 10 energy. The panel shows when each activity is ready. Neither activity is needed for survival, and you can still rest or sleep as before.
 
 A day lasts four minutes: morning and afternoon take two minutes and forty seconds, then night lasts eighty seconds until dawn. The dial in the top bar shows where you are in the day, with night shaded, and counts down to nightfall or dawn. Gathering takes six seconds and building takes twelve seconds, so daylight matters.
 
@@ -35,13 +39,19 @@ You tire slowly while awake, losing about one energy every six seconds you spend
 
 Your bag holds eight supplies at first. To build, stand anywhere inside the marked circle around the campfire and click an upgrade in the “Little improvements” panel. Shelter costs six wood, bed costs four wood after shelter, and storage crate costs four wood. The bed improves resting; the crate raises carrying capacity to sixteen. The game has one fixed map and no combat or companions yet.
 
+### The cold night
+
+The forecast card warns you about a cold front on **day 3 night**. Build a shelter and keep the fire burning through dawn while you stay at camp. The front burns fire fuel twice as fast, so two fresh logs at nightfall will last the full night. The card shows your shelter status and how much fuel is needed. Sleeping passes the night, but the fire still burns and the cold-night outcome still applies.
+
+If you weather it with warmth above 20, you unlock the **stone hearth**. Build it for four wood to make each future log burn for 150 seconds instead of 90. If the camp is unprepared, you wake tired and lose 30 seconds of the morning; another cold front arrives three days later. You can always recover, gather more wood, and try again.
+
 The pale frames in camp mark future building sites. Branch piles and berry bushes are brighter when ready to gather; they fade after collection and replenish at dawn. The scene art is drawn in Phaser, so there are no external image assets to install.
 
 The wilderness has a little life of its own. Birds peck in the meadows and flutter off if you come too close or when night falls. On most evenings a fox visits the edge of camp and sits by the fire until well after dark, unless you walk up to it. Fireflies drift around camp at night. None of this affects survival or the save.
 
 ## Saving
 
-Progress is saved in this browser's local storage under `hearthwild.save` after successful actions, periodically, and when the page is hidden or closed. Choose **Continue your camp** when you return. **Start a new game** asks before replacing an existing save. Saves stay in this browser profile; private browsing, clearing site data, or switching devices will not carry them over. The game shows a message if storage fails or an existing save cannot be read.
+Progress is saved in this browser's local storage under `hearthwild.save` after successful actions, periodically, and when the page is hidden or closed. Choose **Continue your camp** when you return. **Start a new game** asks before replacing an existing save. Existing version 1 saves load with their supplies and camp intact, plus a future cold front with at least two days of warning. Saves stay in this browser profile; private browsing, clearing site data, or switching devices will not carry them over. The game shows a message if storage fails or an existing save cannot be read.
 
 ## Verify
 
@@ -50,4 +60,4 @@ npm test -- --run
 npm run build
 ```
 
-The tests cover game state, gathering, day/night survival, tiredness and sleep, the clock, camp upgrades, save validation, and ambient wildlife timing. A browser playthrough should also check movement, building, fire, day/night visuals, and continue after reloading.
+The tests cover game state, gathering, day/night survival, tiredness and sleep, optional night activities, the clock, camp upgrades, cold-night progression, save migration, and ambient wildlife timing. A browser playthrough should also check movement, building, fire, weather visuals, and continue after reloading.

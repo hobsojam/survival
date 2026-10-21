@@ -271,3 +271,169 @@ describe('tiredness and sleep', () => {
     expect(applyAction(unsheltered, { type: 'sleep' })).toMatchObject({ state: unsheltered, message: expect.stringMatching(/shelter/i) });
   });
 });
+
+describe('optional night activities', () => {
+  it('cooks one berry by a lit campfire for a warm meal', () => {
+    const state = createGame();
+    state.timeOfDay = 170;
+    state.inventory.food = 1;
+    state.fireFuel = 30;
+    state.player.hunger = 30;
+    state.player.warmth = 40;
+    const cooked = applyAction(state, { type: 'cook' });
+    expect(cooked.state.inventory.food).toBe(0);
+    expect(cooked.state.timeOfDay).toBe(178);
+    expect(cooked.state.fireFuel).toBe(22);
+    expect(cooked.state.player.hunger).toBeCloseTo(64);
+    expect(cooked.state.player.warmth).toBe(54);
+    expect(state.inventory.food).toBe(1);
+  });
+
+  it('does not cook in daylight, away from camp, without berries, or without fire', () => {
+    const state = createGame();
+    state.inventory.food = 1;
+    state.fireFuel = 20;
+    for (const setup of [
+      (s: typeof state) => { s.timeOfDay = 100; },
+      (s: typeof state) => { s.timeOfDay = 170; s.player.x = 0; },
+      (s: typeof state) => { s.timeOfDay = 170; s.inventory.food = 0; },
+      (s: typeof state) => { s.timeOfDay = 170; s.fireFuel = 0; }
+    ]) {
+      const attempt = structuredClone(state);
+      setup(attempt);
+      expect(applyAction(attempt, { type: 'cook' }).state).toBe(attempt);
+    }
+  });
+
+  it('stargazes at camp at night, restoring a little energy without supplies', () => {
+    const state = createGame();
+    state.timeOfDay = 230;
+    state.player.energy = 15;
+    const result = applyAction(state, { type: 'stargaze' });
+    expect(result.state.day).toBe(2);
+    expect(result.state.timeOfDay).toBe(2);
+    expect(result.state.player.energy).toBe(25);
+    expect(result.state.inventory).toEqual(state.inventory);
+    expect(result.message).toMatch(/stars|sky|moon/i);
+  });
+
+  it('does not stargaze during daylight or away from camp', () => {
+    const state = createGame();
+    expect(applyAction(state, { type: 'stargaze' }).state).toBe(state);
+    state.timeOfDay = 170;
+    state.player.x = 0;
+    expect(applyAction(state, { type: 'stargaze' }).state).toBe(state);
+  });
+
+  it('does not undo a failed cold-night penalty when stargazing crosses dawn', () => {
+    const state = createGame();
+    state.day = 3;
+    state.timeOfDay = 232;
+    state.player.energy = 30;
+    const dawn = applyAction(state, { type: 'stargaze' }).state;
+    expect(dawn.progress.nextStormDay).toBe(6);
+    expect(dawn.player.energy).toBe(25);
+  });
+});
+
+describe('forecast cold night', () => {
+  it('forecasts day three and starts the front only at nightfall', () => {
+    const state = createGame();
+    expect(state.progress).toEqual({ nextStormDay: 3, hearthUnlocked: false });
+    state.day = 3;
+    state.timeOfDay = BALANCE.nightStart - 5;
+    state.fireFuel = 20;
+    expect(advanceTime(state, 5).fireFuel).toBe(15);
+    expect(advanceTime(state, 10).fireFuel).toBe(5);
+    state.day = 2;
+    state.timeOfDay = BALANCE.nightStart;
+    expect(advanceTime(state, 5).fireFuel).toBe(15);
+  });
+
+  it('makes an unlit sheltered storm night colder', () => {
+    const state = createGame();
+    state.day = 3;
+    state.timeOfDay = BALANCE.nightStart;
+    state.structures.shelter = true;
+    state.player.warmth = 80;
+    expect(advanceTime(state, 10).player.warmth).toBe(72.5);
+  });
+
+  it('unlocks the hearth after a sheltered night with fire through dawn', () => {
+    const state = createGame();
+    state.day = 3;
+    state.timeOfDay = BALANCE.nightStart;
+    state.structures.shelter = true;
+    state.fireFuel = 180;
+    const dawn = advanceTime(state, 80);
+    expect(dawn.day).toBe(4);
+    expect(dawn.timeOfDay).toBe(0);
+    expect(dawn.fireFuel).toBe(20);
+    expect(dawn.progress).toEqual({ nextStormDay: null, hearthUnlocked: true });
+  });
+
+  it('retries after a missed storm and costs the next morning', () => {
+    const state = createGame();
+    state.day = 3;
+    state.timeOfDay = BALANCE.nightStart;
+    state.structures.shelter = true;
+    state.fireFuel = 90;
+    const dawn = advanceTime(state, 80);
+    expect(dawn.progress).toEqual({ nextStormDay: 6, hearthUnlocked: false });
+    expect(dawn.day).toBe(4);
+    expect(dawn.timeOfDay).toBe(30);
+    expect(dawn.player.energy).toBe(25);
+    expect(dawn.fireFuel).toBe(0);
+    expect(applyAction(dawn, { type: 'gather', nodeId: 'branch-0' }).state.inventory.wood).toBe(1);
+  });
+
+  it('requires fire after the last storm second and the survivor at camp', () => {
+    const state = createGame();
+    state.day = 3;
+    state.timeOfDay = BALANCE.nightStart;
+    state.structures.shelter = true;
+    state.fireFuel = 160;
+    expect(advanceTime(state, 80).progress.hearthUnlocked).toBe(false);
+    state.fireFuel = 180;
+    state.player.x = 0;
+    expect(advanceTime(state, 80).progress.hearthUnlocked).toBe(false);
+  });
+
+  it('resolves each retry once when advancing over several days', () => {
+    const state = createGame();
+    state.day = 3;
+    state.timeOfDay = BALANCE.nightStart;
+    const later = advanceTime(state, 800);
+    expect(later.day).toBe(7);
+    expect(later.progress.nextStormDay).toBe(9);
+    expect(later.progress.hearthUnlocked).toBe(false);
+  });
+
+  it('does not let sleep bypass the storm setback', () => {
+    const state = createGame();
+    state.day = 3;
+    state.timeOfDay = BALANCE.nightStart;
+    state.structures.shelter = true;
+    state.structures.bed = true;
+    state.player.energy = 10;
+    const dawn = applyAction(state, { type: 'sleep' }).state;
+    expect(dawn.progress.nextStormDay).toBe(6);
+    expect(dawn.player.energy).toBe(25);
+    expect(dawn.timeOfDay).toBe(30);
+  });
+
+  it('keeps the hearth locked until success, then grants longer fuel', () => {
+    const state = createGame();
+    state.inventory.wood = 4;
+    const locked = applyAction(state, { type: 'build', structureId: 'hearth' });
+    expect(locked.state).toBe(state);
+    expect(locked.message).toMatch(/cold night/i);
+    state.progress.hearthUnlocked = true;
+    state.progress.nextStormDay = null;
+    const built = applyAction(state, { type: 'build', structureId: 'hearth' }).state;
+    expect(built.structures.hearth).toBe(true);
+    expect(built.inventory.wood).toBe(0);
+    built.inventory.wood = 1;
+    expect(applyAction(built, { type: 'stokeFire' }).state.fireFuel).toBe(150);
+  });
+});
