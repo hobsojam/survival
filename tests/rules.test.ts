@@ -126,6 +126,20 @@ describe('time and gentle survival', () => {
 });
 
 describe('fire and camp upgrades', () => {
+  it('builds while standing at the visible shelter and crate sites', () => {
+    const shelterState = createGame();
+    shelterState.inventory.wood = 6;
+    shelterState.player.x = 17;
+    shelterState.player.y = 13;
+    expect(applyAction(shelterState, { type: 'build', structureId: 'shelter' }).state.structures.shelter).toBe(true);
+
+    const crateState = createGame();
+    crateState.inventory.wood = 4;
+    crateState.player.x = 23;
+    crateState.player.y = 16;
+    expect(applyAction(crateState, { type: 'build', structureId: 'crate' }).state.structures.crate).toBe(true);
+  });
+
   it('uses one wood to fuel the fire for 90 seconds', async () => {
     const { advanceTime } = await import('../src/game/rules');
     const state = createGame();

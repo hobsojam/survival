@@ -15,8 +15,8 @@ function near(x1: number, y1: number, x2: number, y2: number): boolean {
   return Math.hypot(x1 - x2, y1 - y2) <= BALANCE.interactionRadius;
 }
 
-function atCamp(state: GameState): boolean {
-  return near(state.player.x, state.player.y, BALANCE.campX, BALANCE.campY);
+export function isAtCamp(state: GameState): boolean {
+  return Math.hypot(state.player.x - BALANCE.campX, state.player.y - BALANCE.campY) <= BALANCE.campRadius;
 }
 
 export function movementFactor(state: GameState): number {
@@ -34,7 +34,7 @@ export function advanceTime(state: GameState, seconds: number): GameState {
   while (remaining > 0.000001) {
     const step = Math.min(remaining, 1, BALANCE.daySeconds - next.timeOfDay);
     const night = next.timeOfDay >= BALANCE.nightStart;
-    const camp = atCamp(next);
+    const camp = isAtCamp(next);
     const lit = next.fireFuel > 0;
     next.player.hunger = Math.max(0, next.player.hunger - step / 8);
     const warmthChange = night
@@ -105,7 +105,7 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     };
   }
   if (action.type === 'stokeFire') {
-    if (!atCamp(state)) return { state, message: 'Return to camp to tend the fire.' };
+    if (!isAtCamp(state)) return { state, message: 'Return to the marked camp area to tend the fire.' };
     if (state.inventory.wood < 1) return { state, message: 'You need wood for the fire.' };
     return {
       state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood - 1 }, fireFuel: state.fireFuel + BALANCE.fireSecondsPerWood },
@@ -113,7 +113,7 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     };
   }
   if (action.type === 'build') {
-    if (!atCamp(state)) return { state, message: 'Return to camp to build.' };
+    if (!isAtCamp(state)) return { state, message: 'Return to the marked camp area to build.' };
     if (state.structures[action.structureId]) return { state, message: 'Already built.' };
     if (action.structureId === 'bed' && !state.structures.shelter) return { state, message: 'Build a shelter first.' };
     const cost = BALANCE.buildCosts[action.structureId];
@@ -129,7 +129,7 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     };
   }
   if (action.type === 'rest') {
-    if (!atCamp(state)) return { state, message: 'Return to camp to rest.' };
+    if (!isAtCamp(state)) return { state, message: 'Return to the marked camp area to rest.' };
     const rested = advanceTime(state, BALANCE.restSeconds);
     return {
       state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + (rested.structures.bed ? BALANCE.bedRestEnergyGain : BALANCE.restEnergyGain)) } },

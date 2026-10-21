@@ -28,7 +28,7 @@ The buttons beside the game also let you eat, rest, and feed the fire. If the ke
 
 A day lasts four minutes; night begins after two minutes and forty seconds. Gathering takes six seconds and building takes twelve seconds, so daylight matters. Cold is stronger outside at night. The fire provides warmth for 90 seconds per wood, and a shelter reduces cold exposure at camp. Hunger falls over time. Low energy, hunger, or warmth slows movement, but you can always move and gather supplies. Branches and berries replenish at dawn.
 
-Your bag holds eight supplies at first. Shelter costs six wood, bed costs four wood after shelter, and storage crate costs four wood. The bed improves resting; the crate raises carrying capacity to sixteen. The game has one fixed map and no combat or companions yet.
+Your bag holds eight supplies at first. To build, stand anywhere inside the marked circle around the campfire and click an upgrade in the “Little improvements” panel. Shelter costs six wood, bed costs four wood after shelter, and storage crate costs four wood. The bed improves resting; the crate raises carrying capacity to sixteen. The game has one fixed map and no combat or companions yet.
 
 ## Saving
 

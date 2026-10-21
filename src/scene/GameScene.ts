@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { BALANCE, type GameState, type ResourceNode } from '../game/state';
-import { advanceTime, applyAction, type GameAction } from '../game/rules';
+import { advanceTime, applyAction, isAtCamp, type GameAction } from '../game/rules';
 
 const TILE = 32;
 const worldX = (x: number) => (x + 0.5) * TILE;
@@ -79,8 +79,8 @@ export class GameScene extends Phaser.Scene {
   getPrompt(): string {
     const node = this.closestNode();
     if (node) return node.kind === 'branch' ? 'E  Collect branches' : 'E  Pick berries';
-    if (Math.hypot(this.state.player.x - BALANCE.campX, this.state.player.y - BALANCE.campY) <= 2) {
-      return 'F  Feed fire    R  Rest';
+    if (isAtCamp(this.state)) {
+      return 'At camp · F Fire · R Rest · Click an upgrade to build';
     }
     return 'WASD / arrows  Move';
   }
@@ -121,6 +121,8 @@ export class GameScene extends Phaser.Scene {
     }
     g.fillStyle(0xb6a078, 0.18);
     g.fillEllipse(worldX(BALANCE.campX), worldY(BALANCE.campY), 320, 235);
+    g.lineStyle(2, 0xe8d4a6, 0.7);
+    g.strokeCircle(worldX(BALANCE.campX), worldY(BALANCE.campY), BALANCE.campRadius * TILE);
     for (let i = 0; i < 82; i++) {
       const x = (i * 223 + 97) % (BALANCE.mapWidth * TILE);
       const y = (i * 347 + 51) % (BALANCE.mapHeight * TILE);

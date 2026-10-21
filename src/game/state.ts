@@ -39,6 +39,7 @@ export const BALANCE = {
   bedRestEnergyGain: 50,
   fireSecondsPerWood: 90,
   interactionRadius: 2,
+  campRadius: 4,
   buildCosts: { shelter: 6, bed: 4, crate: 4 } satisfies Record<StructureId, number>
 } as const;
 

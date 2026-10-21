@@ -39,6 +39,7 @@ h2 { font: 500 18px 'Fraunces', serif; letter-spacing: -.02em; margin: 0 0 17px;
 .supplies strong { display: block; margin-top: 5px; font-size: 15px; }.supplies small { color: #879087; font-size: 10px; }
 .fire-status { margin-top: 12px; padding: 10px; border-radius: 8px; background: #fff2df; color: #a66d45; text-align: center; font-size: 12px; font-weight: 700; }
 .build-panel h2 { margin-bottom: 10px; }
+.build-hint { margin: -2px 0 12px; color: #687c69; font-size: 11px; line-height: 1.4; }
 #build-list { display: grid; gap: 7px; }
 .build-item { display: flex; align-items: center; width: 100%; gap: 9px; border: 1px solid #e7e9dd; border-radius: 9px; padding: 9px; color: #334a3b; background: #fafbf5; text-align: left; }
 .build-symbol { width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; flex: none; background: #e6eddf; color: #6f936c; font-size: 20px; }
