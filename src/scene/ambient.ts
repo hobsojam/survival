@@ -37,7 +37,11 @@ export function foxAt(day: number, timeOfDay: number): FoxPose | null {
   const progress = Math.min(1, (timeOfDay - FOX.arrive) / FOX.travel, (FOX.leave - timeOfDay) / FOX.travel);
   const leaving = timeOfDay - FOX.arrive > FOX.leave - timeOfDay;
   const sitting = progress >= 1;
-  const heading = sitting ? BALANCE.campX - FOX.seat.x : leaving ? FOX.den.x - FOX.seat.x : FOX.seat.x - FOX.den.x;
+  // Sitting, the fox faces the fire; walking, it faces where it's going.
+  let heading: number;
+  if (sitting) heading = BALANCE.campX - FOX.seat.x;
+  else if (leaving) heading = FOX.den.x - FOX.seat.x;
+  else heading = FOX.seat.x - FOX.den.x;
   return {
     x: FOX.den.x + (FOX.seat.x - FOX.den.x) * progress,
     y: FOX.den.y + (FOX.seat.y - FOX.den.y) * progress,
