@@ -209,19 +209,25 @@ function drawCrate(g: Phaser.GameObjects.Graphics, built: boolean): void {
   g.fillCircle(x + 17, y + 11, 2);
 }
 
-function drawFire(g: Phaser.GameObjects.Graphics, fuel: number, time: number): void {
+function drawFire(g: Phaser.GameObjects.Graphics, fuel: number, time: number, hearth: boolean): void {
   const x = worldX(BALANCE.campX);
   const y = worldY(BALANCE.campY);
   g.fillStyle(0x674e37, 0.33);
   g.fillCircle(x, y + 5, 40);
-  g.fillStyle(0x957d5f);
-  g.fillCircle(x, y, 29);
+  g.fillStyle(hearth ? 0x718489 : 0x957d5f);
+  g.fillCircle(x, y, hearth ? 38 : 29);
+  if (hearth) {
+    g.lineStyle(4, 0xd8d5bd);
+    g.strokeCircle(x, y, 35);
+    g.fillStyle(0xc2c9bb);
+    g.fillRoundedRect(x - 32, y + 20, 64, 11, 3);
+  }
   g.fillStyle(0x3e3d35);
   g.fillCircle(x, y, 22);
   for (let i = 0; i < 9; i++) {
     const angle = i * Math.PI * 2 / 9;
-    g.fillStyle(i % 2 ? 0xc3b5a0 : 0xd8c8aa);
-    g.fillEllipse(x + Math.cos(angle) * 25, y + Math.sin(angle) * 25, 11, 8);
+    g.fillStyle(hearth ? (i % 2 ? 0x9eb5b6 : 0xc6d2c7) : (i % 2 ? 0xc3b5a0 : 0xd8c8aa));
+    g.fillEllipse(x + Math.cos(angle) * (hearth ? 32 : 25), y + Math.sin(angle) * (hearth ? 32 : 25), hearth ? 14 : 11, 8);
   }
   g.lineStyle(6, 0x815536);
   g.lineBetween(x - 12, y + 8, x + 11, y - 5);
@@ -250,7 +256,7 @@ export function drawObjects(g: Phaser.GameObjects.Graphics, state: GameState, ti
   }
   drawShelter(g, state.structures.shelter, state.structures.bed);
   drawCrate(g, state.structures.crate);
-  drawFire(g, state.fireFuel, time);
+  drawFire(g, state.fireFuel, time, state.structures.hearth);
 }
 
 export function makeSurvivor(scene: Phaser.Scene): { root: Phaser.GameObjects.Container; figure: Phaser.GameObjects.Container } {

@@ -28,6 +28,7 @@ describe('local save', () => {
     state.nodes[0].amount = 0;
     state.nodes[0].readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(2);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);
@@ -42,6 +43,50 @@ describe('local save', () => {
     storage.setItem(SAVE_KEY, '{broken');
     expect(loadGame(storage).kind).toBe('invalid');
     expect(storage.getItem(SAVE_KEY)).toBe('{broken');
+  });
+
+  it('migrates a valid version one save on a later day without overwriting it', () => {
+    const storage = new MemoryStorage();
+    const legacy = JSON.parse(JSON.stringify(createGame()));
+    legacy.day = 8;
+    legacy.timeOfDay = 105;
+    legacy.inventory.wood = 3;
+    legacy.structures.shelter = true;
+    delete legacy.progress;
+    delete legacy.structures.hearth;
+    const raw = JSON.stringify({ version: 1, state: legacy });
+    storage.setItem(SAVE_KEY, raw);
+    const loaded = loadGame(storage);
+    expect(loaded.kind).toBe('loaded');
+    if (loaded.kind === 'loaded') {
+      expect(loaded.state.day).toBe(8);
+      expect(loaded.state.timeOfDay).toBe(105);
+      expect(loaded.state.inventory.wood).toBe(3);
+      expect(loaded.state.structures).toEqual({ shelter: true, bed: false, crate: false, hearth: false });
+      expect(loaded.state.progress).toEqual({ nextStormDay: 10, hearthUnlocked: false });
+    }
+    expect(storage.getItem(SAVE_KEY)).toBe(raw);
+  });
+
+  it('rejects malformed version one data without rewriting it', () => {
+    const storage = new MemoryStorage();
+    const legacy = JSON.parse(JSON.stringify(createGame()));
+    delete legacy.progress;
+    delete legacy.structures.hearth;
+    legacy.inventory.wood = -1;
+    const raw = JSON.stringify({ version: 1, state: legacy });
+    storage.setItem(SAVE_KEY, raw);
+    expect(loadGame(storage).kind).toBe('invalid');
+    expect(storage.getItem(SAVE_KEY)).toBe(raw);
+  });
+
+  it('rejects impossible version two progression', () => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    state.day = 4;
+    state.progress.nextStormDay = 3;
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 2, state }));
+    expect(loadGame(storage).kind).toBe('invalid');
   });
 
   it('rejects an unsupported schema version without overwriting it', () => {

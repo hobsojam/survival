@@ -22,6 +22,10 @@ export function isAtCamp(state: GameState): boolean {
   return Math.hypot(state.player.x - BALANCE.campX, state.player.y - BALANCE.campY) <= BALANCE.campRadius;
 }
 
+export function isColdNight(state: GameState): boolean {
+  return state.progress.nextStormDay === state.day && state.timeOfDay >= BALANCE.nightStart;
+}
+
 export function movementFactor(state: GameState): number {
   return state.player.energy <= 20 || state.player.hunger <= 20 || state.player.warmth <= 20 ? 0.65 : 1;
 }
@@ -39,6 +43,7 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
   let next: GameState = {
     ...state,
     player: { ...state.player },
+    progress: { ...state.progress },
     nodes: state.nodes.map(node => ({ ...node }))
   };
   let remaining = seconds;
@@ -47,19 +52,35 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
     const night = next.timeOfDay >= BALANCE.nightStart;
     const camp = isAtCamp(next);
     const lit = next.fireFuel > 0;
+    const coldNight = isColdNight(next);
     next.player.hunger = Math.max(0, next.player.hunger - step / 8);
     if (activity === 'awake') next.player.energy = Math.max(0, next.player.energy - step * BALANCE.energyDrainPerSecond);
     const warmthChange = night
-      ? camp && lit ? step / 2 : camp && next.structures.shelter ? -step / 4 : -step / 2
+      ? camp && lit ? step / 2
+        : coldNight ? -step * (camp && next.structures.shelter
+          ? BALANCE.coldNightShelteredWarmthLossPerSecond
+          : BALANCE.coldNightOutdoorWarmthLossPerSecond)
+          : camp && next.structures.shelter ? -step / 4 : -step / 2
       : step / 10;
     next.player.warmth = Math.max(0, Math.min(100, next.player.warmth + warmthChange));
-    next.fireFuel = Math.max(0, next.fireFuel - step);
+    next.fireFuel = Math.max(0, next.fireFuel - step * (coldNight ? BALANCE.coldNightFireBurn : 1));
     next.timeOfDay += step;
     remaining -= step;
     if (next.timeOfDay >= BALANCE.daySeconds - 0.000001) {
+      const stormEnded = next.progress.nextStormDay === next.day;
+      const weathered = stormEnded && camp && next.structures.shelter && next.fireFuel > 0 && next.player.warmth > 20;
       next.day += 1;
       next.timeOfDay = 0;
       next.nodes = next.nodes.map(node => node.readyDay <= next.day ? { ...node, amount: 1 } : node);
+      if (stormEnded) {
+        next.progress = weathered
+          ? { nextStormDay: null, hearthUnlocked: true }
+          : { nextStormDay: next.day + BALANCE.coldNightRetryDays - 1, hearthUnlocked: false };
+        if (!weathered) {
+          next.player.energy = Math.min(next.player.energy, BALANCE.coldNightFailureEnergy);
+          next.timeOfDay = BALANCE.coldNightFailureMorningLoss;
+        }
+      }
     }
   }
   return next;
@@ -133,14 +154,15 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
   if (action.type === 'stargaze') {
     if (state.timeOfDay < BALANCE.nightStart) return { state, message: 'Wait until nightfall to watch the stars.' };
     if (!isAtCamp(state)) return { state, message: 'Return to camp to watch the stars.' };
-    const watched = advanceTime(state, BALANCE.stargazeSeconds, 'resting');
+    const restored = { ...state, player: { ...state.player, energy: Math.min(100, state.player.energy + BALANCE.stargazeEnergyGain) } };
+    const watched = advanceTime(restored, BALANCE.stargazeSeconds, 'resting');
     const thoughts = [
       'The stars shine between the trees.',
       'A quiet patch of sky opens above camp.',
       'The moon makes the clearing look silver.'
     ];
     return {
-      state: { ...watched, player: { ...watched.player, energy: Math.min(100, watched.player.energy + BALANCE.stargazeEnergyGain) } },
+      state: watched,
       message: `${thoughts[(state.day - 1) % thoughts.length]} You feel a little rested.`
     };
   }
@@ -148,12 +170,13 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     if (!isAtCamp(state)) return { state, message: 'Return to the marked camp area to tend the fire.' };
     if (state.inventory.wood < 1) return { state, message: 'You need wood for the fire.' };
     return {
-      state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood - 1 }, fireFuel: state.fireFuel + BALANCE.fireSecondsPerWood },
+      state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood - 1 }, fireFuel: state.fireFuel + (state.structures.hearth ? BALANCE.hearthFireSecondsPerWood : BALANCE.fireSecondsPerWood) },
       message: 'The fire burns brighter.'
     };
   }
   if (action.type === 'build') {
     if (!isAtCamp(state)) return { state, message: 'Return to the marked camp area to build.' };
+    if (action.structureId === 'hearth' && !state.progress.hearthUnlocked) return { state, message: 'Weather the cold night to unlock the hearth.' };
     if (state.structures[action.structureId]) return { state, message: 'Already built.' };
     if (action.structureId === 'bed' && !state.structures.shelter) return { state, message: 'Build a shelter first.' };
     const cost = BALANCE.buildCosts[action.structureId];
@@ -179,11 +202,11 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
   if (action.type === 'sleep') {
     const blocked = sleepBlocker(state);
     if (blocked) return { state, message: blocked };
-    const slept = advanceTime(state, BALANCE.daySeconds - state.timeOfDay, 'resting');
-    const energy = state.structures.bed ? 100 : Math.min(100, slept.player.energy + BALANCE.sleepEnergyGain);
+    const energy = state.structures.bed ? 100 : Math.min(100, state.player.energy + BALANCE.sleepEnergyGain);
+    const slept = advanceTime({ ...state, player: { ...state.player, energy } }, BALANCE.daySeconds - state.timeOfDay, 'resting');
     const fireDied = state.fireFuel > 0 && slept.fireFuel <= 0;
     return {
-      state: { ...slept, player: { ...slept.player, energy } },
+      state: slept,
       message: fireDied ? 'You sleep until morning. The fire burned out in the night.' : 'You sleep until morning.'
     };
   }

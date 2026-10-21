@@ -11,7 +11,8 @@ describe('new game', () => {
     expect(game.player.y).toBeGreaterThanOrEqual(0);
     expect(game.player.y).toBeLessThan(30);
     expect(game.inventory).toEqual({ wood: 0, food: 0 });
-    expect(game.structures).toEqual({ shelter: false, bed: false, crate: false });
+    expect(game.structures).toEqual({ shelter: false, bed: false, crate: false, hearth: false });
+    expect(game.progress).toEqual({ nextStormDay: 3, hearthUnlocked: false });
     expect(game.nodes.filter(node => node.kind === 'branch')).toHaveLength(12);
     expect(game.nodes.filter(node => node.kind === 'berry')).toHaveLength(8);
     expect(new Set(game.nodes.map(node => node.id)).size).toBe(20);
