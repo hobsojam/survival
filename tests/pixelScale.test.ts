@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { displayScale } from '../src/scene/pixelScale';
+import { displayScale, viewportSize, canvasOffset } from '../src/scene/pixelScale';
 
 describe('pixel canvas scale', () => {
   it('uses whole-number desktop magnification and centers spare space', () => {
@@ -7,9 +7,15 @@ describe('pixel canvas scale', () => {
     expect(displayScale(1440, 900)).toBe(3);
   });
 
-  it('fits small frames without cropping the game', () => {
-    expect(displayScale(390, 244)).toBeCloseTo(0.8125);
+  it('uses one art pixel per screen pixel on compact frames', () => {
+    expect(displayScale(390, 244)).toBe(1);
     expect(displayScale(480, 300)).toBe(1);
-    expect(displayScale(800, 500)).toBeCloseTo(5 / 3);
+    expect(displayScale(800, 500)).toBe(1);
+    expect(viewportSize(350, 219)).toEqual({ width: 350, height: 219 });
+    expect(viewportSize(800, 500)).toEqual({ width: 480, height: 300 });
+  });
+
+  it('places the canvas on whole CSS pixels', () => {
+    expect(canvasOffset(1001, 641, 480, 300, 2)).toEqual({ x: 20, y: 20 });
   });
 });

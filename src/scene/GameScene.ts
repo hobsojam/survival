@@ -38,6 +38,7 @@ export class GameScene extends Phaser.Scene {
     this.playerSprite = survivor.root;
     this.playerFigure = survivor.figure;
     this.playerSprite.setPosition(Math.round(worldX(this.state.player.x)), Math.round(worldY(this.state.player.y)));
+    this.playerSprite.setDepth(this.playerSprite.y);
     this.playerSprite.setScale(0.6);
     this.cameras.main.setBounds(0, 0, BALANCE.mapWidth * TILE, BALANCE.mapHeight * TILE);
     this.cameras.main.startFollow(this.playerSprite, true, 0.09, 0.09);
@@ -74,6 +75,7 @@ export class GameScene extends Phaser.Scene {
     this.state = advanceTime(this.state, dt);
     this.reportWeather(beforeTick, this.state);
     this.playerSprite.setPosition(Math.round(worldX(this.state.player.x)), Math.round(worldY(this.state.player.y)));
+    this.playerSprite.setDepth(this.playerSprite.y);
     if (horizontal || vertical) {
       if (horizontal) this.playerSprite.setScale(horizontal < 0 ? -0.6 : 0.6, 0.6);
       this.playerFigure.y = Math.sin(this.time.now / 105) * 1.7;
@@ -119,6 +121,10 @@ export class GameScene extends Phaser.Scene {
 
   getState(): GameState { return this.state; }
 
+  resizeViewport(width: number, height: number): void {
+    if (this.night) this.night.setSize(width, height);
+  }
+
   private closestNode(): ResourceNode | undefined {
     return this.state.nodes
       .filter(node => node.amount > 0 && Math.hypot(node.x - this.state.player.x, node.y - this.state.player.y) <= BALANCE.interactionRadius)
@@ -152,8 +158,8 @@ export class GameScene extends Phaser.Scene {
     if (!isColdNight(this.state)) return;
     this.wind.lineStyle(2, 0xe0f2f2, 0.24);
     for (let i = 0; i < 13; i++) {
-      const x = (i * 86 + this.time.now * 0.0225) % 540 - 40;
-      const y = (i * 68) % 295;
+      const x = (i * 86 + this.time.now * 0.0225) % (this.scale.width + 60) - 40;
+      const y = (i * 68) % this.scale.height;
       this.wind.lineBetween(x, y, x + 14, y - 4);
     }
   }

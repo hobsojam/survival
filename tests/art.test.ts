@@ -9,7 +9,14 @@ function clone(def: SpriteDef): SpriteDef {
 
 describe('sprite pipeline', () => {
   it('validates every registered frame, palette symbol, and anchor', () => {
-    expect(Object.keys(sprites)).toEqual(expect.arrayContaining(['grassPlain', 'branchPile']));
+    expect(Object.keys(sprites)).toEqual(expect.arrayContaining([
+      'branchPile', ...Array.from({ length: 4 }, (_, i) => `grass${i}`),
+      ...Array.from({ length: 3 }, (_, i) => `earth${i}`),
+      ...Array.from({ length: 16 }, (_, i) => `transition${i}`),
+      'tuft0', 'tuft1', 'flower0', 'flower1', 'flower2', 'pebbles0', 'pebbles1',
+      'stump', 'mushrooms', 'fallenLeaf', 'rimStone0', 'rimStone1',
+      'treeBroadleaf', 'treePine', 'treeYoung', 'rock0', 'rock1'
+    ]));
     for (const [name, def] of Object.entries(sprites)) {
       expect(() => validateSprite(def), name).not.toThrow();
       expect(Object.keys(def.frames).length).toBeGreaterThan(0);
@@ -30,6 +37,17 @@ describe('sprite pipeline', () => {
     expect(rustle).toMatchObject({ frameRate: 6, repeat: 0, frames: [
       { key: 'branchPile:ready' }, { key: 'branchPile:readyB' }
     ] });
+  });
+
+  it('keeps corner transition edges seamless for adjacent tiles', () => {
+    for (let left = 0; left < 16; left++) for (let right = 0; right < 16; right++) {
+      const leftEdge = [Boolean(left & 2), Boolean(left & 4)];
+      const rightEdge = [Boolean(right & 1), Boolean(right & 8)];
+      if (leftEdge[0] !== rightEdge[0] || leftEdge[1] !== rightEdge[1]) continue;
+      const a = sprites[`transition${left}`].frames.still;
+      const b = sprites[`transition${right}`].frames.still;
+      for (let y = 0; y < 16; y++) expect(a[y][15]).toBe(b[y][0]);
+    }
   });
 
   it('rejects animations that refer to missing frames', () => {

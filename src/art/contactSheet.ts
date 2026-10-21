@@ -31,9 +31,25 @@ for (const [name, def] of Object.entries(sprites)) for (const frame of Object.ke
     canvas.style.backgroundColor = color;
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Canvas 2D is unavailable.');
-    const image = context.createImageData(...def.size);
+    const ground = label === 'Camp earth' ? sprites.earth0 : sprites.grass0;
+    const groundImage = context.createImageData(...ground.size);
+    groundImage.data.set(rasterizeFrame(ground, 'still'));
+    for (let y = 0; y < canvas.height; y += 16) for (let x = 0; x < canvas.width; x += 16) context.putImageData(groundImage, x, y);
+    const layer = document.createElement('canvas');
+    layer.width = def.size[0]; layer.height = def.size[1];
+    const layerContext = layer.getContext('2d');
+    if (!layerContext) throw new Error('Canvas 2D is unavailable.');
+    const image = layerContext.createImageData(...def.size);
     image.data.set(rasterizeFrame(def, frame));
-    context.putImageData(image, 0, 0);
+    layerContext.putImageData(image, 0, 0);
+    context.drawImage(layer, 0, 0);
+    if (label === 'Night') {
+      // Show how opaque sprites read on grass under the game's full night tint.
+      context.globalAlpha = 0.55;
+      context.fillStyle = palette.night;
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.globalAlpha = 1;
+    }
     const caption = document.createElement('figcaption');
     caption.textContent = label;
     figure.append(canvas, caption);

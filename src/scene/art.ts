@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { BALANCE, type GameState, type ResourceNode } from '../game/state';
+import { buildMap, type MapItem } from './map';
+import { sprites } from '../art/sprites';
 
 export const TILE = 16;
 export const worldX = (x: number) => (x + 0.5) * TILE;
@@ -10,92 +12,34 @@ const LEGACY_TILE = 32;
 export const legacyWorldX = (x: number) => (x + 0.5) * LEGACY_TILE;
 export const legacyWorldY = (y: number) => (y + 0.5) * LEGACY_TILE;
 
-const forest = [0x416b52, 0x4b7458, 0x527a5e, 0x3d644d];
-const seed = (a: number, b: number) => {
-  const value = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
-  return value - Math.floor(value);
-};
-
-function tree(g: Phaser.GameObjects.Graphics, x: number, y: number, size: number): void {
-  g.fillStyle(0x173e35, 0.3);
-  g.fillEllipse(x + 9, y + 12, size * 2.1, size * 0.8);
-  g.fillStyle(0x725b42);
-  g.fillRoundedRect(x - 4, y - 2, 9, size + 12, 3);
-  g.fillStyle(0x294f3e);
-  g.fillCircle(x + 7, y + 2, size * 0.83);
-  g.fillStyle(0x376b4d);
-  g.fillCircle(x - size * 0.44, y - size * 0.25, size * 0.78);
-  g.fillStyle(0x43805a);
-  g.fillCircle(x + size * 0.3, y - size * 0.42, size * 0.77);
-  g.fillStyle(0x69a06a, 0.6);
-  g.fillEllipse(x - size * 0.56, y - size * 0.69, size * 0.75, size * 0.3);
-  g.fillEllipse(x + size * 0.17, y - size * 0.82, size * 0.65, size * 0.27);
-}
-
 export function drawTerrain(scene: Phaser.Scene, nodes: ResourceNode[]): void {
-  const g = scene.add.graphics().setDepth(0).setScale(0.5);
-  const width = BALANCE.mapWidth * LEGACY_TILE;
-  const height = BALANCE.mapHeight * LEGACY_TILE;
-  const cx = legacyWorldX(BALANCE.campX);
-  const cy = legacyWorldY(BALANCE.campY);
-  g.fillStyle(0x426b52);
-  g.fillRect(0, 0, width, height);
-
-  for (let i = 0; i < 440; i++) {
-    const x = seed(i, 3) * width;
-    const y = seed(i, 7) * height;
-    const radius = 12 + seed(i, 11) * 31;
-    g.fillStyle(forest[Math.floor(seed(i, 13) * forest.length)], 0.34);
-    g.fillEllipse(x, y, radius * 2, radius * (0.7 + seed(i, 17)));
+  const map = buildMap(nodes);
+  const canvas = document.createElement('canvas');
+  canvas.width = BALANCE.mapWidth * TILE;
+  canvas.height = BALANCE.mapHeight * TILE;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Terrain canvas is unavailable.');
+  context.imageSmoothingEnabled = false;
+  const stamp = (name: string, x: number, y: number) => {
+    const source = scene.textures.get(`${name}:still`).getSourceImage() as CanvasImageSource;
+    context.drawImage(source, x, y);
+  };
+  for (let y = 0; y < map.ground.length; y++) for (let x = 0; x < map.ground[y].length; x++)
+    stamp(map.ground[y][x], x * TILE, y * TILE);
+  for (const item of [...map.decorations, ...map.rimStones]) {
+    const def = sprites[item.sprite];
+    stamp(item.sprite, Math.round(item.x * TILE - def.anchor[0]), Math.round(item.y * TILE - def.anchor[1]));
   }
-
-  // Worn grass and packed earth make the camp the visual anchor.
-  g.fillStyle(0xa18e64, 0.16);
-  g.fillEllipse(cx + 15, cy + 9, 420, 326);
-  g.fillStyle(0x9e916b, 0.53);
-  g.fillEllipse(cx, cy + 4, 325, 260);
-  g.fillStyle(0xb4a275, 0.46);
-  g.fillEllipse(cx - 12, cy - 10, 274, 216);
-  for (let i = 0; i < 46; i++) {
-    const angle = i * Math.PI * 2 / 46;
-    const radius = BALANCE.campRadius * LEGACY_TILE;
-    const x = cx + Math.cos(angle) * radius;
-    const y = cy + Math.sin(angle) * radius;
-    g.fillStyle(i % 4 === 0 ? 0xe3d7ad : 0xd2c399, 0.6);
-    g.fillEllipse(x, y, 5 + i % 3, 3 + i % 2);
-  }
-  g.lineStyle(2, 0xe7d6a5, 0.5);
-  g.strokeCircle(cx, cy, BALANCE.campRadius * LEGACY_TILE);
-
-  for (let i = 0; i < 360; i++) {
-    const x = seed(i, 23) * width;
-    const y = seed(i, 29) * height;
-    if (Math.hypot(x - cx, y - cy) < 105) continue;
-    const flower = seed(i, 31) > 0.87;
-    g.lineStyle(1.5, flower ? 0xb5c891 : 0x93b57a, flower ? 0.8 : 0.45);
-    g.lineBetween(x - 3, y + 3, x, y - 2);
-    g.lineBetween(x + 2, y + 3, x, y - 2);
-    if (flower) {
-      g.fillStyle(i % 3 === 0 ? 0xf0ce84 : 0xd9e1b2, 0.9);
-      g.fillCircle(x, y - 3, 2.5);
-    }
-  }
-
-  for (let i = 0; i < 78; i++) {
-    const x = 30 + seed(i, 43) * (width - 60);
-    const y = 35 + seed(i, 47) * (height - 70);
-    if (Math.hypot(x - cx, y - cy) < 178) continue;
-    if (nodes.some(node => Math.hypot(x - legacyWorldX(node.x), y - legacyWorldY(node.y)) < 35)) continue;
-    if (seed(i, 53) > 0.28) tree(g, x, y, 15 + seed(i, 59) * 10);
-    else {
-      g.fillStyle(0x253f37, 0.22);
-      g.fillEllipse(x + 5, y + 6, 28, 11);
-      g.fillStyle(0x9aa69a);
-      g.fillEllipse(x, y, 22, 14);
-      g.fillStyle(0xc4cabc, 0.55);
-      g.fillEllipse(x - 5, y - 3, 10, 4);
-    }
-  }
+  scene.textures.addCanvas('terrainMap', canvas);
+  scene.add.image(0, 0, 'terrainMap').setOrigin(0).setDepth(-100);
+  const standing = (item: MapItem) => {
+    const def = sprites[item.sprite];
+    scene.add.image(Math.round(worldX(item.x)), Math.round(worldY(item.y)), `${item.sprite}:still`)
+      .setOrigin(def.anchor[0] / def.size[0], def.anchor[1] / def.size[1])
+      .setDepth(Math.round(worldY(item.y)));
+  };
+  map.trees.forEach(standing);
+  map.rocks.forEach(standing);
 }
 
 function drawBranch(g: Phaser.GameObjects.Graphics, node: ResourceNode, time: number): void {

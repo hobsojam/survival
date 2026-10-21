@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from '../game/state';
 import { GameScene } from '../scene/GameScene';
-import { displayScale, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
+import { displayScale, viewportSize, canvasOffset, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { loadGame, saveGame, type LoadResult } from '../game/save';
 import { isAtCamp, isColdNight, sleepBlocker } from '../game/rules';
 import { dayPhase, formatClock, nextChange } from '../game/clock';
@@ -107,8 +107,16 @@ export class App {
     const fitCanvas = () => {
       if (!this.game?.canvas) return;
       const scale = displayScale(frame.clientWidth, frame.clientHeight);
+      const viewport = scale === 1 ? viewportSize(frame.clientWidth, frame.clientHeight) : { width: LOGICAL_WIDTH, height: LOGICAL_HEIGHT };
+      if (this.game.scale.gameSize.width !== viewport.width || this.game.scale.gameSize.height !== viewport.height) {
+        this.game.scale.setGameSize(viewport.width, viewport.height);
+        this.scene?.resizeViewport(viewport.width, viewport.height);
+      }
       if (this.game.scale.zoom !== scale) this.game.scale.setZoom(scale);
       else this.game.scale.refresh();
+      const offset = canvasOffset(frame.clientWidth, frame.clientHeight, viewport.width, viewport.height, scale);
+      this.game.canvas.style.marginLeft = `${offset.x}px`;
+      this.game.canvas.style.marginTop = `${offset.y}px`;
     };
     this.gameResize = new ResizeObserver(fitCanvas);
     this.gameResize.observe(frame);
