@@ -1,0 +1,75 @@
+import { describe, expect, it } from 'vitest';
+import { BALANCE, createGame } from '../src/game/state';
+import { sceneVisuals, playerVisualDepth, NIGHT_DEPTH, LIGHT_DEPTH, WEATHER_DEPTH } from '../src/scene/visuals';
+import { sprites } from '../src/art/sprites';
+import { validateSprite } from '../src/art/textures';
+
+describe('native-size scene art', () => {
+  it('selects pixel textures for every resource and camp site', () => {
+    const visuals = sceneVisuals(createGame(), 0);
+    const keys = visuals.map(item => item.texture);
+    expect(keys).toContain('branchPile:ready');
+    expect(keys).toContain('berryBush:ready');
+    expect(keys).toContain('fiberReeds:ready');
+    expect(keys).toContain('shelter:site');
+    expect(keys).toContain('crate:site');
+    expect(keys).toContain('dryingRack:site');
+    expect(keys).toContain('windbreak:site');
+    expect(keys).toContain('firePit:unlit');
+    expect(keys).toContain('flame:out');
+    for (const item of visuals) {
+      const [name, frame] = item.texture.split(':');
+      expect(sprites[name]?.frames[frame], item.texture).toBeDefined();
+      expect(Number.isInteger(item.x) && Number.isInteger(item.y)).toBe(true);
+      expect(item.depth).toBe(item.id === 'flame' ? LIGHT_DEPTH : item.y);
+    }
+  });
+
+  it('changes sprite frames when nodes, structures, and the fire change', () => {
+    const state = createGame();
+    state.nodes[0].amount = 0;
+    state.nodes.find(node => node.kind === 'berry')!.amount = 0;
+    state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
+    state.structures.shelter = true;
+    state.structures.bed = true;
+    state.structures.crate = true;
+    state.structures.hearth = true;
+    state.structures.dryingRack = true;
+    state.structures.windbreak = true;
+    state.fireFuel = 30;
+    const keys = sceneVisuals(state, 0).map(item => item.texture);
+    expect(keys).toEqual(expect.arrayContaining([
+      'branchPile:depleted', 'berryBush:depleted', 'fiberReeds:depleted',
+      'shelter:builtBed', 'crate:built', 'dryingRack:built', 'windbreak:built', 'hearth:burning', 'flame:burning'
+    ]));
+    expect(keys).not.toContain('firePit:unlit');
+  });
+
+  it('keeps every new scene sprite on an integer pixel grid', () => {
+    for (const name of ['berryBush', 'fiberReeds', 'shelter', 'crate', 'dryingRack', 'windbreak', 'firePit', 'hearth', 'flame', 'survivor', 'bird', 'fox', 'firefly']) {
+      const def = sprites[name];
+      expect(def, name).toBeDefined();
+      expect(() => validateSprite(def), name).not.toThrow();
+    }
+    expect(sceneVisuals(createGame(), 0).find(item => item.id === 'fire')?.x).toBe((BALANCE.campX + 0.5) * 16);
+  });
+
+  it('layers night over the entire world and lights and weather over night', () => {
+    const bottomEdge = BALANCE.mapHeight * 16;
+    expect(NIGHT_DEPTH).toBeGreaterThan(bottomEdge);
+    expect(LIGHT_DEPTH).toBeGreaterThan(NIGHT_DEPTH);
+    expect(WEATHER_DEPTH).toBeGreaterThan(LIGHT_DEPTH);
+  });
+
+  it('keeps the survivor visible when standing at the lit fire', () => {
+    const state = createGame();
+    state.fireFuel = 20;
+    expect(playerVisualDepth(state)).toBeGreaterThan(LIGHT_DEPTH);
+    expect(playerVisualDepth(state)).toBeLessThan(WEATHER_DEPTH);
+    state.player.x += 2;
+    expect(playerVisualDepth(state)).toBe((state.player.y + 0.5) * 16);
+    state.player.x = BALANCE.campX;
+    state.fireFuel = 0;
+    expect(playerVisualDepth(state)).toBe((state.player.y + 0.5) * 16);
+  });
+});

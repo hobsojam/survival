@@ -1,5 +1,6 @@
 import type { PaletteKey } from './palette';
 import { terrainSprites } from './terrain';
+import { sceneSprites } from './sceneSprites';
 
 export interface SpriteDef {
   size: [number, number];
@@ -77,4 +78,4 @@ const branchPile: SpriteDef = {
 };
 
 /** Phase 1 prototypes; later phases add the production terrain, nodes, and actors. */
-export const sprites: Record<string, SpriteDef> = { grassPlain, branchPile, ...terrainSprites };
+export const sprites: Record<string, SpriteDef> = { grassPlain, branchPile, ...terrainSprites, ...sceneSprites };
