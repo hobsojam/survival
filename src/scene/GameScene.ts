@@ -4,6 +4,8 @@ import { advanceTime, applyAction, isAtCamp, isColdNight, sleepBlocker, type Gam
 import { TILE, worldX, worldY, drawTerrain, drawObjects, makeSurvivor } from './art';
 import { darkness } from './ambient';
 import { AmbientLife } from './ambientLife';
+import { registerSpriteTextures } from '../art/textures';
+import { LOGICAL_WIDTH, LOGICAL_HEIGHT } from './pixelScale';
 
 export class GameScene extends Phaser.Scene {
   private state: GameState;
@@ -27,19 +29,21 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
+    registerSpriteTextures(this);
     drawTerrain(this, this.state.nodes);
-    this.objects = this.add.graphics().setDepth(5);
+    this.objects = this.add.graphics().setDepth(5).setScale(0.5);
     this.glow = this.add.graphics().setDepth(101).setBlendMode(Phaser.BlendModes.ADD);
     this.ambient = new AmbientLife(this);
     const survivor = makeSurvivor(this);
     this.playerSprite = survivor.root;
     this.playerFigure = survivor.figure;
-    this.playerSprite.setPosition(worldX(this.state.player.x), worldY(this.state.player.y));
-    this.playerSprite.setScale(1.2);
+    this.playerSprite.setPosition(Math.round(worldX(this.state.player.x)), Math.round(worldY(this.state.player.y)));
+    this.playerSprite.setScale(0.6);
     this.cameras.main.setBounds(0, 0, BALANCE.mapWidth * TILE, BALANCE.mapHeight * TILE);
     this.cameras.main.startFollow(this.playerSprite, true, 0.09, 0.09);
     this.cameras.main.setZoom(1);
-    this.night = this.add.rectangle(0, 0, 960, 600, 0x101d36, 1)
+    this.cameras.main.roundPixels = true;
+    this.night = this.add.rectangle(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT, 0x101d36, 1)
       .setOrigin(0).setScrollFactor(0).setDepth(100).setAlpha(0);
     this.wind = this.add.graphics().setScrollFactor(0).setDepth(102);
     this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,C,G,Z') as Record<string, Phaser.Input.Keyboard.Key>;
@@ -69,9 +73,9 @@ export class GameScene extends Phaser.Scene {
     const beforeTick = this.state;
     this.state = advanceTime(this.state, dt);
     this.reportWeather(beforeTick, this.state);
-    this.playerSprite.setPosition(worldX(this.state.player.x), worldY(this.state.player.y));
+    this.playerSprite.setPosition(Math.round(worldX(this.state.player.x)), Math.round(worldY(this.state.player.y)));
     if (horizontal || vertical) {
-      if (horizontal) this.playerSprite.setScale(horizontal < 0 ? -1.2 : 1.2, 1.2);
+      if (horizontal) this.playerSprite.setScale(horizontal < 0 ? -0.6 : 0.6, 0.6);
       this.playerFigure.y = Math.sin(this.time.now / 105) * 1.7;
     } else this.playerFigure.y = 0;
     this.paintObjects();
@@ -129,11 +133,11 @@ export class GameScene extends Phaser.Scene {
       const y = worldY(BALANCE.campY);
       const pulse = Math.sin(this.time.now / 300) * 5;
       this.glow.fillStyle(0xffb464, 0.055);
-      this.glow.fillCircle(x, y, 118 + pulse);
+      this.glow.fillCircle(x, y, 59 + pulse / 2);
       this.glow.fillStyle(0xffc874, 0.095);
-      this.glow.fillCircle(x, y, 75 + pulse / 2);
+      this.glow.fillCircle(x, y, 37.5 + pulse / 4);
       this.glow.fillStyle(0xffe6af, 0.15);
-      this.glow.fillCircle(x, y, 28);
+      this.glow.fillCircle(x, y, 14);
     }
   }
 
@@ -148,9 +152,9 @@ export class GameScene extends Phaser.Scene {
     if (!isColdNight(this.state)) return;
     this.wind.lineStyle(2, 0xe0f2f2, 0.24);
     for (let i = 0; i < 13; i++) {
-      const x = (i * 173 + this.time.now * 0.045) % 1080 - 80;
-      const y = (i * 137) % 590;
-      this.wind.lineBetween(x, y, x + 28, y - 7);
+      const x = (i * 86 + this.time.now * 0.0225) % 540 - 40;
+      const y = (i * 68) % 295;
+      this.wind.lineBetween(x, y, x + 14, y - 4);
     }
   }
 

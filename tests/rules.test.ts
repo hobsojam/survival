@@ -369,6 +369,72 @@ describe('optional night activities', () => {
   });
 });
 
+describe('more camp structures', () => {
+  it('builds a drying rack for four wood without a prerequisite', () => {
+    const state = createGame();
+    state.inventory.wood = 4;
+    const built = applyAction(state, { type: 'build', structureId: 'dryingRack' }).state;
+    expect(built.structures.dryingRack).toBe(true);
+    expect(built.inventory.wood).toBe(0);
+    expect(built.player.energy).toBe(94);
+    expect(built.timeOfDay).toBe(12);
+    expect(applyAction(built, { type: 'build', structureId: 'dryingRack' }).state).toBe(built);
+  });
+
+  it('builds a windbreak for five wood and rejects an underfunded attempt', () => {
+    const state = createGame();
+    state.inventory.wood = 4;
+    expect(applyAction(state, { type: 'build', structureId: 'windbreak' }).state).toBe(state);
+    state.inventory.wood = 5;
+    const built = applyAction(state, { type: 'build', structureId: 'windbreak' }).state;
+    expect(built.structures.windbreak).toBe(true);
+    expect(built.inventory.wood).toBe(0);
+  });
+
+  it('makes cooked berries more filling without changing supplies or cooking time', () => {
+    const state = createGame();
+    state.timeOfDay = 170;
+    state.inventory.food = 1;
+    state.fireFuel = 30;
+    state.player.hunger = 20;
+    const plain = applyAction(state, { type: 'cook' }).state;
+    state.structures.dryingRack = true;
+    const improved = applyAction(state, { type: 'cook' }).state;
+    expect(plain.player.hunger).toBeCloseTo(54);
+    expect(improved.player.hunger).toBeCloseTo(69);
+    expect(improved.inventory.food).toBe(0);
+    expect(improved.timeOfDay).toBe(178);
+    expect(improved.fireFuel).toBe(22);
+  });
+
+  it('halves unlit night warmth loss at camp but not fire gain or outdoor loss', () => {
+    const state = createGame();
+    state.timeOfDay = 170;
+    state.player.warmth = 80;
+    state.structures.shelter = true;
+    const ordinary = advanceTime(state, 4).player.warmth;
+    state.structures.windbreak = true;
+    expect(ordinary).toBe(79);
+    expect(advanceTime(state, 4).player.warmth).toBe(79.5);
+    state.fireFuel = 10;
+    expect(advanceTime(state, 4).player.warmth).toBe(82);
+    state.fireFuel = 0;
+    state.player.x = 0;
+    expect(advanceTime(state, 4).player.warmth).toBe(78);
+  });
+
+  it('halves warmth loss during a cold front without changing its retry rule', () => {
+    const state = createGame();
+    state.day = 3;
+    state.timeOfDay = 170;
+    state.player.warmth = 80;
+    state.structures.shelter = true;
+    state.structures.windbreak = true;
+    expect(advanceTime(state, 4).player.warmth).toBe(78.5);
+    expect(advanceTime(state, 70).progress.nextStormDay).toBe(6);
+  });
+});
+
 describe('forecast cold night', () => {
   it('forecasts day three and starts the front only at nightfall', () => {
     const state = createGame();

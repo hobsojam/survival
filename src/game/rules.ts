@@ -1,4 +1,4 @@
-import { BALANCE, type GameState, type StructureId } from './state';
+import { BALANCE, BUILDINGS, type GameState, type StructureId } from './state';
 
 export type GameAction =
   | { type: 'gather'; nodeId: string }
@@ -68,6 +68,7 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
     } else if (night) {
       warmthChange = -step / 2;
     }
+    if (night && camp && !lit && next.structures.windbreak && warmthChange < 0) warmthChange *= 0.5;
     next.player.warmth = Math.max(0, Math.min(100, next.player.warmth + warmthChange));
     next.fireFuel = Math.max(0, next.fireFuel - step * (coldNight ? BALANCE.coldNightFireBurn : 1));
     next.timeOfDay += step;
@@ -151,7 +152,7 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     const cooked = advanceTime({ ...state, inventory: { ...state.inventory, food: state.inventory.food - 1 } }, BALANCE.cookSeconds, 'resting');
     return {
       state: { ...cooked, player: { ...cooked.player,
-        hunger: Math.min(100, cooked.player.hunger + BALANCE.cookHungerGain),
+        hunger: Math.min(100, cooked.player.hunger + (state.structures.dryingRack ? BALANCE.rackCookHungerGain : BALANCE.cookHungerGain)),
         warmth: Math.min(100, cooked.player.warmth + BALANCE.cookWarmthGain)
       } },
       message: 'You toast a berry by the fire. A warm little meal.'
@@ -182,10 +183,12 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
   }
   if (action.type === 'build') {
     if (!isAtCamp(state)) return { state, message: 'Return to the marked camp area to build.' };
-    if (action.structureId === 'hearth' && !state.progress.hearthUnlocked) return { state, message: 'Weather the cold night to unlock the hearth.' };
+    const definition = BUILDINGS[action.structureId];
+    if (!definition) return { state, message: 'That structure is unavailable.' };
+    if (definition.prerequisite === 'coldNight' && !state.progress.hearthUnlocked) return { state, message: 'Weather the cold night to unlock the hearth.' };
     if (state.structures[action.structureId]) return { state, message: 'Already built.' };
-    if (action.structureId === 'bed' && !state.structures.shelter) return { state, message: 'Build a shelter first.' };
-    const cost = BALANCE.buildCosts[action.structureId];
+    if (definition.prerequisite === 'shelter' && !state.structures.shelter) return { state, message: 'Build a shelter first.' };
+    const cost = definition.cost;
     if (state.inventory.wood < cost.wood || state.inventory.fiber < cost.fiber) {
       const needed = [state.inventory.wood < cost.wood ? `${cost.wood} wood` : null, state.inventory.fiber < cost.fiber ? `${cost.fiber} fiber` : null].filter(Boolean).join(' and ');
       return { state, message: `Need ${needed} to build this.` };

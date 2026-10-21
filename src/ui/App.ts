@@ -1,21 +1,18 @@
 import Phaser from 'phaser';
-import { BALANCE, createGame, type GameState, type StructureId } from '../game/state';
+import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from '../game/state';
 import { GameScene } from '../scene/GameScene';
+import { displayScale, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { loadGame, saveGame, type LoadResult } from '../game/save';
 import { isAtCamp, isColdNight, sleepBlocker } from '../game/rules';
 import { dayPhase, formatClock, nextChange } from '../game/clock';
 
-const buildOptions: { id: StructureId; name: string; description: string }[] = [
-  { id: 'shelter', name: 'Shelter', description: 'A roof against the night cold' },
-  { id: 'bed', name: 'Bed', description: 'Rest more deeply at camp' },
-  { id: 'crate', name: 'Storage crate', description: 'Carry up to 16 supplies' },
-  { id: 'hearth', name: 'Stone hearth', description: 'Each log keeps the fire longer' }
-];
+const buildOptions = Object.keys(BUILDINGS) as StructureId[];
 
 export class App {
   private state: GameState;
   private scene?: GameScene;
   private game?: Phaser.Game;
+  private gameResize?: ResizeObserver;
   private readonly root: HTMLElement;
   private storage?: Storage;
   private previousSave: LoadResult = { kind: 'empty' };
@@ -30,9 +27,10 @@ export class App {
     } catch (error) {
       this.previousSave = { kind: 'invalid', reason: `Browser storage is unavailable: ${String(error)}` };
     }
-    const buildMarkup = buildOptions.map(({ id, name, description }) =>
-      `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${id === 'shelter' ? '⌂' : id === 'bed' ? '▣' : id === 'crate' ? '▤' : '♨'}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>`
-    ).join('');
+    const buildMarkup = buildOptions.map(id => {
+      const { name, description, symbol } = BUILDINGS[id];
+      return `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>`;
+    }).join('');
     this.root.innerHTML = `
       <div class="shell">
         <header class="topbar">
@@ -80,6 +78,7 @@ export class App {
   }
 
   startGame(state: GameState): void {
+    this.gameResize?.disconnect();
     this.game?.destroy(true);
     this.root.querySelector('#start-screen')?.classList.add('hidden');
     const restart = this.root.querySelector<HTMLButtonElement>('#restart-game');
@@ -95,12 +94,25 @@ export class App {
     this.game = new Phaser.Game({
       type: Phaser.AUTO,
       parent: 'game-canvas',
-      width: 960,
-      height: 600,
+      width: LOGICAL_WIDTH,
+      height: LOGICAL_HEIGHT,
+      pixelArt: true,
+      roundPixels: true,
+      antialias: false,
       backgroundColor: '#456a59',
       scene: [this.scene],
-      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: 960, height: 600 }
+      scale: { mode: Phaser.Scale.NONE, width: LOGICAL_WIDTH, height: LOGICAL_HEIGHT }
     });
+    const frame = this.root.querySelector<HTMLElement>('.game-frame')!;
+    const fitCanvas = () => {
+      if (!this.game?.canvas) return;
+      const scale = displayScale(frame.clientWidth, frame.clientHeight);
+      if (this.game.scale.zoom !== scale) this.game.scale.setZoom(scale);
+      else this.game.scale.refresh();
+    };
+    this.gameResize = new ResizeObserver(fitCanvas);
+    this.gameResize.observe(frame);
+    fitCanvas();
     this.render();
   }
 
@@ -202,15 +214,17 @@ export class App {
     }
     this.setText('prompt', this.scene?.getPrompt() ?? 'WASD / arrows  Move');
     this.setText('build-hint', isAtCamp(this.state) ? 'At camp — click an upgrade to build.' : 'Stand inside the marked camp circle to build.');
-    for (const { id } of buildOptions) {
+    for (const id of buildOptions) {
       const built = this.state.structures[id];
-      const locked = id === 'hearth' && !this.state.progress.hearthUnlocked;
-      const cost = BALANCE.buildCosts[id];
+      const definition = BUILDINGS[id];
+      const locked = definition.prerequisite === 'coldNight' && !this.state.progress.hearthUnlocked;
+      const needsShelter = definition.prerequisite === 'shelter' && !structures.shelter;
+      const cost = definition.cost;
       const button = this.root.querySelector<HTMLButtonElement>(`[data-build="${id}"]`)!;
       button.disabled = built || locked;
       button.classList.toggle('built', built);
       button.classList.toggle('locked', locked);
-      button.classList.toggle('ready', !built && !locked && isAtCamp(this.state) && inventory.wood >= cost.wood && inventory.fiber >= cost.fiber && (id !== 'bed' || structures.shelter));
+      button.classList.toggle('ready', !built && !locked && !needsShelter && isAtCamp(this.state) && inventory.wood >= cost.wood && inventory.fiber >= cost.fiber);
       const fiberPrice = cost.fiber ? ` · ${cost.fiber} fiber` : '';
       let verb = 'Build';
       let price = `${cost.wood} wood${fiberPrice}`;

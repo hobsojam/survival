@@ -1,6 +1,6 @@
 # Hearthwild
 
-A small, single-player browser survival game about making a wilderness camp feel like home. You control one survivor, gather branches, berries, and fiber, keep a fire burning, and build a shelter, bed, storage crate, and eventually a stone hearth. Survival is gentle: cold and hunger slow you down, but they never end the game.
+A small, single-player browser survival game about making a wilderness camp feel like home. You control one survivor, gather branches, berries, and fiber, keep a fire burning, and build a shelter, bed, storage crate, drying rack, windbreak, and eventually a stone hearth. Survival is gentle: cold and hunger slow you down, but they never end the game.
 
 **Play it online:** <https://hobsojam.github.io/survival/>. Every merge to `main` redeploys it.
 
@@ -13,7 +13,7 @@ npm ci
 npm run dev
 ```
 
-Open the local address printed by Vite, usually <http://localhost:5173/>. For a production bundle, run `npm run build`; the output is in `dist/` and should be served by a static web server.
+Open the local address printed by Vite, usually <http://localhost:5173/>. For a production bundle, run `npm run build`; the output is in `dist/` and should be served by a static web server. During sprite development, open `/sprites.html` on the same local server to see every registered sprite frame at 4× on grass, camp earth, and night backgrounds. The contact sheet is not included in the production build.
 
 ## How to play
 
@@ -31,13 +31,13 @@ Open the local address printed by Vite, usually <http://localhost:5173/>. For a 
 
 The buttons beside the game also let you eat, rest, feed the fire, and sleep. If the keyboard does not respond, click the game area once to focus it.
 
-At night, the **After dark** panel offers two optional ways to spend a little time. Cook one berry at a lit campfire for a warmer, more filling meal; it takes eight seconds and restores 35 hunger and 10 warmth, in addition to the warmth you gain while near the fire. Or watch the stars at camp for twelve seconds and regain 10 energy. The panel shows when each activity is ready. Neither activity is needed for survival, and you can still rest or sleep as before.
+At night, the **After dark** panel offers two optional ways to spend a little time. Cook one berry at a lit campfire for a warmer, more filling meal; it takes eight seconds and restores 35 hunger and 10 warmth, in addition to the warmth you gain while near the fire. A drying rack raises the meal's hunger recovery to 50. Or watch the stars at camp for twelve seconds and regain 10 energy. The panel shows when each activity is ready. Neither activity is needed for survival, and you can still rest or sleep as before.
 
 A day lasts four minutes: morning and afternoon take two minutes and forty seconds, then night lasts eighty seconds until dawn. The dial in the top bar shows where you are in the day, with night shaded, and counts down to nightfall or dawn. Gathering takes six seconds and building takes twelve seconds, so daylight matters.
 
 You tire slowly while awake, losing about one energy every six seconds you spend walking or idle; gathering and building cost their own energy instead. A rest at camp takes twenty seconds and restores 25 energy, or 50 with a bed. Once night falls and you have a shelter, you can sleep at camp until morning: the night still passes, so hunger falls and the fire burns down, but you wake with 60 more energy, or fully rested in a bed. Feed the fire before bed if you want to wake up warm. Cold is stronger outside at night. The fire provides warmth for 90 seconds per wood, and a shelter reduces cold exposure at camp. Hunger falls over time. Low energy, hunger, or warmth slows movement, but you can always move and gather supplies. Branches, berries, and fiber plants replenish at dawn.
 
-Your bag holds eight supplies at first. To build, stand anywhere inside the marked circle around the campfire and click an upgrade in the “Little improvements” panel. Shelter costs six wood and two fiber; bed costs four wood and one fiber after shelter; storage crate costs four wood. Your bag holds wood, food, and fiber toward the same capacity. Gather the pale seed heads for fiber, then choose what to carry home. The bed improves resting; the crate raises carrying capacity to sixteen. The game has one fixed map and no combat or companions yet.
+Your bag holds eight supplies at first. To build, stand anywhere inside the marked circle around the campfire and click an upgrade in the “Little improvements” panel. Shelter costs six wood and two fiber; bed costs four wood and one fiber after shelter; storage crate costs four wood. Your bag holds wood, food, and fiber toward the same capacity. Gather the pale seed heads for fiber, then choose what to carry home. The bed improves resting; the crate raises carrying capacity to sixteen. A drying rack costs four wood and makes cooked berries more filling. A windbreak costs five wood and halves warmth loss at camp on unlit nights, including cold fronts. Both add visible structures to camp. The game has one fixed map and no combat or companions yet.
 
 ### The cold night
 
@@ -51,7 +51,7 @@ The wilderness has a little life of its own. Birds peck in the meadows and flutt
 
 ## Saving
 
-Progress is saved in this browser's local storage under `hearthwild.save` after successful actions, periodically, and when the page is hidden or closed. Choose **Continue your camp** when you return. **Start a new game** asks before replacing an existing save. Existing version 1 and 2 saves load with their supplies and camp intact; fiber plants are added to the map. Version 1 camps also gain a future cold front with at least two days of warning. Saves stay in this browser profile; private browsing, clearing site data, or switching devices will not carry them over. The game shows a message if storage fails or an existing save cannot be read.
+Progress is saved in this browser's local storage under `hearthwild.save` after successful actions, periodically, and when the page is hidden or closed. Choose **Continue your camp** when you return. **Start a new game** asks before replacing an existing save. Existing version 1, 2, and 3 saves load with their supplies and camp intact; missing fiber plants and structures are added to the map and camp. Version 1 camps also gain a future cold front with at least two days of warning. Saves stay in this browser profile; private browsing, clearing site data, or switching devices will not carry them over. The game shows a message if storage fails or an existing save cannot be read.
 
 ## Verify
 

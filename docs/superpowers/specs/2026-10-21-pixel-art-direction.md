@@ -1,6 +1,8 @@
 # Hearthwild: Pixel Art Direction
 
-> **For agentic workers:** This spec replaces the current procedural shape art (`src/scene/art.ts`, the drawing in `src/scene/ambientLife.ts`, the glow and tint in `GameScene`). Work through the phases in order, one PR per phase, each with the screenshots listed in [Review](#review). Do not change gameplay rules, balance values, save format, or map coordinates of resource nodes and camp sites.
+> **For agentic workers:** This spec replaces the current procedural shape art (`src/scene/art.ts`, the drawing in `src/scene/ambientLife.ts`, and the night tint, fire glow and cold-front wind in `GameScene`). Work through the phases in order, one PR per phase, each with the screenshots listed in [Review](#review). Do not change gameplay rules, balance values, the save format (currently version 3), or map coordinates of resource nodes and camp sites.
+>
+> **Updated 2026-10-21** for features merged after the first draft: the cold-front night and stone hearth (#12), cooking and stargazing at night (#14), and the favicon (#13).
 
 ## Why the current art fails
 
@@ -10,7 +12,7 @@ These are the specific problems to fix, not a general dislike:
 2. **Noise instead of texture.** Hundreds of random translucent ellipses on the ground create blotches with no meaning.
 3. **Mixed perspective.** Trees are seen from above, the tent and survivor from the front, branch piles from an angle. There is no shared camera.
 4. **Inconsistent scale.** A berry bush is as big as a tree; the shelter is bigger than a cluster of trees.
-5. **Effects pretending to be art.** Glow halos under ready nodes look like stains. The camp is translucent ellipses plus a dotted circle that reads as a debug overlay. Firelight is additive circles with visible ring edges.
+5. **Effects pretending to be art.** Glow halos under ready nodes look like stains. The camp is translucent ellipses plus a dotted circle that reads as a debug overlay. Firelight is additive circles with visible ring edges. The cold front is thin diagonal lines scrolling across the screen, and the hearth is the fire pit drawn with bigger grey circles.
 6. **No rules.** Some shapes have outlines and some don't, shadows point in different directions, and colors are chosen per object rather than from a palette.
 
 The fix is a system: a fixed palette, one grid, one camera, one light direction, and sprites built from rules. A modest sprite that follows the rules looks better than an elaborate one that doesn't.
@@ -92,6 +94,8 @@ Singles:
 | `night` | `#1a2140` | Night tint (lighting layer only). |
 | `dusk` | `#f0a050` | Golden-hour tint (lighting layer only). |
 | `dawn` | `#e8a0a8` | Dawn tint (lighting layer only). |
+| `storm` | `#23405a` | Cold-front tint (lighting layer only). |
+| `frost` | `#d8eef0` | Wind streaks and sleet flecks during the cold front. |
 | `firefly` | `#e9f79a` | Firefly cores. |
 
 Value plan, which matters more than hue:
@@ -143,8 +147,10 @@ Replace the flat night rectangle and the additive glow circles with one lighting
   - Golden hour (the last 30 s before nightfall): `dusk` at up to 12%.
   - Night: `night` at up to 55%.
   - Dawn (the first 25 s): fades from `night` through `dawn` at 15% to clear.
+  - Cold front (`isColdNight()` in `src/game/rules.ts`): `storm` instead of `night`, at up to 64%, so storm nights read colder and darker than ordinary ones while the fire still cuts through.
 - **Light shapes are stepped, not smooth:** each light is 3 concentric bands with hard edges (for example 100%, 60% and 30% erase), or a 2 × 2 ordered dither between bands. No smooth radial gradients, which look out of place next to pixel art.
-- **Fire light:** the radius follows fuel (full at 60 s or more of fuel, shrinking to 60% as it nears zero) and flickers by ±1 art pixel on a 4-frame cycle in step with the flame animation. Unlit means no light.
+- **Fire light:** the radius follows fuel (full at 60 s or more of fuel, shrinking to 60% as it nears zero) and flickers by ±1 art pixel on a 4-frame cycle in step with the flame animation. Unlit means no light. A built hearth adds one art pixel of radius per band: it should feel like a steadier, slightly bigger fire, not a different light.
+- **Cold-front weather:** replace the scrolling lines with pixel wind streaks and sleet (see [Effects](#effects)) drawn above the lighting layer, in world space so they move with the camera, and snapped to the art grid. Keep them sparse: about 10 streaks and 20 flecks on screen. Flames on the fire pit and hearth switch to their windy frames.
 - **Small lights:** fireflies (a 5 px stepped light each) and optionally the survivor's shelter doorway when the bed is built (a faint warm glow).
 - The fire must be the brightest and warmest thing on screen at night, and the camp must still be readable at full darkness.
 
@@ -175,18 +181,24 @@ Sizes are in art pixels (W × H). The anchor is bottom-centre unless noted.
 
 | Sprite | Size | Frames | Notes |
 |---|---|---|---|
-| Fire pit | 24 × 24 | `unlit`; `burning` (4); `low` (4) | Ring of 8 stones (`stone` ramp) around charred logs. Burning: flames rise about 12 px with a `fire4` core. Low (under 30 s of fuel): flames about 6 px plus embers. Anchor at the centre of the ring. |
+| Fire pit | 24 × 24 | `unlit`; `burning` (4); `low` (4); `windy` (4) | Ring of 8 stones (`stone` ramp) around charred logs. Burning: flames rise about 12 px with a `fire4` core. Low (under 30 s of fuel): flames about 6 px plus embers. Windy (cold front): flames lean 2 to 3 px with the wind and throw an extra spark. Anchor at the centre of the ring. Keep the flame design consistent with the favicon (`public/favicon.svg`), which uses the same ramps; if the in-game flame changes noticeably, redraw the favicon to match. |
+| Hearth site | 24 × 12 | 1 | Ground decal next to the fire pit: a small stack of fitted stones and a chalk outline. Shown only once the hearth is unlocked and not yet built. |
+| Stone hearth | 32 × 28 | `unlit`; `burning` (4); `low` (4); `windy` (4) | Replaces the fire pit when built, at the same anchor. A low, mortared wall of fitted `stone` blocks with a flat front lip and a back wall a few pixels taller, so it reads as built rather than gathered. Same flame frames as the fire pit, 2 px taller. |
 | Shelter site | 48 × 32 | 1 | Ground decal: 4 stakes with rope between them on a cleared earth rectangle. No transparency, no box outline. |
 | Shelter | 48 × 40 | `built`, `built-bed` | A-frame or lean-to of `canvas` over `wood` poles, open doorway facing down (toward the camera). `built-bed` shows a bedroll inside the doorway. |
 | Crate site | 16 × 16 | 1 | Ground decal: four corner pegs and a chalk-like `earth4` cross. |
 | Crate | 16 × 16 | 1 | Wooden crate, plank lines, top face visible. |
+| Drying rack site | 32 × 16 | 1 | Four stakes marking a small frame northeast of the fire. |
+| Drying rack | 32 × 32 | 1 | Two upright posts, crossbar, and hanging berry clusters. |
+| Windbreak site | 48 × 16 | 1 | A curved row of short stakes southwest of the fire. |
+| Windbreak | 48 × 32 | 1 | Short woven timber wall, with the front face and top edge visible. |
 | Log seat (decorative) | 24 × 12 | 1 | One or two by the fire. Purely decorative, makes the camp feel lived in. |
 
 ### Survivor
 
 | Sprite | Size | Frames | Notes |
 |---|---|---|---|
-| Survivor | 16 × 24 | `idle-down` (2), `walk-down` (4), `walk-up` (4), `walk-side` (4, flipped for left), `gather` (2), `rest` (2) | Red `coat`, `scarf`, backpack on the back (visible from behind and the side). Big readable head (about 9 px wide). Walk at 8 fps, idle breathes (1 px bob) at 2 fps. Gather is a bend-and-reach, played once per gather. Rest is sitting by the fire. Pick direction from the last movement input. |
+| Survivor | 16 × 24 | `idle-down` (2), `walk-down` (4), `walk-up` (4), `walk-side` (4, flipped for left), `gather` (2), `rest` (2), `cook` (2), `stargaze` (2), `shiver` (2) | Red `coat`, `scarf`, backpack on the back (visible from behind and the side). Big readable head (about 9 px wide). Walk at 8 fps, idle breathes (1 px bob) at 2 fps. Gather is a bend-and-reach, played once per gather. Rest is sitting by the fire. Cook is sitting by the fire holding a stick with 2 berries toward the flames. Stargaze is sitting or lying back, face turned up. Shiver (warmth at or below 20) is a 1 px side-to-side jitter of the idle pose, arms in. Pick direction from the last movement input. |
 
 ### Wildlife
 
@@ -205,18 +217,29 @@ Keep all behaviour in `src/scene/ambient.ts` and `src/scene/ambientLife.ts`; onl
 | Gather pop | 8 × 8 icon | rises 8 px over 0.6 s, then vanishes | Shows the wood or berry icon above the node. |
 | Smoke puff | 8 × 8 | 3 | Rises from the fire every 1 to 2 s while burning. Uses `stone3`/`stone4`. |
 | Sparks | 1 × 1 | n/a | 1 to 2 `fire4` pixels drifting up from the fire occasionally. |
+| Wind streak | 12 × 3 | 3 | Cold front only. A short `frost` streak that stretches, holds and fades as it drifts with the wind. |
+| Sleet fleck | 1 × 1 or 2 × 1 | n/a | Cold front only. `frost` pixels falling at a slant, faster than the streaks. |
+| Shooting star | 6 × 2 | 3 | Optional. During stargazing, one streak of `paper` crosses the top third of the screen once. In top-down view the sky isn't visible, so this is the only sky cue; keep it rare. |
+| Cook steam | 4 × 6 | 3 | A wisp above the berries while the survivor cooks. |
+| Morning frost | 16 × 16 | 3 variants | Optional. After a failed cold night, `frost` and `stone4` rime on the grass and earth tiles around camp, fading out over the 30 seconds the game skips into the morning. Presentation only: detect the failed-night transition in the scene, as the outcome message already does, and keep it out of the saved state. |
 
 ### UI icons
 
 The HTML sidebar and top bar keep their current layout and fonts. Replace the Unicode symbols (▰ ● ◫ ⌂ ▣ ▤) with pixel icons rendered from the same sprite definitions (exported as data URLs at boot, shown with `image-rendering: pixelated` at 2× or 3×).
 
-| Icon | Size |
-|---|---|
-| Wood, food, bag capacity | 16 × 16 |
-| Shelter, bed, crate (build list) | 16 × 16 |
-| Energy, hunger, warmth (meter labels) | 8 × 8 |
+| Icon | Size | Notes |
+|---|---|---|
+| Wood, food, bag capacity | 16 × 16 | |
+| Shelter, bed, crate, hearth (build list) | 16 × 16 | |
+| Hearth locked state | 16 × 16 | Same hearth icon in `stone1`/`stone2` only, with a small padlock. |
+| Forecast card (cold front coming, active, weathered) | 16 × 16 each | Cloud with wind; cloud with sleet; sun over the hearth. |
+| Forecast checks (done, not yet) | 8 × 8 each | Replace the text ✓ marks on the shelter and fire checks: a `grass3` tick, and an empty `stone2` circle. |
+| Night actions: cook, stargaze | 16 × 16 each | Berries on a stick; a star. |
+| Energy, hunger, warmth (meter labels) | 8 × 8 | |
 
-Align the sidebar's accent colors with the palette: energy bar in `grass3`/`grass4`, hunger in `scarf3`/`scarf4`, warmth in `fire2`/`fire3`, wood text in `wood2`, berries in `berry2`.
+Align the sidebar's accent colors with the palette: energy bar in `grass3`/`grass4`, hunger in `scarf3`/`scarf4`, warmth in `fire2`/`fire3`, wood text in `wood2`, berries in `berry2`. The forecast card uses `storm` and `frost` while a front is coming or active, and the `fire` ramp once weathered.
+
+The favicon (`public/favicon.svg`, a 16 × 16 campfire) already follows this spec. Use it as the reference for the fire's look and for icon scale.
 
 ## Phases
 
@@ -224,17 +247,17 @@ Each phase is one PR, keeps the game playable, and keeps all existing tests pass
 
 1. **Pipeline:** palette, sprite format, texture generation, contact sheet page, art tests, pixel-perfect scaling and the 16 px `TILE`. Temporarily show the existing art scaled to the new grid if needed. No new art yet beyond a test sprite or two.
 2. **Terrain and map composition:** grass, autotiled camp clearing and paths, decoration, rim stones, trees with y-sorting, forest border and groves.
-3. **Nodes and camp:** branch piles, berry bushes, fire pit, build sites, shelter, bed, crate, log seat. Remove halos, dotted circle and translucent ellipses.
-4. **Survivor:** directional walk, idle, gather and rest animations.
-5. **Wildlife and effects:** birds, fox, fireflies, gather pops, smoke, sparks.
-6. **Lighting:** the time-of-day lighting layer, stepped lights, fire radius tied to fuel. Remove the old night rectangle and additive glow.
-7. **UI icons and palette alignment** in the HTML interface.
+3. **Nodes and camp:** branch piles, berry bushes, fire pit, build sites, shelter, bed, crate, hearth site, stone hearth, log seat. Remove halos, dotted circle and translucent ellipses.
+4. **Survivor:** directional walk, idle, gather, rest, cook, stargaze and shiver animations.
+5. **Wildlife and effects:** birds, fox, fireflies, gather pops, smoke, sparks, cook steam, shooting star, wind streaks, sleet and morning frost.
+6. **Lighting and weather:** the time-of-day lighting layer including the cold-front tint, stepped lights, fire radius tied to fuel and hearth, windy flames. Remove the old night rectangle, additive glow and scrolling wind lines.
+7. **UI icons and palette alignment** in the HTML interface, including the forecast card and its checks, night actions and the locked hearth.
 
 ## Review
 
 ### Screenshots for every PR
 
-Take them at 2× (a 960 × 600 canvas) by loading a save into `localStorage` under `hearthwild.save` and pressing **Continue your camp**. Show before and after for:
+Take them at 2× (a 960 × 600 canvas) by loading a save into `localStorage` under `hearthwild.save` and pressing **Continue your camp**. Build the state from `createGame()` (so it has every current field) and save it as `{ version: 3, state }`, matching `SAVE_VERSION` in `src/game/save.ts`; a stale shape or version is rejected as unreadable. Show before and after for:
 
 1. Day, survivor at camp with shelter, bed and crate built and the fire burning.
 2. Day, a fresh game: camp with all build sites empty and nodes ready.
@@ -242,8 +265,12 @@ Take them at 2× (a 960 × 600 canvas) by loading a save into `localStorage` und
 4. Golden hour (`timeOfDay` 150) with the fox arriving.
 5. Night (`timeOfDay` 200) at camp, fire burning, fox sitting, fireflies.
 6. Night with the fire out.
-7. The contact sheet page.
-8. One of the above at phone width (390 px wide).
+7. Cold-front night (`day` 3, `timeOfDay` 190, `progress.nextStormDay` 3) at camp with a shelter and the fire burning.
+8. The morning after a failed cold night, if morning frost is implemented: let the fire run out during shot 7's night and capture dawn.
+9. Day with the stone hearth built and burning (`structures.hearth` and `progress.hearthUnlocked` true).
+10. The survivor cooking and stargazing at camp at night (two shots).
+11. The contact sheet page.
+12. One of the above at phone width (390 px wide).
 
 Also attach a 4× crop of the area around the survivor in shot 1, to check pixel alignment.
 
@@ -260,7 +287,8 @@ A phase is done when all of these hold for everything it touched:
 - [ ] No pillow shading, banding, jaggies or orphan pixels in the contact sheet at 4×.
 - [ ] Ready vs depleted is readable without any halo or glow.
 - [ ] Y-sorting is right: the survivor passes behind trees and the shelter from above and in front from below.
-- [ ] At night the fire is the brightest, warmest thing on screen and the camp is readable.
+- [ ] At night the fire is the brightest, warmest thing on screen and the camp is readable, including on a cold-front night.
+- [ ] Cold-front weather moves with the world, sits on the art grid, and doesn't hide the survivor or the fire.
 - [ ] No gameplay change: all existing tests pass, and node and camp positions are unchanged.
 - [ ] Frame time is no worse than before at 2× (draw static terrain once into a texture rather than per frame).
 
@@ -269,5 +297,5 @@ A phase is done when all of these hold for everything it touched:
 - Gameplay, balance, save format, and positions of nodes and camp sites.
 - Collision with trees or rocks.
 - Sound.
-- New areas, weather, or seasons (weather has its own issue, #6; it should reuse this palette and lighting layer when it happens).
+- New areas, seasons, or weather beyond the existing cold front. Any future weather should reuse this palette, the lighting layer and the wind and sleet sprites.
 - Replacing the HTML UI with an in-canvas pixel UI.
