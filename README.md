@@ -32,6 +32,8 @@ Your bag holds eight supplies at first. To build, stand anywhere inside the mark
 
 The pale frames in camp mark future building sites. Branch piles and berry bushes are brighter when ready to gather; they fade after collection and replenish at dawn. The scene art is drawn in Phaser, so there are no external image assets to install.
 
+The wilderness has a little life of its own. Birds peck in the meadows and flutter off if you come too close or when night falls. On most evenings a fox visits the edge of camp and sits by the fire until well after dark, unless you walk up to it. Fireflies drift around camp at night. None of this affects survival or the save.
+
 ## Saving
 
 Progress is saved in this browser's local storage under `hearthwild.save` after successful actions, periodically, and when the page is hidden or closed. Choose **Continue your camp** when you return. **Start a new game** asks before replacing an existing save. Saves stay in this browser profile; private browsing, clearing site data, or switching devices will not carry them over. The game shows a message if storage fails or an existing save cannot be read.
@@ -43,4 +45,4 @@ npm test -- --run
 npm run build
 ```
 
-The tests cover game state, gathering, day/night survival, camp upgrades, and save validation. A browser playthrough should also check movement, building, fire, day/night visuals, and continue after reloading.
+The tests cover game state, gathering, day/night survival, camp upgrades, save validation, and ambient wildlife timing. A browser playthrough should also check movement, building, fire, day/night visuals, and continue after reloading.

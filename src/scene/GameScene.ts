@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { BALANCE, type GameState, type ResourceNode } from '../game/state';
 import { advanceTime, applyAction, isAtCamp, type GameAction } from '../game/rules';
 import { TILE, worldX, worldY, drawTerrain, drawObjects, makeSurvivor } from './art';
+import { darkness } from './ambient';
+import { AmbientLife } from './ambientLife';
 
 export class GameScene extends Phaser.Scene {
   private state: GameState;
@@ -13,6 +15,7 @@ export class GameScene extends Phaser.Scene {
   private objects!: Phaser.GameObjects.Graphics;
   private glow!: Phaser.GameObjects.Graphics;
   private night!: Phaser.GameObjects.Rectangle;
+  private ambient!: AmbientLife;
   private hudElapsed = 0;
 
   constructor(state: GameState, onStateChange: (state: GameState, cause: 'action' | 'tick') => void, onFeedback: (message: string) => void) {
@@ -26,6 +29,7 @@ export class GameScene extends Phaser.Scene {
     drawTerrain(this, this.state.nodes);
     this.objects = this.add.graphics().setDepth(5);
     this.glow = this.add.graphics().setDepth(101).setBlendMode(Phaser.BlendModes.ADD);
+    this.ambient = new AmbientLife(this);
     const survivor = makeSurvivor(this);
     this.playerSprite = survivor.root;
     this.playerFigure = survivor.figure;
@@ -64,6 +68,7 @@ export class GameScene extends Phaser.Scene {
       this.playerFigure.y = Math.sin(this.time.now / 105) * 1.7;
     } else this.playerFigure.y = 0;
     this.paintObjects();
+    this.ambient.update(this.state, dt, this.time.now);
     this.paintNight();
     this.hudElapsed += delta;
     if (this.hudElapsed >= 250) {
@@ -116,10 +121,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   private paintNight(): void {
-    const t = this.state.timeOfDay;
-    const alpha = t >= BALANCE.nightStart
-      ? Math.min(0.5, (t - BALANCE.nightStart) / 30 * 0.5)
-      : this.state.day > 1 && t < 25 ? (1 - t / 25) * 0.5 : 0;
-    this.night.setAlpha(alpha);
+    this.night.setAlpha(darkness(this.state.day, this.state.timeOfDay) * 0.5);
   }
 }
