@@ -4,7 +4,7 @@ export type GameAction =
   | { type: 'gather'; nodeId: string }
   | { type: 'build'; structureId: StructureId }
   | { type: 'move'; dx: number; dy: number }
-  | { type: 'eat' | 'stokeFire' | 'rest' | 'sleep' };
+  | { type: 'eat' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' };
 
 /** Awake time tires the survivor; work already costs energy, and resting doesn't. */
 export type Activity = 'awake' | 'working' | 'resting';
@@ -135,6 +135,35 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
         player: { ...state.player, hunger: Math.min(100, state.player.hunger + BALANCE.eatHungerGain) }
       },
       message: 'Ate some berries.'
+    };
+  }
+  if (action.type === 'cook') {
+    if (state.timeOfDay < BALANCE.nightStart) return { state, message: 'Cook berries after nightfall.' };
+    if (!isAtCamp(state)) return { state, message: 'Return to camp to cook.' };
+    if (state.fireFuel <= 0) return { state, message: 'Light the campfire before cooking.' };
+    if (state.inventory.food <= 0) return { state, message: 'Gather a berry to cook.' };
+    const cooked = advanceTime({ ...state, inventory: { ...state.inventory, food: state.inventory.food - 1 } }, BALANCE.cookSeconds, 'resting');
+    return {
+      state: { ...cooked, player: { ...cooked.player,
+        hunger: Math.min(100, cooked.player.hunger + BALANCE.cookHungerGain),
+        warmth: Math.min(100, cooked.player.warmth + BALANCE.cookWarmthGain)
+      } },
+      message: 'You toast a berry by the fire. A warm little meal.'
+    };
+  }
+  if (action.type === 'stargaze') {
+    if (state.timeOfDay < BALANCE.nightStart) return { state, message: 'Wait until nightfall to watch the stars.' };
+    if (!isAtCamp(state)) return { state, message: 'Return to camp to watch the stars.' };
+    const restored = { ...state, player: { ...state.player, energy: Math.min(100, state.player.energy + BALANCE.stargazeEnergyGain) } };
+    const watched = advanceTime(restored, BALANCE.stargazeSeconds, 'resting');
+    const thoughts = [
+      'The stars shine between the trees.',
+      'A quiet patch of sky opens above camp.',
+      'The moon makes the clearing look silver.'
+    ];
+    return {
+      state: watched,
+      message: `${thoughts[(state.day - 1) % thoughts.length]} You feel a little rested.`
     };
   }
   if (action.type === 'stokeFire') {

@@ -272,6 +272,70 @@ describe('tiredness and sleep', () => {
   });
 });
 
+describe('optional night activities', () => {
+  it('cooks one berry by a lit campfire for a warm meal', () => {
+    const state = createGame();
+    state.timeOfDay = 170;
+    state.inventory.food = 1;
+    state.fireFuel = 30;
+    state.player.hunger = 30;
+    state.player.warmth = 40;
+    const cooked = applyAction(state, { type: 'cook' });
+    expect(cooked.state.inventory.food).toBe(0);
+    expect(cooked.state.timeOfDay).toBe(178);
+    expect(cooked.state.fireFuel).toBe(22);
+    expect(cooked.state.player.hunger).toBeCloseTo(64);
+    expect(cooked.state.player.warmth).toBe(54);
+    expect(state.inventory.food).toBe(1);
+  });
+
+  it('does not cook in daylight, away from camp, without berries, or without fire', () => {
+    const state = createGame();
+    state.inventory.food = 1;
+    state.fireFuel = 20;
+    for (const setup of [
+      (s: typeof state) => { s.timeOfDay = 100; },
+      (s: typeof state) => { s.timeOfDay = 170; s.player.x = 0; },
+      (s: typeof state) => { s.timeOfDay = 170; s.inventory.food = 0; },
+      (s: typeof state) => { s.timeOfDay = 170; s.fireFuel = 0; }
+    ]) {
+      const attempt = structuredClone(state);
+      setup(attempt);
+      expect(applyAction(attempt, { type: 'cook' }).state).toBe(attempt);
+    }
+  });
+
+  it('stargazes at camp at night, restoring a little energy without supplies', () => {
+    const state = createGame();
+    state.timeOfDay = 230;
+    state.player.energy = 15;
+    const result = applyAction(state, { type: 'stargaze' });
+    expect(result.state.day).toBe(2);
+    expect(result.state.timeOfDay).toBe(2);
+    expect(result.state.player.energy).toBe(25);
+    expect(result.state.inventory).toEqual(state.inventory);
+    expect(result.message).toMatch(/stars|sky|moon/i);
+  });
+
+  it('does not stargaze during daylight or away from camp', () => {
+    const state = createGame();
+    expect(applyAction(state, { type: 'stargaze' }).state).toBe(state);
+    state.timeOfDay = 170;
+    state.player.x = 0;
+    expect(applyAction(state, { type: 'stargaze' }).state).toBe(state);
+  });
+
+  it('does not undo a failed cold-night penalty when stargazing crosses dawn', () => {
+    const state = createGame();
+    state.day = 3;
+    state.timeOfDay = 232;
+    state.player.energy = 30;
+    const dawn = applyAction(state, { type: 'stargaze' }).state;
+    expect(dawn.progress.nextStormDay).toBe(6);
+    expect(dawn.player.energy).toBe(25);
+  });
+});
+
 describe('forecast cold night', () => {
   it('forecasts day three and starts the front only at nightfall', () => {
     const state = createGame();

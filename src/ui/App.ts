@@ -43,7 +43,7 @@ export class App {
           <main class="game-panel">
             <div class="game-frame"><div id="game-canvas"></div><div class="prompt" id="prompt">WASD / arrows  Move</div></div>
             <div class="message" id="message">Gather a few branches. Your camp is waiting.</div>
-            <div class="shortcuts"><span><kbd>WASD</kbd> Move</span><span><kbd>E</kbd> Gather</span><span><kbd>F</kbd> Fire</span><span><kbd>R</kbd> Rest</span><span><kbd>Q</kbd> Eat</span><span><kbd>Z</kbd> Sleep</span></div>
+            <div class="shortcuts"><span><kbd>WASD</kbd> Move</span><span><kbd>E</kbd> Gather</span><span><kbd>F</kbd> Fire</span><span><kbd>R</kbd> Rest</span><span><kbd>Q</kbd> Eat</span><span><kbd>C</kbd> Cook</span><span><kbd>G</kbd> Stargaze</span><span><kbd>Z</kbd> Sleep</span></div>
           </main>
           <aside class="sidebar">
             <section class="panel forecast-panel" id="forecast-panel"><p class="eyebrow">THE FORECAST</p><h2 id="forecast-title">A cold front is coming</h2><p id="forecast-copy" class="forecast-copy"></p><div class="forecast-checks"><span id="forecast-shelter"></span><span id="forecast-fire"></span></div></section>
@@ -54,6 +54,7 @@ export class App {
               <div class="quick-actions"><button data-action="eat">Eat berries</button><button data-action="rest">Rest</button><button data-action="stokeFire">Feed fire</button><button data-action="sleep" id="sleep-button">Sleep</button></div>
             </section>
             <section class="panel"><p class="eyebrow">IN YOUR BAG</p><div class="supplies"><div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small></div><div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small></div><div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small>Carried</small></div></div><div class="fire-status" id="fire-status">The fire is unlit</div></section>
+            <section class="panel night-panel"><p class="eyebrow">AFTER DARK</p><h2>A little time for yourself</h2><p class="night-hint" id="night-hint">These small moments are waiting for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button></div></section>
             <section class="panel build-panel"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand inside the marked camp circle to build.</p><div id="build-list">${buildMarkup}</div></section>
           </aside>
         </div>
@@ -61,7 +62,7 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'rest' | 'stokeFire' | 'sleep';
+        const type = button.dataset.action as 'eat' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze';
         this.scene?.perform({ type });
       });
     });
@@ -174,6 +175,13 @@ export class App {
     this.setText('food-count', String(inventory.food));
     this.setText('space-count', `${inventory.wood + inventory.food}/${structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity}`);
     this.setText('fire-status', this.state.fireFuel > 0 ? `Fire burning · ${Math.ceil(this.state.fireFuel)}s of warmth` : 'The fire is unlit');
+    const atCamp = isAtCamp(this.state);
+    const afterDark = timeOfDay >= BALANCE.nightStart;
+    this.setText('night-hint', !afterDark ? 'These small moments are waiting for nightfall.'
+      : !atCamp ? 'Return to the camp circle for a quiet evening.'
+        : 'Optional comforts while the night passes.');
+    this.root.querySelector('#cook-button')?.classList.toggle('ready', afterDark && atCamp && inventory.food > 0 && this.state.fireFuel > 0);
+    this.root.querySelector('#stargaze-button')?.classList.toggle('ready', afterDark && atCamp);
     const storm = isColdNight(this.state);
     const forecast = this.root.querySelector('#forecast-panel');
     forecast?.classList.toggle('active', storm);
