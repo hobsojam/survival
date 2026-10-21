@@ -217,6 +217,7 @@ Keep all behaviour in `src/scene/ambient.ts` and `src/scene/ambientLife.ts`; onl
 | Sleet fleck | 1 × 1 or 2 × 1 | n/a | Cold front only. `frost` pixels falling at a slant, faster than the streaks. |
 | Shooting star | 6 × 2 | 3 | Optional. During stargazing, one streak of `paper` crosses the top third of the screen once. In top-down view the sky isn't visible, so this is the only sky cue; keep it rare. |
 | Cook steam | 4 × 6 | 3 | A wisp above the berries while the survivor cooks. |
+| Morning frost | 16 × 16 | 3 variants | Optional. After a failed cold night, `frost` and `stone4` rime on the grass and earth tiles around camp, fading out over the 30 seconds the game skips into the morning. Presentation only: detect the failed-night transition in the scene, as the outcome message already does, and keep it out of the saved state. |
 
 ### UI icons
 
@@ -228,6 +229,7 @@ The HTML sidebar and top bar keep their current layout and fonts. Replace the Un
 | Shelter, bed, crate, hearth (build list) | 16 × 16 | |
 | Hearth locked state | 16 × 16 | Same hearth icon in `stone1`/`stone2` only, with a small padlock. |
 | Forecast card (cold front coming, active, weathered) | 16 × 16 each | Cloud with wind; cloud with sleet; sun over the hearth. |
+| Forecast checks (done, not yet) | 8 × 8 each | Replace the text ✓ marks on the shelter and fire checks: a `grass3` tick, and an empty `stone2` circle. |
 | Night actions: cook, stargaze | 16 × 16 each | Berries on a stick; a star. |
 | Energy, hunger, warmth (meter labels) | 8 × 8 | |
 
@@ -243,9 +245,9 @@ Each phase is one PR, keeps the game playable, and keeps all existing tests pass
 2. **Terrain and map composition:** grass, autotiled camp clearing and paths, decoration, rim stones, trees with y-sorting, forest border and groves.
 3. **Nodes and camp:** branch piles, berry bushes, fire pit, build sites, shelter, bed, crate, hearth site, stone hearth, log seat. Remove halos, dotted circle and translucent ellipses.
 4. **Survivor:** directional walk, idle, gather, rest, cook, stargaze and shiver animations.
-5. **Wildlife and effects:** birds, fox, fireflies, gather pops, smoke, sparks, cook steam, shooting star, wind streaks and sleet.
+5. **Wildlife and effects:** birds, fox, fireflies, gather pops, smoke, sparks, cook steam, shooting star, wind streaks, sleet and morning frost.
 6. **Lighting and weather:** the time-of-day lighting layer including the cold-front tint, stepped lights, fire radius tied to fuel and hearth, windy flames. Remove the old night rectangle, additive glow and scrolling wind lines.
-7. **UI icons and palette alignment** in the HTML interface, including the forecast card, night actions and the locked hearth.
+7. **UI icons and palette alignment** in the HTML interface, including the forecast card and its checks, night actions and the locked hearth.
 
 ## Review
 
@@ -260,10 +262,11 @@ Take them at 2× (a 960 × 600 canvas) by loading a save into `localStorage` und
 5. Night (`timeOfDay` 200) at camp, fire burning, fox sitting, fireflies.
 6. Night with the fire out.
 7. Cold-front night (`day` 3, `timeOfDay` 190, `progress.nextStormDay` 3) at camp with a shelter and the fire burning.
-8. Day with the stone hearth built and burning (`structures.hearth` and `progress.hearthUnlocked` true).
-9. The survivor cooking and stargazing at camp at night (two shots).
-10. The contact sheet page.
-11. One of the above at phone width (390 px wide).
+8. The morning after a failed cold night, if morning frost is implemented: let the fire run out during shot 7's night and capture dawn.
+9. Day with the stone hearth built and burning (`structures.hearth` and `progress.hearthUnlocked` true).
+10. The survivor cooking and stargazing at camp at night (two shots).
+11. The contact sheet page.
+12. One of the above at phone width (390 px wide).
 
 Also attach a 4× crop of the area around the survivor in shot 1, to check pixel alignment.
 
