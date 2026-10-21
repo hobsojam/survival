@@ -2,13 +2,14 @@ import Phaser from 'phaser';
 import { BALANCE, createGame, type GameState, type StructureId } from '../game/state';
 import { GameScene } from '../scene/GameScene';
 import { loadGame, saveGame, type LoadResult } from '../game/save';
-import { isAtCamp, sleepBlocker } from '../game/rules';
+import { isAtCamp, isColdNight, sleepBlocker } from '../game/rules';
 import { dayPhase, formatClock, nextChange } from '../game/clock';
 
 const buildOptions: { id: StructureId; name: string; description: string }[] = [
   { id: 'shelter', name: 'Shelter', description: 'A roof against the night cold' },
   { id: 'bed', name: 'Bed', description: 'Rest more deeply at camp' },
-  { id: 'crate', name: 'Storage crate', description: 'Carry up to 16 supplies' }
+  { id: 'crate', name: 'Storage crate', description: 'Carry up to 16 supplies' },
+  { id: 'hearth', name: 'Stone hearth', description: 'Each log keeps the fire longer' }
 ];
 
 export class App {
@@ -30,7 +31,7 @@ export class App {
       this.previousSave = { kind: 'invalid', reason: `Browser storage is unavailable: ${String(error)}` };
     }
     const buildMarkup = buildOptions.map(({ id, name, description }) =>
-      `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${id === 'shelter' ? '⌂' : id === 'bed' ? '▣' : '▤'}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>`
+      `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${id === 'shelter' ? '⌂' : id === 'bed' ? '▣' : id === 'crate' ? '▤' : '♨'}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>`
     ).join('');
     this.root.innerHTML = `
       <div class="shell">
@@ -45,6 +46,7 @@ export class App {
             <div class="shortcuts"><span><kbd>WASD</kbd> Move</span><span><kbd>E</kbd> Gather</span><span><kbd>F</kbd> Fire</span><span><kbd>R</kbd> Rest</span><span><kbd>Q</kbd> Eat</span><span><kbd>Z</kbd> Sleep</span></div>
           </main>
           <aside class="sidebar">
+            <section class="panel forecast-panel" id="forecast-panel"><p class="eyebrow">THE FORECAST</p><h2 id="forecast-title">A cold front is coming</h2><p id="forecast-copy" class="forecast-copy"></p><div class="forecast-checks"><span id="forecast-shelter"></span><span id="forecast-fire"></span></div></section>
             <section class="panel"><p class="eyebrow">YOUR SURVIVOR</p><h2>Take it one day at a time</h2>
               <div class="meter"><div class="meter-title"><span>Energy</span><b id="energy-value">100</b></div><div class="track"><div id="energy-bar" class="fill energy"></div></div></div>
               <div class="meter"><div class="meter-title"><span>Hunger</span><b id="hunger-value">100</b></div><div class="track"><div id="hunger-bar" class="fill hunger"></div></div></div>
@@ -172,17 +174,36 @@ export class App {
     this.setText('food-count', String(inventory.food));
     this.setText('space-count', `${inventory.wood + inventory.food}/${structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity}`);
     this.setText('fire-status', this.state.fireFuel > 0 ? `Fire burning · ${Math.ceil(this.state.fireFuel)}s of warmth` : 'The fire is unlit');
+    const storm = isColdNight(this.state);
+    const forecast = this.root.querySelector('#forecast-panel');
+    forecast?.classList.toggle('active', storm);
+    forecast?.classList.toggle('weathered', this.state.progress.hearthUnlocked);
+    if (this.state.progress.hearthUnlocked) {
+      this.setText('forecast-title', 'The cold night is behind you');
+      this.setText('forecast-copy', 'You kept your camp warm through dawn. The stone hearth is ready to build.');
+      this.setText('forecast-shelter', '✓ Shelter held firm');
+      this.setText('forecast-fire', '✓ Hearth unlocked');
+    } else {
+      const day = this.state.progress.nextStormDay!;
+      const needed = storm ? Math.ceil((BALANCE.daySeconds - timeOfDay) * BALANCE.coldNightFireBurn) : (BALANCE.daySeconds - BALANCE.nightStart) * BALANCE.coldNightFireBurn;
+      this.setText('forecast-title', storm ? 'The cold front is here' : `Cold front · day ${day} night`);
+      this.setText('forecast-copy', storm ? 'Stay at camp and keep the fire alive until dawn.' : `Build a shelter and bring two logs to camp before nightfall on day ${day}.`);
+      this.setText('forecast-shelter', `${structures.shelter ? '✓' : '○'} Shelter ${structures.shelter ? 'ready' : 'needed'}`);
+      this.setText('forecast-fire', `${this.state.fireFuel > needed ? '✓' : '○'} Fire: ${Math.ceil(this.state.fireFuel)} / ${needed}s ${storm ? 'to dawn' : 'for the night'}`);
+    }
     this.setText('prompt', this.scene?.getPrompt() ?? 'WASD / arrows  Move');
     this.setText('build-hint', isAtCamp(this.state) ? 'At camp — click an upgrade to build.' : 'Stand inside the marked camp circle to build.');
     for (const { id } of buildOptions) {
       const built = this.state.structures[id];
+      const locked = id === 'hearth' && !this.state.progress.hearthUnlocked;
       const cost = BALANCE.buildCosts[id];
       const button = this.root.querySelector<HTMLButtonElement>(`[data-build="${id}"]`)!;
-      button.disabled = built;
+      button.disabled = built || locked;
       button.classList.toggle('built', built);
-      button.classList.toggle('ready', !built && isAtCamp(this.state) && inventory.wood >= cost && (id !== 'bed' || structures.shelter));
-      button.querySelector<HTMLElement>('.build-verb')!.textContent = built ? 'Built' : 'Build';
-      button.querySelector<HTMLElement>('.build-price')!.textContent = built ? 'Complete' : `${cost} wood`;
+      button.classList.toggle('locked', locked);
+      button.classList.toggle('ready', !built && !locked && isAtCamp(this.state) && inventory.wood >= cost && (id !== 'bed' || structures.shelter));
+      button.querySelector<HTMLElement>('.build-verb')!.textContent = built ? 'Built' : locked ? 'Locked' : 'Build';
+      button.querySelector<HTMLElement>('.build-price')!.textContent = built ? 'Complete' : locked ? 'Weather cold night' : `${cost} wood`;
     }
   }
 
