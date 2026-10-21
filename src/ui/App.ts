@@ -107,8 +107,8 @@ export class App {
     const fitCanvas = () => {
       if (!this.game?.canvas) return;
       const scale = displayScale(frame.clientWidth, frame.clientHeight);
-      this.game.canvas.style.width = `${LOGICAL_WIDTH * scale}px`;
-      this.game.canvas.style.height = `${LOGICAL_HEIGHT * scale}px`;
+      if (this.game.scale.zoom !== scale) this.game.scale.setZoom(scale);
+      else this.game.scale.refresh();
     };
     this.gameResize = new ResizeObserver(fitCanvas);
     this.gameResize.observe(frame);

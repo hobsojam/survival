@@ -5,6 +5,7 @@ export interface SpriteDef {
   anchor: [number, number];
   legend: Record<string, PaletteKey>;
   frames: Record<string, string[]>;
+  animations?: Record<string, { frames: string[]; frameRate: number; repeat: number }>;
 }
 
 const grassPlain: SpriteDef = {
@@ -34,6 +35,24 @@ const branchPile: SpriteDef = {
       '....ssssss......',
       '................'
     ],
+    readyB: [
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '.......oo.......',
+      '......olwo......',
+      '.....owllwo.....',
+      '...odwwhhdo.....',
+      '..oowwoowwoo....',
+      '..owhwwddwho....',
+      '...oowwwwoo.....',
+      '....oooooo......',
+      '....ssssss......',
+      '................'
+    ],
     depleted: [
       '................',
       '................',
@@ -52,7 +71,8 @@ const branchPile: SpriteDef = {
       '.....ssss.......',
       '................'
     ]
-  }
+  },
+  animations: { rustle: { frames: ['ready', 'readyB'], frameRate: 6, repeat: 0 } }
 };
 
 /** Phase 1 prototypes; later phases add the production terrain, nodes, and actors. */

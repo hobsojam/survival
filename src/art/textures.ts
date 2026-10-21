@@ -18,6 +18,11 @@ export function validateSprite(def: SpriteDef): void {
       for (const symbol of row) if (symbol !== '.' && !(symbol in def.legend)) throw new Error(`Frame ${name} has unknown symbol ${symbol}.`);
     }
   }
+  for (const [name, animation] of Object.entries(def.animations ?? {})) {
+    if (!animation.frames.length || !Number.isFinite(animation.frameRate) || animation.frameRate <= 0) throw new Error(`Invalid animation ${name}.`);
+    if (!Number.isInteger(animation.repeat) || animation.repeat < -1) throw new Error(`Invalid animation ${name} repeat.`);
+    for (const frame of animation.frames) if (!(frame in def.frames)) throw new Error(`Animation ${name} uses missing frame ${frame}.`);
+  }
 }
 
 export function rasterizeFrame(def: SpriteDef, frame: string): Uint8ClampedArray {
@@ -40,6 +45,15 @@ export function rasterizeFrame(def: SpriteDef, frame: string): Uint8ClampedArray
   return bytes;
 }
 
+export function animationConfigs(all: Record<string, SpriteDef>): Phaser.Types.Animations.Animation[] {
+  return Object.entries(all).flatMap(([name, def]) => Object.entries(def.animations ?? {}).map(([animationName, animation]) => ({
+    key: `${name}:${animationName}`,
+    frames: animation.frames.map(frame => ({ key: `${name}:${frame}` })),
+    frameRate: animation.frameRate,
+    repeat: animation.repeat
+  })));
+}
+
 export function registerSpriteTextures(scene: Phaser.Scene): void {
   for (const [name, def] of Object.entries(sprites)) for (const frame of Object.keys(def.frames)) {
     const key = `${name}:${frame}`;
@@ -51,4 +65,5 @@ export function registerSpriteTextures(scene: Phaser.Scene): void {
     texture.context.putImageData(image, 0, 0);
     texture.refresh();
   }
+  for (const config of animationConfigs(sprites)) if (!scene.anims.exists(config.key!)) scene.anims.create(config);
 }

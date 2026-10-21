@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { palette } from '../src/art/palette';
 import { sprites, type SpriteDef } from '../src/art/sprites';
-import { rasterizeFrame, validateSprite } from '../src/art/textures';
+import { animationConfigs, rasterizeFrame, validateSprite } from '../src/art/textures';
 
 function clone(def: SpriteDef): SpriteDef {
   return { ...def, size: [...def.size], anchor: [...def.anchor], legend: { ...def.legend }, frames: Object.fromEntries(Object.entries(def.frames).map(([key, rows]) => [key, [...rows]])) };
@@ -23,6 +23,19 @@ describe('sprite pipeline', () => {
     const badPixel = clone(sprites.branchPile);
     badPixel.frames.ready[0] = '?'.repeat(16);
     expect(() => validateSprite(badPixel)).toThrow(/symbol/i);
+  });
+
+  it('provides registered frame sequences for Phaser animations', () => {
+    const rustle = animationConfigs(sprites).find(config => config.key === 'branchPile:rustle');
+    expect(rustle).toMatchObject({ frameRate: 6, repeat: 0, frames: [
+      { key: 'branchPile:ready' }, { key: 'branchPile:readyB' }
+    ] });
+  });
+
+  it('rejects animations that refer to missing frames', () => {
+    const bad = clone(sprites.branchPile);
+    bad.animations = { broken: { frames: ['missing'], frameRate: 6, repeat: 0 } };
+    expect(() => validateSprite(bad)).toThrow(/animation/i);
   });
 
   it('turns palette symbols into exact RGBA bytes and leaves dots transparent', () => {

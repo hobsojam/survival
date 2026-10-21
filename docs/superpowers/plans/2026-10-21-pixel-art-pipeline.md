@@ -33,25 +33,25 @@
 
 **Interfaces:** `SpriteDef`, `sprites`, `validateSprite`, `rasterizeFrame`, `registerSpriteTextures(scene)`.
 
-- [ ] Write tests for frame dimensions, symbol resolution, anchors, transparency, palette bytes, and invalid frames.
-- [ ] Run `npm test -- --run tests/art.test.ts` and confirm red.
-- [ ] Implement palette, two prototype sprite definitions, validation, rasterization, and Phaser canvas texture registration.
-- [ ] Run the focused test and confirm green; commit.
+- [x] Write tests for frame dimensions, symbol resolution, anchors, transparency, palette bytes, and invalid frames.
+- [x] Run `npm test -- --run tests/art.test.ts` and confirm red.
+- [x] Implement palette, two prototype sprite definitions, validation, rasterization, and Phaser canvas texture registration.
+- [x] Run the focused test and confirm green; commit.
 
 ### Task 2: Contact sheet
 
 **Files:** Create `sprites.html`, `src/art/contactSheet.ts`; update `README.md`.
 
-- [ ] Show every registered frame at 4× on grass, earth, and night backgrounds, with sprite name and size.
-- [ ] Keep `sprites.html` out of production `dist/`; verify it through Vite development server.
-- [ ] Document the dev page and commit.
+- [x] Show every registered frame at 4× on grass, earth, and night backgrounds, with sprite name and size.
+- [x] Keep `sprites.html` out of production `dist/`; verify it through Vite development server.
+- [x] Document the dev page and commit.
 
 ### Task 3: 16 px world and temporary legacy-art adapter
 
 **Files:** Modify `src/scene/art.ts`, `src/scene/ambientLife.ts`, `src/scene/GameScene.ts`, `src/ui/App.ts`, `src/style.css`.
 
-- [ ] Change exported `TILE` to 16 and game logical resolution to 480 × 300.
-- [ ] Add nearest-neighbour Phaser/CSS settings and integer desktop scaling with fit below 2×.
-- [ ] Render old procedural world and wildlife at half their former logical size so existing gameplay remains visible until later phases replace them.
-- [ ] Round player and camera rendering to whole art pixels; keep gameplay coordinates untouched.
-- [ ] Run all tests and production build; verify the contact sheet is absent from `dist/`; inspect desktop and phone if browser tooling is available; commit.
+- [x] Change exported `TILE` to 16 and game logical resolution to 480 × 300.
+- [x] Add nearest-neighbour Phaser/CSS settings and integer desktop scaling with fit below 2×.
+- [x] Render old procedural world and wildlife at half their former logical size so existing gameplay remains visible until later phases replace them.
+- [x] Round player and camera rendering to whole art pixels; keep gameplay coordinates untouched.
+- [x] Run all tests and production build; verify the contact sheet is absent from `dist/`; inspect desktop and phone if browser tooling is available; commit.

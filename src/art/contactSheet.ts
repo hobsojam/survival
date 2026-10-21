@@ -26,6 +26,8 @@ for (const [name, def] of Object.entries(sprites)) for (const frame of Object.ke
     const canvas = document.createElement('canvas');
     canvas.width = def.size[0];
     canvas.height = def.size[1];
+    canvas.style.width = `${def.size[0] * 4}px`;
+    canvas.style.height = `${def.size[1] * 4}px`;
     canvas.style.backgroundColor = color;
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Canvas 2D is unavailable.');
