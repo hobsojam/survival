@@ -188,6 +188,10 @@ Sizes are in art pixels (W × H). The anchor is bottom-centre unless noted.
 | Shelter | 48 × 40 | `built`, `built-bed` | A-frame or lean-to of `canvas` over `wood` poles, open doorway facing down (toward the camera). `built-bed` shows a bedroll inside the doorway. |
 | Crate site | 16 × 16 | 1 | Ground decal: four corner pegs and a chalk-like `earth4` cross. |
 | Crate | 16 × 16 | 1 | Wooden crate, plank lines, top face visible. |
+| Drying rack site | 32 × 16 | 1 | Four stakes marking a small frame northeast of the fire. |
+| Drying rack | 32 × 32 | 1 | Two upright posts, crossbar, and hanging berry clusters. |
+| Windbreak site | 48 × 16 | 1 | A curved row of short stakes southwest of the fire. |
+| Windbreak | 48 × 32 | 1 | Short woven timber wall, with the front face and top edge visible. |
 | Log seat (decorative) | 24 × 12 | 1 | One or two by the fire. Purely decorative, makes the camp feel lived in. |
 
 ### Survivor

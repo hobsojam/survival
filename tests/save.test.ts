@@ -25,10 +25,12 @@ describe('local save', () => {
     state.fireFuel = 43;
     state.structures.shelter = true;
     state.structures.crate = true;
+    state.structures.dryingRack = true;
+    state.structures.windbreak = true;
     state.nodes[0].amount = 0;
     state.nodes[0].readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(2);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(3);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);
@@ -54,6 +56,8 @@ describe('local save', () => {
     legacy.structures.shelter = true;
     delete legacy.progress;
     delete legacy.structures.hearth;
+    delete legacy.structures.dryingRack;
+    delete legacy.structures.windbreak;
     const raw = JSON.stringify({ version: 1, state: legacy });
     storage.setItem(SAVE_KEY, raw);
     const loaded = loadGame(storage);
@@ -62,7 +66,7 @@ describe('local save', () => {
       expect(loaded.state.day).toBe(8);
       expect(loaded.state.timeOfDay).toBe(105);
       expect(loaded.state.inventory.wood).toBe(3);
-      expect(loaded.state.structures).toEqual({ shelter: true, bed: false, crate: false, hearth: false });
+      expect(loaded.state.structures).toEqual({ shelter: true, bed: false, crate: false, hearth: false, dryingRack: false, windbreak: false });
       expect(loaded.state.progress).toEqual({ nextStormDay: 10, hearthUnlocked: false });
     }
     expect(storage.getItem(SAVE_KEY)).toBe(raw);
@@ -73,6 +77,8 @@ describe('local save', () => {
     const legacy = JSON.parse(JSON.stringify(createGame()));
     delete legacy.progress;
     delete legacy.structures.hearth;
+    delete legacy.structures.dryingRack;
+    delete legacy.structures.windbreak;
     legacy.inventory.wood = -1;
     const raw = JSON.stringify({ version: 1, state: legacy });
     storage.setItem(SAVE_KEY, raw);
@@ -85,8 +91,45 @@ describe('local save', () => {
     const state = createGame();
     state.day = 4;
     state.progress.nextStormDay = 3;
+    delete (state.structures as Partial<typeof state.structures>).dryingRack;
+    delete (state.structures as Partial<typeof state.structures>).windbreak;
     storage.setItem(SAVE_KEY, JSON.stringify({ version: 2, state }));
     expect(loadGame(storage).kind).toBe('invalid');
+  });
+
+  it('migrates a version two camp without changing its cold-night progress or stored data', () => {
+    const storage = new MemoryStorage();
+    const legacy = JSON.parse(JSON.stringify(createGame()));
+    legacy.day = 5;
+    legacy.timeOfDay = 95;
+    legacy.inventory.wood = 3;
+    legacy.structures.hearth = true;
+    legacy.progress = { nextStormDay: null, hearthUnlocked: true };
+    delete legacy.structures.dryingRack;
+    delete legacy.structures.windbreak;
+    const raw = JSON.stringify({ version: 2, state: legacy });
+    storage.setItem(SAVE_KEY, raw);
+    const loaded = loadGame(storage);
+    expect(loaded.kind).toBe('loaded');
+    if (loaded.kind === 'loaded') {
+      expect(loaded.state.day).toBe(5);
+      expect(loaded.state.timeOfDay).toBe(95);
+      expect(loaded.state.inventory.wood).toBe(3);
+      expect(loaded.state.structures).toEqual({ shelter: false, bed: false, crate: false, hearth: true, dryingRack: false, windbreak: false });
+      expect(loaded.state.progress).toEqual({ nextStormDay: null, hearthUnlocked: true });
+    }
+    expect(storage.getItem(SAVE_KEY)).toBe(raw);
+  });
+
+  it('rejects version three data with missing or invalid new structure flags', () => {
+    const storage = new MemoryStorage();
+    const state = JSON.parse(JSON.stringify(createGame()));
+    delete state.structures.dryingRack;
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 3, state }));
+    expect(loadGame(storage).kind).toBe('invalid');
+    state.structures.dryingRack = false;
+    state.structures.windbreak = 'yes';
+    expect(saveGame(storage, state).ok).toBe(false);
   });
 
   it('rejects an unsupported schema version without overwriting it', () => {

@@ -1,5 +1,15 @@
 export type ResourceKind = 'branch' | 'berry';
-export type StructureId = 'shelter' | 'bed' | 'crate' | 'hearth';
+
+export const BUILDINGS = {
+  shelter: { name: 'Shelter', description: 'A roof against the night cold', symbol: '⌂', cost: 6, prerequisite: null },
+  bed: { name: 'Bed', description: 'Rest more deeply at camp', symbol: '▣', cost: 4, prerequisite: 'shelter' },
+  crate: { name: 'Storage crate', description: 'Carry up to 16 supplies', symbol: '▤', cost: 4, prerequisite: null },
+  hearth: { name: 'Stone hearth', description: 'Each log keeps the fire longer', symbol: '♨', cost: 4, prerequisite: 'coldNight' },
+  dryingRack: { name: 'Drying rack', description: 'Cooked berries are more filling', symbol: '☼', cost: 4, prerequisite: null },
+  windbreak: { name: 'Windbreak', description: 'Stay warmer when the fire fades', symbol: '▥', cost: 5, prerequisite: null }
+} as const;
+
+export type StructureId = keyof typeof BUILDINGS;
 
 export interface ResourceNode {
   id: string;
@@ -38,6 +48,7 @@ export const BALANCE = {
   eatHungerGain: 25,
   cookSeconds: 8,
   cookHungerGain: 35,
+  rackCookHungerGain: 50,
   cookWarmthGain: 10,
   stargazeSeconds: 12,
   stargazeEnergyGain: 10,
@@ -56,8 +67,7 @@ export const BALANCE = {
   coldNightFailureEnergy: 25,
   coldNightFailureMorningLoss: 30,
   interactionRadius: 2,
-  campRadius: 4,
-  buildCosts: { shelter: 6, bed: 4, crate: 4, hearth: 4 } satisfies Record<StructureId, number>
+  campRadius: 4
 } as const;
 
 const branchPositions = [
@@ -80,7 +90,7 @@ export function createGame(): GameState {
     player: { x: BALANCE.campX, y: BALANCE.campY, energy: 100, hunger: 100, warmth: 100 },
     inventory: { wood: 0, food: 0 },
     fireFuel: 0,
-    structures: { shelter: false, bed: false, crate: false, hearth: false },
+    structures: { shelter: false, bed: false, crate: false, hearth: false, dryingRack: false, windbreak: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false },
     nodes
   };
