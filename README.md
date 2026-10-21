@@ -2,6 +2,8 @@
 
 A small, single-player browser survival game about making a wilderness camp feel like home. You control one survivor, gather branches and berries, keep a fire burning, and build a shelter, bed, storage crate, and eventually a stone hearth. Survival is gentle: cold and hunger slow you down, but they never end the game.
 
+**Play it online:** <https://hobsojam.github.io/survival/>. Every merge to `main` redeploys it.
+
 ## Run it
 
 Requires npm and Node.js 24 (recommended). The installed toolchain also supports Node.js 22.12+ or 26+.

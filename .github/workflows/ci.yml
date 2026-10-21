@@ -39,7 +39,7 @@ jobs:
           node-version: lts/*
           cache: npm
       - if: steps.project.outputs.exists == 'true'
-        run: npm ci
+        run: npm ci --ignore-scripts
       - if: steps.project.outputs.exists == 'true' && github.event_name != 'schedule'
         run: npm test -- --run
       - if: steps.project.outputs.exists == 'true' && github.event_name != 'schedule'
