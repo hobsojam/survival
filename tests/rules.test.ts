@@ -192,3 +192,19 @@ describe('fire and camp upgrades', () => {
     expect(byFire).toBe(52);
   });
 });
+
+describe('daylight spent on work', () => {
+  it('gathering takes six seconds of daylight', () => {
+    const result = applyAction(createGame(), { type: 'gather', nodeId: 'branch-0' });
+    expect(result.state.timeOfDay).toBe(6);
+    expect(result.state.player.hunger).toBe(99.25);
+  });
+
+  it('building takes twelve seconds of daylight', () => {
+    const state = createGame();
+    state.inventory.wood = 6;
+    const result = applyAction(state, { type: 'build', structureId: 'shelter' });
+    expect(result.state.timeOfDay).toBe(12);
+    expect(result.state.player.hunger).toBe(98.5);
+  });
+});

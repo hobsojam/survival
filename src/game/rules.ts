@@ -84,12 +84,12 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
       ? { ...item, amount: item.amount - 1, readyDay: state.day + 1 }
       : item);
     return {
-      state: {
+      state: advanceTime({
         ...state,
         player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.gatherEnergyCost) },
         inventory: { ...state.inventory, [resource]: state.inventory[resource] + 1 },
         nodes
-      },
+      }, BALANCE.gatherSeconds),
       message: resource === 'wood' ? 'Collected wood.' : 'Picked berries.'
     };
   }
@@ -119,12 +119,12 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     const cost = BALANCE.buildCosts[action.structureId];
     if (state.inventory.wood < cost) return { state, message: `Need ${cost} wood to build this.` };
     return {
-      state: {
+      state: advanceTime({
         ...state,
         inventory: { ...state.inventory, wood: state.inventory.wood - cost },
         player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.buildEnergyCost) },
         structures: { ...state.structures, [action.structureId]: true }
-      },
+      }, BALANCE.buildSeconds),
       message: `Built the ${action.structureId}.`
     };
   }
