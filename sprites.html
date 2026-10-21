@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hearthwild sprite contact sheet</title>
+    <style>
+      :root { font: 14px/1.4 system-ui, sans-serif; color: #f7f1e1; background: #1c1820; }
+      body { margin: 0; padding: 24px; }
+      h1 { margin: 0 0 8px; }
+      p { margin: 0 0 24px; color: #d0d2cc; }
+      #sheet { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+      article { border: 1px solid #4d5161; padding: 14px; background: #2b2d3a; }
+      article h2 { font-size: 15px; margin: 0 0 3px; }
+      article small { color: #a3a7ad; }
+      .samples { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+      figure { margin: 0; text-align: center; }
+      figure canvas { display: block; image-rendering: pixelated; border: 1px solid #4d5161; }
+      figcaption { margin-top: 4px; font-size: 11px; color: #d0d2cc; }
+    </style>
+  </head>
+  <body>
+    <h1>Hearthwild sprite contact sheet</h1>
+    <p>Every registered frame, enlarged 4× on grass, camp earth, and night. Development only.</p>
+    <main id="sheet"></main>
+    <script type="module" src="/src/art/contactSheet.ts"></script>
+  </body>
+</html>

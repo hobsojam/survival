@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from '../game/state';
 import { GameScene } from '../scene/GameScene';
+import { displayScale, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { loadGame, saveGame, type LoadResult } from '../game/save';
 import { isAtCamp, isColdNight, sleepBlocker } from '../game/rules';
 import { dayPhase, formatClock, nextChange } from '../game/clock';
@@ -11,6 +12,7 @@ export class App {
   private state: GameState;
   private scene?: GameScene;
   private game?: Phaser.Game;
+  private gameResize?: ResizeObserver;
   private readonly root: HTMLElement;
   private storage?: Storage;
   private previousSave: LoadResult = { kind: 'empty' };
@@ -76,6 +78,7 @@ export class App {
   }
 
   startGame(state: GameState): void {
+    this.gameResize?.disconnect();
     this.game?.destroy(true);
     this.root.querySelector('#start-screen')?.classList.add('hidden');
     const restart = this.root.querySelector<HTMLButtonElement>('#restart-game');
@@ -91,12 +94,25 @@ export class App {
     this.game = new Phaser.Game({
       type: Phaser.AUTO,
       parent: 'game-canvas',
-      width: 960,
-      height: 600,
+      width: LOGICAL_WIDTH,
+      height: LOGICAL_HEIGHT,
+      pixelArt: true,
+      roundPixels: true,
+      antialias: false,
       backgroundColor: '#456a59',
       scene: [this.scene],
-      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: 960, height: 600 }
+      scale: { mode: Phaser.Scale.NONE, width: LOGICAL_WIDTH, height: LOGICAL_HEIGHT }
     });
+    const frame = this.root.querySelector<HTMLElement>('.game-frame')!;
+    const fitCanvas = () => {
+      if (!this.game?.canvas) return;
+      const scale = displayScale(frame.clientWidth, frame.clientHeight);
+      if (this.game.scale.zoom !== scale) this.game.scale.setZoom(scale);
+      else this.game.scale.refresh();
+    };
+    this.gameResize = new ResizeObserver(fitCanvas);
+    this.gameResize.observe(frame);
+    fitCanvas();
     this.render();
   }
 

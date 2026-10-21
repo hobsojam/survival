@@ -1,6 +1,6 @@
 # Hearthwild: Pixel Art Direction
 
-> **For agentic workers:** This spec replaces the current procedural shape art (`src/scene/art.ts`, the drawing in `src/scene/ambientLife.ts`, and the night tint, fire glow and cold-front wind in `GameScene`). Work through the phases in order, one PR per phase, each with the screenshots listed in [Review](#review). Do not change gameplay rules, balance values, the save format (currently version 2), or map coordinates of resource nodes and camp sites.
+> **For agentic workers:** This spec replaces the current procedural shape art (`src/scene/art.ts`, the drawing in `src/scene/ambientLife.ts`, and the night tint, fire glow and cold-front wind in `GameScene`). Work through the phases in order, one PR per phase, each with the screenshots listed in [Review](#review). Do not change gameplay rules, balance values, the save format (currently version 3), or map coordinates of resource nodes and camp sites.
 >
 > **Updated 2026-10-21** for features merged after the first draft: the cold-front night and stone hearth (#12), cooking and stargazing at night (#14), and the favicon (#13).
 
@@ -257,7 +257,7 @@ Each phase is one PR, keeps the game playable, and keeps all existing tests pass
 
 ### Screenshots for every PR
 
-Take them at 2× (a 960 × 600 canvas) by loading a save into `localStorage` under `hearthwild.save` and pressing **Continue your camp**. Build the state from `createGame()` (so it has every current field) and save it as `{ version: 2, state }`, matching `SAVE_VERSION` in `src/game/save.ts`; a stale shape or version is rejected as unreadable. Show before and after for:
+Take them at 2× (a 960 × 600 canvas) by loading a save into `localStorage` under `hearthwild.save` and pressing **Continue your camp**. Build the state from `createGame()` (so it has every current field) and save it as `{ version: 3, state }`, matching `SAVE_VERSION` in `src/game/save.ts`; a stale shape or version is rejected as unreadable. Show before and after for:
 
 1. Day, survivor at camp with shelter, bed and crate built and the fire burning.
 2. Day, a fresh game: camp with all build sites empty and nodes ready.

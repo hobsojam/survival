@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { GameState } from '../game/state';
-import { worldX, worldY } from './art';
+import { legacyWorldX, legacyWorldY } from './art';
 import {
   BIRD_HOMES, FIREFLY_HOMES, FOX, birdMayReturn, birdShouldLeave, darkness, fireflyGlow, fireflyOffset, foxAt, type Point
 } from './ambient';
@@ -34,8 +34,8 @@ export class AmbientLife {
 
   constructor(scene: Phaser.Scene) {
     // Creatures sit under the night tint; firefly light shines through it.
-    this.creatures = scene.add.graphics().setDepth(15);
-    this.lights = scene.add.graphics().setDepth(102).setBlendMode(Phaser.BlendModes.ADD);
+    this.creatures = scene.add.graphics().setDepth(15).setScale(0.5);
+    this.lights = scene.add.graphics().setDepth(102).setScale(0.5).setBlendMode(Phaser.BlendModes.ADD);
     this.birds = BIRD_HOMES.map((home, index) => ({ home, away: null, flight: null, restSeconds: 0, index }));
   }
 
@@ -64,7 +64,7 @@ export class AmbientLife {
       const x = lerp(flight.from.x, flight.to.x, progress);
       const y = lerp(flight.from.y, flight.to.y, progress);
       const facing = Math.sign(flight.to.x - flight.from.x) || 1;
-      placed(this.creatures, worldX(x), worldY(y), BIRD_SCALE, () => drawFlyingBird(this.creatures, 0, 0, height, facing, timeMs, alpha));
+      placed(this.creatures, legacyWorldX(x), legacyWorldY(y), BIRD_SCALE, () => drawFlyingBird(this.creatures, 0, 0, height, facing, timeMs, alpha));
       if (progress >= 1) {
         bird.away = flight.leaving ? flight.to : null;
         bird.flight = null;
@@ -81,7 +81,7 @@ export class AmbientLife {
     } else if (bird.away && bird.restSeconds <= 0 && birdMayReturn(bird.home, player, dark)) {
       bird.flight = { from: bird.away, to: bird.home, elapsed: 0, duration: FLIGHT_SECONDS * 1.4, leaving: false };
     } else if (!bird.away) {
-      placed(this.creatures, worldX(bird.home.x), worldY(bird.home.y), BIRD_SCALE, () => drawGroundBird(this.creatures, 0, 0, bird.index, timeMs));
+      placed(this.creatures, legacyWorldX(bird.home.x), legacyWorldY(bird.home.y), BIRD_SCALE, () => drawGroundBird(this.creatures, 0, 0, bird.index, timeMs));
     }
   }
 
@@ -93,7 +93,7 @@ export class AmbientLife {
       const x = lerp(run.from.x, run.to.x, progress);
       const y = lerp(run.from.y, run.to.y, progress);
       const facing = Math.sign(run.to.x - run.from.x) || 1;
-      placed(this.creatures, worldX(x), worldY(y), FOX_SCALE, () => drawFox(this.creatures, 0, 0, false, facing, timeMs * 1.8));
+      placed(this.creatures, legacyWorldX(x), legacyWorldY(y), FOX_SCALE, () => drawFox(this.creatures, 0, 0, false, facing, timeMs * 1.8));
       if (progress >= 1) this.foxRun = null;
       return;
     }
@@ -105,7 +105,7 @@ export class AmbientLife {
       this.foxRun = { from: pose, to: FOX.den, elapsed: 0, duration: FOX_RUN_SECONDS, leaving: true };
       return;
     }
-    placed(this.creatures, worldX(pose.x), worldY(pose.y), FOX_SCALE, () => drawFox(this.creatures, 0, 0, pose.sitting, pose.facing, timeMs));
+    placed(this.creatures, legacyWorldX(pose.x), legacyWorldY(pose.y), FOX_SCALE, () => drawFox(this.creatures, 0, 0, pose.sitting, pose.facing, timeMs));
   }
 
   private drawFireflies(dark: number, timeMs: number): void {
@@ -114,8 +114,8 @@ export class AmbientLife {
       const glow = fireflyGlow(index, timeMs, dark);
       if (glow < 0.02) return;
       const offset = fireflyOffset(index, timeMs);
-      const x = worldX(home.x + offset.x);
-      const y = worldY(home.y + offset.y);
+      const x = legacyWorldX(home.x + offset.x);
+      const y = legacyWorldY(home.y + offset.y);
       this.lights.fillStyle(0xc8f07a, 0.18 * glow);
       this.lights.fillCircle(x, y, 9);
       this.lights.fillStyle(0xf4ffb8, 0.85 * glow);

@@ -1,9 +1,14 @@
 import Phaser from 'phaser';
 import { BALANCE, type GameState, type ResourceNode } from '../game/state';
 
-export const TILE = 32;
+export const TILE = 16;
 export const worldX = (x: number) => (x + 0.5) * TILE;
 export const worldY = (y: number) => (y + 0.5) * TILE;
+
+// Temporary Phase 1 adapter. Procedural art is replaced by sprites in later phases.
+const LEGACY_TILE = 32;
+export const legacyWorldX = (x: number) => (x + 0.5) * LEGACY_TILE;
+export const legacyWorldY = (y: number) => (y + 0.5) * LEGACY_TILE;
 
 const forest = [0x416b52, 0x4b7458, 0x527a5e, 0x3d644d];
 const seed = (a: number, b: number) => {
@@ -28,11 +33,11 @@ function tree(g: Phaser.GameObjects.Graphics, x: number, y: number, size: number
 }
 
 export function drawTerrain(scene: Phaser.Scene, nodes: ResourceNode[]): void {
-  const g = scene.add.graphics().setDepth(0);
-  const width = BALANCE.mapWidth * TILE;
-  const height = BALANCE.mapHeight * TILE;
-  const cx = worldX(BALANCE.campX);
-  const cy = worldY(BALANCE.campY);
+  const g = scene.add.graphics().setDepth(0).setScale(0.5);
+  const width = BALANCE.mapWidth * LEGACY_TILE;
+  const height = BALANCE.mapHeight * LEGACY_TILE;
+  const cx = legacyWorldX(BALANCE.campX);
+  const cy = legacyWorldY(BALANCE.campY);
   g.fillStyle(0x426b52);
   g.fillRect(0, 0, width, height);
 
@@ -53,14 +58,14 @@ export function drawTerrain(scene: Phaser.Scene, nodes: ResourceNode[]): void {
   g.fillEllipse(cx - 12, cy - 10, 274, 216);
   for (let i = 0; i < 46; i++) {
     const angle = i * Math.PI * 2 / 46;
-    const radius = BALANCE.campRadius * TILE;
+    const radius = BALANCE.campRadius * LEGACY_TILE;
     const x = cx + Math.cos(angle) * radius;
     const y = cy + Math.sin(angle) * radius;
     g.fillStyle(i % 4 === 0 ? 0xe3d7ad : 0xd2c399, 0.6);
     g.fillEllipse(x, y, 5 + i % 3, 3 + i % 2);
   }
   g.lineStyle(2, 0xe7d6a5, 0.5);
-  g.strokeCircle(cx, cy, BALANCE.campRadius * TILE);
+  g.strokeCircle(cx, cy, BALANCE.campRadius * LEGACY_TILE);
 
   for (let i = 0; i < 360; i++) {
     const x = seed(i, 23) * width;
@@ -80,7 +85,7 @@ export function drawTerrain(scene: Phaser.Scene, nodes: ResourceNode[]): void {
     const x = 30 + seed(i, 43) * (width - 60);
     const y = 35 + seed(i, 47) * (height - 70);
     if (Math.hypot(x - cx, y - cy) < 178) continue;
-    if (nodes.some(node => Math.hypot(x - worldX(node.x), y - worldY(node.y)) < 35)) continue;
+    if (nodes.some(node => Math.hypot(x - legacyWorldX(node.x), y - legacyWorldY(node.y)) < 35)) continue;
     if (seed(i, 53) > 0.28) tree(g, x, y, 15 + seed(i, 59) * 10);
     else {
       g.fillStyle(0x253f37, 0.22);
@@ -94,8 +99,8 @@ export function drawTerrain(scene: Phaser.Scene, nodes: ResourceNode[]): void {
 }
 
 function drawBranch(g: Phaser.GameObjects.Graphics, node: ResourceNode, time: number): void {
-  const x = worldX(node.x);
-  const y = worldY(node.y);
+  const x = legacyWorldX(node.x);
+  const y = legacyWorldY(node.y);
   const ready = node.amount > 0;
   if (ready) {
     g.fillStyle(0xe8bd73, 0.11 + Math.sin(time / 380 + x) * 0.04);
@@ -118,8 +123,8 @@ function drawBranch(g: Phaser.GameObjects.Graphics, node: ResourceNode, time: nu
 }
 
 function drawBerry(g: Phaser.GameObjects.Graphics, node: ResourceNode, time: number): void {
-  const x = worldX(node.x);
-  const y = worldY(node.y);
+  const x = legacyWorldX(node.x);
+  const y = legacyWorldY(node.y);
   const ready = node.amount > 0;
   if (ready) {
     g.fillStyle(0xd6df9b, 0.09 + Math.sin(time / 420 + x) * 0.03);
@@ -145,8 +150,8 @@ function drawBerry(g: Phaser.GameObjects.Graphics, node: ResourceNode, time: num
 }
 
 function drawShelter(g: Phaser.GameObjects.Graphics, built: boolean, bed: boolean): void {
-  const x = worldX(BALANCE.campX - 3);
-  const y = worldY(BALANCE.campY - 2);
+  const x = legacyWorldX(BALANCE.campX - 3);
+  const y = legacyWorldY(BALANCE.campY - 2);
   g.fillStyle(0x493d30, 0.24);
   g.fillEllipse(x + 4, y + 18, 116, 83);
   if (!built) {
@@ -186,8 +191,8 @@ function drawShelter(g: Phaser.GameObjects.Graphics, built: boolean, bed: boolea
 }
 
 function drawCrate(g: Phaser.GameObjects.Graphics, built: boolean): void {
-  const x = worldX(BALANCE.campX + 3);
-  const y = worldY(BALANCE.campY + 1);
+  const x = legacyWorldX(BALANCE.campX + 3);
+  const y = legacyWorldY(BALANCE.campY + 1);
   g.fillStyle(0x3d382c, 0.25);
   g.fillEllipse(x + 4, y + 11, 49, 24);
   if (!built) {
@@ -210,8 +215,8 @@ function drawCrate(g: Phaser.GameObjects.Graphics, built: boolean): void {
 }
 
 function drawDryingRack(g: Phaser.GameObjects.Graphics, built: boolean): void {
-  const x = worldX(BALANCE.campX + 2);
-  const y = worldY(BALANCE.campY - 2);
+  const x = legacyWorldX(BALANCE.campX + 2);
+  const y = legacyWorldY(BALANCE.campY - 2);
   g.fillStyle(0x3d382c, 0.22);
   g.fillEllipse(x + 4, y + 13, 67, 20);
   if (!built) {
@@ -241,8 +246,8 @@ function drawDryingRack(g: Phaser.GameObjects.Graphics, built: boolean): void {
 }
 
 function drawWindbreak(g: Phaser.GameObjects.Graphics, built: boolean): void {
-  const x = worldX(BALANCE.campX - 2);
-  const y = worldY(BALANCE.campY + 2);
+  const x = legacyWorldX(BALANCE.campX - 2);
+  const y = legacyWorldY(BALANCE.campY + 2);
   g.fillStyle(0x3d382c, 0.22);
   g.fillEllipse(x + 4, y + 13, 86, 19);
   if (!built) {
@@ -267,8 +272,8 @@ function drawWindbreak(g: Phaser.GameObjects.Graphics, built: boolean): void {
 }
 
 function drawFire(g: Phaser.GameObjects.Graphics, fuel: number, time: number, hearth: boolean): void {
-  const x = worldX(BALANCE.campX);
-  const y = worldY(BALANCE.campY);
+  const x = legacyWorldX(BALANCE.campX);
+  const y = legacyWorldY(BALANCE.campY);
   g.fillStyle(0x674e37, 0.33);
   g.fillCircle(x, y + 5, 40);
   g.fillStyle(hearth ? 0x718489 : 0x957d5f);
