@@ -30,6 +30,8 @@ A day lasts four minutes; night begins after two minutes and forty seconds. Gath
 
 Your bag holds eight supplies at first. To build, stand anywhere inside the marked circle around the campfire and click an upgrade in the “Little improvements” panel. Shelter costs six wood, bed costs four wood after shelter, and storage crate costs four wood. The bed improves resting; the crate raises carrying capacity to sixteen. The game has one fixed map and no combat or companions yet.
 
+The pale frames in camp mark future building sites. Branch piles and berry bushes are brighter when ready to gather; they fade after collection and replenish at dawn. The scene art is drawn in Phaser, so there are no external image assets to install.
+
 ## Saving
 
 Progress is saved in this browser's local storage under `hearthwild.save` after successful actions, periodically, and when the page is hidden or closed. Choose **Continue your camp** when you return. **Start a new game** asks before replacing an existing save. Saves stay in this browser profile; private browsing, clearing site data, or switching devices will not carry them over. The game shows a message if storage fails or an existing save cannot be read.

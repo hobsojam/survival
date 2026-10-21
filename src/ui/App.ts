@@ -28,6 +28,9 @@ export class App {
     } catch (error) {
       this.previousSave = { kind: 'invalid', reason: `Browser storage is unavailable: ${String(error)}` };
     }
+    const buildMarkup = buildOptions.map(({ id, name, description }) =>
+      `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${id === 'shelter' ? '⌂' : id === 'bed' ? '▣' : '▤'}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>`
+    ).join('');
     this.root.innerHTML = `
       <div class="shell">
         <header class="topbar">
@@ -48,7 +51,7 @@ export class App {
               <div class="quick-actions"><button data-action="eat">Eat berries</button><button data-action="rest">Rest</button><button data-action="stokeFire">Feed fire</button></div>
             </section>
             <section class="panel"><p class="eyebrow">IN YOUR BAG</p><div class="supplies"><div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small></div><div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small></div><div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small>Carried</small></div></div><div class="fire-status" id="fire-status">The fire is unlit</div></section>
-            <section class="panel build-panel"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand inside the marked camp circle to build.</p><div id="build-list"></div></section>
+            <section class="panel build-panel"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand inside the marked camp circle to build.</p><div id="build-list">${buildMarkup}</div></section>
           </aside>
         </div>
         <div id="start-screen" class="start-screen"><div class="start-card"><div class="start-mark">✦</div><p class="eyebrow">A SMALL SURVIVAL STORY</p><h1>Make a little place<br>feel like home.</h1><p class="start-copy">Gather what you need, keep a fire glowing, and build a refuge one day at a time.</p><p id="start-note" class="start-note"></p><div class="start-buttons"><button id="continue-game" class="primary-button" hidden>Continue your camp</button><button id="new-game" class="secondary-button">Start a new game</button></div><small>Single player · Saves in this browser</small></div></div>
@@ -163,11 +166,16 @@ export class App {
     this.setText('fire-status', this.state.fireFuel > 0 ? `Fire burning · ${Math.ceil(this.state.fireFuel)}s of warmth` : 'The fire is unlit');
     this.setText('prompt', this.scene?.getPrompt() ?? 'WASD / arrows  Move');
     this.setText('build-hint', isAtCamp(this.state) ? 'At camp — click an upgrade to build.' : 'Stand inside the marked camp circle to build.');
-    this.root.querySelector('#build-list')!.innerHTML = buildOptions.map(({ id, name, description }) => {
+    for (const { id } of buildOptions) {
       const built = this.state.structures[id];
       const cost = BALANCE.buildCosts[id];
-      return `<button class="build-item ${built ? 'built' : ''}" data-build="${id}" ${built ? 'disabled' : ''}><span class="build-symbol">${id === 'shelter' ? '⌂' : id === 'bed' ? '▣' : '▤'}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost">${built ? 'Built' : `${cost} wood`}</span></button>`;
-    }).join('');
+      const button = this.root.querySelector<HTMLButtonElement>(`[data-build="${id}"]`)!;
+      button.disabled = built;
+      button.classList.toggle('built', built);
+      button.classList.toggle('ready', !built && isAtCamp(this.state) && inventory.wood >= cost && (id !== 'bed' || structures.shelter));
+      button.querySelector<HTMLElement>('.build-verb')!.textContent = built ? 'Built' : 'Build';
+      button.querySelector<HTMLElement>('.build-price')!.textContent = built ? 'Complete' : `${cost} wood`;
+    }
   }
 
   private setText(id: string, text: string): void {
