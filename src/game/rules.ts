@@ -115,10 +115,10 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     }
     if (node.amount <= 0) return { state, message: 'Nothing to gather yet.' };
     const capacity = state.structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity;
-    if (state.inventory.wood + state.inventory.food >= capacity) {
+    if (state.inventory.wood + state.inventory.food + state.inventory.fiber >= capacity) {
       return { state, message: 'Your bag is full. Return to camp.' };
     }
-    const resource = node.kind === 'branch' ? 'wood' : 'food';
+    const resource = node.kind === 'branch' ? 'wood' : node.kind === 'berry' ? 'food' : 'fiber';
     const nodes = state.nodes.map((item, itemIndex) => itemIndex === index
       ? { ...item, amount: item.amount - 1, readyDay: state.day + 1 }
       : item);
@@ -129,7 +129,7 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
         inventory: { ...state.inventory, [resource]: state.inventory[resource] + 1 },
         nodes
       }, BALANCE.gatherSeconds, 'working'),
-      message: resource === 'wood' ? 'Collected wood.' : 'Picked berries.'
+      message: resource === 'wood' ? 'Collected wood.' : resource === 'food' ? 'Picked berries.' : 'Gathered fiber.'
     };
   }
   if (action.type === 'eat') {
@@ -186,11 +186,14 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     if (state.structures[action.structureId]) return { state, message: 'Already built.' };
     if (action.structureId === 'bed' && !state.structures.shelter) return { state, message: 'Build a shelter first.' };
     const cost = BALANCE.buildCosts[action.structureId];
-    if (state.inventory.wood < cost) return { state, message: `Need ${cost} wood to build this.` };
+    if (state.inventory.wood < cost.wood || state.inventory.fiber < cost.fiber) {
+      const needed = [state.inventory.wood < cost.wood ? `${cost.wood} wood` : null, state.inventory.fiber < cost.fiber ? `${cost.fiber} fiber` : null].filter(Boolean).join(' and ');
+      return { state, message: `Need ${needed} to build this.` };
+    }
     return {
       state: advanceTime({
         ...state,
-        inventory: { ...state.inventory, wood: state.inventory.wood - cost },
+        inventory: { ...state.inventory, wood: state.inventory.wood - cost.wood, fiber: state.inventory.fiber - cost.fiber },
         player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.buildEnergyCost) },
         structures: { ...state.structures, [action.structureId]: true }
       }, BALANCE.buildSeconds, 'working'),

@@ -1,4 +1,4 @@
-export type ResourceKind = 'branch' | 'berry';
+export type ResourceKind = 'branch' | 'berry' | 'fiber';
 export type StructureId = 'shelter' | 'bed' | 'crate' | 'hearth';
 
 export interface ResourceNode {
@@ -14,7 +14,7 @@ export interface GameState {
   day: number;
   timeOfDay: number;
   player: { x: number; y: number; energy: number; hunger: number; warmth: number };
-  inventory: { wood: number; food: number };
+  inventory: { wood: number; food: number; fiber: number };
   fireFuel: number;
   structures: Record<StructureId, boolean>;
   progress: { nextStormDay: number | null; hearthUnlocked: boolean };
@@ -57,7 +57,7 @@ export const BALANCE = {
   coldNightFailureMorningLoss: 30,
   interactionRadius: 2,
   campRadius: 4,
-  buildCosts: { shelter: 6, bed: 4, crate: 4, hearth: 4 } satisfies Record<StructureId, number>
+  buildCosts: { shelter: { wood: 6, fiber: 2 }, bed: { wood: 4, fiber: 1 }, crate: { wood: 4, fiber: 0 }, hearth: { wood: 4, fiber: 0 } } satisfies Record<StructureId, { wood: number; fiber: number }>
 } as const;
 
 const branchPositions = [
@@ -69,16 +69,22 @@ const berryPositions = [
   [12, 15], [28, 20], [9, 10], [33, 8]
 ];
 
+const fiberPositions = [
+  [21, 14], [17, 19], [24, 18], [14, 16],
+  [27, 12], [10, 14], [30, 18], [8, 21]
+];
+
 export function createGame(): GameState {
   const nodes: ResourceNode[] = [
     ...branchPositions.map(([x, y], index) => ({ id: `branch-${index}`, kind: 'branch' as const, x, y, amount: 1, readyDay: 1 })),
-    ...berryPositions.map(([x, y], index) => ({ id: `berry-${index}`, kind: 'berry' as const, x, y, amount: 1, readyDay: 1 }))
+    ...berryPositions.map(([x, y], index) => ({ id: `berry-${index}`, kind: 'berry' as const, x, y, amount: 1, readyDay: 1 })),
+    ...fiberPositions.map(([x, y], index) => ({ id: `fiber-${index}`, kind: 'fiber' as const, x, y, amount: 1, readyDay: 1 }))
   ];
   return {
     day: 1,
     timeOfDay: 0,
     player: { x: BALANCE.campX, y: BALANCE.campY, energy: 100, hunger: 100, warmth: 100 },
-    inventory: { wood: 0, food: 0 },
+    inventory: { wood: 0, food: 0, fiber: 0 },
     fireFuel: 0,
     structures: { shelter: false, bed: false, crate: false, hearth: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false },

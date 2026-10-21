@@ -13,6 +13,23 @@ describe('gathering and inventory', () => {
     expect(before.nodes[0].amount).toBe(1);
   });
 
+  it('gathers fiber, counts it in the bag, and regrows it at dawn', () => {
+    const state = createGame();
+    state.player.x = 21;
+    state.player.y = 14;
+    const gathered = applyAction(state, { type: 'gather', nodeId: 'fiber-0' });
+    expect(gathered.state.inventory.fiber).toBe(1);
+    expect(gathered.state.nodes.find(node => node.id === 'fiber-0')?.amount).toBe(0);
+    expect(advanceTime(gathered.state, 240).nodes.find(node => node.id === 'fiber-0')?.amount).toBe(1);
+  });
+
+  it('counts fiber toward carrying capacity', () => {
+    const state = createGame();
+    state.inventory.wood = 6;
+    state.inventory.fiber = 2;
+    expect(applyAction(state, { type: 'gather', nodeId: 'branch-0' }).message).toMatch(/full/i);
+  });
+
   it('gathers berries into food', () => {
     const state = createGame();
     state.player.x = 19;
@@ -129,6 +146,7 @@ describe('fire and camp upgrades', () => {
   it('builds while standing at the visible shelter and crate sites', () => {
     const shelterState = createGame();
     shelterState.inventory.wood = 6;
+    shelterState.inventory.fiber = 2;
     shelterState.player.x = 17;
     shelterState.player.y = 13;
     expect(applyAction(shelterState, { type: 'build', structureId: 'shelter' }).state.structures.shelter).toBe(true);
@@ -150,19 +168,32 @@ describe('fire and camp upgrades', () => {
     expect(advanceTime(lit, 100).fireFuel).toBe(0);
   });
 
-  it('builds the shelter with six wood and six energy', () => {
+  it('builds the shelter with six wood, two fiber, and six energy', () => {
     const state = createGame();
     state.inventory.wood = 6;
+    state.inventory.fiber = 2;
     const built = applyAction(state, { type: 'build', structureId: 'shelter' }).state;
     expect(built.structures.shelter).toBe(true);
     expect(built.inventory.wood).toBe(0);
     expect(built.player.energy).toBe(94);
   });
 
+  it('requires both wood and fiber for a shelter', () => {
+    const state = createGame();
+    state.inventory.wood = 6;
+    expect(applyAction(state, { type: 'build', structureId: 'shelter' }).state).toBe(state);
+    state.inventory.fiber = 2;
+    const built = applyAction(state, { type: 'build', structureId: 'shelter' }).state;
+    expect(built.structures.shelter).toBe(true);
+    expect(built.inventory.wood).toBe(0);
+    expect(built.inventory.fiber).toBe(0);
+  });
+
   it('bed improves rest and costs four wood', () => {
     const state = createGame();
     state.structures.shelter = true;
     state.inventory.wood = 4;
+    state.inventory.fiber = 1;
     state.player.energy = 20;
     const built = applyAction(state, { type: 'build', structureId: 'bed' }).state;
     expect(built.structures.bed).toBe(true);
@@ -184,6 +215,7 @@ describe('fire and camp upgrades', () => {
     const state = createGame();
     expect(applyAction(state, { type: 'build', structureId: 'shelter' }).state.structures.shelter).toBe(false);
     state.inventory.wood = 8;
+    state.inventory.fiber = 2;
     state.player.x = 0;
     expect(applyAction(state, { type: 'build', structureId: 'shelter' }).state.inventory.wood).toBe(8);
     state.player.x = 20;
@@ -217,6 +249,7 @@ describe('daylight spent on work', () => {
   it('building takes twelve seconds of daylight', () => {
     const state = createGame();
     state.inventory.wood = 6;
+    state.inventory.fiber = 2;
     const result = applyAction(state, { type: 'build', structureId: 'shelter' });
     expect(result.state.timeOfDay).toBe(12);
     expect(result.state.player.hunger).toBe(98.5);
