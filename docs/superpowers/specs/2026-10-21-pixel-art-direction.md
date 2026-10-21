@@ -1,8 +1,8 @@
 # Hearthwild: Pixel Art Direction
 
-> **For agentic workers:** This spec replaces the current procedural shape art (`src/scene/art.ts`, the drawing in `src/scene/ambientLife.ts`, and the night tint, fire glow and cold-front wind in `GameScene`). Work through the phases in order, one PR per phase, each with the screenshots listed in [Review](#review). Do not change gameplay rules, balance values, the save format (currently version 3), or map coordinates of resource nodes and camp sites.
+> **For agentic workers:** This spec replaces the current procedural shape art (`src/scene/art.ts`, the drawing in `src/scene/ambientLife.ts`, and the night tint, fire glow and cold-front wind in `GameScene`). Work through the phases in order, one PR per phase, each with the screenshots listed in [Review](#review). Do not change gameplay rules, balance values, the save format (`SAVE_VERSION` in `src/game/save.ts`), or map coordinates of resource nodes and camp sites.
 >
-> **Updated 2026-10-21** for features merged after the first draft: the cold-front night and stone hearth (#12), cooking and stargazing at night (#14), and the favicon (#13).
+> **Updated 2026-10-21** for features merged after the first draft: the cold-front night and stone hearth (#12), cooking and stargazing at night (#14), the favicon (#13), and fiber (#17). Scaling and review rules were tightened after the phase 1 review (#18).
 
 ## Why the current art fails
 
@@ -27,7 +27,9 @@ Cozy top-down pixel art on a 16 px grid, in the family of Stardew Valley, Sprout
 
 - **Art grid:** 1 tile = 16 × 16 art pixels. Change `TILE` from 32 to 16. Game logic stays in tile units, so rules and saves are unaffected.
 - **Logical resolution:** 480 × 300. At 2× this is today's 960 × 600 canvas and shows the same 30 × 18.75 tiles.
-- **Display scale:** use the largest whole-number scale that fits the frame (2× on a typical desktop, 3× on large screens), centred with letterboxing in the frame's background color. Only below 2× (phones) fall back to fit-to-frame, accepting slightly uneven pixels.
+- **Display scale:** use the largest whole-number scale that fits the frame (2× on a typical desktop, 3× on large screens), centred with letterboxing in the frame's background color. The page layout must let the game frame grow wide enough for 3× (1,440 px) on viewports about 1,900 px wide or more; don't cap it at a width that makes 3× unreachable.
+- **Never scale below 1× or by a fraction.** Where the frame is too small for 2× (phones), render at 1× and resize the logical viewport to the frame instead, so the camera shows fewer tiles. Shrinking the whole 480 × 300 view drops whole art pixels, so 1 px outlines and details disappear.
+- **Whole-pixel placement:** the canvas's on-page position must be a whole number of CSS pixels. Centring in a frame with an odd size gives half-pixel offsets that blur or double rows in some browsers; round the offsets.
 - **Phaser config:** `pixelArt: true`, `roundPixels: true`, `antialias: false`. CSS on the canvas: `image-rendering: pixelated`.
 - **Never** rotate, skew, scale by a non-integer, or draw at sub-pixel positions. Movement is float in game state but rendered at whole art pixels. Camera follow must also round. Flipping horizontally (`scaleX = -1`) is allowed.
 - No Phaser `Graphics` shapes for art. Everything visible in the world is a texture made from a sprite definition, except the lighting layer described below.
@@ -55,11 +57,11 @@ export const berryBush: SpriteDef = {
 - `src/art/palette.ts` holds every color as a named key (see [Palette](#palette)). Legends map characters to palette keys only, never to hex values.
 - `src/art/textures.ts` turns definitions into textures (one canvas per frame, or one sheet per sprite) during `preload`/`create`, and registers animations.
 - Group sprites by area: `terrain`, `nodes`, `camp`, `survivor`, `wildlife`, `effects`, `icons`.
-- **Tests** (`tests/art.test.ts`): every frame has exactly `size` rows of exactly `size[0]` characters; every character is `.` or in the legend; every legend value is a palette key; every required sprite and animation in the [sprite list](#sprite-list) exists; anchors are inside the frame.
+- **Tests** (`tests/art.test.ts`): every frame has exactly `size` rows of exactly `size[0]` characters; every character is `.` or in the legend; every legend value is a palette key; anchors are inside the frame. Keep an explicit list of required sprites, frames and animations in the test, and have each phase add the ones from the [sprite list](#sprite-list) it delivers, so a phase can't quietly skip one.
 
 ### Contact sheet
 
-Add a dev-only page, `sprites.html` (served by `npm run dev`, excluded from the production build), that shows every sprite and every animation at 4× on three backgrounds: the grass tile, the camp dirt tile, and the night tint. Label each with its name and size. This page is how sprites get reviewed before they reach the game. Include it in every art PR's screenshots.
+Add a dev-only page, `sprites.html` (served by `npm run dev`, excluded from the production build), that shows every sprite and every animation at 4× on three backgrounds: the grass tile, the camp dirt tile, and night. The night sample must draw the sprite on grass and then lay the night tint over it at full strength (`night` at 55%), as the game will, rather than placing the sprite at full brightness on a flat night color. Label each with its name and size. This page is how sprites get reviewed before they reach the game. Include it in every art PR's screenshots.
 
 ## Palette
 
@@ -176,6 +178,7 @@ Sizes are in art pixels (W × H). The anchor is bottom-centre unless noted.
 |---|---|---|---|
 | Branch pile | 16 × 16 | `ready`, `depleted` | Ready: 3 to 4 crossed sticks with clear ends, top highlighted. Depleted: two small twigs on an `earth` scuff. |
 | Berry bush | 16 × 16 | `ready`, `picked`, `rustle` (2 frames) | Ready: 4 to 6 berries clearly visible as `berry` clusters with a `berry4` shine pixel. Picked: same bush, no berries, slightly paler. Rustle plays when gathered. |
+| Fiber reeds | 16 × 16 | `ready`, `cut`, `sway` (2 frames) | Ready: a clump of 4 or 5 tall reed stalks in `grass3`/`grass4` with a `grass0` outline, topped with `canvas3`/`canvas4` seed heads, standing clearly above the grass with the tallest about 14 px. Cut: short `grass1` stubble with 2 or 3 pale `canvas2` cut ends; it must still read as a spot that will regrow, not as empty grass. Sway is a 1 px lean of the heads, played slowly and out of step between clumps. |
 
 ### Camp
 
@@ -185,7 +188,7 @@ Sizes are in art pixels (W × H). The anchor is bottom-centre unless noted.
 | Hearth site | 24 × 12 | 1 | Ground decal next to the fire pit: a small stack of fitted stones and a chalk outline. Shown only once the hearth is unlocked and not yet built. |
 | Stone hearth | 32 × 28 | `unlit`; `burning` (4); `low` (4); `windy` (4) | Replaces the fire pit when built, at the same anchor. A low, mortared wall of fitted `stone` blocks with a flat front lip and a back wall a few pixels taller, so it reads as built rather than gathered. Same flame frames as the fire pit, 2 px taller. |
 | Shelter site | 48 × 32 | 1 | Ground decal: 4 stakes with rope between them on a cleared earth rectangle. No transparency, no box outline. |
-| Shelter | 48 × 40 | `built`, `built-bed` | A-frame or lean-to of `canvas` over `wood` poles, open doorway facing down (toward the camera). `built-bed` shows a bedroll inside the doorway. |
+| Shelter | 48 × 40 | `built`, `built-bed` | A-frame or lean-to of `canvas` over `wood` poles, open doorway facing down (toward the camera), with poles lashed at the top in `canvas2` fiber cord (shelter and bed both cost fiber). `built-bed` shows a bedroll inside the doorway. |
 | Crate site | 16 × 16 | 1 | Ground decal: four corner pegs and a chalk-like `earth4` cross. |
 | Crate | 16 × 16 | 1 | Wooden crate, plank lines, top face visible. |
 | Drying rack site | 32 × 16 | 1 | Four stakes marking a small frame northeast of the fire. |
@@ -214,7 +217,7 @@ Keep all behaviour in `src/scene/ambient.ts` and `src/scene/ambientLife.ts`; onl
 
 | Sprite | Size | Frames | Notes |
 |---|---|---|---|
-| Gather pop | 8 × 8 icon | rises 8 px over 0.6 s, then vanishes | Shows the wood or berry icon above the node. |
+| Gather pop | 8 × 8 icon | rises 8 px over 0.6 s, then vanishes | Shows the wood, berry or fiber icon above the node. |
 | Smoke puff | 8 × 8 | 3 | Rises from the fire every 1 to 2 s while burning. Uses `stone3`/`stone4`. |
 | Sparks | 1 × 1 | n/a | 1 to 2 `fire4` pixels drifting up from the fire occasionally. |
 | Wind streak | 12 × 3 | 3 | Cold front only. A short `frost` streak that stretches, holds and fades as it drifts with the wind. |
@@ -229,7 +232,7 @@ The HTML sidebar and top bar keep their current layout and fonts. Replace the Un
 
 | Icon | Size | Notes |
 |---|---|---|
-| Wood, food, bag capacity | 16 × 16 | |
+| Wood, food, fiber, bag capacity | 16 × 16 | Fiber is a small coiled bundle of reed cord in the `canvas` ramp. |
 | Shelter, bed, crate, hearth (build list) | 16 × 16 | |
 | Hearth locked state | 16 × 16 | Same hearth icon in `stone1`/`stone2` only, with a small padlock. |
 | Forecast card (cold front coming, active, weathered) | 16 × 16 each | Cloud with wind; cloud with sleet; sun over the hearth. |
@@ -237,7 +240,7 @@ The HTML sidebar and top bar keep their current layout and fonts. Replace the Un
 | Night actions: cook, stargaze | 16 × 16 each | Berries on a stick; a star. |
 | Energy, hunger, warmth (meter labels) | 8 × 8 | |
 
-Align the sidebar's accent colors with the palette: energy bar in `grass3`/`grass4`, hunger in `scarf3`/`scarf4`, warmth in `fire2`/`fire3`, wood text in `wood2`, berries in `berry2`. The forecast card uses `storm` and `frost` while a front is coming or active, and the `fire` ramp once weathered.
+Align the sidebar's accent colors with the palette: energy bar in `grass3`/`grass4`, hunger in `scarf3`/`scarf4`, warmth in `fire2`/`fire3`, wood text in `wood2`, berries in `berry2`, fiber in `canvas2`. The forecast card uses `storm` and `frost` while a front is coming or active, and the `fire` ramp once weathered.
 
 The favicon (`public/favicon.svg`, a 16 × 16 campfire) already follows this spec. Use it as the reference for the fire's look and for icon scale.
 
@@ -247,7 +250,7 @@ Each phase is one PR, keeps the game playable, and keeps all existing tests pass
 
 1. **Pipeline:** palette, sprite format, texture generation, contact sheet page, art tests, pixel-perfect scaling and the 16 px `TILE`. Temporarily show the existing art scaled to the new grid if needed. No new art yet beyond a test sprite or two.
 2. **Terrain and map composition:** grass, autotiled camp clearing and paths, decoration, rim stones, trees with y-sorting, forest border and groves.
-3. **Nodes and camp:** branch piles, berry bushes, fire pit, build sites, shelter, bed, crate, hearth site, stone hearth, log seat. Remove halos, dotted circle and translucent ellipses.
+3. **Nodes and camp:** branch piles, berry bushes, fiber reeds, fire pit, build sites, shelter, bed, crate, hearth site, stone hearth, log seat. Remove halos, dotted circle and translucent ellipses.
 4. **Survivor:** directional walk, idle, gather, rest, cook, stargaze and shiver animations.
 5. **Wildlife and effects:** birds, fox, fireflies, gather pops, smoke, sparks, cook steam, shooting star, wind streaks, sleet and morning frost.
 6. **Lighting and weather:** the time-of-day lighting layer including the cold-front tint, stepped lights, fire radius tied to fuel and hearth, windy flames. Remove the old night rectangle, additive glow and scrolling wind lines.
@@ -257,11 +260,11 @@ Each phase is one PR, keeps the game playable, and keeps all existing tests pass
 
 ### Screenshots for every PR
 
-Take them at 2× (a 960 × 600 canvas) by loading a save into `localStorage` under `hearthwild.save` and pressing **Continue your camp**. Build the state from `createGame()` (so it has every current field) and save it as `{ version: 3, state }`, matching `SAVE_VERSION` in `src/game/save.ts`; a stale shape or version is rejected as unreadable. Show before and after for:
+Take them at 2× (a 960 × 600 canvas) by loading a save into `localStorage` under `hearthwild.save` and pressing **Continue your camp**. In the page, import `createGame` from `/src/game/state.ts` and `saveGame` from `/src/game/save.ts`, adjust the state, and save it with `saveGame(localStorage, state)`. Check it returns `ok: true`: the save validator rejects inconsistent states, for example a built hearth needs `progress.hearthUnlocked` true and `progress.nextStormDay` null, and the bag can't hold more than its capacity. Hand-writing `{ version, state }` JSON breaks whenever the save version changes. Show before and after for:
 
 1. Day, survivor at camp with shelter, bed and crate built and the fire burning.
 2. Day, a fresh game: camp with all build sites empty and nodes ready.
-3. Meadow away from camp with birds and some depleted nodes.
+3. Meadow away from camp with birds, and ready and depleted branch, berry and fiber nodes.
 4. Golden hour (`timeOfDay` 150) with the fox arriving.
 5. Night (`timeOfDay` 200) at camp, fire burning, fox sitting, fireflies.
 6. Night with the fire out.
