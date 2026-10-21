@@ -15,7 +15,59 @@ function near(x1: number, y1: number, x2: number, y2: number): boolean {
   return Math.hypot(x1 - x2, y1 - y2) <= BALANCE.interactionRadius;
 }
 
+function atCamp(state: GameState): boolean {
+  return near(state.player.x, state.player.y, BALANCE.campX, BALANCE.campY);
+}
+
+export function movementFactor(state: GameState): number {
+  return state.player.energy <= 20 || state.player.hunger <= 20 || state.player.warmth <= 20 ? 0.65 : 1;
+}
+
+export function advanceTime(state: GameState, seconds: number): GameState {
+  if (!Number.isFinite(seconds) || seconds <= 0) return state;
+  let next: GameState = {
+    ...state,
+    player: { ...state.player },
+    nodes: state.nodes.map(node => ({ ...node }))
+  };
+  let remaining = seconds;
+  while (remaining > 0.000001) {
+    const step = Math.min(remaining, 1, BALANCE.daySeconds - next.timeOfDay);
+    const night = next.timeOfDay >= BALANCE.nightStart;
+    const camp = atCamp(next);
+    const lit = next.fireFuel > 0;
+    next.player.hunger = Math.max(0, next.player.hunger - step / 8);
+    const warmthChange = night
+      ? camp && lit ? step / 2 : camp && next.structures.shelter ? -step / 4 : -step / 2
+      : step / 10;
+    next.player.warmth = Math.max(0, Math.min(100, next.player.warmth + warmthChange));
+    next.fireFuel = Math.max(0, next.fireFuel - step);
+    next.timeOfDay += step;
+    remaining -= step;
+    if (next.timeOfDay >= BALANCE.daySeconds - 0.000001) {
+      next.day += 1;
+      next.timeOfDay = 0;
+      next.nodes = next.nodes.map(node => node.readyDay <= next.day ? { ...node, amount: 1 } : node);
+    }
+  }
+  return next;
+}
+
 export function applyAction(state: GameState, action: GameAction): ActionResult {
+  if (action.type === 'move') {
+    const factor = movementFactor(state);
+    return {
+      state: {
+        ...state,
+        player: {
+          ...state.player,
+          x: Math.max(0, Math.min(BALANCE.mapWidth - 1, state.player.x + action.dx * factor)),
+          y: Math.max(0, Math.min(BALANCE.mapHeight - 1, state.player.y + action.dy * factor))
+        }
+      },
+      message: ''
+    };
+  }
   if (action.type === 'gather') {
     const index = state.nodes.findIndex(node => node.id === action.nodeId);
     const node = state.nodes[index];
@@ -50,6 +102,14 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
         player: { ...state.player, hunger: Math.min(100, state.player.hunger + BALANCE.eatHungerGain) }
       },
       message: 'Ate some berries.'
+    };
+  }
+  if (action.type === 'rest') {
+    if (!atCamp(state)) return { state, message: 'Return to camp to rest.' };
+    const rested = advanceTime(state, BALANCE.restSeconds);
+    return {
+      state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + BALANCE.restEnergyGain) } },
+      message: 'You take a short rest.'
     };
   }
   return { state, message: 'That action is not available yet.' };

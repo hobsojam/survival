@@ -53,3 +53,74 @@ describe('gathering and inventory', () => {
     expect(applyAction(state, { type: 'gather', nodeId: 'branch-0' }).state.inventory.wood).toBe(1);
   });
 });
+
+describe('time and gentle survival', () => {
+  it('rolls the day over at 240 seconds and replenishes gathered nodes', async () => {
+    const { advanceTime } = await import('../src/game/rules');
+    const state = createGame();
+    state.nodes[0].amount = 0;
+    state.nodes[0].readyDay = 2;
+    const next = advanceTime(state, 240);
+    expect(next.day).toBe(2);
+    expect(next.timeOfDay).toBe(0);
+    expect(next.nodes[0].amount).toBe(1);
+  });
+
+  it('handles two dawns in one time step', async () => {
+    const { advanceTime } = await import('../src/game/rules');
+    const state = createGame();
+    state.nodes[0].amount = 0;
+    state.nodes[0].readyDay = 2;
+    const next = advanceTime(state, 490);
+    expect(next.day).toBe(3);
+    expect(next.timeOfDay).toBe(10);
+    expect(next.nodes[0].amount).toBe(1);
+  });
+
+  it('starts cold exposure at night and keeps meters within bounds', async () => {
+    const { advanceTime } = await import('../src/game/rules');
+    const state = createGame();
+    state.player.x = 0;
+    state.player.y = 0;
+    state.player.hunger = 1;
+    state.timeOfDay = 159;
+    const beforeNight = advanceTime(state, 1);
+    expect(beforeNight.player.warmth).toBe(100);
+    const atNight = advanceTime(beforeNight, 2);
+    expect(atNight.player.warmth).toBe(99);
+    expect(atNight.player.hunger).toBeGreaterThanOrEqual(0);
+    const longNight = advanceTime(atNight, 3000);
+    expect(longNight.player.hunger).toBe(0);
+    expect(longNight.player.warmth).toBeGreaterThanOrEqual(0);
+    expect(longNight.player.warmth).toBeLessThanOrEqual(100);
+  });
+
+  it('slows but never blocks movement at depleted meters', async () => {
+    const { movementFactor } = await import('../src/game/rules');
+    const state = createGame();
+    state.player.energy = 0;
+    state.player.hunger = 0;
+    state.player.warmth = 0;
+    expect(movementFactor(state)).toBe(0.65);
+    expect(applyAction(state, { type: 'move', dx: 1, dy: 0 }).state.player.x).toBeGreaterThan(20);
+    expect(applyAction(state, { type: 'gather', nodeId: 'branch-0' }).state.inventory.wood).toBe(1);
+  });
+
+  it('stops movement at the map boundary', () => {
+    const state = createGame();
+    expect(applyAction(state, { type: 'move', dx: 1, dy: 0 }).state.player.x).toBe(21);
+    state.player.x = 39;
+    state.player.y = 0;
+    const moved = applyAction(state, { type: 'move', dx: 2, dy: -2 }).state;
+    expect(moved.player.x).toBe(39);
+    expect(moved.player.y).toBe(0);
+  });
+
+  it('rest advances time and restores energy', () => {
+    const state = createGame();
+    state.player.energy = 30;
+    const rested = applyAction(state, { type: 'rest' }).state;
+    expect(rested.player.energy).toBe(55);
+    expect(rested.timeOfDay).toBe(20);
+  });
+});
