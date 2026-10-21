@@ -1,0 +1,273 @@
+# Hearthwild: Pixel Art Direction
+
+> **For agentic workers:** This spec replaces the current procedural shape art (`src/scene/art.ts`, the drawing in `src/scene/ambientLife.ts`, the glow and tint in `GameScene`). Work through the phases in order, one PR per phase, each with the screenshots listed in [Review](#review). Do not change gameplay rules, balance values, save format, or map coordinates of resource nodes and camp sites.
+
+## Why the current art fails
+
+These are the specific problems to fix, not a general dislike:
+
+1. **No value structure.** Ground, trees and bushes are all mid-value olive green. Nothing interactive stands out, so the screen reads as mush.
+2. **Noise instead of texture.** Hundreds of random translucent ellipses on the ground create blotches with no meaning.
+3. **Mixed perspective.** Trees are seen from above, the tent and survivor from the front, branch piles from an angle. There is no shared camera.
+4. **Inconsistent scale.** A berry bush is as big as a tree; the shelter is bigger than a cluster of trees.
+5. **Effects pretending to be art.** Glow halos under ready nodes look like stains. The camp is translucent ellipses plus a dotted circle that reads as a debug overlay. Firelight is additive circles with visible ring edges.
+6. **No rules.** Some shapes have outlines and some don't, shadows point in different directions, and colors are chosen per object rather than from a palette.
+
+The fix is a system: a fixed palette, one grid, one camera, one light direction, and sprites built from rules. A modest sprite that follows the rules looks better than an elaborate one that doesn't.
+
+## Style in one paragraph
+
+Cozy top-down pixel art on a 16 px grid, in the family of Stardew Valley, Sprout Lands and Eastward's overworld: a three-quarter view (ground seen from above, objects show their top and front face), a warm hue-shifted palette, light from the top-left, soft dark outlines in each material's own darkest color, and small, purposeful animation. Clearings feel warm and lived in; the forest edge frames the scene. At night the fire is the brightest thing on screen.
+
+## Technical rules
+
+### Resolution and scaling
+
+- **Art grid:** 1 tile = 16 × 16 art pixels. Change `TILE` from 32 to 16. Game logic stays in tile units, so rules and saves are unaffected.
+- **Logical resolution:** 480 × 300. At 2× this is today's 960 × 600 canvas and shows the same 30 × 18.75 tiles.
+- **Display scale:** use the largest whole-number scale that fits the frame (2× on a typical desktop, 3× on large screens), centred with letterboxing in the frame's background color. Only below 2× (phones) fall back to fit-to-frame, accepting slightly uneven pixels.
+- **Phaser config:** `pixelArt: true`, `roundPixels: true`, `antialias: false`. CSS on the canvas: `image-rendering: pixelated`.
+- **Never** rotate, skew, scale by a non-integer, or draw at sub-pixel positions. Movement is float in game state but rendered at whole art pixels. Camera follow must also round. Flipping horizontally (`scaleX = -1`) is allowed.
+- No Phaser `Graphics` shapes for art. Everything visible in the world is a texture made from a sprite definition, except the lighting layer described below.
+
+### Sprite authoring format
+
+Sprites are code: palette-indexed strings, one character per pixel, converted to Phaser textures at boot. This guarantees palette discipline and keeps sprites diffable.
+
+```ts
+// src/art/sprites/berryBush.ts
+export const berryBush: SpriteDef = {
+  size: [16, 16],
+  anchor: [8, 15],           // pixel that sits on the tile position (feet / base)
+  legend: { o: 'leaf0', d: 'leaf1', m: 'leaf2', l: 'leaf3', r: 'berry1', R: 'berry2', s: 'shadow' },
+  frames: {
+    ready: [
+      '................',
+      // ...16 rows of 16 characters; '.' is always transparent
+    ],
+    picked: [ /* ... */ ]
+  }
+};
+```
+
+- `src/art/palette.ts` holds every color as a named key (see [Palette](#palette)). Legends map characters to palette keys only, never to hex values.
+- `src/art/textures.ts` turns definitions into textures (one canvas per frame, or one sheet per sprite) during `preload`/`create`, and registers animations.
+- Group sprites by area: `terrain`, `nodes`, `camp`, `survivor`, `wildlife`, `effects`, `icons`.
+- **Tests** (`tests/art.test.ts`): every frame has exactly `size` rows of exactly `size[0]` characters; every character is `.` or in the legend; every legend value is a palette key; every required sprite and animation in the [sprite list](#sprite-list) exists; anchors are inside the frame.
+
+### Contact sheet
+
+Add a dev-only page, `sprites.html` (served by `npm run dev`, excluded from the production build), that shows every sprite and every animation at 4× on three backgrounds: the grass tile, the camp dirt tile, and the night tint. Label each with its name and size. This page is how sprites get reviewed before they reach the game. Include it in every art PR's screenshots.
+
+## Palette
+
+All colors are hue-shifted ramps: shadows lean cool (toward blue and purple), highlights lean warm (toward yellow). Index 0 is the darkest and is used as that material's outline. Use **only** these colors. If a sprite seems to need a new color, the answer is almost always a different choice from an existing ramp. Adding a color needs a note in the PR saying why.
+
+| Ramp | 0 (outline) | 1 | 2 | 3 | 4 (highlight) |
+|---|---|---|---|---|---|
+| `grass` | `#2f5236` | `#3d6b3f` | `#5a8a45` | `#7aa64f` | `#a3c45e` |
+| `leaf` (trees, bushes) | `#16302e` | `#1f4a3a` | `#2f6b44` | `#4a8f4c` | `#7db55a` |
+| `earth` (camp, paths) | `#3a2620` | `#5c3d2b` | `#8a5f3c` | `#b58a5a` | `#dbb985` |
+| `wood` | `#2e1c18` | `#573423` | `#85512f` | `#b07a47` | `#d9a86a` |
+| `stone` | `#2b2d3a` | `#4d5161` | `#767b88` | `#a3a7ad` | `#d0d2cc` |
+| `canvas` (tent, bedroll) | `#4a3a2c` | `#7a6448` | `#b39a6e` | `#d9c595` | `#f0e2b8` |
+| `berry` | `#4a1426` | `#6b1e33` | `#b83a45` | `#e8665a` | `#ffc2a8` |
+| `fire` | `#7a2614` | `#c4471c` | `#ef7d23` | `#ffb84a` | `#ffe58a` |
+| `fox` | `#4a2014` | `#7a3418` | `#c25a24` | `#e88a3e` | `#f2e2c4` |
+| `bird` | `#2e2420` | `#4a3528` | `#7d5a40` | `#b08a62` | `#e3c9a0` |
+| `coat` (survivor) | `#3a1c22` | `#5e2a2e` | `#9c3f3a` | `#c9644c` | `#e88c6a` |
+| `scarf` | `#5e3f1c` | `#8a5f22` | `#b7832f` | `#e3b552` | `#f5d98a` |
+| `skin` | `#4a2a24` | `#8a5040` | `#c98a68` | `#efc39c` | `#fbe0c4` |
+| `hair` | `#1c1418` | `#3a2826` | `#5e4038` | `#7e5a48` | `#9e7a60` |
+| `flower` | `#5e3a6e` (violet) | `#e6c25a` (yellow) | `#f2f0e0` (white) | `#e88aa0` (pink) | `#8ab0e0` (blue) |
+
+Singles:
+
+| Key | Hex | Use |
+|---|---|---|
+| `ink` | `#1c1820` | Eyes and the tiniest details only. Never as a general outline. |
+| `paper` | `#f7f1e1` | The lightest color. Never use pure white. |
+| `beak` | `#e0a040` | Bird beaks and feet. |
+| `shadow` | `#1a2a24` at 45% alpha | The only translucent color. Ground shadows under objects. |
+| `night` | `#1a2140` | Night tint (lighting layer only). |
+| `dusk` | `#f0a050` | Golden-hour tint (lighting layer only). |
+| `dawn` | `#e8a0a8` | Dawn tint (lighting layer only). |
+| `firefly` | `#e9f79a` | Firefly cores. |
+
+Value plan, which matters more than hue:
+
+- **Ground** sits in the middle values (`grass2`, `earth2`/`earth3`).
+- **Decoration** (grass tufts, flowers, pebbles) stays within one step of the ground's value, so it adds texture without competing.
+- **Interactive objects** (branch piles, berry bushes, fire, build sites, structures) get the strongest contrast: a full dark outline plus at least one highlight two or more steps above the ground value.
+- **Trees** are darker and cooler than grass (`leaf1` to `leaf3`) so the forest frames the meadow without looking interactive.
+- **The survivor** is the highest-contrast thing on screen by day: a warm red coat against cool green.
+
+## Drawing rules
+
+1. **Light from the top-left.** Highlights on top and left edges, shade on the bottom and right. No exceptions.
+2. **Outlines:** every object gets a 1 px outline in its own ramp's index 0, not black. The outline can break (be skipped) on the top-left edge where the highlight is strongest. Ground tiles and decoration smaller than 8 px have no outline.
+3. **Shadows:** one flat `shadow` ellipse under each standing object, centred on the anchor and offset 1 px right. Its width is about 70% of the object's width and its height is 3 to 5 px. No other shadow directions.
+4. **Shape first:** block each sprite in as a silhouette with 2 or 3 tones, check it reads, then add highlight and detail. A sprite should be recognisable as a solid black silhouette.
+5. **Avoid the classic pixel art mistakes:**
+   - *Pillow shading* (dark edges all round, light in the middle): shade follows the light direction instead.
+   - *Banding* (rows of same-length clusters stacked in parallel): vary cluster lengths.
+   - *Jaggies* (lines whose steps go 1, 3, 1, 2): use regular step patterns (1-1-1, 2-2-2, 1-2-1-2).
+   - *Orphan pixels and noise:* every pixel belongs to a cluster of at least 2, except deliberate sparkles.
+   - *Too many colors per sprite:* 4 to 6 colors per material in one sprite, 12 at most in total.
+6. **Readable states without effects:** a ready berry bush shows berries and a picked one doesn't; a full branch pile shows a stack and a depleted one shows two twigs on bare earth. Delete the glow halos.
+7. **Animation is economical:** 2 to 4 frames, consistent timing, and the sprite's anchor never shifts between frames unless it's deliberate (a hop or bob).
+
+## Camera and layering
+
+- **Three-quarter top-down view** for everything. Ground is seen straight down. Trees, bushes, structures, wildlife and the survivor show their front face and a bit of their top.
+- **Y-sorting:** every standing object (trees, nodes, structures, rocks, wildlife, survivor) gets `depth = anchor y in world pixels`, so the survivor passes behind a tree when standing above its trunk and in front when below. Ground and ground decals (paths, flowers, build-site markings) stay on a flat layer below.
+- Trees stay non-blocking, since collision is out of scope. Keep them clear of the camp clearing, resource nodes (at least 1.5 tiles) and the main paths, so the survivor rarely walks through a trunk.
+
+## Map composition
+
+Keep every resource node and camp coordinate exactly where it is. Change only what surrounds them:
+
+- **Forest border:** a band of dense, overlapping trees 2 to 3 tiles deep around all map edges, so the world has a frame instead of ending in flat grass. Canopies may extend past the map edge.
+- **Groves, not scatter:** inside the border, place trees in 6 to 9 clusters of 3 to 7 trees, with open meadow between them. Placement is deterministic (seeded), as it is now.
+- **Camp clearing:** a circle of `earth` ground whose edge matches `campRadius` to within half a tile, with a soft, irregular autotiled edge (see the terrain list). Mark the boundary with small stones every 2 to 3 tiles around the rim, so the gameplay rule (build inside the circle) is visible without a drawn line.
+- **Worn paths:** narrow earth paths (1 tile wide, irregular) from the camp toward each of the 3 or 4 densest node areas. Purely decorative; they hint where to go.
+- **Decoration:** grass tufts, small flowers in patches (not evenly sprinkled), pebbles, a few stumps and mushrooms. Keep the meadow mostly calm: 1 decorated tile in 4 at most.
+
+## Lighting and time of day
+
+Replace the flat night rectangle and the additive glow circles with one lighting layer:
+
+- A full-screen `RenderTexture` above the world, filled with the tint for the current time, with light sources **erased** out of it.
+- **Tint by time of day**, using the existing `darkness()` curve in `src/scene/ambient.ts` to drive it:
+  - Day: no tint.
+  - Golden hour (the last 30 s before nightfall): `dusk` at up to 12%.
+  - Night: `night` at up to 55%.
+  - Dawn (the first 25 s): fades from `night` through `dawn` at 15% to clear.
+- **Light shapes are stepped, not smooth:** each light is 3 concentric bands with hard edges (for example 100%, 60% and 30% erase), or a 2 × 2 ordered dither between bands. No smooth radial gradients, which look out of place next to pixel art.
+- **Fire light:** the radius follows fuel (full at 60 s or more of fuel, shrinking to 60% as it nears zero) and flickers by ±1 art pixel on a 4-frame cycle in step with the flame animation. Unlit means no light.
+- **Small lights:** fireflies (a 5 px stepped light each) and optionally the survivor's shelter doorway when the bed is built (a faint warm glow).
+- The fire must be the brightest and warmest thing on screen at night, and the camp must still be readable at full darkness.
+
+## Sprite list
+
+Sizes are in art pixels (W × H). The anchor is bottom-centre unless noted.
+
+### Terrain
+
+| Sprite | Size | Frames / variants | Notes |
+|---|---|---|---|
+| Grass tile | 16 × 16 | 4 variants | Plain, two with tufts, one slightly darker patch. Picked by a deterministic hash of the tile position. Variants must tile seamlessly in any combination. |
+| Earth/grass autotile | 16 × 16 | 16 tiles | Corner-based (2-corner Wang / marching squares) transitions between grass and earth, for the camp clearing and paths. Irregular, slightly lumpy edge with a 1 px `earth0` lip on the earth side. |
+| Earth tile | 16 × 16 | 3 variants | Plain, pebbles, faint footprints. |
+| Decorations | 8 × 8 to 16 × 16 | about 10 | Grass tufts (2), flower patches (3, using the `flower` ramp), pebbles (2), stump, mushroom pair, fallen leaf. Flat ground decals have no shadow. |
+| Rim stone | 8 × 8 | 2 variants | Camp boundary markers. |
+| Trees | 32 × 48 | 3 variants | Round broadleaf, pine, small young tree (24 × 32). Trunk base at the anchor. Canopy in clear clusters of leaves, not a smooth blob. |
+| Rocks | 16 × 16 | 2 variants | Decorative boulders. |
+
+### Resource nodes
+
+| Sprite | Size | Frames | Notes |
+|---|---|---|---|
+| Branch pile | 16 × 16 | `ready`, `depleted` | Ready: 3 to 4 crossed sticks with clear ends, top highlighted. Depleted: two small twigs on an `earth` scuff. |
+| Berry bush | 16 × 16 | `ready`, `picked`, `rustle` (2 frames) | Ready: 4 to 6 berries clearly visible as `berry` clusters with a `berry4` shine pixel. Picked: same bush, no berries, slightly paler. Rustle plays when gathered. |
+
+### Camp
+
+| Sprite | Size | Frames | Notes |
+|---|---|---|---|
+| Fire pit | 24 × 24 | `unlit`; `burning` (4); `low` (4) | Ring of 8 stones (`stone` ramp) around charred logs. Burning: flames rise about 12 px with a `fire4` core. Low (under 30 s of fuel): flames about 6 px plus embers. Anchor at the centre of the ring. |
+| Shelter site | 48 × 32 | 1 | Ground decal: 4 stakes with rope between them on a cleared earth rectangle. No transparency, no box outline. |
+| Shelter | 48 × 40 | `built`, `built-bed` | A-frame or lean-to of `canvas` over `wood` poles, open doorway facing down (toward the camera). `built-bed` shows a bedroll inside the doorway. |
+| Crate site | 16 × 16 | 1 | Ground decal: four corner pegs and a chalk-like `earth4` cross. |
+| Crate | 16 × 16 | 1 | Wooden crate, plank lines, top face visible. |
+| Log seat (decorative) | 24 × 12 | 1 | One or two by the fire. Purely decorative, makes the camp feel lived in. |
+
+### Survivor
+
+| Sprite | Size | Frames | Notes |
+|---|---|---|---|
+| Survivor | 16 × 24 | `idle-down` (2), `walk-down` (4), `walk-up` (4), `walk-side` (4, flipped for left), `gather` (2), `rest` (2) | Red `coat`, `scarf`, backpack on the back (visible from behind and the side). Big readable head (about 9 px wide). Walk at 8 fps, idle breathes (1 px bob) at 2 fps. Gather is a bend-and-reach, played once per gather. Rest is sitting by the fire. Pick direction from the last movement input. |
+
+### Wildlife
+
+Keep all behaviour in `src/scene/ambient.ts` and `src/scene/ambientLife.ts`; only the drawing changes.
+
+| Sprite | Size | Frames | Notes |
+|---|---|---|---|
+| Bird | 8 × 8 | `idle`, `peck` (2), `hop`, `fly` (2) | Fly at 12 fps. |
+| Fox | 24 × 16 | `trot` (4), `run` (4), `sit` (2, tail flick) | Trot at 10 fps, run at 14 fps. Sitting fox is about 12 × 16 within the frame and faces the fire. |
+| Firefly | 3 × 3 | `glow` (2) | A `firefly` core pixel plus a dim cross. The light comes from the lighting layer. |
+
+### Effects
+
+| Sprite | Size | Frames | Notes |
+|---|---|---|---|
+| Gather pop | 8 × 8 icon | rises 8 px over 0.6 s, then vanishes | Shows the wood or berry icon above the node. |
+| Smoke puff | 8 × 8 | 3 | Rises from the fire every 1 to 2 s while burning. Uses `stone3`/`stone4`. |
+| Sparks | 1 × 1 | n/a | 1 to 2 `fire4` pixels drifting up from the fire occasionally. |
+
+### UI icons
+
+The HTML sidebar and top bar keep their current layout and fonts. Replace the Unicode symbols (▰ ● ◫ ⌂ ▣ ▤) with pixel icons rendered from the same sprite definitions (exported as data URLs at boot, shown with `image-rendering: pixelated` at 2× or 3×).
+
+| Icon | Size |
+|---|---|
+| Wood, food, bag capacity | 16 × 16 |
+| Shelter, bed, crate (build list) | 16 × 16 |
+| Energy, hunger, warmth (meter labels) | 8 × 8 |
+
+Align the sidebar's accent colors with the palette: energy bar in `grass3`/`grass4`, hunger in `scarf3`/`scarf4`, warmth in `fire2`/`fire3`, wood text in `wood2`, berries in `berry2`.
+
+## Phases
+
+Each phase is one PR, keeps the game playable, and keeps all existing tests passing.
+
+1. **Pipeline:** palette, sprite format, texture generation, contact sheet page, art tests, pixel-perfect scaling and the 16 px `TILE`. Temporarily show the existing art scaled to the new grid if needed. No new art yet beyond a test sprite or two.
+2. **Terrain and map composition:** grass, autotiled camp clearing and paths, decoration, rim stones, trees with y-sorting, forest border and groves.
+3. **Nodes and camp:** branch piles, berry bushes, fire pit, build sites, shelter, bed, crate, log seat. Remove halos, dotted circle and translucent ellipses.
+4. **Survivor:** directional walk, idle, gather and rest animations.
+5. **Wildlife and effects:** birds, fox, fireflies, gather pops, smoke, sparks.
+6. **Lighting:** the time-of-day lighting layer, stepped lights, fire radius tied to fuel. Remove the old night rectangle and additive glow.
+7. **UI icons and palette alignment** in the HTML interface.
+
+## Review
+
+### Screenshots for every PR
+
+Take them at 2× (a 960 × 600 canvas) by loading a save into `localStorage` under `hearthwild.save` and pressing **Continue your camp**. Show before and after for:
+
+1. Day, survivor at camp with shelter, bed and crate built and the fire burning.
+2. Day, a fresh game: camp with all build sites empty and nodes ready.
+3. Meadow away from camp with birds and some depleted nodes.
+4. Golden hour (`timeOfDay` 150) with the fox arriving.
+5. Night (`timeOfDay` 200) at camp, fire burning, fox sitting, fireflies.
+6. Night with the fire out.
+7. The contact sheet page.
+8. One of the above at phone width (390 px wide).
+
+Also attach a 4× crop of the area around the survivor in shot 1, to check pixel alignment.
+
+### Acceptance checklist
+
+A phase is done when all of these hold for everything it touched:
+
+- [ ] Every visible pixel sits on the art grid at a whole-number scale: no blur, no half pixels, no mixed pixel sizes (check the 4× crop).
+- [ ] Only palette colors appear, apart from `shadow` alpha and the lighting layer.
+- [ ] **Grayscale test:** in a grayscale copy of shots 1 and 3, the survivor, ready vs depleted nodes, the fire state and each structure are still distinguishable.
+- [ ] **Squint test:** blurred or viewed small, the eye goes first to the survivor, then the fire and camp, then nodes; decoration and trees recede.
+- [ ] Light comes from the top-left on every sprite; every shadow points the same way.
+- [ ] Outlines follow the rule (own ramp's darkest color, 1 px, may break on the lit edge).
+- [ ] No pillow shading, banding, jaggies or orphan pixels in the contact sheet at 4×.
+- [ ] Ready vs depleted is readable without any halo or glow.
+- [ ] Y-sorting is right: the survivor passes behind trees and the shelter from above and in front from below.
+- [ ] At night the fire is the brightest, warmest thing on screen and the camp is readable.
+- [ ] No gameplay change: all existing tests pass, and node and camp positions are unchanged.
+- [ ] Frame time is no worse than before at 2× (draw static terrain once into a texture rather than per frame).
+
+## Out of scope
+
+- Gameplay, balance, save format, and positions of nodes and camp sites.
+- Collision with trees or rocks.
+- Sound.
+- New areas, weather, or seasons (weather has its own issue, #6; it should reuse this palette and lighting layer when it happens).
+- Replacing the HTML UI with an in-canvas pixel UI.
