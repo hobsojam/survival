@@ -25,9 +25,13 @@ Open the local address printed by Vite, usually <http://localhost:5173/>. For a 
 | R | Rest at camp for a short break |
 | Z | Sleep until morning (at night, at camp, once the shelter is built) |
 | Q | Eat one carried food |
+| C | Cook one berry at a lit campfire after dark |
+| G | Watch the stars at camp after dark |
 | Build buttons | Spend wood on camp upgrades |
 
 The buttons beside the game also let you eat, rest, feed the fire, and sleep. If the keyboard does not respond, click the game area once to focus it.
+
+At night, the **After dark** panel offers two optional ways to spend a little time. Cook one berry at a lit campfire for a warmer, more filling meal; it takes eight seconds and restores 35 hunger and 10 warmth, in addition to the warmth you gain while near the fire. Or watch the stars at camp for twelve seconds and regain 10 energy. The panel shows when each activity is ready. Neither activity is needed for survival, and you can still rest or sleep as before.
 
 A day lasts four minutes: morning and afternoon take two minutes and forty seconds, then night lasts eighty seconds until dawn. The dial in the top bar shows where you are in the day, with night shaded, and counts down to nightfall or dawn. Gathering takes six seconds and building takes twelve seconds, so daylight matters.
 
@@ -50,4 +54,4 @@ npm test -- --run
 npm run build
 ```
 
-The tests cover game state, gathering, day/night survival, tiredness and sleep, the clock, camp upgrades, save validation, and ambient wildlife timing. A browser playthrough should also check movement, building, fire, day/night visuals, and continue after reloading.
+The tests cover game state, gathering, day/night survival, tiredness and sleep, optional night activities, the clock, camp upgrades, save validation, and ambient wildlife timing. A browser playthrough should also check movement, building, fire, day/night visuals, and continue after reloading.
