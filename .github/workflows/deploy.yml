@@ -25,7 +25,7 @@ jobs:
         with:
           node-version: lts/*
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm test -- --run
       - run: npm run build
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
