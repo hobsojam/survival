@@ -51,7 +51,7 @@ export class App {
               <div class="meter"><div class="meter-title"><span>Warmth</span><b id="warmth-value">100</b></div><div class="track"><div id="warmth-bar" class="fill warmth"></div></div></div>
               <div class="quick-actions"><button data-action="eat">Eat berries</button><button data-action="rest">Rest</button><button data-action="stokeFire">Feed fire</button><button data-action="sleep" id="sleep-button">Sleep</button></div>
             </section>
-            <section class="panel"><p class="eyebrow">IN YOUR BAG</p><div class="supplies"><div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small></div><div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small></div><div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small>Carried</small></div></div><div class="fire-status" id="fire-status">The fire is unlit</div></section>
+            <section class="panel"><p class="eyebrow">IN YOUR BAG</p><div class="supplies"><div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small></div><div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small></div><div><span class="supply-icon fiber">≋</span><strong id="fiber-count">0</strong><small>Fiber</small></div><div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small>Carried</small></div></div><div class="fire-status" id="fire-status">The fire is unlit</div></section>
             <section class="panel night-panel"><p class="eyebrow">AFTER DARK</p><h2>A little time for yourself</h2><p class="night-hint" id="night-hint">These small moments are waiting for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button></div></section>
             <section class="panel build-panel"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand inside the marked camp circle to build.</p><div id="build-list">${buildMarkup}</div></section>
           </aside>
@@ -185,7 +185,8 @@ export class App {
     }
     this.setText('wood-count', String(inventory.wood));
     this.setText('food-count', String(inventory.food));
-    this.setText('space-count', `${inventory.wood + inventory.food}/${structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity}`);
+    this.setText('fiber-count', String(inventory.fiber));
+    this.setText('space-count', `${inventory.wood + inventory.food + inventory.fiber}/${structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity}`);
     this.setText('fire-status', this.state.fireFuel > 0 ? `Fire burning · ${Math.ceil(this.state.fireFuel)}s of warmth` : 'The fire is unlit');
     const atCamp = isAtCamp(this.state);
     const afterDark = timeOfDay >= BALANCE.nightStart;
@@ -223,9 +224,19 @@ export class App {
       button.disabled = built || locked;
       button.classList.toggle('built', built);
       button.classList.toggle('locked', locked);
-      button.classList.toggle('ready', !built && !locked && !needsShelter && isAtCamp(this.state) && inventory.wood >= cost);
-      button.querySelector<HTMLElement>('.build-verb')!.textContent = built ? 'Built' : locked ? 'Locked' : 'Build';
-      button.querySelector<HTMLElement>('.build-price')!.textContent = built ? 'Complete' : locked ? 'Weather cold night' : `${cost} wood`;
+      button.classList.toggle('ready', !built && !locked && !needsShelter && isAtCamp(this.state) && inventory.wood >= cost.wood && inventory.fiber >= cost.fiber);
+      const fiberPrice = cost.fiber ? ` · ${cost.fiber} fiber` : '';
+      let verb = 'Build';
+      let price = `${cost.wood} wood${fiberPrice}`;
+      if (built) {
+        verb = 'Built';
+        price = 'Complete';
+      } else if (locked) {
+        verb = 'Locked';
+        price = 'Weather cold night';
+      }
+      button.querySelector<HTMLElement>('.build-verb')!.textContent = verb;
+      button.querySelector<HTMLElement>('.build-price')!.textContent = price;
     }
   }
 

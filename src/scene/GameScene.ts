@@ -106,7 +106,7 @@ export class GameScene extends Phaser.Scene {
     const node = this.closestNode();
     const canSleep = !sleepBlocker(this.state);
     if (node) {
-      const gather = node.kind === 'branch' ? 'E  Collect branches' : 'E  Pick berries';
+      const gather = node.kind === 'branch' ? 'E  Collect branches' : node.kind === 'berry' ? 'E  Pick berries' : 'E  Gather fiber';
       return canSleep ? `${gather} · Z Sleep until morning` : gather;
     }
     if (isAtCamp(this.state)) {

@@ -149,6 +149,24 @@ function drawBerry(g: Phaser.GameObjects.Graphics, node: ResourceNode, time: num
   }
 }
 
+function drawFiber(g: Phaser.GameObjects.Graphics, node: ResourceNode, time: number): void {
+  const x = legacyWorldX(node.x);
+  const y = legacyWorldY(node.y);
+  const ready = node.amount > 0;
+  g.fillStyle(0x233d32, 0.34);
+  g.fillEllipse(x + 3, y + 10, 32, 10);
+  for (const offset of [-11, -5, 2, 9]) {
+    const sway = ready ? Math.sin(time / 600 + offset) * 2 : 0;
+    const top = ready ? y - 18 - offset % 4 : y + 3;
+    g.lineStyle(ready ? 3 : 2, ready ? 0x72975a : 0x617358, ready ? 1 : 0.65);
+    g.lineBetween(x + offset, y + 7, x + offset + sway, top);
+    if (ready) {
+      g.fillStyle(0xd9c789);
+      g.fillEllipse(x + offset + sway, top - 3, 6, 10);
+    }
+  }
+}
+
 function drawShelter(g: Phaser.GameObjects.Graphics, built: boolean, bed: boolean): void {
   const x = legacyWorldX(BALANCE.campX - 3);
   const y = legacyWorldY(BALANCE.campY - 2);
@@ -314,7 +332,8 @@ export function drawObjects(g: Phaser.GameObjects.Graphics, state: GameState, ti
   g.clear();
   for (const node of state.nodes) {
     if (node.kind === 'branch') drawBranch(g, node, time);
-    else drawBerry(g, node, time);
+    else if (node.kind === 'berry') drawBerry(g, node, time);
+    else drawFiber(g, node, time);
   }
   drawShelter(g, state.structures.shelter, state.structures.bed);
   drawCrate(g, state.structures.crate);
