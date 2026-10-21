@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly audit catches newly published advisories against unchanged deps.
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Test, build, and audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Skip Node steps until the Vite/Phaser project is scaffolded (plan Task 1).
+      - id: project
+        run: |
+          if [ -f package-lock.json ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::No package-lock.json yet; skipping Node steps."
+          fi
+
+      - if: steps.project.outputs.exists == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: lts/*
+          cache: npm
+      - if: steps.project.outputs.exists == 'true'
+        run: npm ci
+      - if: steps.project.outputs.exists == 'true' && github.event_name != 'schedule'
+        run: npm test -- --run
+      - if: steps.project.outputs.exists == 'true' && github.event_name != 'schedule'
+        run: npm run build
+      - if: steps.project.outputs.exists == 'true'
+        run: npm audit --audit-level=moderate
