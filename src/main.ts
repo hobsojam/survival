@@ -1,6 +1,6 @@
 import './style.css';
-import { createGame } from './game/state';
+import { App } from './ui/App';
 
-const game = createGame();
-const app = document.querySelector<HTMLDivElement>('#app');
-if (app) app.textContent = `Cozy Survival — Day ${game.day}`;
+const root = document.querySelector<HTMLElement>('#app');
+if (!root) throw new Error('Missing app root');
+new App(root);
