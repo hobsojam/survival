@@ -212,7 +212,8 @@ export class App {
       button.classList.toggle('locked', locked);
       button.classList.toggle('ready', !built && !locked && isAtCamp(this.state) && inventory.wood >= cost.wood && inventory.fiber >= cost.fiber && (id !== 'bed' || structures.shelter));
       button.querySelector<HTMLElement>('.build-verb')!.textContent = built ? 'Built' : locked ? 'Locked' : 'Build';
-      button.querySelector<HTMLElement>('.build-price')!.textContent = built ? 'Complete' : locked ? 'Weather cold night' : `${cost.wood} wood${cost.fiber ? ` · ${cost.fiber} fiber` : ''}`;
+      const fiberPrice = cost.fiber ? ` · ${cost.fiber} fiber` : '';
+      button.querySelector<HTMLElement>('.build-price')!.textContent = built ? 'Complete' : locked ? 'Weather cold night' : `${cost.wood} wood${fiberPrice}`;
     }
   }
 
