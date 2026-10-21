@@ -55,13 +55,19 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
     const coldNight = isColdNight(next);
     next.player.hunger = Math.max(0, next.player.hunger - step / 8);
     if (activity === 'awake') next.player.energy = Math.max(0, next.player.energy - step * BALANCE.energyDrainPerSecond);
-    const warmthChange = night
-      ? camp && lit ? step / 2
-        : coldNight ? -step * (camp && next.structures.shelter
-          ? BALANCE.coldNightShelteredWarmthLossPerSecond
-          : BALANCE.coldNightOutdoorWarmthLossPerSecond)
-          : camp && next.structures.shelter ? -step / 4 : -step / 2
-      : step / 10;
+    let warmthChange = step / 10;
+    if (night && camp && lit) {
+      warmthChange = step / 2;
+    } else if (night && coldNight) {
+      const lossPerSecond = camp && next.structures.shelter
+        ? BALANCE.coldNightShelteredWarmthLossPerSecond
+        : BALANCE.coldNightOutdoorWarmthLossPerSecond;
+      warmthChange = -step * lossPerSecond;
+    } else if (night && camp && next.structures.shelter) {
+      warmthChange = -step / 4;
+    } else if (night) {
+      warmthChange = -step / 2;
+    }
     next.player.warmth = Math.max(0, Math.min(100, next.player.warmth + warmthChange));
     next.fireFuel = Math.max(0, next.fireFuel - step * (coldNight ? BALANCE.coldNightFireBurn : 1));
     next.timeOfDay += step;
