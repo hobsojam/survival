@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createGame } from '../src/game/state';
-import { applyAction } from '../src/game/rules';
+import { BALANCE, createGame } from '../src/game/state';
+import { advanceTime, applyAction } from '../src/game/rules';
 
 describe('gathering and inventory', () => {
   it('gathers nearby wood and spends energy without mutating the old state', () => {
@@ -220,5 +220,54 @@ describe('daylight spent on work', () => {
     const result = applyAction(state, { type: 'build', structureId: 'shelter' });
     expect(result.state.timeOfDay).toBe(12);
     expect(result.state.player.hunger).toBe(98.5);
+  });
+});
+
+describe('tiredness and sleep', () => {
+  const nightAtCamp = () => {
+    const state = createGame();
+    state.timeOfDay = BALANCE.nightStart + 10;
+    state.structures.shelter = true;
+    state.player.energy = 20;
+    return state;
+  };
+
+  it('drains energy slowly while awake but not while resting', () => {
+    const state = createGame();
+    expect(advanceTime(state, 60).player.energy).toBeCloseTo(100 - 60 * BALANCE.energyDrainPerSecond);
+    expect(advanceTime(state, 60, 'resting').player.energy).toBe(100);
+    expect(advanceTime(state, 60, 'working').player.energy).toBe(100);
+    state.player.energy = 1;
+    expect(advanceTime(state, 600).player.energy).toBe(0);
+  });
+
+  it('sleeps through to dawn, letting the night play out', () => {
+    const state = nightAtCamp();
+    state.fireFuel = 30;
+    const result = applyAction(state, { type: 'sleep' });
+    expect(result.state.day).toBe(2);
+    expect(result.state.timeOfDay).toBe(0);
+    expect(result.state.fireFuel).toBe(0);
+    expect(result.state.player.hunger).toBeLessThan(state.player.hunger);
+    expect(result.state.player.energy).toBe(20 + BALANCE.sleepEnergyGain);
+    expect(result.message).toMatch(/morning/i);
+  });
+
+  it('sleeps fully restored in a bed', () => {
+    const state = nightAtCamp();
+    state.structures.bed = true;
+    expect(applyAction(state, { type: 'sleep' }).state.player.energy).toBe(100);
+  });
+
+  it('only sleeps at night, at camp, with a shelter', () => {
+    const day = nightAtCamp();
+    day.timeOfDay = 60;
+    expect(applyAction(day, { type: 'sleep' })).toMatchObject({ state: day, message: expect.stringMatching(/night/i) });
+    const away = nightAtCamp();
+    away.player.x = 0;
+    expect(applyAction(away, { type: 'sleep' })).toMatchObject({ state: away, message: expect.stringMatching(/camp/i) });
+    const unsheltered = nightAtCamp();
+    unsheltered.structures.shelter = false;
+    expect(applyAction(unsheltered, { type: 'sleep' })).toMatchObject({ state: unsheltered, message: expect.stringMatching(/shelter/i) });
   });
 });

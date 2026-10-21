@@ -29,7 +29,14 @@ button:focus-visible { outline: 3px solid #d69c5d; outline-offset: 3px; }
 .top-actions { display: flex; align-items: center; gap: 13px; }
 .save-status { color: #788a7c; font-size: 11px; white-space: nowrap; }
 .restart-button { border: 0; background: transparent; color: #59735d; font-size: 11px; font-weight: 700; text-decoration: underline; }
-.day-pill { background: #dce8d6; color: #3f684b; border: 1px solid #cbdcc7; border-radius: 100px; padding: 10px 17px; font-weight: 700; font-size: 12px; white-space: nowrap; box-shadow: inset 0 1px #fff9; }
+.day-pill { display: flex; align-items: center; gap: 10px; background: #dce8d6; color: #3f684b; border: 1px solid #cbdcc7; border-radius: 100px; padding: 10px 17px; font-weight: 700; font-size: 12px; white-space: nowrap; box-shadow: inset 0 1px #fff9; transition: background .6s, color .6s, border-color .6s; }
+.day-pill.night { background: #2f4459; color: #e6ebf4; border-color: #415a72; box-shadow: inset 0 1px #ffffff22; }
+.day-dial { position: relative; width: 84px; height: 8px; border-radius: 8px; background: linear-gradient(90deg, #f1d48e, #e6ad6b); box-shadow: inset 0 1px 2px #6b5a3a33; }
+.day-dial-night { position: absolute; top: 0; right: 0; bottom: 0; border-radius: 0 8px 8px 0; background: #3d5875; }
+.day-pill.night .day-dial-night { background: #6e88a8; }
+.day-dial-hand { position: absolute; top: -4px; width: 4px; height: 16px; margin-left: -2px; border-radius: 2px; background: #2e4a38; box-shadow: 0 0 0 1.5px #fffdf7; }
+.day-pill.night .day-dial-hand { background: #f6e7b8; box-shadow: 0 0 0 1.5px #2f4459; }
+.day-countdown { min-width: 86px; font-weight: 600; opacity: .85; }
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
 .game-panel, .panel { background: #fffdf7; border: 1px solid #e3e5d9; box-shadow: 0 10px 30px #38503c15, 0 2px 5px #38503c08; }
 .game-panel { border-radius: 20px; padding: 10px; overflow: hidden; }
@@ -53,9 +60,11 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
 .fill.energy { background: linear-gradient(90deg, #74a774, #9dc389); }
 .fill.hunger { background: linear-gradient(90deg, #cc975d, #e1b879); }
 .fill.warmth { background: linear-gradient(90deg, #cf795c, #e4a17b); }
-.quick-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 19px; }
+.quick-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; margin-top: 19px; }
 .quick-actions button { background: #eaf1e7; color: #44664b; border: 1px solid #d4e1d0; border-bottom-width: 2px; border-radius: 8px; padding: 9px 3px; font-size: 11px; font-weight: 700; }
 .quick-actions button:hover, .build-item:hover:not(:disabled) { background: #e0eddb; }
+.quick-actions button.ready { background: #3d5875; border-color: #2f4459; color: #f1f4fa; }
+.quick-actions button.ready:hover { background: #34506c; }
 .quick-actions button:active, .build-item:active:not(:disabled) { transform: translateY(1px); }
 .supplies { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; text-align: center; }
 .supplies > div { background: #f4f6ed; border: 1px solid #ecf0e4; border-radius: 11px; padding: 10px 3px; }
@@ -103,7 +112,9 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
   .topbar { height: 62px; }
   .brand strong { font-size: 20px; }
   .brand small { font-size: 9px; }
-  .day-pill { font-size: 11px; padding: 8px 10px; }
+  .day-pill { font-size: 11px; padding: 8px 10px; gap: 7px; }
+  .day-dial { width: 44px; }
+  .day-countdown { display: none; }
   .sidebar { display: flex; }
   .game-panel { padding: 7px; }
   .shortcuts { gap: 8px; }

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { BALANCE, type GameState, type ResourceNode } from '../game/state';
-import { advanceTime, applyAction, isAtCamp, type GameAction } from '../game/rules';
+import { advanceTime, applyAction, isAtCamp, sleepBlocker, type GameAction } from '../game/rules';
 import { TILE, worldX, worldY, drawTerrain, drawObjects, makeSurvivor } from './art';
 import { darkness } from './ambient';
 import { AmbientLife } from './ambientLife';
@@ -40,7 +40,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setZoom(1);
     this.night = this.add.rectangle(0, 0, 960, 600, 0x101d36, 1)
       .setOrigin(0).setScrollFactor(0).setDepth(100).setAlpha(0);
-    this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,Z') as Record<string, Phaser.Input.Keyboard.Key>;
     this.paintObjects();
     this.onStateChange(this.state, 'tick');
   }
@@ -61,6 +61,7 @@ export class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.keys.F)) this.perform({ type: 'stokeFire' });
     if (Phaser.Input.Keyboard.JustDown(this.keys.R)) this.perform({ type: 'rest' });
     if (Phaser.Input.Keyboard.JustDown(this.keys.Q)) this.perform({ type: 'eat' });
+    if (Phaser.Input.Keyboard.JustDown(this.keys.Z)) this.perform({ type: 'sleep' });
     this.state = advanceTime(this.state, dt);
     this.playerSprite.setPosition(worldX(this.state.player.x), worldY(this.state.player.y));
     if (horizontal || vertical) {
@@ -89,8 +90,13 @@ export class GameScene extends Phaser.Scene {
 
   getPrompt(): string {
     const node = this.closestNode();
-    if (node) return node.kind === 'branch' ? 'E  Collect branches' : 'E  Pick berries';
+    const canSleep = !sleepBlocker(this.state);
+    if (node) {
+      const gather = node.kind === 'branch' ? 'E  Collect branches' : 'E  Pick berries';
+      return canSleep ? `${gather} · Z Sleep until morning` : gather;
+    }
     if (isAtCamp(this.state)) {
+      if (canSleep) return 'At camp · Z Sleep until morning · F Fire · R Rest';
       return 'At camp · F Fire · R Rest · Click an upgrade to build';
     }
     return 'WASD / arrows  Move';

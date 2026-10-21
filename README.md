@@ -20,13 +20,16 @@ Open the local address printed by Vite, usually <http://localhost:5173/>. For a 
 | WASD or arrow keys | Move the survivor |
 | E | Gather the nearest branches or berries within reach |
 | F | Add one wood to the campfire while at camp |
-| R | Rest at camp |
+| R | Rest at camp for a short break |
+| Z | Sleep until morning (at night, at camp, once the shelter is built) |
 | Q | Eat one carried food |
 | Build buttons | Spend wood on camp upgrades |
 
-The buttons beside the game also let you eat, rest, and feed the fire. If the keyboard does not respond, click the game area once to focus it.
+The buttons beside the game also let you eat, rest, feed the fire, and sleep. If the keyboard does not respond, click the game area once to focus it.
 
-A day lasts four minutes; night begins after two minutes and forty seconds. Gathering takes six seconds and building takes twelve seconds, so daylight matters. Cold is stronger outside at night. The fire provides warmth for 90 seconds per wood, and a shelter reduces cold exposure at camp. Hunger falls over time. Low energy, hunger, or warmth slows movement, but you can always move and gather supplies. Branches and berries replenish at dawn.
+A day lasts four minutes: morning and afternoon take two minutes and forty seconds, then night lasts eighty seconds until dawn. The dial in the top bar shows where you are in the day, with night shaded, and counts down to nightfall or dawn. Gathering takes six seconds and building takes twelve seconds, so daylight matters.
+
+You tire slowly while awake, losing about one energy every six seconds you spend walking or idle; gathering and building cost their own energy instead. A rest at camp takes twenty seconds and restores 25 energy, or 50 with a bed. Once night falls and you have a shelter, you can sleep at camp until morning: the night still passes, so hunger falls and the fire burns down, but you wake with 60 more energy, or fully rested in a bed. Feed the fire before bed if you want to wake up warm. Cold is stronger outside at night. The fire provides warmth for 90 seconds per wood, and a shelter reduces cold exposure at camp. Hunger falls over time. Low energy, hunger, or warmth slows movement, but you can always move and gather supplies. Branches and berries replenish at dawn.
 
 Your bag holds eight supplies at first. To build, stand anywhere inside the marked circle around the campfire and click an upgrade in the “Little improvements” panel. Shelter costs six wood, bed costs four wood after shelter, and storage crate costs four wood. The bed improves resting; the crate raises carrying capacity to sixteen. The game has one fixed map and no combat or companions yet.
 
@@ -45,4 +48,4 @@ npm test -- --run
 npm run build
 ```
 
-The tests cover game state, gathering, day/night survival, camp upgrades, save validation, and ambient wildlife timing. A browser playthrough should also check movement, building, fire, day/night visuals, and continue after reloading.
+The tests cover game state, gathering, day/night survival, tiredness and sleep, the clock, camp upgrades, save validation, and ambient wildlife timing. A browser playthrough should also check movement, building, fire, day/night visuals, and continue after reloading.
