@@ -8,7 +8,7 @@ const worldY = (y: number) => (y + 0.5) * TILE;
 
 export class GameScene extends Phaser.Scene {
   private state: GameState;
-  private readonly onStateChange: (state: GameState) => void;
+  private readonly onStateChange: (state: GameState, cause: 'action' | 'tick') => void;
   private readonly onFeedback: (message: string) => void;
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private playerSprite!: Phaser.GameObjects.Container;
@@ -17,7 +17,7 @@ export class GameScene extends Phaser.Scene {
   private night!: Phaser.GameObjects.Rectangle;
   private hudElapsed = 0;
 
-  constructor(state: GameState, onStateChange: (state: GameState) => void, onFeedback: (message: string) => void) {
+  constructor(state: GameState, onStateChange: (state: GameState, cause: 'action' | 'tick') => void, onFeedback: (message: string) => void) {
     super({ key: 'GameScene' });
     this.state = state;
     this.onStateChange = onStateChange;
@@ -36,7 +36,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0).setScrollFactor(0).setDepth(100);
     this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q') as Record<string, Phaser.Input.Keyboard.Key>;
     this.paintObjects();
-    this.onStateChange(this.state);
+    this.onStateChange(this.state, 'tick');
   }
 
   update(_time: number, delta: number): void {
@@ -61,7 +61,7 @@ export class GameScene extends Phaser.Scene {
     this.paintNight();
     this.hudElapsed += delta;
     if (this.hudElapsed >= 250) {
-      this.onStateChange(this.state);
+      this.onStateChange(this.state, 'tick');
       this.hudElapsed = 0;
     }
   }
@@ -71,7 +71,7 @@ export class GameScene extends Phaser.Scene {
     this.state = result.state;
     if (announce && result.message) this.onFeedback(result.message);
     if (announce) {
-      this.onStateChange(this.state);
+      this.onStateChange(this.state, 'action');
       if (this.objects) this.paintObjects();
     }
   }

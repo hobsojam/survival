@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BALANCE, createGame, type GameState, type StructureId } from '../game/state';
 import { GameScene } from '../scene/GameScene';
+import { loadGame, saveGame, type LoadResult } from '../game/save';
 
 const buildOptions: { id: StructureId; name: string; description: string }[] = [
   { id: 'shelter', name: 'Shelter', description: 'A roof against the night cold' },
@@ -13,15 +14,24 @@ export class App {
   private scene?: GameScene;
   private game?: Phaser.Game;
   private readonly root: HTMLElement;
+  private storage?: Storage;
+  private previousSave: LoadResult = { kind: 'empty' };
+  private lastSaveAt = 0;
 
   constructor(root: HTMLElement) {
     this.root = root;
     this.state = createGame();
+    try {
+      this.storage = window.localStorage;
+      this.previousSave = loadGame(this.storage);
+    } catch (error) {
+      this.previousSave = { kind: 'invalid', reason: `Browser storage is unavailable: ${String(error)}` };
+    }
     this.root.innerHTML = `
       <div class="shell">
         <header class="topbar">
           <div class="brand"><span class="brand-icon">✦</span><div><strong>Hearthwild</strong><small>A little place to begin again</small></div></div>
-          <div class="day-pill" id="day-pill">Day 1 · Morning</div>
+          <div class="top-actions"><span id="save-status" class="save-status">Local save</span><button id="restart-game" class="restart-button" hidden>New game</button><div class="day-pill" id="day-pill">Day 1 · Morning</div></div>
         </header>
         <div class="layout">
           <main class="game-panel">
@@ -40,6 +50,7 @@ export class App {
             <section class="panel build-panel"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><div id="build-list"></div></section>
           </aside>
         </div>
+        <div id="start-screen" class="start-screen"><div class="start-card"><div class="start-mark">✦</div><p class="eyebrow">A SMALL SURVIVAL STORY</p><h1>Make a little place<br>feel like home.</h1><p class="start-copy">Gather what you need, keep a fire glowing, and build a refuge one day at a time.</p><p id="start-note" class="start-note"></p><div class="start-buttons"><button id="continue-game" class="primary-button" hidden>Continue your camp</button><button id="new-game" class="secondary-button">Start a new game</button></div><small>Single player · Saves in this browser</small></div></div>
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
@@ -51,15 +62,27 @@ export class App {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-build]');
       if (button) this.scene?.perform({ type: 'build', structureId: button.dataset.build as StructureId });
     });
-    this.startGame(this.state);
+    this.root.querySelector('#new-game')!.addEventListener('click', () => this.beginNewGame());
+    this.root.querySelector('#continue-game')!.addEventListener('click', () => this.continueGame());
+    this.root.querySelector('#restart-game')!.addEventListener('click', () => this.beginNewGame());
+    window.addEventListener('pagehide', () => { if (this.scene) this.saveCurrent(); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden && this.scene) this.saveCurrent(); });
+    this.showStartScreen();
+    this.render();
   }
 
   startGame(state: GameState): void {
     this.game?.destroy(true);
+    this.root.querySelector('#start-screen')?.classList.add('hidden');
+    const restart = this.root.querySelector<HTMLButtonElement>('#restart-game');
+    if (restart) restart.hidden = false;
     this.state = state;
-    this.scene = new GameScene(state, next => {
+    this.lastSaveAt = Date.now();
+    this.scene = new GameScene(state, (next, cause) => {
+      const previous = this.state;
       this.state = next;
       this.render();
+      if ((cause === 'action' && next !== previous) || Date.now() - this.lastSaveAt >= 10000) this.saveCurrent();
     }, message => this.setMessage(message));
     this.game = new Phaser.Game({
       type: Phaser.AUTO,
@@ -71,6 +94,49 @@ export class App {
       scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: 960, height: 600 }
     });
     this.render();
+  }
+
+  private showStartScreen(): void {
+    const note = this.root.querySelector<HTMLElement>('#start-note');
+    const continueButton = this.root.querySelector<HTMLButtonElement>('#continue-game');
+    if (continueButton) continueButton.hidden = this.previousSave.kind !== 'loaded';
+    if (note) note.textContent = this.previousSave.kind === 'loaded'
+      ? `Your camp is waiting on day ${this.previousSave.state.day}.`
+      : this.previousSave.kind === 'invalid'
+        ? `Your existing save could not be loaded: ${this.previousSave.reason}`
+        : 'A fresh camp is ready whenever you are.';
+  }
+
+  private beginNewGame(): void {
+    if (this.previousSave.kind !== 'empty' && !window.confirm('Start a new game? Your existing local save will be replaced.')) return;
+    this.startGame(createGame());
+    this.setMessage('Gather a few branches. Your camp is waiting.');
+    this.saveCurrent();
+  }
+
+  private continueGame(): void {
+    if (this.previousSave.kind !== 'loaded') return;
+    this.startGame(this.previousSave.state);
+    this.setMessage('Welcome back to your camp.');
+    this.setText('save-status', 'Loaded locally');
+  }
+
+  private saveCurrent(): void {
+    this.state = this.scene?.getState() ?? this.state;
+    if (!this.storage) {
+      this.setText('save-status', 'Saving unavailable');
+      this.setMessage('Browser storage is unavailable; progress will be lost when you close this page.');
+      return;
+    }
+    const result = saveGame(this.storage, this.state);
+    if (result.ok) {
+      this.previousSave = { kind: 'loaded', state: this.state };
+      this.lastSaveAt = Date.now();
+      this.setText('save-status', 'Saved locally');
+    } else {
+      this.setText('save-status', 'Save failed');
+      this.setMessage(`Could not save locally: ${result.error}`);
+    }
   }
 
   getState(): GameState { return this.state; }
