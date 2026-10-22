@@ -51,7 +51,11 @@ The wilderness has a little life of its own. Birds peck in the meadows and flutt
 
 ## Saving
 
-Progress is saved in this browser's local storage under `hearthwild.save` after successful actions, periodically, and when the page is hidden or closed. Choose **Continue your camp** when you return. **Start a new game** asks before replacing an existing save. Existing version 1, 2, and 3 saves load with their supplies and camp intact; missing fiber plants and structures are added to the map and camp. Version 1 camps also gain a future cold front with at least two days of warning. Saves stay in this browser profile; private browsing, clearing site data, or switching devices will not carry them over. The game shows a message if storage fails or an existing save cannot be read.
+Progress is saved in this browser's local storage under `hearthwild.save` after successful actions, periodically, and when the page is hidden or closed. Choose **Continue your camp** when you return. **Start a new game** asks before replacing an existing save. Existing version 1, 2, and 3 saves load with their supplies and camp intact; missing fiber plants and structures are added to the map and camp. Version 1 camps also gain a future cold front with at least two days of warning. Saves stay in this browser profile; private browsing, clearing site data, or switching devices will not carry them over. The game shows a message if storage fails or an existing save cannot be read. If saving keeps failing, the game says so once, then retries quietly after 10, 30 and 60 seconds while the status reads **Save failed · retrying**.
+
+### Changing the save format
+
+Only one open PR may change the save format (`SAVE_VERSION`, the saved shape, or a migration) at a time. Before merging, rebase it on `main` and take the next unused version number, so two branches never ship different shapes under the same version.
 
 ## Verify
 
