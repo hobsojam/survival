@@ -30,4 +30,21 @@ describe('terrain composition', () => {
       expect(flowers.filter(item => Math.hypot(item.x - x, item.y - y) <= 3).length).toBeGreaterThanOrEqual(2);
     }
   });
+
+  it('places six to nine actual groves of three to seven trees', () => {
+    const map = buildMap(nodes);
+    expect(map.groves).toBeDefined();
+    expect(map.groves.length).toBeGreaterThanOrEqual(6);
+    expect(map.groves.length).toBeLessThanOrEqual(9);
+    const groveTrees = map.groves.flat();
+    expect(new Set(groveTrees.map(tree => `${tree.x},${tree.y}`)).size).toBe(groveTrees.length);
+    for (const grove of map.groves) {
+      expect(grove.length).toBeGreaterThanOrEqual(3);
+      expect(grove.length).toBeLessThanOrEqual(7);
+      for (const tree of grove) {
+        expect(Math.min(tree.x, tree.y, BALANCE.mapWidth - 1 - tree.x, BALANCE.mapHeight - 1 - tree.y)).toBeGreaterThan(2);
+        expect(map.trees).toContainEqual(tree);
+      }
+    }
+  });
 });
