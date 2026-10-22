@@ -133,7 +133,7 @@ export class GameScene extends Phaser.Scene {
     const node = this.closestNode();
     const canSleep = !sleepBlocker(this.state);
     if (node) {
-      let gather = 'E  Collect branches';
+      let gather = 'E  Pick up fallen branches';
       if (node.kind === 'berry') gather = 'E  Pick berries';
       else if (node.kind === 'fiber') gather = 'E  Gather fiber';
       else if (node.kind === 'stone') gather = 'E  Collect stone';

@@ -11,8 +11,18 @@ describe('terrain composition', () => {
     expect(map.trees.length).toBeGreaterThan(50);
     for (const tree of map.trees) {
       expect(Math.hypot(tree.x - BALANCE.campX, tree.y - BALANCE.campY)).toBeGreaterThan(BALANCE.campRadius + 1);
-      expect(nodes.every(node => Math.hypot(tree.x - node.x, tree.y - node.y) >= 3.5)).toBe(true);
+      expect(nodes.every(node => Math.hypot(tree.x - node.x, tree.y - node.y) >= (node.kind === 'branch' ? 1.5 : 3.5))).toBe(true);
     }
+  });
+
+  it('places fallen branches beside trees while keeping starter wood near camp', () => {
+    const branches = nodes.filter(node => node.kind === 'branch');
+    const trees = buildMap(nodes).trees;
+    const nearTrees = branches.filter(branch => trees.some(tree => Math.hypot(tree.x - branch.x, tree.y - branch.y) <= 3.5));
+    const nearCamp = branches.filter(branch => Math.hypot(branch.x - BALANCE.campX, branch.y - BALANCE.campY) <= 5);
+    expect(nearTrees.length).toBeGreaterThanOrEqual(7);
+    expect(nearCamp.length).toBeGreaterThanOrEqual(4);
+    expect(new Set(nodes.map(node => `${node.x},${node.y}`)).size).toBe(nodes.length);
   });
 
   it('uses the camp radius for its visible edge and decorates sparsely', () => {
