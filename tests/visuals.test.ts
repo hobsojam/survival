@@ -112,6 +112,8 @@ describe('native-size scene art', () => {
 
   it('keeps the survivor visible when standing at the lit fire', () => {
     const state = createGame();
+    state.player.x = BALANCE.campX;
+    state.player.y = BALANCE.campY;
     state.fireFuel = 20;
     expect(playerVisualDepth(state)).toBeGreaterThan(LIGHT_DEPTH);
     expect(playerVisualDepth(state)).toBeLessThan(WEATHER_DEPTH);

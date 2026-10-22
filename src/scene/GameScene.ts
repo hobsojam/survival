@@ -69,7 +69,9 @@ export class GameScene extends Phaser.Scene {
     }
     if (Phaser.Input.Keyboard.JustDown(this.keys.E)) {
       const node = this.closestNode();
-      this.perform(node ? { type: 'gather', nodeId: node.id } : { type: 'rest' });
+      if (node) this.perform({ type: 'gather', nodeId: node.id });
+      else if (isAtCamp(this.state)) this.perform({ type: 'rest' });
+      else this.onFeedback('Nothing to gather here.');
     }
     if (Phaser.Input.Keyboard.JustDown(this.keys.F)) this.perform({ type: 'stokeFire' });
     if (Phaser.Input.Keyboard.JustDown(this.keys.R)) this.perform({ type: 'rest' });
