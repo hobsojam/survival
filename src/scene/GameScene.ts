@@ -8,6 +8,7 @@ import { darkness } from './ambient';
 import { AmbientLife } from './ambientLife';
 import { registerSpriteTextures } from '../art/textures';
 import { LOGICAL_WIDTH, LOGICAL_HEIGHT } from './pixelScale';
+import { facingFromInput, selectSurvivorVisual, type Facing, type SurvivorAction } from './survivorVisual';
 
 export class GameScene extends Phaser.Scene {
   private state: GameState;
@@ -21,6 +22,8 @@ export class GameScene extends Phaser.Scene {
   private wind!: Phaser.GameObjects.Graphics;
   private ambient!: AmbientLife;
   private hudElapsed = 0;
+  private facing: Facing = 'down';
+  private visualAction?: { kind: SurvivorAction; startedAtMs: number };
 
   constructor(state: GameState, onStateChange: (state: GameState, cause: 'action' | 'tick') => void, onFeedback: (message: string) => void) {
     super({ key: 'GameScene' });
@@ -34,7 +37,7 @@ export class GameScene extends Phaser.Scene {
     drawTerrain(this, this.state.nodes);
     this.ambient = new AmbientLife(this);
     const playerArt = sprites.survivor;
-    this.playerSprite = this.add.image(Math.round(worldX(this.state.player.x)), Math.round(worldY(this.state.player.y)), 'survivor:idle')
+    this.playerSprite = this.add.image(Math.round(worldX(this.state.player.x)), Math.round(worldY(this.state.player.y)), 'survivor:idleDown0')
       .setOrigin(playerArt.anchor[0] / playerArt.size[0], playerArt.anchor[1] / playerArt.size[1]);
     this.playerSprite.setDepth(playerVisualDepth(this.state));
     this.cameras.main.setBounds(0, 0, BALANCE.mapWidth * TILE, BALANCE.mapHeight * TILE);
@@ -54,6 +57,11 @@ export class GameScene extends Phaser.Scene {
     const dt = Math.min(delta / 1000, 0.05);
     const horizontal = Number(this.keys.D.isDown || this.keys.RIGHT.isDown) - Number(this.keys.A.isDown || this.keys.LEFT.isDown);
     const vertical = Number(this.keys.S.isDown || this.keys.DOWN.isDown) - Number(this.keys.W.isDown || this.keys.UP.isDown);
+    const walking = Boolean(horizontal || vertical);
+    if (walking) {
+      this.facing = facingFromInput(horizontal, vertical, this.facing);
+      this.visualAction = undefined;
+    }
     if (horizontal || vertical) {
       const length = Math.hypot(horizontal, vertical);
       this.perform({ type: 'move', dx: horizontal / length * dt * 3.5, dy: vertical / length * dt * 3.5 }, false);
@@ -71,13 +79,12 @@ export class GameScene extends Phaser.Scene {
     const beforeTick = this.state;
     this.state = advanceTime(this.state, dt);
     this.reportWeather(beforeTick, this.state);
-    const walking = Boolean(horizontal || vertical);
-    const step = walking && Math.floor(this.time.now / 140) % 2 === 1;
-    const playerTexture = `survivor:${step ? 'step' : 'idle'}`;
-    if (this.playerSprite.texture.key !== playerTexture) this.playerSprite.setTexture(playerTexture);
-    this.playerSprite.setPosition(Math.round(worldX(this.state.player.x)), Math.round(worldY(this.state.player.y)) - (step ? 1 : 0));
+    const visual = selectSurvivorVisual({ facing: this.facing, moving: walking, warmth: this.state.player.warmth,
+      nowMs: this.time.now, action: this.visualAction });
+    if (this.playerSprite.texture.key !== visual.texture) this.playerSprite.setTexture(visual.texture);
+    this.playerSprite.setPosition(Math.round(worldX(this.state.player.x)), Math.round(worldY(this.state.player.y)));
     this.playerSprite.setDepth(playerVisualDepth(this.state));
-    if (horizontal) this.playerSprite.setFlipX(horizontal < 0);
+    this.playerSprite.setFlipX(visual.flipX);
     this.paintObjects();
     this.ambient.update(this.state, dt, this.time.now);
     this.paintNight();
@@ -93,6 +100,8 @@ export class GameScene extends Phaser.Scene {
     const before = this.state;
     const result = applyAction(before, action);
     this.state = result.state;
+    if (result.state !== before && (action.type === 'gather' || action.type === 'rest' || action.type === 'cook' || action.type === 'stargaze'))
+      this.visualAction = { kind: action.type, startedAtMs: this.time.now };
     if (action.type === 'gather') {
       const node = before.nodes.find(item => item.id === action.nodeId);
       const remaining = this.state.nodes.find(item => item.id === action.nodeId)?.amount;
