@@ -1,6 +1,7 @@
 import type { PaletteKey } from './palette';
 import { terrainSprites } from './terrain';
 import { sceneSprites } from './sceneSprites';
+import { phase3Sprites } from './phase3Sprites';
 
 export interface SpriteDef {
   size: [number, number];
@@ -15,67 +16,5 @@ const grassPlain: SpriteDef = {
   frames: { plain: Array(16).fill('gggggggggggggggg') }
 };
 
-const branchPile: SpriteDef = {
-  size: [16, 16], anchor: [8, 15],
-  legend: { o: 'wood0', d: 'wood1', w: 'wood2', l: 'wood3', h: 'wood4', e: 'earth2', s: 'shadow' },
-  frames: {
-    ready: [
-      '................',
-      '................',
-      '................',
-      '................',
-      '................',
-      '................',
-      '......oo........',
-      '.....olwo.......',
-      '....owllwo......',
-      '...odwwhhdo.....',
-      '..oowwoowwoo....',
-      '..owhwwddwho....',
-      '...oowwwwoo.....',
-      '....oooooo......',
-      '....ssssss......',
-      '................'
-    ],
-    readyB: [
-      '................',
-      '................',
-      '................',
-      '................',
-      '................',
-      '................',
-      '.......oo.......',
-      '......olwo......',
-      '.....owllwo.....',
-      '...odwwhhdo.....',
-      '..oowwoowwoo....',
-      '..owhwwddwho....',
-      '...oowwwwoo.....',
-      '....oooooo......',
-      '....ssssss......',
-      '................'
-    ],
-    depleted: [
-      '................',
-      '................',
-      '................',
-      '................',
-      '................',
-      '................',
-      '................',
-      '................',
-      '................',
-      '................',
-      '......ee........',
-      '....eewwee......',
-      '.....oddo.......',
-      '....eewwee......',
-      '.....ssss.......',
-      '................'
-    ]
-  },
-  animations: { rustle: { frames: ['ready', 'readyB'], frameRate: 6, repeat: 0 } }
-};
-
-/** Phase 1 prototypes; later phases add the production terrain, nodes, and actors. */
-export const sprites: Record<string, SpriteDef> = { grassPlain, branchPile, ...terrainSprites, ...sceneSprites };
+/** Palette-indexed art shared by the game and contact sheet. */
+export const sprites: Record<string, SpriteDef> = { grassPlain, ...terrainSprites, ...sceneSprites, ...phase3Sprites };
