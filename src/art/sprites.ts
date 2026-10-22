@@ -1,6 +1,6 @@
 import type { PaletteKey } from './palette';
 import { terrainSprites } from './terrain';
-import { sceneSprites } from './sceneSprites';
+import { wildlifeSprites } from './wildlifeSprites';
 import { phase3Sprites } from './phase3Sprites';
 import { survivorSprite } from './survivor';
 
@@ -80,4 +80,4 @@ const branchPile: SpriteDef = {
 };
 
 /** Palette-indexed art shared by the game and contact sheet. */
-export const sprites: Record<string, SpriteDef> = { grassPlain, ...terrainSprites, ...sceneSprites, ...phase3Sprites, branchPile, survivor: survivorSprite };
+export const sprites: Record<string, SpriteDef> = { grassPlain, ...terrainSprites, ...wildlifeSprites, ...phase3Sprites, branchPile, survivor: survivorSprite };
