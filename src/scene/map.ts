@@ -1,7 +1,7 @@
 import { BALANCE, type ResourceNode } from '../game/state';
 
 export interface MapItem { x: number; y: number; sprite: string }
-export interface TerrainMap { ground: string[][]; decorations: MapItem[]; rimStones: MapItem[]; trees: MapItem[]; rocks: MapItem[] }
+export interface TerrainMap { ground: string[][]; decorations: MapItem[]; rimStones: MapItem[]; trees: MapItem[]; groves: MapItem[][]; rocks: MapItem[] }
 
 function hash(x: number, y: number, salt = 0): number {
   let n = Math.imul(x + salt * 31, 374761393) + Math.imul(y - salt * 17, 668265263);
@@ -54,16 +54,29 @@ export function buildMap(nodes: ResourceNode[]): TerrainMap {
     }
     ground.push(row);
   }
-  const groves = [[7, 6], [17, 6], [28, 5], [35, 12], [33, 24], [24, 26], [13, 25], [5, 17]];
-  for (let grove = 0; grove < groves.length; grove++) {
-    const [cx, cy] = groves[grove];
-    for (let i = 0; i < 7; i++) {
-      const angle = i * 2.39996 + grove, radius = 1 + (i % 3);
+  const groves: MapItem[][] = [];
+  const preferredCenters = [[7, 6], [17, 6], [28, 5], [35, 12], [33, 24], [24, 26], [13, 25], [5, 17]];
+  const fallbackCenters: number[][] = [];
+  for (let y = 5; y < BALANCE.mapHeight - 4; y += 5) {
+    for (let x = 5; x < BALANCE.mapWidth - 4; x += 5) fallbackCenters.push([x, y]);
+  }
+  fallbackCenters.sort(([ax, ay], [bx, by]) => hash(ax, ay, 9) - hash(bx, by, 9));
+  const chosenCenters: number[][] = [];
+  for (const [cx, cy] of [...preferredCenters, ...fallbackCenters]) {
+    if (groves.length === 8) break;
+    if (chosenCenters.some(([x, y]) => Math.hypot(cx - x, cy - y) < 7)) continue;
+    const grove: MapItem[] = [];
+    for (let i = 0; i < 21 && grove.length < 7; i++) {
+      const angle = i * 2.39996 + hash(cx, cy, 10) % 6, radius = 1 + (i % 3);
       const x = Math.round(cx + Math.cos(angle) * radius), y = Math.round(cy + Math.sin(angle) * radius);
       if (x < 3 || x >= BALANCE.mapWidth - 3 || y < 3 || y >= BALANCE.mapHeight - 3 || !clearForTree(x, y, nodes)) continue;
-      if (trees.some(tree => Math.hypot(tree.x - x, tree.y - y) < 1.2)) continue;
-      trees.push({ x, y, sprite: ['treeBroadleaf', 'treePine', 'treeYoung'][hash(x, y, 6) % 3] });
+      if ([...trees, ...grove].some(tree => Math.hypot(tree.x - x, tree.y - y) < 1.2)) continue;
+      grove.push({ x, y, sprite: ['treeBroadleaf', 'treePine', 'treeYoung'][hash(x, y, 6) % 3] });
     }
+    if (grove.length < 3) continue;
+    groves.push(grove);
+    chosenCenters.push([cx, cy]);
+    trees.push(...grove);
   }
   for (let i = 0; i < 12; i++) {
     const angle = i * Math.PI * 2 / 12;
@@ -74,5 +87,5 @@ export function buildMap(nodes: ResourceNode[]): TerrainMap {
     const x = 3 + hash(i, 4, 7) % (BALANCE.mapWidth - 6), y = 3 + hash(i, 8, 8) % (BALANCE.mapHeight - 6);
     if (clearForTree(x, y, nodes)) rocks.push({ x, y, sprite: `rock${i % 2}` });
   }
-  return { ground, decorations, rimStones, trees, rocks };
+  return { ground, decorations, rimStones, trees, groves, rocks };
 }
