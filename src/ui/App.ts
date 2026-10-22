@@ -3,7 +3,8 @@ import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from
 import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
-import { isAtCamp, isColdNight, sleepBlocker } from '../game/rules';
+import { buildStatus, cookBlocker, isAtCamp, isColdNight, sleepBlocker, stargazeBlocker } from '../game/rules';
+import { forecastFireCheck } from '../game/forecast';
 import { dayPhase, formatClock, nextChange } from '../game/clock';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
@@ -212,8 +213,8 @@ export class App {
     this.setText('night-hint', !afterDark ? 'These small moments are waiting for nightfall.'
       : !atCamp ? 'Return to the camp circle for a quiet evening.'
         : 'Optional comforts while the night passes.');
-    this.root.querySelector('#cook-button')?.classList.toggle('ready', afterDark && atCamp && inventory.food > 0 && this.state.fireFuel > 0);
-    this.root.querySelector('#stargaze-button')?.classList.toggle('ready', afterDark && atCamp);
+    this.root.querySelector('#cook-button')?.classList.toggle('ready', !cookBlocker(this.state));
+    this.root.querySelector('#stargaze-button')?.classList.toggle('ready', !stargazeBlocker(this.state));
     const storm = isColdNight(this.state);
     const forecast = this.root.querySelector('#forecast-panel');
     forecast?.classList.toggle('active', storm);
@@ -225,26 +226,26 @@ export class App {
       this.setText('forecast-fire', '✓ Hearth unlocked');
     } else {
       const day = this.state.progress.nextStormDay!;
-      const needed = storm ? Math.ceil((BALANCE.daySeconds - timeOfDay) * BALANCE.coldNightFireBurn) : (BALANCE.daySeconds - BALANCE.nightStart) * BALANCE.coldNightFireBurn;
       this.setText('forecast-title', storm ? 'The cold front is here' : `Cold front · day ${day} night`);
       this.setText('forecast-copy', storm ? 'Stay at camp and keep the fire alive until dawn.' : `Build a shelter and bring two logs to camp before nightfall on day ${day}.`);
       this.setText('forecast-shelter', `${structures.shelter ? '✓' : '○'} Shelter ${structures.shelter ? 'ready' : 'needed'}`);
-      this.setText('forecast-fire', `${this.state.fireFuel > needed ? '✓' : '○'} Fire: ${Math.ceil(this.state.fireFuel)} / ${needed}s ${storm ? 'to dawn' : 'for the night'}`);
+      this.setText('forecast-fire', forecastFireCheck(this.state));
     }
     this.setText('prompt', this.scene?.getPrompt() ?? 'WASD / arrows  Move');
     this.setText('build-hint', isAtCamp(this.state) ? 'At camp — click an upgrade to build.' : 'Stand inside the marked camp circle to build.');
     for (const id of buildOptions) {
-      const built = this.state.structures[id];
+      const status = buildStatus(this.state, id);
+      const built = status === 'built';
+      const locked = status === 'locked';
+      const needsShelter = status === 'needsShelter';
       const definition = BUILDINGS[id];
-      const locked = definition.prerequisite === 'coldNight' && !this.state.progress.hearthUnlocked;
-      const needsShelter = definition.prerequisite === 'shelter' && !structures.shelter;
       const cost = definition.cost;
       const stoneCost = 'stone' in cost ? cost.stone : 0;
       const button = this.root.querySelector<HTMLButtonElement>(`[data-build="${id}"]`)!;
       button.disabled = built || locked || needsShelter;
       button.classList.toggle('built', built);
       button.classList.toggle('locked', locked || needsShelter);
-      button.classList.toggle('ready', !built && !locked && !needsShelter && isAtCamp(this.state) && inventory.wood >= cost.wood && inventory.fiber >= cost.fiber && inventory.stone >= stoneCost);
+      button.classList.toggle('ready', status === 'ready');
       button.querySelector<HTMLElement>('.build-copy small')!.textContent = needsShelter ? 'Requires shelter' : definition.description;
       const fiberPrice = cost.fiber ? ` · ${cost.fiber} fiber` : '';
       const stonePrice = stoneCost ? ` · ${stoneCost} stone` : '';

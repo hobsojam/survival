@@ -95,7 +95,7 @@ export function createGame(): GameState {
   return {
     day: 1,
     timeOfDay: 0,
-    player: { x: BALANCE.campX, y: BALANCE.campY, energy: 100, hunger: 100, warmth: 100 },
+    player: { x: BALANCE.campX + 1, y: BALANCE.campY + 1, energy: 100, hunger: 100, warmth: 100 },
     inventory: { wood: 0, food: 0, fiber: 0, stone: 0 },
     fireFuel: 0,
     structures: { shelter: false, bed: false, crate: false, hearth: false, dryingRack: false, windbreak: false },
