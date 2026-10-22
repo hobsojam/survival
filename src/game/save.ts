@@ -122,6 +122,11 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** Autosave interval, stretched to 10, 30 and then 60 seconds after consecutive failures. */
+export function autosaveDelayMs(failures: number): number {
+  return [10000, 10000, 30000][failures] ?? 60000;
+}
+
 export function saveGame(storage: Storage, state: GameState): SaveResult {
   if (!validState(state)) return { ok: false, error: 'The game state is invalid and was not saved.' };
   try {
