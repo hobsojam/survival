@@ -28,16 +28,29 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: { id: 
     visuals.push({ id, texture, x, y, depth: depth ?? y });
   };
   for (const node of state.nodes) {
-    const sprite = node.kind === 'branch' ? 'branchPile' : node.kind === 'berry' ? 'berryBush' : 'fiberReeds';
+    let sprite = 'fiberReeds';
+    if (node.kind === 'branch') sprite = 'branchPile';
+    else if (node.kind === 'berry') sprite = 'berryBush';
     const sinceGather = gathered?.id === node.id ? timeMs - gathered.atMs : -1;
-    const frame = node.kind === 'berry' && sinceGather >= 0 && sinceGather < 300 ? `rustle${Math.floor(sinceGather / 150)}`
-      : node.amount <= 0 ? node.kind === 'berry' ? 'picked' : node.kind === 'fiber' ? 'cut' : 'depleted'
-      : node.kind === 'fiber' ? ['ready', 'sway0', 'ready', 'sway1'][(Math.floor(timeMs / 500) + node.id.length + node.x) % 4] : 'ready';
+    let frame = 'ready';
+    if (node.kind === 'berry' && sinceGather >= 0 && sinceGather < 300) {
+      frame = `rustle${Math.floor(sinceGather / 150)}`;
+    } else if (node.amount <= 0) {
+      if (node.kind === 'berry') frame = 'picked';
+      else if (node.kind === 'fiber') frame = 'cut';
+      else frame = 'depleted';
+    } else if (node.kind === 'fiber') {
+      frame = ['ready', 'sway0', 'ready', 'sway1'][(Math.floor(timeMs / 500) + node.id.length + node.x) % 4];
+    }
     add(node.id, `${sprite}:${frame}`, node.x, node.y);
   }
   const { campX: x, campY: y } = BALANCE;
-  add('shelter', state.structures.shelter ? `shelter:${state.structures.bed ? 'builtBed' : 'built'}` : 'shelterSite:still', x - 3, y - 2,
-    state.structures.shelter ? undefined : GROUND_DECAL_DEPTH);
+  let shelterTexture = 'shelterSite:still';
+  if (state.structures.shelter) {
+    const shelterFrame = state.structures.bed ? 'builtBed' : 'built';
+    shelterTexture = `shelter:${shelterFrame}`;
+  }
+  add('shelter', shelterTexture, x - 3, y - 2, state.structures.shelter ? undefined : GROUND_DECAL_DEPTH);
   add('crate', state.structures.crate ? 'crate:built' : 'crateSite:still', x + 3, y + 1,
     state.structures.crate ? undefined : GROUND_DECAL_DEPTH);
   add('dryingRack', state.structures.dryingRack ? 'dryingRack:built' : 'dryingRackSite:still', x + 2, y - 2,
@@ -50,7 +63,11 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: { id: 
   const phase = Math.floor(timeMs / 180) % 4;
   const storm = isColdNight(state);
   const low = state.fireFuel < 30;
-  const mode = state.fireFuel <= 0 ? 'unlit' : low && storm ? 'lowWindy' : storm ? 'windy' : low ? 'low' : 'burning';
+  let mode = 'burning';
+  if (state.fireFuel <= 0) mode = 'unlit';
+  else if (low && storm) mode = 'lowWindy';
+  else if (storm) mode = 'windy';
+  else if (low) mode = 'low';
   add('fire', `${fire}:${mode === 'unlit' ? mode : `${mode}${phase}`}`, x, y);
   if (state.fireFuel > 0 && state.timeOfDay >= BALANCE.nightStart) visuals.push({
     id: 'flame', texture: `${state.structures.hearth ? 'hearthFlame' : 'flame'}:${mode}${phase}`,
