@@ -14,6 +14,10 @@ class MemoryStorage implements Storage {
 
 function legacySnapshot(): any {
   const state = JSON.parse(JSON.stringify(createGame()));
+  const oldBranches = [[22, 15], [18, 16], [21, 18], [16, 14], [24, 13], [13, 12], [27, 17], [19, 22], [29, 9], [10, 18], [32, 21], [7, 8]];
+  state.nodes.filter((node: { kind: string }) => node.kind === 'branch').forEach((node: { x: number; y: number }, index: number) => {
+    [node.x, node.y] = oldBranches[index];
+  });
   delete state.inventory.stone;
   state.nodes = state.nodes.filter((node: { kind: string }) => node.kind !== 'stone');
   return state;
@@ -40,10 +44,26 @@ describe('local save', () => {
     state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
     state.nodes.find(node => node.kind === 'fiber')!.readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(5);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(6);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);
+  });
+
+  it('moves version five branches to their tree locations without losing gathered state', () => {
+    const storage = new MemoryStorage();
+    const old = legacySnapshot();
+    old.inventory.stone = 0;
+    old.nodes.push(...createGame().nodes.filter(node => node.kind === 'stone'));
+    old.day = 3;
+    old.nodes[6].amount = 0;
+    old.nodes[6].readyDay = 4;
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 5, state: old }));
+    const loaded = loadGame(storage);
+    expect(loaded.kind).toBe('loaded');
+    if (loaded.kind === 'loaded') {
+      expect(loaded.state.nodes[6]).toEqual({ ...createGame().nodes[6], amount: 0, readyDay: 4 });
+    }
   });
 
   it('reports no save when storage is empty', () => {
@@ -69,7 +89,8 @@ describe('local save', () => {
     const state = createGame();
     state.inventory.stone = 9;
     expect(saveGame(storage, state).ok).toBe(false);
-    const malformed = JSON.parse(JSON.stringify(createGame()));
+    const malformed = legacySnapshot();
+    malformed.nodes.push(...createGame().nodes.filter(node => node.kind === 'stone'));
     delete malformed.inventory.stone;
     storage.setItem(SAVE_KEY, JSON.stringify({ version: 5, state: malformed }));
     expect(loadGame(storage).kind).toBe('invalid');
@@ -122,7 +143,7 @@ describe('local save', () => {
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') {
       expect(loaded.state.inventory).toEqual({ wood: 4, food: 0, fiber: 0, stone: 0 });
-      expect(loaded.state.nodes[0]).toEqual(old.nodes[0]);
+      expect(loaded.state.nodes[0]).toEqual({ ...old.nodes[0], x: createGame().nodes[0].x, y: createGame().nodes[0].y });
       expect(loaded.state.nodes.filter(node => node.kind === 'fiber')).toHaveLength(8);
     }
   });
@@ -145,11 +166,11 @@ describe('local save', () => {
 
   it('rejects impossible version two progression', () => {
     const storage = new MemoryStorage();
-    const state = createGame();
+    const state = legacySnapshot();
     state.day = 4;
     state.progress.nextStormDay = 3;
     delete (state.inventory as Partial<typeof state.inventory>).fiber;
-    state.nodes = state.nodes.filter(node => node.kind !== 'fiber');
+    state.nodes = state.nodes.filter((node: { kind: string }) => node.kind !== 'fiber');
     delete (state.structures as Partial<typeof state.structures>).dryingRack;
     delete (state.structures as Partial<typeof state.structures>).windbreak;
     storage.setItem(SAVE_KEY, JSON.stringify({ version: 2, state }));

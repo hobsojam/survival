@@ -23,7 +23,7 @@ function earthAt(x: number, y: number): boolean {
 }
 function clearForTree(x: number, y: number, nodes: ResourceNode[]): boolean {
   return Math.hypot(x - BALANCE.campX, y - BALANCE.campY) > BALANCE.campRadius + 1 &&
-    nodes.every(node => Math.hypot(x - node.x, y - node.y) >= 3.5) &&
+    nodes.every(node => Math.hypot(x - node.x, y - node.y) >= (node.kind === 'branch' ? 1.5 : 3.5)) &&
     destinations.every(([dx, dy]) => distanceToPath(x + .5, y + .5, dx + .5, dy + .5) >= 1.35);
 }
 

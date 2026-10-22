@@ -163,7 +163,7 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
         inventory: { ...state.inventory, [resource]: state.inventory[resource] + 1 },
         nodes
       }, BALANCE.gatherSeconds, 'working'),
-      message: { wood: 'Collected wood.', food: 'Picked berries.', fiber: 'Gathered fiber.', stone: 'Collected stone.' }[resource]
+      message: { wood: 'Picked up fallen branches.', food: 'Picked berries.', fiber: 'Gathered fiber.', stone: 'Collected stone.' }[resource]
     };
   }
   if (action.type === 'eat') {
