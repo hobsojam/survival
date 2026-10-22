@@ -229,10 +229,11 @@ export class App {
       const needsShelter = definition.prerequisite === 'shelter' && !structures.shelter;
       const cost = definition.cost;
       const button = this.root.querySelector<HTMLButtonElement>(`[data-build="${id}"]`)!;
-      button.disabled = built || locked;
+      button.disabled = built || locked || needsShelter;
       button.classList.toggle('built', built);
-      button.classList.toggle('locked', locked);
+      button.classList.toggle('locked', locked || needsShelter);
       button.classList.toggle('ready', !built && !locked && !needsShelter && isAtCamp(this.state) && inventory.wood >= cost.wood && inventory.fiber >= cost.fiber);
+      button.querySelector<HTMLElement>('.build-copy small')!.textContent = needsShelter ? 'Requires shelter' : definition.description;
       const fiberPrice = cost.fiber ? ` · ${cost.fiber} fiber` : '';
       let verb = 'Build';
       let price = `${cost.wood} wood${fiberPrice}`;
@@ -242,6 +243,8 @@ export class App {
       } else if (locked) {
         verb = 'Locked';
         price = 'Weather cold night';
+      } else if (needsShelter) {
+        verb = 'Blocked';
       }
       button.querySelector<HTMLElement>('.build-verb')!.textContent = verb;
       button.querySelector<HTMLElement>('.build-price')!.textContent = price;
