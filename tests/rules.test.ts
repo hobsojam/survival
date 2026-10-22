@@ -23,6 +23,23 @@ describe('gathering and inventory', () => {
     expect(advanceTime(gathered.state, 240).nodes.find(node => node.id === 'fiber-0')?.amount).toBe(1);
   });
 
+  it('collects stone from a rock once and counts it toward bag capacity', () => {
+    const state = createGame();
+    const stone = state.nodes.find(node => node.kind === 'stone')!;
+    state.player.x = stone.x;
+    state.player.y = stone.y;
+    const gathered = applyAction(state, { type: 'gather', nodeId: stone.id });
+    expect(gathered.state.inventory.stone).toBe(1);
+    expect(gathered.state.nodes.find(node => node.id === stone.id)?.amount).toBe(0);
+    expect(advanceTime(gathered.state, 240).nodes.find(node => node.id === stone.id)?.amount).toBe(0);
+    const fullBag = gathered.state;
+    fullBag.inventory.wood = 7;
+    const secondStone = fullBag.nodes.find(node => node.kind === 'stone' && node.amount > 0)!;
+    fullBag.player.x = secondStone.x;
+    fullBag.player.y = secondStone.y;
+    expect(applyAction(fullBag, { type: 'gather', nodeId: secondStone.id }).message).toMatch(/full/i);
+  });
+
   it('counts fiber toward carrying capacity', () => {
     const state = createGame();
     state.inventory.wood = 6;
@@ -523,15 +540,18 @@ describe('forecast cold night', () => {
 
   it('keeps the hearth locked until success, then grants longer fuel', () => {
     const state = createGame();
-    state.inventory.wood = 4;
+    state.inventory.wood = 2;
     const locked = applyAction(state, { type: 'build', structureId: 'hearth' });
     expect(locked.state).toBe(state);
     expect(locked.message).toMatch(/cold night/i);
     state.progress.hearthUnlocked = true;
     state.progress.nextStormDay = null;
+    expect(applyAction(state, { type: 'build', structureId: 'hearth' }).message).toMatch(/stone/i);
+    state.inventory.stone = 3;
     const built = applyAction(state, { type: 'build', structureId: 'hearth' }).state;
     expect(built.structures.hearth).toBe(true);
     expect(built.inventory.wood).toBe(0);
+    expect(built.inventory.stone).toBe(0);
     built.inventory.wood = 1;
     expect(applyAction(built, { type: 'stokeFire' }).state.fireFuel).toBe(150);
   });

@@ -28,6 +28,10 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: { id: 
     visuals.push({ id, texture, x, y, depth: depth ?? y });
   };
   for (const node of state.nodes) {
+    if (node.kind === 'stone') {
+      add(node.id, node.amount > 0 ? 'rock0:still' : 'pebbles0:still', node.x, node.y);
+      continue;
+    }
     let sprite = 'fiberReeds';
     if (node.kind === 'branch') sprite = 'branchPile';
     else if (node.kind === 'berry') sprite = 'berryBush';

@@ -34,5 +34,4 @@ export function drawTerrain(scene: Phaser.Scene, nodes: ResourceNode[]): void {
       .setDepth(Math.round(worldY(item.y)));
   };
   map.trees.forEach(standing);
-  map.rocks.forEach(standing);
 }
