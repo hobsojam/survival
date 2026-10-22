@@ -41,6 +41,8 @@ jobs:
       - if: steps.project.outputs.exists == 'true'
         run: npm ci --ignore-scripts
       - if: steps.project.outputs.exists == 'true' && github.event_name != 'schedule'
+        run: npm run lint
+      - if: steps.project.outputs.exists == 'true' && github.event_name != 'schedule'
         run: npm test -- --run
       - if: steps.project.outputs.exists == 'true' && github.event_name != 'schedule'
         run: npm run build
