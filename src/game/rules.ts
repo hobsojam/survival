@@ -38,6 +38,36 @@ export function sleepBlocker(state: GameState): string | null {
   return null;
 }
 
+/** Why the survivor can't cook right now, or null if they can. */
+export function cookBlocker(state: GameState): string | null {
+  if (state.timeOfDay < BALANCE.nightStart) return 'Cook berries after nightfall.';
+  if (!isAtCamp(state)) return 'Return to camp to cook.';
+  if (state.fireFuel <= 0) return 'Light the campfire before cooking.';
+  if (state.inventory.food <= 0) return 'Gather a berry to cook.';
+  return null;
+}
+
+/** Why the survivor can't watch the stars right now, or null if they can. */
+export function stargazeBlocker(state: GameState): string | null {
+  if (state.timeOfDay < BALANCE.nightStart) return 'Wait until nightfall to watch the stars.';
+  if (!isAtCamp(state)) return 'Return to camp to watch the stars.';
+  return null;
+}
+
+export type BuildStatus = 'built' | 'locked' | 'needsShelter' | 'ready' | 'unavailable';
+
+/** How a structure's build button should look: built, locked, blocked by a missing shelter, ready to build here, or not yet. */
+export function buildStatus(state: GameState, id: StructureId): BuildStatus {
+  const definition = BUILDINGS[id];
+  if (state.structures[id]) return 'built';
+  if (definition.prerequisite === 'coldNight' && !state.progress.hearthUnlocked) return 'locked';
+  if (definition.prerequisite === 'shelter' && !state.structures.shelter) return 'needsShelter';
+  const cost = definition.cost;
+  const stoneCost = 'stone' in cost ? cost.stone : 0;
+  const affordable = state.inventory.wood >= cost.wood && state.inventory.fiber >= cost.fiber && state.inventory.stone >= stoneCost;
+  return affordable && isAtCamp(state) ? 'ready' : 'unavailable';
+}
+
 export function advanceTime(state: GameState, seconds: number, activity: Activity = 'awake'): GameState {
   if (!Number.isFinite(seconds) || seconds <= 0) return state;
   let next: GameState = {
@@ -148,10 +178,8 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     };
   }
   if (action.type === 'cook') {
-    if (state.timeOfDay < BALANCE.nightStart) return { state, message: 'Cook berries after nightfall.' };
-    if (!isAtCamp(state)) return { state, message: 'Return to camp to cook.' };
-    if (state.fireFuel <= 0) return { state, message: 'Light the campfire before cooking.' };
-    if (state.inventory.food <= 0) return { state, message: 'Gather a berry to cook.' };
+    const blocker = cookBlocker(state);
+    if (blocker) return { state, message: blocker };
     const cooked = advanceTime({ ...state, inventory: { ...state.inventory, food: state.inventory.food - 1 } }, BALANCE.cookSeconds, 'resting');
     return {
       state: { ...cooked, player: { ...cooked.player,
@@ -162,8 +190,8 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     };
   }
   if (action.type === 'stargaze') {
-    if (state.timeOfDay < BALANCE.nightStart) return { state, message: 'Wait until nightfall to watch the stars.' };
-    if (!isAtCamp(state)) return { state, message: 'Return to camp to watch the stars.' };
+    const blocker = stargazeBlocker(state);
+    if (blocker) return { state, message: blocker };
     const restored = { ...state, player: { ...state.player, energy: Math.min(100, state.player.energy + BALANCE.stargazeEnergyGain) } };
     const watched = advanceTime(restored, BALANCE.stargazeSeconds, 'resting');
     const thoughts = [
