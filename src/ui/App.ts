@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from '../game/state';
 import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
-import { loadGame, saveGame, type LoadResult } from '../game/save';
+import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
 import { isAtCamp, isColdNight, sleepBlocker } from '../game/rules';
 import { dayPhase, formatClock, nextChange } from '../game/clock';
 
@@ -17,6 +17,7 @@ export class App {
   private storage?: Storage;
   private previousSave: LoadResult = { kind: 'empty' };
   private lastSaveAt = 0;
+  private saveFailures = 0;
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -85,11 +86,14 @@ export class App {
     if (restart) restart.hidden = false;
     this.state = state;
     this.lastSaveAt = Date.now();
+    this.saveFailures = 0;
     this.scene = new GameScene(state, (next, cause) => {
       const previous = this.state;
       this.state = next;
       this.render();
-      if ((cause === 'action' && next !== previous) || Date.now() - this.lastSaveAt >= 10000) this.saveCurrent();
+      // After a failed save, wait for the backoff instead of retrying on every action.
+      const due = Date.now() - this.lastSaveAt >= autosaveDelayMs(this.saveFailures);
+      if ((cause === 'action' && next !== previous && !this.saveFailures) || due) this.saveCurrent();
     }, message => this.setMessage(message));
     this.game = new Phaser.Game({
       type: Phaser.AUTO,
@@ -157,13 +161,19 @@ export class App {
       return;
     }
     const result = saveGame(this.storage, this.state);
+    this.lastSaveAt = Date.now();
+    const status = this.root.querySelector<HTMLElement>('#save-status');
     if (result.ok) {
       this.previousSave = { kind: 'loaded', state: this.state };
-      this.lastSaveAt = Date.now();
+      this.saveFailures = 0;
       this.setText('save-status', 'Saved locally');
+      status?.removeAttribute('title');
     } else {
-      this.setText('save-status', 'Save failed');
-      this.setMessage(`Could not save locally: ${result.error}`);
+      // Report the failure once; later retries only update the status, so gameplay messages stay visible.
+      if (!this.saveFailures) this.setMessage(`Could not save locally: ${result.error}`);
+      this.saveFailures++;
+      this.setText('save-status', 'Save failed · retrying');
+      status?.setAttribute('title', result.error);
     }
   }
 

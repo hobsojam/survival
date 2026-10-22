@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createGame } from '../src/game/state';
-import { loadGame, saveGame, SAVE_KEY } from '../src/game/save';
+import { autosaveDelayMs, loadGame, saveGame, SAVE_KEY } from '../src/game/save';
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();
@@ -275,5 +275,15 @@ describe('local save', () => {
     storage.getItem = () => { throw new Error('Storage blocked'); };
     const result = loadGame(storage);
     expect(result.kind).toBe('invalid');
+  });
+});
+
+describe('autosave backoff', () => {
+  it('saves every 10 seconds, then backs off to 30 and 60 seconds after repeated failures', () => {
+    expect(autosaveDelayMs(0)).toBe(10000);
+    expect(autosaveDelayMs(1)).toBe(10000);
+    expect(autosaveDelayMs(2)).toBe(30000);
+    expect(autosaveDelayMs(3)).toBe(60000);
+    expect(autosaveDelayMs(40)).toBe(60000);
   });
 });
