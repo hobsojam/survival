@@ -206,7 +206,7 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
         player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.buildEnergyCost) },
         structures: { ...state.structures, [action.structureId]: true }
       }, BALANCE.buildSeconds, 'working'),
-      message: `Built the ${action.structureId}.`
+      message: `Built the ${definition.name.toLowerCase()}.`
     };
   }
   if (action.type === 'rest') {

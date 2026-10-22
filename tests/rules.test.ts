@@ -142,7 +142,8 @@ describe('time and gentle survival', () => {
 
   it('stops movement at the map boundary', () => {
     const state = createGame();
-    expect(applyAction(state, { type: 'move', dx: 1, dy: 0 }).state.player.x).toBe(21);
+    const startX = state.player.x;
+    expect(applyAction(state, { type: 'move', dx: 1, dy: 0 }).state.player.x).toBe(startX + 1);
     state.player.x = 39;
     state.player.y = 0;
     const moved = applyAction(state, { type: 'move', dx: 2, dy: -2 }).state;
@@ -160,6 +161,12 @@ describe('time and gentle survival', () => {
 });
 
 describe('fire and camp upgrades', () => {
+  it('names the structure in plain words when it is built', () => {
+    const state = createGame();
+    state.inventory.wood = 4;
+    expect(applyAction(state, { type: 'build', structureId: 'dryingRack' }).message).toBe('Built the drying rack.');
+  });
+
   it('builds while standing at the visible shelter and crate sites', () => {
     const shelterState = createGame();
     shelterState.inventory.wood = 6;
