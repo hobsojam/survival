@@ -8,6 +8,39 @@ function clone(def: SpriteDef): SpriteDef {
 }
 
 describe('sprite pipeline', () => {
+  it('provides complete phase 3 resource and camp art', () => {
+    const required: Record<string, { size: [number, number]; frames: string[] }> = {
+      branchPile: { size: [16, 16], frames: ['ready', 'depleted'] },
+      berryBush: { size: [16, 16], frames: ['ready', 'picked', 'rustle0', 'rustle1'] },
+      fiberReeds: { size: [16, 16], frames: ['ready', 'cut', 'sway0', 'sway1'] },
+      firePit: { size: [24, 24], frames: ['unlit', 'burning0', 'burning1', 'burning2', 'burning3', 'low0', 'low1', 'low2', 'low3', 'windy0', 'windy1', 'windy2', 'windy3', 'lowWindy0', 'lowWindy1', 'lowWindy2', 'lowWindy3'] },
+      hearth: { size: [32, 28], frames: ['unlit', 'burning0', 'burning1', 'burning2', 'burning3', 'low0', 'low1', 'low2', 'low3', 'windy0', 'windy1', 'windy2', 'windy3', 'lowWindy0', 'lowWindy1', 'lowWindy2', 'lowWindy3'] },
+      flame: { size: [16, 20], frames: ['burning0', 'low0', 'windy0', 'lowWindy0'] },
+      hearthFlame: { size: [16, 24], frames: ['burning0', 'low0', 'windy0', 'lowWindy0'] },
+      hearthSite: { size: [24, 12], frames: ['still'] },
+      shelter: { size: [48, 40], frames: ['built', 'builtBed'] },
+      shelterSite: { size: [48, 32], frames: ['still'] },
+      crate: { size: [16, 16], frames: ['built'] },
+      crateSite: { size: [16, 16], frames: ['still'] },
+      dryingRack: { size: [32, 32], frames: ['built'] },
+      dryingRackSite: { size: [32, 16], frames: ['still'] },
+      windbreak: { size: [48, 32], frames: ['built'] },
+      windbreakSite: { size: [48, 16], frames: ['still'] },
+      logSeat: { size: [24, 12], frames: ['still'] }
+    };
+    for (const [name, expected] of Object.entries(required)) {
+      expect(sprites[name]?.size, name).toEqual(expected.size);
+      expect(Object.keys(sprites[name]?.frames ?? {}), name).toEqual(expect.arrayContaining(expected.frames));
+      expect(() => validateSprite(sprites[name]), name).not.toThrow();
+    }
+    expect(sprites.firePit.frames.burning0).not.toEqual(sprites.firePit.frames.unlit);
+    for (const name of ['firePit', 'hearth']) for (const mode of ['burning', 'low', 'windy', 'lowWindy'])
+      expect(new Set(Array.from({ length: 4 }, (_, i) => sprites[name].frames[`${mode}${i}`].join(''))).size, `${name}:${mode}`).toBe(4);
+    expect(sprites.hearth.frames.unlit).not.toEqual(sprites.firePit.frames.unlit);
+    expect(sprites.berryBush.frames.ready).not.toEqual(sprites.berryBush.frames.picked);
+    expect(sprites.berryBush.frames.ready.join('')).toContain('p');
+    expect(sprites.fiberReeds.frames.ready).not.toEqual(sprites.fiberReeds.frames.cut);
+  });
   it('validates every registered frame, palette symbol, and anchor', () => {
     expect(Object.keys(sprites)).toEqual(expect.arrayContaining([
       'branchPile', ...Array.from({ length: 4 }, (_, i) => `grass${i}`),
@@ -33,9 +66,9 @@ describe('sprite pipeline', () => {
   });
 
   it('provides registered frame sequences for Phaser animations', () => {
-    const rustle = animationConfigs(sprites).find(config => config.key === 'branchPile:rustle');
-    expect(rustle).toMatchObject({ frameRate: 6, repeat: 0, frames: [
-      { key: 'branchPile:ready' }, { key: 'branchPile:readyB' }
+    const rustle = animationConfigs(sprites).find(config => config.key === 'berryBush:rustle');
+    expect(rustle).toMatchObject({ frameRate: 8, repeat: 0, frames: [
+      { key: 'berryBush:rustle0' }, { key: 'berryBush:rustle1' }, { key: 'berryBush:ready' }
     ] });
   });
 

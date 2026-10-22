@@ -16,6 +16,7 @@ export class GameScene extends Phaser.Scene {
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private playerSprite!: Phaser.GameObjects.Image;
   private objects = new Map<string, Phaser.GameObjects.Image>();
+  private gatheredBerry?: { id: string; atMs: number };
   private night!: Phaser.GameObjects.Rectangle;
   private wind!: Phaser.GameObjects.Graphics;
   private ambient!: AmbientLife;
@@ -92,6 +93,12 @@ export class GameScene extends Phaser.Scene {
     const before = this.state;
     const result = applyAction(before, action);
     this.state = result.state;
+    if (action.type === 'gather') {
+      const node = before.nodes.find(item => item.id === action.nodeId);
+      const remaining = this.state.nodes.find(item => item.id === action.nodeId)?.amount;
+      if (node?.kind === 'berry' && remaining !== undefined && remaining < node.amount)
+        this.gatheredBerry = { id: node.id, atMs: this.time.now };
+    }
     const weatherMessage = this.weatherMessage(before, this.state);
     if (weatherMessage) this.onFeedback(weatherMessage);
     else if (announce && result.message) this.onFeedback(result.message);
@@ -129,18 +136,22 @@ export class GameScene extends Phaser.Scene {
   }
 
   private paintObjects(): void {
-    for (const visual of sceneVisuals(this.state, this.time.now)) {
+    const shown = new Set<string>();
+    for (const visual of sceneVisuals(this.state, this.time.now, this.gatheredBerry)) {
+      shown.add(visual.id);
       let image = this.objects.get(visual.id);
+      const [name] = visual.texture.split(':');
+      const art = sprites[name];
       if (!image) {
-        const [name] = visual.texture.split(':');
-        const art = sprites[name];
         image = this.add.image(visual.x, visual.y, visual.texture)
           .setOrigin(art.anchor[0] / art.size[0], art.anchor[1] / art.size[1]);
         this.objects.set(visual.id, image);
       }
       if (image.texture.key !== visual.texture) image.setTexture(visual.texture);
-      image.setPosition(visual.x, visual.y).setDepth(visual.depth);
+      image.setOrigin(art.anchor[0] / art.size[0], art.anchor[1] / art.size[1])
+        .setPosition(visual.x, visual.y).setDepth(visual.depth);
     }
+    for (const [id, image] of this.objects) if (!shown.has(id)) { image.destroy(); this.objects.delete(id); }
   }
 
   private paintNight(): void {
