@@ -2,7 +2,7 @@ import type { PaletteKey } from './palette';
 import type { SpriteDef } from './sprites';
 
 type Grid = string[][];
-const blank = (w: number, h: number): Grid => Array.from({ length: h }, () => Array(w).fill('.'));
+const blank = (w: number, h: number): Grid => Array.from({ length: h }, () => new Array(w).fill('.'));
 const dot = (g: Grid, x: number, y: number, c: string): void => { if (g[y]?.[x] !== undefined) g[y][x] = c; };
 const box = (g: Grid, x: number, y: number, w: number, h: number, c: string): void => {
   for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) dot(g, xx, yy, c);
@@ -113,7 +113,7 @@ function windbreakSite(g: Grid): void {
 function windbreak(g: Grid): void {
   oval(g, 24, 28, 22, 2, 's');
   for (let x = 2; x < 46; x += 5) {
-    const top = 9 + Math.abs(x - 24) / 7 | 0;
+    const top = Math.trunc(9 + Math.abs(x - 24) / 7);
     box(g, x, top, 5, 27 - top, 'a'); box(g, x + 1, top + 1, 3, 25 - top, 'c');
     box(g, x + 1, top, 2, 1, 'e');
   }
