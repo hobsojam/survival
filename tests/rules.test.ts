@@ -23,7 +23,7 @@ describe('gathering and inventory', () => {
     expect(advanceTime(gathered.state, 240).nodes.find(node => node.id === 'fiber-0')?.amount).toBe(1);
   });
 
-  it('collects stone from a rock once and counts it toward bag capacity', () => {
+  it('collects stone from a rock, refills it at dawn, and counts it toward bag capacity', () => {
     const state = createGame();
     const stone = state.nodes.find(node => node.kind === 'stone')!;
     state.player.x = stone.x;
