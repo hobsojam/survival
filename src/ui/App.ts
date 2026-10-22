@@ -102,6 +102,8 @@ export class App {
       const previous = this.state;
       this.state = next;
       this.render();
+      // Without storage there is nothing to retry; starting the game already said so once.
+      if (!this.storage) return;
       // After a failed save, wait for the backoff instead of retrying on every action.
       const due = Date.now() - this.lastSaveAt >= autosaveDelayMs(this.saveFailures);
       if ((cause === 'action' && next !== previous && !this.saveFailures) || due) this.saveCurrent();
@@ -143,7 +145,8 @@ export class App {
     const note = this.root.querySelector<HTMLElement>('#start-note');
     const continueButton = this.root.querySelector<HTMLButtonElement>('#continue-game');
     if (continueButton) continueButton.hidden = this.previousSave.kind !== 'loaded';
-    if (note) note.textContent = this.previousSave.kind === 'loaded'
+    if (note && !this.storage) note.textContent = 'Browser storage is unavailable, so this camp will not be saved.';
+    else if (note) note.textContent = this.previousSave.kind === 'loaded'
       ? `Your camp is waiting on day ${this.previousSave.state.day}.`
       : this.previousSave.kind === 'invalid'
         ? `Your existing save could not be loaded: ${this.previousSave.reason}`
@@ -151,7 +154,7 @@ export class App {
   }
 
   private beginNewGame(): void {
-    if (this.previousSave.kind !== 'empty' && !window.confirm('Start a new game? Your existing local save will be replaced.')) return;
+    if (this.storage && this.previousSave.kind !== 'empty' && !window.confirm('Start a new game? Your existing local save will be replaced.')) return;
     this.startGame(createGame());
     this.setMessage('Gather a few branches. Your camp is waiting.');
     this.saveCurrent();
