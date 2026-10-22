@@ -1,7 +1,7 @@
 import { BALANCE, type ResourceNode } from '../game/state';
 
 export interface MapItem { x: number; y: number; sprite: string }
-export interface TerrainMap { ground: string[][]; decorations: MapItem[]; rimStones: MapItem[]; trees: MapItem[]; groves: MapItem[][]; rocks: MapItem[] }
+export interface TerrainMap { ground: string[][]; decorations: MapItem[]; rimStones: MapItem[]; trees: MapItem[]; groves: MapItem[][] }
 
 function hash(x: number, y: number, salt = 0): number {
   let n = Math.imul(x + salt * 31, 374761393) + Math.imul(y - salt * 17, 668265263);
@@ -29,7 +29,7 @@ function clearForTree(x: number, y: number, nodes: ResourceNode[]): boolean {
 
 export function buildMap(nodes: ResourceNode[]): TerrainMap {
   const ground: string[][] = [];
-  const decorations: MapItem[] = [], rimStones: MapItem[] = [], trees: MapItem[] = [], rocks: MapItem[] = [];
+  const decorations: MapItem[] = [], rimStones: MapItem[] = [], trees: MapItem[] = [];
   for (let y = 0; y < BALANCE.mapHeight; y++) {
     const row: string[] = [];
     for (let x = 0; x < BALANCE.mapWidth; x++) {
@@ -83,9 +83,5 @@ export function buildMap(nodes: ResourceNode[]): TerrainMap {
     rimStones.push({ x: campX + Math.cos(angle) * BALANCE.campRadius, y: campY + Math.sin(angle) * BALANCE.campRadius,
       sprite: `rimStone${i % 2}` });
   }
-  for (let i = 0; i < 12; i++) {
-    const x = 3 + hash(i, 4, 7) % (BALANCE.mapWidth - 6), y = 3 + hash(i, 8, 8) % (BALANCE.mapHeight - 6);
-    if (clearForTree(x, y, nodes)) rocks.push({ x, y, sprite: `rock${i % 2}` });
-  }
-  return { ground, decorations, rimStones, trees, groves, rocks };
+  return { ground, decorations, rimStones, trees, groves };
 }

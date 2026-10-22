@@ -11,6 +11,7 @@ describe('native-size scene art', () => {
     expect(keys).toContain('branchPile:ready');
     expect(keys).toContain('berryBush:ready');
     expect(keys).toContain('fiberReeds:ready');
+    expect(keys).toContain('rock0:still');
     expect(keys).toContain('shelterSite:still');
     expect(keys).toContain('crateSite:still');
     expect(keys).toContain('dryingRackSite:still');
@@ -32,6 +33,7 @@ describe('native-size scene art', () => {
     state.nodes[0].amount = 0;
     state.nodes.find(node => node.kind === 'berry')!.amount = 0;
     state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
+    state.nodes.find(node => node.kind === 'stone')!.amount = 0;
     state.structures.shelter = true;
     state.structures.bed = true;
     state.structures.crate = true;
@@ -41,7 +43,7 @@ describe('native-size scene art', () => {
     state.fireFuel = 30;
     const keys = sceneVisuals(state, 0).map(item => item.texture);
     expect(keys).toEqual(expect.arrayContaining([
-      'branchPile:depleted', 'berryBush:picked', 'fiberReeds:cut',
+      'branchPile:depleted', 'berryBush:picked', 'fiberReeds:cut', 'pebbles0:still',
       'shelter:builtBed', 'crate:built', 'dryingRack:built', 'windbreak:built', 'hearth:burning0'
     ]));
     expect(keys).not.toContain('firePit:unlit');
