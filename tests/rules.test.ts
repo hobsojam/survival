@@ -31,13 +31,33 @@ describe('gathering and inventory', () => {
     const gathered = applyAction(state, { type: 'gather', nodeId: stone.id });
     expect(gathered.state.inventory.stone).toBe(1);
     expect(gathered.state.nodes.find(node => node.id === stone.id)?.amount).toBe(0);
-    expect(advanceTime(gathered.state, 240).nodes.find(node => node.id === stone.id)?.amount).toBe(0);
+    expect(advanceTime(gathered.state, 240).nodes.find(node => node.id === stone.id)?.amount).toBe(1);
     const fullBag = gathered.state;
     fullBag.inventory.wood = 7;
     const secondStone = fullBag.nodes.find(node => node.kind === 'stone' && node.amount > 0)!;
     fullBag.player.x = secondStone.x;
     fullBag.player.y = secondStone.y;
     expect(applyAction(fullBag, { type: 'gather', nodeId: secondStone.id }).message).toMatch(/full/i);
+  });
+
+  it('can clear a stone-filled bag and still build the shelter', () => {
+    let state = createGame();
+    state.inventory.stone = 6;
+    state.inventory.fiber = 2;
+    for (let i = 0; i < 6; i++) {
+      const dropped = applyAction(state, { type: 'drop', resource: 'stone' });
+      expect(dropped.state.inventory.stone).toBe(5 - i);
+      state = dropped.state;
+    }
+    expect(applyAction(state, { type: 'drop', resource: 'stone' }).state).toBe(state);
+    for (const node of state.nodes.filter(node => node.kind === 'branch').slice(0, 6)) {
+      state.player.x = node.x;
+      state.player.y = node.y;
+      state = applyAction(state, { type: 'gather', nodeId: node.id }).state;
+    }
+    state.player.x = BALANCE.campX;
+    state.player.y = BALANCE.campY;
+    expect(applyAction(state, { type: 'build', structureId: 'shelter' }).state.structures.shelter).toBe(true);
   });
 
   it('counts fiber toward carrying capacity', () => {

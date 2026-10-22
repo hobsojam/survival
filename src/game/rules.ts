@@ -2,6 +2,7 @@ import { BALANCE, BUILDINGS, type GameState, type StructureId } from './state';
 
 export type GameAction =
   | { type: 'gather'; nodeId: string }
+  | { type: 'drop'; resource: keyof GameState['inventory'] }
   | { type: 'build'; structureId: StructureId }
   | { type: 'move'; dx: number; dy: number }
   | { type: 'eat' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' };
@@ -108,7 +109,7 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
       const weathered = stormEnded && camp && next.structures.shelter && next.fireFuel > 0 && next.player.warmth > 20;
       next.day += 1;
       next.timeOfDay = 0;
-      next.nodes = next.nodes.map(node => node.kind !== 'stone' && node.readyDay <= next.day ? { ...node, amount: 1 } : node);
+      next.nodes = next.nodes.map(node => node.readyDay <= next.day ? { ...node, amount: 1 } : node);
       if (stormEnded) {
         next.progress = weathered
           ? { nextStormDay: null, hearthUnlocked: true }
@@ -147,7 +148,7 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     if (node.amount <= 0) return { state, message: 'Nothing to gather yet.' };
     const capacity = state.structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity;
     if (state.inventory.wood + state.inventory.food + state.inventory.fiber + state.inventory.stone >= capacity) {
-      return { state, message: 'Your bag is full. Return to camp.' };
+      return { state, message: 'Your bag is full. Drop an item to make room.' };
     }
     let resource: keyof GameState['inventory'] = 'wood';
     if (node.kind === 'berry') resource = 'food';
@@ -164,6 +165,15 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
         nodes
       }, BALANCE.gatherSeconds, 'working'),
       message: { wood: 'Picked up fallen branches.', food: 'Picked berries.', fiber: 'Gathered fiber.', stone: 'Collected stone.' }[resource]
+    };
+  }
+  if (action.type === 'drop') {
+    const amount = state.inventory[action.resource];
+    if (!amount) return { state, message: `No ${action.resource} to drop.` };
+    const item = action.resource === 'food' ? 'berry' : action.resource;
+    return {
+      state: { ...state, inventory: { ...state.inventory, [action.resource]: amount - 1 } },
+      message: `Dropped one ${item}.`
     };
   }
   if (action.type === 'eat') {
