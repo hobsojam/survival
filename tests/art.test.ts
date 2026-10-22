@@ -39,6 +39,29 @@ describe('sprite pipeline', () => {
     ] });
   });
 
+  it('keeps the branch pile as a small stick stack with a contrasting depleted scuff', () => {
+    const pile = sprites.branchPile;
+    const wood = (frame: string[]) => frame.join('').split('').filter(symbol =>
+      symbol !== '.' && symbol !== 's' && !pile.legend[symbol]?.startsWith('earth')
+    ).length;
+    expect(wood(pile.frames.ready)).toBeLessThanOrEqual(42);
+    expect(wood(pile.frames.ready)).toBeGreaterThanOrEqual(24);
+    expect(wood(pile.frames.depleted)).toBeLessThanOrEqual(8);
+    const depletedColours = new Set(pile.frames.depleted.join('').split('').map(symbol => pile.legend[symbol]));
+    expect(depletedColours).toContain('earth1');
+    expect(depletedColours).toContain('earth3');
+    expect(depletedColours).not.toContain('earth2');
+  });
+
+  it('moves the branch pile visibly through its rustle animation', () => {
+    const { ready, readyB } = sprites.branchPile.frames;
+    const moved = ready.flatMap((row, y) => [...row].map((pixel, x) =>
+      (pixel === '.') !== (readyB[y][x] === '.') ? y : -1
+    )).filter(y => y >= 0);
+    expect(moved.length).toBeGreaterThanOrEqual(16);
+    expect(moved.some(y => y >= 9)).toBe(true);
+  });
+
   it('keeps corner transition edges seamless for adjacent tiles', () => {
     for (let left = 0; left < 16; left++) for (let right = 0; right < 16; right++) {
       const leftEdge = [Boolean(left & 2), Boolean(left & 4)];
