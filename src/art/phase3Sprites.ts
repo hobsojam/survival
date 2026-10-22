@@ -41,7 +41,8 @@ function bush(g: Grid, berries: boolean, rustle = 0): void {
   box(g, 4 + rustle, 4, 4, 2, 'k'); box(g, 9 + rustle, 5, 3, 2, 'k');
   box(g, 4 + rustle, 4, 2, 1, 'l'); box(g, 10 + rustle, 5, 2, 1, 'l');
   if (berries) for (const [x, y] of [[4, 9], [7, 6], [11, 9], [7, 11], [12, 6]]) {
-    box(g, x + rustle, y, 2, 2, 'm'); dot(g, x + rustle, y, 'o'); dot(g, x + rustle + 1, y + 1, 'n');
+    box(g, x + rustle, y, 2, 2, 'm'); dot(g, x + rustle, y, 'p');
+    dot(g, x + rustle + 1, y, 'o'); dot(g, x + rustle + 1, y + 1, 'n');
   }
 }
 function reeds(g: Grid, ready: boolean, lean = 0): void {
@@ -135,34 +136,35 @@ function fireBase(g: Grid, hearth: boolean): void {
   line(g, cx - 6, cy + 3, cx + 5, cy - 2, 'a'); line(g, cx - 5, cy - 2, cx + 6, cy + 3, 'c');
   dot(g, cx - 6, cy + 3, 'e'); dot(g, cx - 5, cy - 2, 'e');
 }
-function flames(g: Grid, hearth: boolean, mode: 'burning' | 'low' | 'windy', frame: number): void {
+function flames(g: Grid, hearth: boolean, mode: 'burning' | 'low' | 'windy' | 'lowWindy', frame: number): void {
   const cx = g[0].length / 2, base = g.length - 8;
-  const height = mode === 'low' ? 6 : hearth ? 14 : 12;
-  const lean = mode === 'windy' ? 3 : 0;
+  const low = mode === 'low' || mode === 'lowWindy';
+  const height = low ? 6 : hearth ? 14 : 12;
+  const lean = mode === 'windy' || mode === 'lowWindy' ? 3 : 0;
   for (let y = 0; y < height; y++) {
     const half = Math.max(0, Math.floor((height - y) / 4));
     const x = cx + Math.round(lean * y / height) + (frame % 2 && y > height / 2 ? 1 : 0);
     box(g, x - half, base - y, half * 2 + 1, 1, y < height * .3 ? 'w' : y < height * .6 ? 'v' : 't');
   }
   box(g, cx - 2, base - 3, 4, 3, 'u'); box(g, cx - 1, base - 4, 2, 3, 'w');
-  dot(g, cx + lean + frame - 1, base - height - frame % 2, mode === 'low' ? 'v' : 'w');
-  if (mode === 'windy') dot(g, cx + 5 + frame % 2, base - height + 1, 'w');
-  if (mode === 'low') for (const x of [cx - 5, cx + 4]) dot(g, x, base + 2, 'v');
+  dot(g, cx + lean + frame - 1, base - height - frame % 2, low ? 'v' : 'w');
+  if (lean) dot(g, cx + 5 + frame % 2, base - height + 1, 'w');
+  if (low) for (const x of [cx - 5, cx + 4]) dot(g, x, base + 2, 'v');
 }
 function fireFrames(hearth: boolean): SpriteDef {
   const frames: Record<string, (g: Grid) => void> = { unlit: g => fireBase(g, hearth) };
-  for (const mode of ['burning', 'low', 'windy'] as const) for (let i = 0; i < 4; i++)
+  for (const mode of ['burning', 'low', 'windy', 'lowWindy'] as const) for (let i = 0; i < 4; i++)
     frames[`${mode}${i}`] = g => { fireBase(g, hearth); flames(g, hearth, mode, i); };
   return define(hearth ? 32 : 24, hearth ? 28 : 24, campLegend, frames,
-    [hearth ? 16 : 12, hearth ? 20 : 16], Object.fromEntries(['burning', 'low', 'windy'].map(mode => [mode, {
+    [hearth ? 16 : 12, hearth ? 20 : 16], Object.fromEntries(['burning', 'low', 'windy', 'lowWindy'].map(mode => [mode, {
       frames: Array.from({ length: 4 }, (_, i) => `${mode}${i}`), frameRate: 6, repeat: -1
     }])));
 }
-function flameOverlay(): SpriteDef {
+function flameOverlay(hearth: boolean): SpriteDef {
   const frames: Record<string, (g: Grid) => void> = { out: () => {} };
-  for (const mode of ['burning', 'low', 'windy'] as const) for (let i = 0; i < 4; i++)
-    frames[`${mode}${i}`] = g => flames(g, false, mode, i);
-  return define(16, 20, campLegend, frames, [8, 12]);
+  for (const mode of ['burning', 'low', 'windy', 'lowWindy'] as const) for (let i = 0; i < 4; i++)
+    frames[`${mode}${i}`] = g => flames(g, hearth, mode, i);
+  return define(16, hearth ? 24 : 20, campLegend, frames, [8, hearth ? 16 : 12]);
 }
 function hearthSite(g: Grid): void {
   line(g, 2, 9, 21, 9, 'q'); line(g, 4, 3, 4, 9, 'q'); line(g, 21, 4, 21, 9, 'q');
@@ -183,7 +185,7 @@ export const phase3Sprites: Record<string, SpriteDef> = {
     { rustle: { frames: ['rustle0', 'rustle1', 'ready'], frameRate: 8, repeat: 0 } }),
   fiberReeds: define(16, 16, nodeLegend, { ready: g => reeds(g, true), cut: g => reeds(g, false), sway0: g => reeds(g, true, -1), sway1: g => reeds(g, true, 1) }, [8, 14],
     { sway: { frames: ['ready', 'sway0', 'ready', 'sway1'], frameRate: 2, repeat: -1 } }),
-  firePit: fireFrames(false), hearth: fireFrames(true), flame: flameOverlay(),
+  firePit: fireFrames(false), hearth: fireFrames(true), flame: flameOverlay(false), hearthFlame: flameOverlay(true),
   hearthSite: define(24, 12, campLegend, { still: hearthSite }),
   shelterSite: define(48, 32, campLegend, { still: shelterSite }),
   shelter: define(48, 40, campLegend, { built: g => shelter(g, false), builtBed: g => shelter(g, true) }),

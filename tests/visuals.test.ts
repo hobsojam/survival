@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, createGame } from '../src/game/state';
-import { sceneVisuals, playerVisualDepth, NIGHT_DEPTH, LIGHT_DEPTH, WEATHER_DEPTH } from '../src/scene/visuals';
+import { sceneVisuals, playerVisualDepth, GROUND_DECAL_DEPTH, NIGHT_DEPTH, LIGHT_DEPTH, WEATHER_DEPTH } from '../src/scene/visuals';
 import { sprites } from '../src/art/sprites';
 import { validateSprite } from '../src/art/textures';
 
@@ -18,11 +18,12 @@ describe('native-size scene art', () => {
     expect(keys).toContain('logSeat:still');
     expect(keys).toContain('firePit:unlit');
     expect(keys).not.toContain('hearthSite:still');
+    const sites = new Set(['shelter', 'crate', 'dryingRack', 'windbreak']);
     for (const item of visuals) {
       const [name, frame] = item.texture.split(':');
       expect(sprites[name]?.frames[frame], item.texture).toBeDefined();
       expect(Number.isInteger(item.x) && Number.isInteger(item.y)).toBe(true);
-      expect(item.depth).toBe(item.y);
+      expect(item.depth).toBe(sites.has(item.id) ? GROUND_DECAL_DEPTH : item.y);
     }
   });
 
@@ -55,11 +56,21 @@ describe('native-size scene art', () => {
     state.day = 3;
     state.timeOfDay = 200;
     state.progress.nextStormDay = 3;
-    expect(sceneVisuals(state, 180).map(item => item.texture)).toContain('firePit:windy1');
-    expect(sceneVisuals(state, 180).map(item => item.texture)).toContain('flame:windy1');
+    expect(sceneVisuals(state, 180).map(item => item.texture)).toContain('firePit:lowWindy1');
+    expect(sceneVisuals(state, 180).map(item => item.texture)).toContain('flame:lowWindy1');
     state.structures.hearth = true;
-    expect(sceneVisuals(state, 180).map(item => item.texture)).toContain('hearth:windy1');
+    expect(sceneVisuals(state, 180).map(item => item.texture)).toContain('hearth:lowWindy1');
+    expect(sceneVisuals(state, 180).map(item => item.texture)).toContain('hearthFlame:lowWindy1');
     expect(sceneVisuals(state, 180).map(item => item.texture)).not.toContain('hearthSite:still');
+  });
+
+  it('keeps hearth construction marks below standing objects', () => {
+    const state = createGame();
+    state.progress.hearthUnlocked = true;
+    const site = sceneVisuals(state, 0).find(item => item.id === 'hearthSite')!;
+    expect(site.depth).toBe(GROUND_DECAL_DEPTH);
+    expect(site.depth).toBeLessThan(playerVisualDepth(state));
+    expect(sceneVisuals(state, 0).find(item => item.id === 'logSeat')!.depth).toBeGreaterThan(site.depth);
   });
 
   it('sways ready reeds out of step while cut reeds stay still', () => {

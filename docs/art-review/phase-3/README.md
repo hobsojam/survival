@@ -11,6 +11,8 @@ These captures use game states created by `createGame()` and saved through `save
 | Night with fire | [Phase 2](../phase-2/night-lit.png) | [Night lit](night-lit.png) |
 | Night without fire | [Phase 2](../phase-2/night-unlit.png) | [Night unlit](night-unlit.png) |
 | Cold front and windy flame | [Phase 2](../phase-2/cold-front.png) | [Cold front](cold-front.png) |
+| Low fire at night | — | [Low fire](low-fire.png) |
+| Low fire during a cold front | — | [Low windy fire](cold-front-low.png) |
 | Unlocked hearth site | — | [Hearth site](hearth-site.png) |
 | Built stone hearth | [Phase 2](../phase-2/hearth.png) | [Hearth](hearth.png) |
 | Cooking at night | [Phase 2](../phase-2/cooking.png) | [Cooking](cooking.png) |

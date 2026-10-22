@@ -13,8 +13,10 @@ describe('sprite pipeline', () => {
       branchPile: { size: [16, 16], frames: ['ready', 'depleted'] },
       berryBush: { size: [16, 16], frames: ['ready', 'picked', 'rustle0', 'rustle1'] },
       fiberReeds: { size: [16, 16], frames: ['ready', 'cut', 'sway0', 'sway1'] },
-      firePit: { size: [24, 24], frames: ['unlit', 'burning0', 'burning1', 'burning2', 'burning3', 'low0', 'low1', 'low2', 'low3', 'windy0', 'windy1', 'windy2', 'windy3'] },
-      hearth: { size: [32, 28], frames: ['unlit', 'burning0', 'burning1', 'burning2', 'burning3', 'low0', 'low1', 'low2', 'low3', 'windy0', 'windy1', 'windy2', 'windy3'] },
+      firePit: { size: [24, 24], frames: ['unlit', 'burning0', 'burning1', 'burning2', 'burning3', 'low0', 'low1', 'low2', 'low3', 'windy0', 'windy1', 'windy2', 'windy3', 'lowWindy0', 'lowWindy1', 'lowWindy2', 'lowWindy3'] },
+      hearth: { size: [32, 28], frames: ['unlit', 'burning0', 'burning1', 'burning2', 'burning3', 'low0', 'low1', 'low2', 'low3', 'windy0', 'windy1', 'windy2', 'windy3', 'lowWindy0', 'lowWindy1', 'lowWindy2', 'lowWindy3'] },
+      flame: { size: [16, 20], frames: ['burning0', 'low0', 'windy0', 'lowWindy0'] },
+      hearthFlame: { size: [16, 24], frames: ['burning0', 'low0', 'windy0', 'lowWindy0'] },
       hearthSite: { size: [24, 12], frames: ['still'] },
       shelter: { size: [48, 40], frames: ['built', 'builtBed'] },
       shelterSite: { size: [48, 32], frames: ['still'] },
@@ -32,10 +34,11 @@ describe('sprite pipeline', () => {
       expect(() => validateSprite(sprites[name]), name).not.toThrow();
     }
     expect(sprites.firePit.frames.burning0).not.toEqual(sprites.firePit.frames.unlit);
-    for (const name of ['firePit', 'hearth']) for (const mode of ['burning', 'low', 'windy'])
+    for (const name of ['firePit', 'hearth']) for (const mode of ['burning', 'low', 'windy', 'lowWindy'])
       expect(new Set(Array.from({ length: 4 }, (_, i) => sprites[name].frames[`${mode}${i}`].join(''))).size, `${name}:${mode}`).toBe(4);
     expect(sprites.hearth.frames.unlit).not.toEqual(sprites.firePit.frames.unlit);
     expect(sprites.berryBush.frames.ready).not.toEqual(sprites.berryBush.frames.picked);
+    expect(sprites.berryBush.frames.ready.join('')).toContain('p');
     expect(sprites.fiberReeds.frames.ready).not.toEqual(sprites.fiberReeds.frames.cut);
   });
   it('validates every registered frame, palette symbol, and anchor', () => {
