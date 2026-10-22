@@ -1,4 +1,4 @@
-import { BALANCE } from '../game/state';
+import { BALANCE, type ResourceNode } from '../game/state';
 
 // Ambient life is decoration only: it reads game state but never changes or saves it.
 // Positions are in tiles, like the game state.
@@ -55,6 +55,15 @@ export const BIRD_HOMES: Point[] = [
   { x: 27.5, y: 6.4 }, { x: 28.4, y: 7.1 }
 ];
 export const BIRD_FLEE_RADIUS = 2.5;
+export const BIRD_FORAGE_RADIUS = 7;
+
+/** A bird makes one chance roll per trip and only visits a ready bush nearby. */
+export function birdForageTarget(home: Point, nodes: ResourceNode[], chance: number): ResourceNode | null {
+  if (chance >= 0.5) return null;
+  const nearby = nodes.filter(node => node.kind === 'berry' && node.amount > 0 && distance(home, node) <= BIRD_FORAGE_RADIUS);
+  nearby.sort((left, right) => distance(home, left) - distance(home, right));
+  return nearby[0] ?? null;
+}
 
 export const birdShouldLeave = (home: Point, player: Point, dark: number) =>
   dark > 0.3 || distance(home, player) < BIRD_FLEE_RADIUS;

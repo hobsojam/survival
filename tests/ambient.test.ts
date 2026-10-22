@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE } from '../src/game/state';
+import { BALANCE, createGame } from '../src/game/state';
 import {
-  BIRD_FLEE_RADIUS, FIREFLY_HOMES, FOX, birdMayReturn, birdShouldLeave, darkness, fireflyGlow, foxAt, foxVisits
+  BIRD_FLEE_RADIUS, BIRD_FORAGE_RADIUS, BIRD_HOMES, FIREFLY_HOMES, FOX, birdForageTarget, birdMayReturn, birdShouldLeave, darkness, fireflyGlow, foxAt, foxVisits
 } from '../src/scene/ambient';
 
 const visitDay = Array.from({ length: 20 }, (_, i) => i + 1).find(foxVisits)!;
@@ -63,6 +63,23 @@ describe('birds', () => {
     expect(birdMayReturn(home, { x: 20, y: 20 }, 0)).toBe(true);
     expect(birdMayReturn(home, { x: 10 + BIRD_FLEE_RADIUS + 0.5, y: 10 }, 0)).toBe(false);
     expect(birdMayReturn(home, { x: 20, y: 20 }, 0.5)).toBe(false);
+  });
+
+  it('chooses a nearby ripe bush on half of foraging attempts', () => {
+    const berries = createGame().nodes.filter(node => node.kind === 'berry');
+    for (const home of BIRD_HOMES) {
+      const target = birdForageTarget(home, berries, 0.49);
+      expect(target).not.toBeNull();
+      expect(Math.hypot(target!.x - home.x, target!.y - home.y)).toBeLessThanOrEqual(BIRD_FORAGE_RADIUS);
+      expect(birdForageTarget(home, berries, 0.5)).toBeNull();
+    }
+  });
+
+  it('ignores picked and distant bushes while choosing a destination', () => {
+    const home = { x: 10, y: 10 };
+    const berries = createGame().nodes.filter(node => node.kind === 'berry');
+    expect(birdForageTarget(home, berries.map(node => ({ ...node, amount: 0 })), 0)).toBeNull();
+    expect(birdForageTarget(home, [{ ...berries[0], x: 30, y: 20 }], 0)).toBeNull();
   });
 });
 
