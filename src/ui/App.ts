@@ -53,7 +53,13 @@ export class App {
               <div class="meter"><div class="meter-title"><span>Warmth</span><b id="warmth-value">100</b></div><div class="track"><div id="warmth-bar" class="fill warmth"></div></div></div>
               <div class="quick-actions"><button data-action="eat">Eat berries</button><button data-action="rest">Rest</button><button data-action="stokeFire">Feed fire</button><button data-action="sleep" id="sleep-button">Sleep</button></div>
             </section>
-            <section class="panel"><p class="eyebrow">IN YOUR BAG</p><div class="supplies"><div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small></div><div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small></div><div><span class="supply-icon fiber">≋</span><strong id="fiber-count">0</strong><small>Fiber</small></div><div><span class="supply-icon stone">◆</span><strong id="stone-count">0</strong><small>Stone</small></div><div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small>Carried</small></div></div><div class="fire-status" id="fire-status">The fire is unlit</div></section>
+            <section class="panel"><p class="eyebrow">IN YOUR BAG</p><div class="supplies">
+              <div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small><button type="button" class="drop-item" data-drop="wood" aria-label="Drop one wood">Drop 1</button></div>
+              <div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small><button type="button" class="drop-item" data-drop="food" aria-label="Drop one berry">Drop 1</button></div>
+              <div><span class="supply-icon fiber">≋</span><strong id="fiber-count">0</strong><small>Fiber</small><button type="button" class="drop-item" data-drop="fiber" aria-label="Drop one fiber">Drop 1</button></div>
+              <div><span class="supply-icon stone">◆</span><strong id="stone-count">0</strong><small>Stone</small><button type="button" class="drop-item" data-drop="stone" aria-label="Drop one stone">Drop 1</button></div>
+              <div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small>Carried</small></div>
+            </div><div class="fire-status" id="fire-status">The fire is unlit</div></section>
             <section class="panel night-panel"><p class="eyebrow">AFTER DARK</p><h2>A little time for yourself</h2><p class="night-hint" id="night-hint">These small moments are waiting for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button></div></section>
             <section class="panel build-panel"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand inside the marked camp circle to build.</p><div id="build-list">${buildMarkup}</div></section>
           </aside>
@@ -65,6 +71,10 @@ export class App {
         const type = button.dataset.action as 'eat' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze';
         this.scene?.perform({ type });
       });
+    });
+    this.root.querySelector('.supplies')!.addEventListener('click', event => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-drop]');
+      if (button) this.scene?.perform({ type: 'drop', resource: button.dataset.drop as keyof GameState['inventory'] });
     });
     this.root.querySelector('#build-list')!.addEventListener('click', event => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-build]');
@@ -207,6 +217,9 @@ export class App {
     this.setText('fiber-count', String(inventory.fiber));
     this.setText('stone-count', String(inventory.stone));
     this.setText('space-count', `${inventory.wood + inventory.food + inventory.fiber + inventory.stone}/${structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity}`);
+    this.root.querySelectorAll<HTMLButtonElement>('[data-drop]').forEach(button => {
+      button.disabled = inventory[button.dataset.drop as keyof GameState['inventory']] <= 0;
+    });
     this.setText('fire-status', this.state.fireFuel > 0 ? `Fire burning · ${Math.ceil(this.state.fireFuel)}s of warmth` : 'The fire is unlit');
     const atCamp = isAtCamp(this.state);
     const afterDark = timeOfDay >= BALANCE.nightStart;
