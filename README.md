@@ -60,6 +60,7 @@ Only one open PR may change the save format (`SAVE_VERSION`, the saved shape, or
 ## Verify
 
 ```bash
+npm run lint
 npm test -- --run
 npm run build
 ```

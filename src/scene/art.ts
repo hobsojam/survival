@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BALANCE, type GameState, type ResourceNode } from '../game/state';
+import { BALANCE, type ResourceNode } from '../game/state';
 import { buildMap, type MapItem } from './map';
 import { sprites } from '../art/sprites';
 
