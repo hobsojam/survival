@@ -2,13 +2,14 @@ import Phaser from 'phaser';
 import { BALANCE, type GameState, type ResourceNode } from '../game/state';
 import { advanceTime, applyAction, isAtCamp, isColdNight, sleepBlocker, type GameAction } from '../game/rules';
 import { TILE, worldX, worldY, drawTerrain } from './art';
-import { sceneVisuals, playerVisualDepth, NIGHT_DEPTH, WEATHER_DEPTH } from './visuals';
+import { sceneVisuals, playerVisualDepth, NIGHT_DEPTH } from './visuals';
 import { sprites } from '../art/sprites';
 import { darkness } from './ambient';
 import { AmbientLife } from './ambientLife';
 import { registerSpriteTextures } from '../art/textures';
 import { LOGICAL_WIDTH, LOGICAL_HEIGHT } from './pixelScale';
 import { facingFromInput, selectSurvivorVisual, type Facing, type SurvivorAction } from './survivorVisual';
+import { SceneEffects } from './SceneEffects';
 
 export class GameScene extends Phaser.Scene {
   private state: GameState;
@@ -19,8 +20,8 @@ export class GameScene extends Phaser.Scene {
   private objects = new Map<string, Phaser.GameObjects.Image>();
   private gatheredBerry?: { id: string; atMs: number };
   private night!: Phaser.GameObjects.Rectangle;
-  private wind!: Phaser.GameObjects.Graphics;
   private ambient!: AmbientLife;
+  private effects!: SceneEffects;
   private hudElapsed = 0;
   private facing: Facing = 'down';
   private visualAction?: { kind: SurvivorAction; startedAtMs: number };
@@ -36,6 +37,7 @@ export class GameScene extends Phaser.Scene {
     registerSpriteTextures(this);
     drawTerrain(this, this.state.nodes);
     this.ambient = new AmbientLife(this);
+    this.effects = new SceneEffects(this);
     const playerArt = sprites.survivor;
     this.playerSprite = this.add.image(Math.round(worldX(this.state.player.x)), Math.round(worldY(this.state.player.y)), 'survivor:idleDown0')
       .setOrigin(playerArt.anchor[0] / playerArt.size[0], playerArt.anchor[1] / playerArt.size[1]);
@@ -46,7 +48,6 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.roundPixels = true;
     this.night = this.add.rectangle(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT, 0x101d36, 1)
       .setOrigin(0).setScrollFactor(0).setDepth(NIGHT_DEPTH).setAlpha(0);
-    this.wind = this.add.graphics().setScrollFactor(0).setDepth(WEATHER_DEPTH);
     this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,C,G,Z') as Record<string, Phaser.Input.Keyboard.Key>;
     this.paintObjects();
     this.onStateChange(this.state, 'tick');
@@ -89,8 +90,8 @@ export class GameScene extends Phaser.Scene {
     this.playerSprite.setFlipX(visual.flipX);
     this.paintObjects();
     this.ambient.update(this.state, dt, this.time.now);
+    this.effects.update(this.state, this.time.now);
     this.paintNight();
-    this.paintWind();
     this.hudElapsed += delta;
     if (this.hudElapsed >= 250) {
       this.onStateChange(this.state, 'tick');
@@ -102,6 +103,15 @@ export class GameScene extends Phaser.Scene {
     const before = this.state;
     const result = applyAction(before, action);
     this.state = result.state;
+    this.showMorningFrost(before, this.state);
+    if (result.state !== before) {
+      if (action.type === 'gather') {
+        const node = before.nodes.find(item => item.id === action.nodeId);
+        if (node) this.effects?.trigger('gather', this.time.now, node.x, node.y, node.kind);
+      }
+      if (action.type === 'cook' || action.type === 'stargaze')
+        this.effects?.trigger(action.type, this.time.now, this.state.player.x, this.state.player.y);
+    }
     if (result.state !== before && (action.type === 'gather' || action.type === 'rest' || action.type === 'cook' || action.type === 'stargaze'))
       this.visualAction = { kind: action.type, startedAtMs: this.time.now };
     if (action.type === 'gather') {
@@ -174,17 +184,6 @@ export class GameScene extends Phaser.Scene {
     this.night.setAlpha(darkness(this.state.day, this.state.timeOfDay) * (storm ? 0.64 : 0.5));
   }
 
-  private paintWind(): void {
-    this.wind.clear();
-    if (!isColdNight(this.state)) return;
-    this.wind.lineStyle(2, 0xe0f2f2, 0.24);
-    for (let i = 0; i < 13; i++) {
-      const x = (i * 86 + this.time.now * 0.0225) % (this.scale.width + 60) - 40;
-      const y = (i * 68) % this.scale.height;
-      this.wind.lineBetween(x, y, x + 14, y - 4);
-    }
-  }
-
   private weatherMessage(before: GameState, after: GameState): string | null {
     if (!isColdNight(before) && isColdNight(after)) return 'The cold front has arrived. Keep the fire alive until dawn.';
     if (isColdNight(before) && !isColdNight(after)) return after.progress.hearthUnlocked
@@ -194,7 +193,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private reportWeather(before: GameState, after: GameState): void {
+    this.showMorningFrost(before, after);
     const message = this.weatherMessage(before, after);
     if (message) this.onFeedback(message);
+  }
+
+  private showMorningFrost(before: GameState, after: GameState): void {
+    if (isColdNight(before) && !isColdNight(after) && !after.progress.hearthUnlocked)
+      this.effects.trigger('frost', this.time.now, BALANCE.campX, BALANCE.campY);
   }
 }

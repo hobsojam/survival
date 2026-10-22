@@ -4,7 +4,8 @@ import { worldX, worldY } from './art';
 import { LIGHT_DEPTH } from './visuals';
 import { sprites } from '../art/sprites';
 import {
-  BIRD_HOMES, FIREFLY_HOMES, FOX, birdMayReturn, birdShouldLeave, darkness, fireflyGlow, fireflyOffset, foxAt, type Point
+  BIRD_HOMES, FIREFLY_HOMES, FOX, birdMayReturn, birdShouldLeave, birdGroundFrame, birdFlightFrame,
+  darkness, fireflyFrame, fireflyGlow, fireflyOffset, foxAt, foxFrame, type Point
 } from './ambient';
 
 interface Flight { from: Point; to: Point; elapsed: number; duration: number; leaving: boolean }
@@ -33,10 +34,10 @@ export class AmbientLife {
   constructor(scene: Phaser.Scene) {
     this.birds = BIRD_HOMES.map((home, index) => ({
       home, away: null, flight: null, restSeconds: 0, index,
-      image: sprite(scene, 'bird', 'ground')
+      image: sprite(scene, 'bird', 'idle')
     }));
-    this.fox = sprite(scene, 'fox', 'standing');
-    this.fireflies = FIREFLY_HOMES.map(() => sprite(scene, 'firefly', 'still', LIGHT_DEPTH));
+    this.fox = sprite(scene, 'fox', 'trot0');
+    this.fireflies = FIREFLY_HOMES.map(() => sprite(scene, 'firefly', 'glow0', LIGHT_DEPTH));
   }
 
   update(state: GameState, seconds: number, timeMs: number): void {
@@ -66,7 +67,7 @@ export class AmbientLife {
       const x = lerp(flight.from.x, flight.to.x, progress);
       const y = lerp(flight.from.y, flight.to.y, progress) - height;
       const facing = Math.sign(flight.to.x - flight.from.x) || 1;
-      this.show(bird.image, x, y, 'bird:flying', facing, alpha);
+      this.show(bird.image, x, y, birdFlightFrame(flight.elapsed), facing, alpha);
       if (progress >= 1) {
         bird.away = flight.leaving ? flight.to : null;
         bird.flight = null;
@@ -84,8 +85,9 @@ export class AmbientLife {
     } else if (bird.away && bird.restSeconds <= 0 && birdMayReturn(bird.home, player, dark)) {
       bird.flight = { from: bird.away, to: bird.home, elapsed: 0, duration: FLIGHT_SECONDS * 1.4, leaving: false };
     } else if (!bird.away) {
-      const hop = (timeMs / 1000 + bird.index * 1.37) % 4 > 3.6 ? 1 : 0;
-      this.show(bird.image, bird.home.x, bird.home.y - hop / 16, 'bird:ground', bird.index % 2 ? 1 : -1);
+      const frame = birdGroundFrame(bird.index, timeMs);
+      const hop = frame === 'bird:hop' ? 1 : 0;
+      this.show(bird.image, bird.home.x, bird.home.y - hop / 16, frame, bird.index % 2 ? 1 : -1);
     } else bird.image.setVisible(false);
   }
 
@@ -96,7 +98,7 @@ export class AmbientLife {
       const progress = Math.min(1, run.elapsed / run.duration);
       const x = lerp(run.from.x, run.to.x, progress);
       const y = lerp(run.from.y, run.to.y, progress);
-      this.show(this.fox, x, y, 'fox:standing', Math.sign(run.to.x - run.from.x) || 1);
+      this.show(this.fox, x, y, foxFrame('run', run.elapsed), Math.sign(run.to.x - run.from.x) || 1);
       if (progress >= 1) this.foxRun = null;
       return;
     }
@@ -109,7 +111,8 @@ export class AmbientLife {
       this.fox.setVisible(false);
       return;
     }
-    this.show(this.fox, pose.x, pose.y, `fox:${pose.sitting ? 'sitting' : 'standing'}`, pose.facing);
+    const foxPose = pose.sitting ? 'sit' : 'trot';
+    this.show(this.fox, pose.x, pose.y, foxFrame(foxPose, timeMs / 1000), pose.facing);
   }
 
   private updateFireflies(dark: number, timeMs: number): void {
@@ -118,6 +121,7 @@ export class AmbientLife {
       const glow = fireflyGlow(index, timeMs, dark);
       if (glow < 0.02) { image.setVisible(false); return; }
       const offset = fireflyOffset(index, timeMs);
+      image.setTexture(fireflyFrame(index, timeMs));
       image.setPosition(Math.round(worldX(home.x + offset.x)), Math.round(worldY(home.y + offset.y)))
         .setAlpha(glow).setVisible(true);
     });

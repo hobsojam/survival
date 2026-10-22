@@ -84,3 +84,26 @@ export function fireflyGlow(index: number, timeMs: number, dark: number): number
   const pulse = 0.5 + 0.5 * Math.sin(timeMs / (600 + hash(index + 307) * 500) + index * 2.3);
   return dark * pulse * pulse;
 }
+
+export function birdGroundFrame(index: number, timeMs: number): string {
+  const phase = (timeMs / 1000 + index * 1.37) % 4;
+  if (phase > 3.6) return 'bird:hop';
+  if (phase >= 2.6 && phase < 3.2) return `bird:peck${Math.floor((phase - 2.6) / 0.15) % 2}`;
+  return 'bird:idle';
+}
+
+export function birdFlightFrame(elapsedSeconds: number): string {
+  return `bird:fly${Math.floor(elapsedSeconds * 12) % 2}`;
+}
+
+export function foxFrame(pose: 'trot' | 'run' | 'sit', elapsedSeconds: number): string {
+  let frameRate = 10;
+  let frameCount = 4;
+  if (pose === 'run') frameRate = 14;
+  if (pose === 'sit') { frameRate = 2; frameCount = 2; }
+  return `fox:${pose}${Math.floor(elapsedSeconds * frameRate) % frameCount}`;
+}
+
+export function fireflyFrame(index: number, timeMs: number): string {
+  return `firefly:glow${Math.floor(timeMs / 500 + index) % 2}`;
+}
