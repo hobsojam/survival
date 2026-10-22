@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createGame } from '../src/game/state';
-import { loadGame, saveGame, SAVE_KEY } from '../src/game/save';
+import { autosaveDelayMs, loadGame, saveGame, SAVE_KEY } from '../src/game/save';
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();
@@ -10,6 +10,13 @@ class MemoryStorage implements Storage {
   getItem(key: string): string | null { return this.data.get(key) ?? null; }
   setItem(key: string, value: string): void { this.data.set(key, value); }
   removeItem(key: string): void { this.data.delete(key); }
+}
+
+function legacySnapshot(): any {
+  const state = JSON.parse(JSON.stringify(createGame()));
+  delete state.inventory.stone;
+  state.nodes = state.nodes.filter((node: { kind: string }) => node.kind !== 'stone');
+  return state;
 }
 
 describe('local save', () => {
@@ -33,7 +40,7 @@ describe('local save', () => {
     state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
     state.nodes.find(node => node.kind === 'fiber')!.readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(4);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(5);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);
@@ -41,6 +48,31 @@ describe('local save', () => {
 
   it('reports no save when storage is empty', () => {
     expect(loadGame(new MemoryStorage()).kind).toBe('empty');
+  });
+
+  it('migrates an existing version four camp with stone nodes available', () => {
+    const storage = new MemoryStorage();
+    const legacy = legacySnapshot();
+    delete legacy.inventory.stone;
+    legacy.nodes = legacy.nodes.filter((node: { kind: string }) => node.kind !== 'stone');
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 4, state: legacy }));
+    const loaded = loadGame(storage);
+    expect(loaded.kind).toBe('loaded');
+    if (loaded.kind === 'loaded') {
+      expect(loaded.state.inventory.stone).toBe(0);
+      expect(loaded.state.nodes.filter(node => node.kind === 'stone')).toHaveLength(6);
+    }
+  });
+
+  it('rejects a version five save with missing or excess stone', () => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    state.inventory.stone = 9;
+    expect(saveGame(storage, state).ok).toBe(false);
+    const malformed = JSON.parse(JSON.stringify(createGame()));
+    delete malformed.inventory.stone;
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 5, state: malformed }));
+    expect(loadGame(storage).kind).toBe('invalid');
   });
 
   it('rejects malformed JSON without overwriting it', () => {
@@ -52,7 +84,7 @@ describe('local save', () => {
 
   it('migrates a valid version one save on a later day without overwriting it', () => {
     const storage = new MemoryStorage();
-    const legacy = JSON.parse(JSON.stringify(createGame()));
+    const legacy = legacySnapshot();
     legacy.day = 8;
     legacy.timeOfDay = 105;
     legacy.inventory.wood = 3;
@@ -79,7 +111,7 @@ describe('local save', () => {
 
   it('migrates a version two camp with its gathered nodes intact', () => {
     const storage = new MemoryStorage();
-    const old = JSON.parse(JSON.stringify(createGame()));
+    const old = legacySnapshot();
     delete old.inventory.fiber;
     old.nodes = old.nodes.filter((node: { kind: string }) => node.kind !== 'fiber');
     old.inventory.wood = 4;
@@ -89,7 +121,7 @@ describe('local save', () => {
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') {
-      expect(loaded.state.inventory).toEqual({ wood: 4, food: 0, fiber: 0 });
+      expect(loaded.state.inventory).toEqual({ wood: 4, food: 0, fiber: 0, stone: 0 });
       expect(loaded.state.nodes[0]).toEqual(old.nodes[0]);
       expect(loaded.state.nodes.filter(node => node.kind === 'fiber')).toHaveLength(8);
     }
@@ -97,7 +129,7 @@ describe('local save', () => {
 
   it('rejects malformed version one data without rewriting it', () => {
     const storage = new MemoryStorage();
-    const legacy = JSON.parse(JSON.stringify(createGame()));
+    const legacy = legacySnapshot();
     delete legacy.inventory.fiber;
     legacy.nodes = legacy.nodes.filter((node: { kind: string }) => node.kind !== 'fiber');
     delete legacy.progress;
@@ -126,7 +158,7 @@ describe('local save', () => {
 
   it('rejects a version three save whose fiber exceeds the bag capacity', () => {
     const storage = new MemoryStorage();
-    const state = JSON.parse(JSON.stringify(createGame()));
+    const state = legacySnapshot();
     state.inventory.wood = 7;
     state.inventory.fiber = 2;
     delete state.structures.dryingRack;
@@ -137,7 +169,7 @@ describe('local save', () => {
 
   it('migrates a version three camp from main and adds fiber without changing its structures', () => {
     const storage = new MemoryStorage();
-    const legacy = JSON.parse(JSON.stringify(createGame()));
+    const legacy = legacySnapshot();
     legacy.day = 4;
     legacy.progress.nextStormDay = 6;
     legacy.structures.dryingRack = true;
@@ -159,7 +191,7 @@ describe('local save', () => {
 
   it('migrates a version three fiber camp and adds the new structures', () => {
     const storage = new MemoryStorage();
-    const legacy = JSON.parse(JSON.stringify(createGame()));
+    const legacy = legacySnapshot();
     legacy.inventory.fiber = 2;
     legacy.nodes.find((node: { kind: string }) => node.kind === 'fiber').amount = 0;
     delete legacy.structures.dryingRack;
@@ -177,7 +209,7 @@ describe('local save', () => {
 
   it('migrates a version two camp without changing its cold-night progress or stored data', () => {
     const storage = new MemoryStorage();
-    const legacy = JSON.parse(JSON.stringify(createGame()));
+    const legacy = legacySnapshot();
     legacy.day = 5;
     legacy.timeOfDay = 95;
     legacy.inventory.wood = 3;
@@ -203,7 +235,7 @@ describe('local save', () => {
 
   it('rejects version three data with missing or invalid new structure flags', () => {
     const storage = new MemoryStorage();
-    const state = JSON.parse(JSON.stringify(createGame()));
+    const state = legacySnapshot();
     delete state.inventory.fiber;
     state.nodes = state.nodes.filter((node: { kind: string }) => node.kind !== 'fiber');
     delete state.structures.dryingRack;
@@ -243,5 +275,15 @@ describe('local save', () => {
     storage.getItem = () => { throw new Error('Storage blocked'); };
     const result = loadGame(storage);
     expect(result.kind).toBe('invalid');
+  });
+});
+
+describe('autosave backoff', () => {
+  it('saves every 10 seconds, then backs off to 30 and 60 seconds after repeated failures', () => {
+    expect(autosaveDelayMs(0)).toBe(10000);
+    expect(autosaveDelayMs(1)).toBe(10000);
+    expect(autosaveDelayMs(2)).toBe(30000);
+    expect(autosaveDelayMs(3)).toBe(60000);
+    expect(autosaveDelayMs(40)).toBe(60000);
   });
 });

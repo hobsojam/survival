@@ -22,21 +22,6 @@ function define(w: number, h: number, legend: Record<string, PaletteKey>, frames
   })) };
 }
 
-const personLegend = { s: 'shadow', a: 'hair0', b: 'hair1', c: 'hair2', d: 'skin1', e: 'skin3', f: 'skin4', g: 'coat0', h: 'coat1', i: 'coat2', j: 'coat3', k: 'coat4', l: 'scarf1', m: 'scarf3', n: 'scarf4', o: 'canvas1', p: 'canvas3', q: 'wood1' } as const;
-function survivor(g: Grid, step: boolean): void {
-  oval(g, 10, 26, 8, 2, 's');
-  rect(g, step ? 6 : 5, 22, 4, 4, 'q'); rect(g, step ? 12 : 11, 22, 4, 4, 'q');
-  rect(g, 3, 13, 5, 10, 'o'); rect(g, 4, 14, 3, 8, 'p');
-  rect(g, 5, 11, 11, 13, 'g'); rect(g, 6, 12, 9, 11, 'i');
-  rect(g, 2, 13, 3, 8, 'h'); rect(g, 16, 13, 3, 8, 'h');
-  rect(g, 3, 19, 2, 2, 'j'); rect(g, 16, 19, 2, 2, 'j');
-  rect(g, 6, 11, 9, 3, 'm'); rect(g, 7, 11, 6, 1, 'n');
-  rect(g, 6, 3, 9, 8, 'b'); rect(g, 7, 5, 7, 6, 'e');
-  rect(g, 8, 6, 5, 3, 'f'); rect(g, 6, 3, 9, 3, 'a');
-  rect(g, 8, 2, 6, 2, 'c'); pixel(g, 13, 8, 'd');
-  rect(g, 8, 15, 5, 2, 'k');
-}
-
 const animalLegend = { s: 'shadow', a: 'bird0', b: 'bird1', c: 'bird2', d: 'bird3', e: 'bird4', f: 'beak', g: 'fox0', h: 'fox1', i: 'fox2', j: 'fox3', k: 'fox4' } as const;
 function bird(g: Grid, flying: boolean): void {
   if (flying) {
@@ -65,7 +50,6 @@ function fox(g: Grid, sitting: boolean): void {
 }
 
 export const sceneSprites: Record<string, SpriteDef> = {
-  survivor: define(20, 28, personLegend, { idle: g => survivor(g, false), step: g => survivor(g, true) }),
   bird: define(14, 12, animalLegend, { ground: g => bird(g, false), flying: g => bird(g, true) }),
   fox: define(32, 22, animalLegend, { standing: g => fox(g, false), sitting: g => fox(g, true) }),
   firefly: define(3, 3, { a: 'firefly', b: 'fire4' }, { still: g => { pixel(g, 1, 0, 'a'); pixel(g, 0, 1, 'a'); pixel(g, 1, 1, 'b'); pixel(g, 2, 1, 'a'); pixel(g, 1, 2, 'a'); } }, [1, 1])

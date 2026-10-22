@@ -8,6 +8,28 @@ function clone(def: SpriteDef): SpriteDef {
 }
 
 describe('sprite pipeline', () => {
+  it('registers the complete 16 by 24 survivor animation set', () => {
+    const survivor = sprites.survivor;
+    expect(survivor.size).toEqual([16, 24]);
+    expect(survivor.anchor).toEqual([8, 22]);
+    const counts = { idleDown: 2, walkDown: 4, walkUp: 4, walkSide: 4, gather: 2, rest: 2, cook: 2, stargaze: 2, shiver: 2 };
+    for (const [name, count] of Object.entries(counts)) {
+      const frameNames = Array.from({ length: count }, (_, index) => `${name}${index}`);
+      for (const frame of frameNames) expect(survivor.frames[frame], frame).toBeDefined();
+      expect(new Set(frameNames.map(frame => survivor.frames[frame].join(''))).size, name).toBe(count);
+      const animation = animationConfigs({ survivor }).find(config => config.key === `survivor:${name}`);
+      expect(animation?.frames, name).toEqual(frameNames.map(frame => ({ key: `survivor:${frame}` })));
+      let expectedRate = 4;
+      if (name.startsWith('walk')) expectedRate = 8;
+      else if (name === 'idleDown' || name === 'shiver') expectedRate = 2;
+      expect(animation?.frameRate, name).toBe(expectedRate);
+      if (name === 'gather') expect(animation?.repeat).toBe(0);
+    }
+    expect(() => validateSprite(survivor)).not.toThrow();
+    expect(Object.values(survivor.legend)).toContain('coat3');
+    expect(Object.values(survivor.legend)).toContain('scarf3');
+    expect(Object.values(survivor.legend)).toContain('canvas2');
+  });
   it('provides complete phase 3 resource and camp art', () => {
     const required: Record<string, { size: [number, number]; frames: string[] }> = {
       branchPile: { size: [16, 16], frames: ['ready', 'depleted'] },

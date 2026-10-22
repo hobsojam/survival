@@ -2,8 +2,9 @@ import Phaser from 'phaser';
 import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from '../game/state';
 import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
-import { loadGame, saveGame, type LoadResult } from '../game/save';
-import { isAtCamp, isColdNight, sleepBlocker } from '../game/rules';
+import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
+import { buildStatus, cookBlocker, isAtCamp, isColdNight, sleepBlocker, stargazeBlocker } from '../game/rules';
+import { forecastFireCheck } from '../game/forecast';
 import { dayPhase, formatClock, nextChange } from '../game/clock';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
@@ -17,6 +18,7 @@ export class App {
   private storage?: Storage;
   private previousSave: LoadResult = { kind: 'empty' };
   private lastSaveAt = 0;
+  private saveFailures = 0;
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -51,7 +53,7 @@ export class App {
               <div class="meter"><div class="meter-title"><span>Warmth</span><b id="warmth-value">100</b></div><div class="track"><div id="warmth-bar" class="fill warmth"></div></div></div>
               <div class="quick-actions"><button data-action="eat">Eat berries</button><button data-action="rest">Rest</button><button data-action="stokeFire">Feed fire</button><button data-action="sleep" id="sleep-button">Sleep</button></div>
             </section>
-            <section class="panel"><p class="eyebrow">IN YOUR BAG</p><div class="supplies"><div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small></div><div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small></div><div><span class="supply-icon fiber">≋</span><strong id="fiber-count">0</strong><small>Fiber</small></div><div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small>Carried</small></div></div><div class="fire-status" id="fire-status">The fire is unlit</div></section>
+            <section class="panel"><p class="eyebrow">IN YOUR BAG</p><div class="supplies"><div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small></div><div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small></div><div><span class="supply-icon fiber">≋</span><strong id="fiber-count">0</strong><small>Fiber</small></div><div><span class="supply-icon stone">◆</span><strong id="stone-count">0</strong><small>Stone</small></div><div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small>Carried</small></div></div><div class="fire-status" id="fire-status">The fire is unlit</div></section>
             <section class="panel night-panel"><p class="eyebrow">AFTER DARK</p><h2>A little time for yourself</h2><p class="night-hint" id="night-hint">These small moments are waiting for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button></div></section>
             <section class="panel build-panel"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand inside the marked camp circle to build.</p><div id="build-list">${buildMarkup}</div></section>
           </aside>
@@ -85,11 +87,14 @@ export class App {
     if (restart) restart.hidden = false;
     this.state = state;
     this.lastSaveAt = Date.now();
+    this.saveFailures = 0;
     this.scene = new GameScene(state, (next, cause) => {
       const previous = this.state;
       this.state = next;
       this.render();
-      if ((cause === 'action' && next !== previous) || Date.now() - this.lastSaveAt >= 10000) this.saveCurrent();
+      // After a failed save, wait for the backoff instead of retrying on every action.
+      const due = Date.now() - this.lastSaveAt >= autosaveDelayMs(this.saveFailures);
+      if ((cause === 'action' && next !== previous && !this.saveFailures) || due) this.saveCurrent();
     }, message => this.setMessage(message));
     this.game = new Phaser.Game({
       type: Phaser.AUTO,
@@ -157,13 +162,19 @@ export class App {
       return;
     }
     const result = saveGame(this.storage, this.state);
+    this.lastSaveAt = Date.now();
+    const status = this.root.querySelector<HTMLElement>('#save-status');
     if (result.ok) {
       this.previousSave = { kind: 'loaded', state: this.state };
-      this.lastSaveAt = Date.now();
+      this.saveFailures = 0;
       this.setText('save-status', 'Saved locally');
+      status?.removeAttribute('title');
     } else {
-      this.setText('save-status', 'Save failed');
-      this.setMessage(`Could not save locally: ${result.error}`);
+      // Report the failure once; later retries only update the status, so gameplay messages stay visible.
+      if (!this.saveFailures) this.setMessage(`Could not save locally: ${result.error}`);
+      this.saveFailures++;
+      this.setText('save-status', 'Save failed · retrying');
+      status?.setAttribute('title', result.error);
     }
   }
 
@@ -194,15 +205,16 @@ export class App {
     this.setText('wood-count', String(inventory.wood));
     this.setText('food-count', String(inventory.food));
     this.setText('fiber-count', String(inventory.fiber));
-    this.setText('space-count', `${inventory.wood + inventory.food + inventory.fiber}/${structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity}`);
+    this.setText('stone-count', String(inventory.stone));
+    this.setText('space-count', `${inventory.wood + inventory.food + inventory.fiber + inventory.stone}/${structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity}`);
     this.setText('fire-status', this.state.fireFuel > 0 ? `Fire burning · ${Math.ceil(this.state.fireFuel)}s of warmth` : 'The fire is unlit');
     const atCamp = isAtCamp(this.state);
     const afterDark = timeOfDay >= BALANCE.nightStart;
     this.setText('night-hint', !afterDark ? 'These small moments are waiting for nightfall.'
       : !atCamp ? 'Return to the camp circle for a quiet evening.'
         : 'Optional comforts while the night passes.');
-    this.root.querySelector('#cook-button')?.classList.toggle('ready', afterDark && atCamp && inventory.food > 0 && this.state.fireFuel > 0);
-    this.root.querySelector('#stargaze-button')?.classList.toggle('ready', afterDark && atCamp);
+    this.root.querySelector('#cook-button')?.classList.toggle('ready', !cookBlocker(this.state));
+    this.root.querySelector('#stargaze-button')?.classList.toggle('ready', !stargazeBlocker(this.state));
     const storm = isColdNight(this.state);
     const forecast = this.root.querySelector('#forecast-panel');
     forecast?.classList.toggle('active', storm);
@@ -214,29 +226,31 @@ export class App {
       this.setText('forecast-fire', '✓ Hearth unlocked');
     } else {
       const day = this.state.progress.nextStormDay!;
-      const needed = storm ? Math.ceil((BALANCE.daySeconds - timeOfDay) * BALANCE.coldNightFireBurn) : (BALANCE.daySeconds - BALANCE.nightStart) * BALANCE.coldNightFireBurn;
       this.setText('forecast-title', storm ? 'The cold front is here' : `Cold front · day ${day} night`);
       this.setText('forecast-copy', storm ? 'Stay at camp and keep the fire alive until dawn.' : `Build a shelter and bring two logs to camp before nightfall on day ${day}.`);
       this.setText('forecast-shelter', `${structures.shelter ? '✓' : '○'} Shelter ${structures.shelter ? 'ready' : 'needed'}`);
-      this.setText('forecast-fire', `${this.state.fireFuel > needed ? '✓' : '○'} Fire: ${Math.ceil(this.state.fireFuel)} / ${needed}s ${storm ? 'to dawn' : 'for the night'}`);
+      this.setText('forecast-fire', forecastFireCheck(this.state));
     }
     this.setText('prompt', this.scene?.getPrompt() ?? 'WASD / arrows  Move');
     this.setText('build-hint', isAtCamp(this.state) ? 'At camp — click an upgrade to build.' : 'Stand inside the marked camp circle to build.');
     for (const id of buildOptions) {
-      const built = this.state.structures[id];
+      const status = buildStatus(this.state, id);
+      const built = status === 'built';
+      const locked = status === 'locked';
+      const needsShelter = status === 'needsShelter';
       const definition = BUILDINGS[id];
-      const locked = definition.prerequisite === 'coldNight' && !this.state.progress.hearthUnlocked;
-      const needsShelter = definition.prerequisite === 'shelter' && !structures.shelter;
       const cost = definition.cost;
+      const stoneCost = 'stone' in cost ? cost.stone : 0;
       const button = this.root.querySelector<HTMLButtonElement>(`[data-build="${id}"]`)!;
       button.disabled = built || locked || needsShelter;
       button.classList.toggle('built', built);
       button.classList.toggle('locked', locked || needsShelter);
-      button.classList.toggle('ready', !built && !locked && !needsShelter && isAtCamp(this.state) && inventory.wood >= cost.wood && inventory.fiber >= cost.fiber);
+      button.classList.toggle('ready', status === 'ready');
       button.querySelector<HTMLElement>('.build-copy small')!.textContent = needsShelter ? 'Requires shelter' : definition.description;
       const fiberPrice = cost.fiber ? ` · ${cost.fiber} fiber` : '';
+      const stonePrice = stoneCost ? ` · ${stoneCost} stone` : '';
       let verb = 'Build';
-      let price = `${cost.wood} wood${fiberPrice}`;
+      let price = `${cost.wood} wood${fiberPrice}${stonePrice}`;
       if (built) {
         verb = 'Built';
         price = 'Complete';

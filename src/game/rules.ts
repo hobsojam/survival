@@ -38,6 +38,36 @@ export function sleepBlocker(state: GameState): string | null {
   return null;
 }
 
+/** Why the survivor can't cook right now, or null if they can. */
+export function cookBlocker(state: GameState): string | null {
+  if (state.timeOfDay < BALANCE.nightStart) return 'Cook berries after nightfall.';
+  if (!isAtCamp(state)) return 'Return to camp to cook.';
+  if (state.fireFuel <= 0) return 'Light the campfire before cooking.';
+  if (state.inventory.food <= 0) return 'Gather a berry to cook.';
+  return null;
+}
+
+/** Why the survivor can't watch the stars right now, or null if they can. */
+export function stargazeBlocker(state: GameState): string | null {
+  if (state.timeOfDay < BALANCE.nightStart) return 'Wait until nightfall to watch the stars.';
+  if (!isAtCamp(state)) return 'Return to camp to watch the stars.';
+  return null;
+}
+
+export type BuildStatus = 'built' | 'locked' | 'needsShelter' | 'ready' | 'unavailable';
+
+/** How a structure's build button should look: built, locked, blocked by a missing shelter, ready to build here, or not yet. */
+export function buildStatus(state: GameState, id: StructureId): BuildStatus {
+  const definition = BUILDINGS[id];
+  if (state.structures[id]) return 'built';
+  if (definition.prerequisite === 'coldNight' && !state.progress.hearthUnlocked) return 'locked';
+  if (definition.prerequisite === 'shelter' && !state.structures.shelter) return 'needsShelter';
+  const cost = definition.cost;
+  const stoneCost = 'stone' in cost ? cost.stone : 0;
+  const affordable = state.inventory.wood >= cost.wood && state.inventory.fiber >= cost.fiber && state.inventory.stone >= stoneCost;
+  return affordable && isAtCamp(state) ? 'ready' : 'unavailable';
+}
+
 export function advanceTime(state: GameState, seconds: number, activity: Activity = 'awake'): GameState {
   if (!Number.isFinite(seconds) || seconds <= 0) return state;
   let next: GameState = {
@@ -78,7 +108,7 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
       const weathered = stormEnded && camp && next.structures.shelter && next.fireFuel > 0 && next.player.warmth > 20;
       next.day += 1;
       next.timeOfDay = 0;
-      next.nodes = next.nodes.map(node => node.readyDay <= next.day ? { ...node, amount: 1 } : node);
+      next.nodes = next.nodes.map(node => node.kind !== 'stone' && node.readyDay <= next.day ? { ...node, amount: 1 } : node);
       if (stormEnded) {
         next.progress = weathered
           ? { nextStormDay: null, hearthUnlocked: true }
@@ -116,10 +146,13 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     }
     if (node.amount <= 0) return { state, message: 'Nothing to gather yet.' };
     const capacity = state.structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity;
-    if (state.inventory.wood + state.inventory.food + state.inventory.fiber >= capacity) {
+    if (state.inventory.wood + state.inventory.food + state.inventory.fiber + state.inventory.stone >= capacity) {
       return { state, message: 'Your bag is full. Return to camp.' };
     }
-    const resource = node.kind === 'branch' ? 'wood' : node.kind === 'berry' ? 'food' : 'fiber';
+    let resource: keyof GameState['inventory'] = 'wood';
+    if (node.kind === 'berry') resource = 'food';
+    else if (node.kind === 'fiber') resource = 'fiber';
+    else if (node.kind === 'stone') resource = 'stone';
     const nodes = state.nodes.map((item, itemIndex) => itemIndex === index
       ? { ...item, amount: item.amount - 1, readyDay: state.day + 1 }
       : item);
@@ -130,7 +163,7 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
         inventory: { ...state.inventory, [resource]: state.inventory[resource] + 1 },
         nodes
       }, BALANCE.gatherSeconds, 'working'),
-      message: resource === 'wood' ? 'Collected wood.' : resource === 'food' ? 'Picked berries.' : 'Gathered fiber.'
+      message: { wood: 'Collected wood.', food: 'Picked berries.', fiber: 'Gathered fiber.', stone: 'Collected stone.' }[resource]
     };
   }
   if (action.type === 'eat') {
@@ -145,10 +178,8 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     };
   }
   if (action.type === 'cook') {
-    if (state.timeOfDay < BALANCE.nightStart) return { state, message: 'Cook berries after nightfall.' };
-    if (!isAtCamp(state)) return { state, message: 'Return to camp to cook.' };
-    if (state.fireFuel <= 0) return { state, message: 'Light the campfire before cooking.' };
-    if (state.inventory.food <= 0) return { state, message: 'Gather a berry to cook.' };
+    const blocker = cookBlocker(state);
+    if (blocker) return { state, message: blocker };
     const cooked = advanceTime({ ...state, inventory: { ...state.inventory, food: state.inventory.food - 1 } }, BALANCE.cookSeconds, 'resting');
     return {
       state: { ...cooked, player: { ...cooked.player,
@@ -159,8 +190,8 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     };
   }
   if (action.type === 'stargaze') {
-    if (state.timeOfDay < BALANCE.nightStart) return { state, message: 'Wait until nightfall to watch the stars.' };
-    if (!isAtCamp(state)) return { state, message: 'Return to camp to watch the stars.' };
+    const blocker = stargazeBlocker(state);
+    if (blocker) return { state, message: blocker };
     const restored = { ...state, player: { ...state.player, energy: Math.min(100, state.player.energy + BALANCE.stargazeEnergyGain) } };
     const watched = advanceTime(restored, BALANCE.stargazeSeconds, 'resting');
     const thoughts = [
@@ -189,18 +220,21 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     if (state.structures[action.structureId]) return { state, message: 'Already built.' };
     if (definition.prerequisite === 'shelter' && !state.structures.shelter) return { state, message: 'Build a shelter first.' };
     const cost = definition.cost;
-    if (state.inventory.wood < cost.wood || state.inventory.fiber < cost.fiber) {
-      const needed = [state.inventory.wood < cost.wood ? `${cost.wood} wood` : null, state.inventory.fiber < cost.fiber ? `${cost.fiber} fiber` : null].filter(Boolean).join(' and ');
+    const stoneCost = 'stone' in cost ? cost.stone : 0;
+    if (state.inventory.wood < cost.wood || state.inventory.fiber < cost.fiber || state.inventory.stone < stoneCost) {
+      const needed = [state.inventory.wood < cost.wood ? `${cost.wood} wood` : null,
+        state.inventory.fiber < cost.fiber ? `${cost.fiber} fiber` : null,
+        state.inventory.stone < stoneCost ? `${stoneCost} stone` : null].filter(Boolean).join(' and ');
       return { state, message: `Need ${needed} to build this.` };
     }
     return {
       state: advanceTime({
         ...state,
-        inventory: { ...state.inventory, wood: state.inventory.wood - cost.wood, fiber: state.inventory.fiber - cost.fiber },
+        inventory: { ...state.inventory, wood: state.inventory.wood - cost.wood, fiber: state.inventory.fiber - cost.fiber, stone: state.inventory.stone - stoneCost },
         player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.buildEnergyCost) },
         structures: { ...state.structures, [action.structureId]: true }
       }, BALANCE.buildSeconds, 'working'),
-      message: `Built the ${action.structureId}.`
+      message: `Built the ${definition.name.toLowerCase()}.`
     };
   }
   if (action.type === 'rest') {
