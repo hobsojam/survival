@@ -27,6 +27,32 @@ function legacySnapshot(): any {
 }
 
 describe('local save', () => {
+  it('migrates a version nine save with discoveries and adds an empty ration pouch', () => {
+    const storage = new MemoryStorage();
+    const old = createGame();
+    old.progress.discoveries.basket = true;
+    delete (old.inventory as Partial<typeof old.inventory>).trailFood;
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 9, state: old }));
+    const result = loadGame(storage);
+    expect(result.kind).toBe('loaded');
+    if (result.kind === 'loaded') {
+      expect(result.state.progress.discoveries.basket).toBe(true);
+      expect(result.state.inventory.trailFood).toBe(0);
+    }
+  });
+
+  it('round trips rations and rejects counts that overfill the bag', () => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    state.inventory.trailFood = 2;
+    expect(saveGame(storage, state).ok).toBe(true);
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
+    state.inventory.wood = 7;
+    expect(saveGame(storage, state).ok).toBe(false);
+    state.inventory.wood = 0;
+    state.inventory.trailFood = -1;
+    expect(saveGame(storage, state).ok).toBe(false);
+  });
   it('round-trips progression across a page reload', () => {
     const storage = new MemoryStorage();
     const state = createGame();
@@ -47,7 +73,7 @@ describe('local save', () => {
     state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
     state.nodes.find(node => node.kind === 'fiber')!.readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(9);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(10);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);
@@ -244,7 +270,7 @@ describe('local save', () => {
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') {
-      expect(loaded.state.inventory).toEqual({ wood: 4, food: 0, fiber: 0, stone: 0 });
+      expect(loaded.state.inventory).toEqual({ wood: 4, food: 0, fiber: 0, stone: 0, trailFood: 0 });
       expect(loaded.state.nodes[0]).toEqual({ ...old.nodes[0], x: createGame().nodes[0].x, y: createGame().nodes[0].y });
       expect(loaded.state.nodes.filter(node => node.kind === 'fiber')).toHaveLength(8);
     }

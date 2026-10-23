@@ -47,7 +47,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setZoom(1);
     this.cameras.main.roundPixels = true;
     this.lighting = new SceneLighting(this, LOGICAL_WIDTH, LOGICAL_HEIGHT);
-    this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,C,G,Z,L,X,V') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,T,P,C,G,Z,L,X,V') as Record<string, Phaser.Input.Keyboard.Key>;
     this.paintObjects();
     this.onStateChange(this.state, 'tick');
   }
@@ -75,6 +75,8 @@ export class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.keys.F)) this.perform({ type: 'stokeFire' });
     if (Phaser.Input.Keyboard.JustDown(this.keys.R)) this.perform({ type: 'rest' });
     if (Phaser.Input.Keyboard.JustDown(this.keys.Q)) this.perform({ type: 'eat' });
+    if (Phaser.Input.Keyboard.JustDown(this.keys.T)) this.perform({ type: 'eatTrailFood' });
+    if (Phaser.Input.Keyboard.JustDown(this.keys.P)) this.perform({ type: 'prepareTrailFood' });
     if (Phaser.Input.Keyboard.JustDown(this.keys.C)) this.perform({ type: 'cook' });
     if (Phaser.Input.Keyboard.JustDown(this.keys.G)) this.perform({ type: 'stargaze' });
     if (Phaser.Input.Keyboard.JustDown(this.keys.Z)) this.perform({ type: 'sleep' });

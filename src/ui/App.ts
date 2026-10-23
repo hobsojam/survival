@@ -3,7 +3,7 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type SiteId, typ
 import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
-import { buildStatus, cookBlocker, isAtCamp, isColdNight, lookoutRepairBlocker, sleepBlocker, stargazeBlocker } from '../game/rules';
+import { buildStatus, carriedCount, cookBlocker, isAtCamp, isColdNight, lookoutRepairBlocker, sleepBlocker, stargazeBlocker, trailFoodBlocker } from '../game/rules';
 import { forecastFireCheck } from '../game/forecast';
 import { dayPhase, formatClock, nextChange } from '../game/clock';
 
@@ -43,24 +43,26 @@ export class App {
           <main class="game-panel">
             <div class="game-frame"><div id="game-canvas"></div><div class="prompt" id="prompt">WASD / arrows  Move</div></div>
             <div class="message" id="message">Gather a few branches. Your camp is waiting.</div>
-            <div class="shortcuts"><span><kbd>WASD</kbd> Move</span><span><kbd>E</kbd> Gather</span><span><kbd>V</kbd> Explore</span><span><kbd>F</kbd> Fire</span><span><kbd>R</kbd> Rest</span><span><kbd>Q</kbd> Eat</span><span><kbd>C</kbd> Cook</span><span><kbd>G</kbd> Stargaze</span><span><kbd>Z</kbd> Sleep</span><span><kbd>L</kbd> Lookout</span><span><kbd>X</kbd> Chop</span></div>
+            <div class="shortcuts"><span><kbd>WASD</kbd> Move</span><span><kbd>E</kbd> Gather</span><span><kbd>V</kbd> Explore</span><span><kbd>F</kbd> Fire</span><span><kbd>R</kbd> Rest</span><span><kbd>Q</kbd> Berries</span><span><kbd>T</kbd> Ration</span><span><kbd>P</kbd> Prepare</span><span><kbd>C</kbd> Cook</span><span><kbd>G</kbd> Stargaze</span><span><kbd>Z</kbd> Sleep</span><span><kbd>L</kbd> Lookout</span><span><kbd>X</kbd> Chop</span></div>
           </main>
           <aside class="sidebar">
             <section class="panel forecast-panel" id="forecast-panel"><p class="eyebrow">THE FORECAST</p><h2 id="forecast-title">A cold front is coming</h2><p id="forecast-copy" class="forecast-copy"></p><div class="forecast-checks"><span id="forecast-shelter"></span><span id="forecast-fire"></span></div></section>
             <section class="panel lookout-panel" id="lookout-panel"><p class="eyebrow">A PLACE BEYOND CAMP</p><h2 id="lookout-title">The old lookout</h2><p id="lookout-copy" class="lookout-copy"></p><button type="button" id="lookout-button" data-action="repairLookout">Repair lookout</button><small id="lookout-cost">4 wood · 2 fiber · 2 stone</small></section>
             <section class="panel axe-panel"><p class="eyebrow">FOREST TOOLS</p><h2 id="axe-title">Stone axe</h2><p id="axe-copy" class="lookout-copy"></p><button type="button" id="axe-button" data-action="craftAxe">Craft stone axe</button><small id="axe-cost">1 wood · 1 fiber · 1 stone</small></section>
+            <section class="panel ration-panel"><p class="eyebrow">TRAIL FOOD</p><h2>Drying rack</h2><p class="lookout-copy">Dry a berry at camp for a ration you can eat anywhere. Each restores 45 hunger.</p><button type="button" id="prepare-button" data-action="prepareTrailFood">Prepare trail ration</button><small id="prepare-hint">Build a drying rack first.</small></section>
             <section class="panel sites-panel"><p class="eyebrow">BEYOND CAMP</p><h2>Follow the paths</h2><p class="lookout-copy">An old basket, a quiet spring, and a stone cairn wait beyond the clearing.</p><p id="sites-seen" class="sites-seen">Places found: none yet</p><button type="button" id="site-button">Explore nearby place</button><small>Stand beside a place and press V</small></section>
             <section class="panel"><p class="eyebrow">YOUR SURVIVOR</p><h2>Take it one day at a time</h2>
               <div class="meter"><div class="meter-title"><span>Energy</span><b id="energy-value">100</b></div><div class="track"><div id="energy-bar" class="fill energy"></div></div></div>
               <div class="meter"><div class="meter-title"><span>Hunger</span><b id="hunger-value">100</b></div><div class="track"><div id="hunger-bar" class="fill hunger"></div></div></div>
               <div class="meter"><div class="meter-title"><span>Warmth</span><b id="warmth-value">100</b></div><div class="track"><div id="warmth-bar" class="fill warmth"></div></div></div>
-              <div class="quick-actions"><button data-action="eat">Eat berries</button><button data-action="rest">Rest</button><button data-action="stokeFire">Feed fire</button><button data-action="sleep" id="sleep-button">Sleep</button></div>
+              <div class="quick-actions"><button data-action="eat">Eat berries</button><button data-action="eatTrailFood" id="eat-ration-button">Eat ration</button><button data-action="rest">Rest</button><button data-action="stokeFire">Feed fire</button><button data-action="sleep" id="sleep-button">Sleep</button></div>
             </section>
             <section class="panel"><p class="eyebrow">IN YOUR BAG</p><div class="supplies">
               <div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small><button type="button" class="drop-item" data-drop="wood" aria-label="Drop one wood">Drop 1</button></div>
               <div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small><button type="button" class="drop-item" data-drop="food" aria-label="Drop one berry">Drop 1</button></div>
               <div><span class="supply-icon fiber">≋</span><strong id="fiber-count">0</strong><small>Fiber</small><button type="button" class="drop-item" data-drop="fiber" aria-label="Drop one fiber">Drop 1</button></div>
               <div><span class="supply-icon stone">◆</span><strong id="stone-count">0</strong><small>Stone</small><button type="button" class="drop-item" data-drop="stone" aria-label="Drop one stone">Drop 1</button></div>
+              <div><span class="supply-icon ration">◇</span><strong id="ration-count">0</strong><small>Rations</small><button type="button" class="drop-item" data-drop="trailFood" aria-label="Drop one trail ration">Drop 1</button></div>
               <div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small>Carried</small></div>
             </div><div class="fire-status" id="fire-status">The fire is unlit</div></section>
             <section class="panel night-panel"><p class="eyebrow">AFTER DARK</p><h2>A little time for yourself</h2><p class="night-hint" id="night-hint">These small moments are waiting for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button></div></section>
@@ -72,7 +74,7 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe';
+        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe';
         this.scene?.perform({ type });
       });
     });
@@ -233,11 +235,15 @@ export class App {
     this.setText('food-count', String(inventory.food));
     this.setText('fiber-count', String(inventory.fiber));
     this.setText('stone-count', String(inventory.stone));
+    this.setText('ration-count', String(inventory.trailFood));
     const seenSites = (Object.keys(SITES) as SiteId[]).filter(id => this.state.progress.discoveries[id]);
     this.setText('sites-seen', seenSites.length ? `Places found: ${seenSites.map(id => SITES[id].name).join(' · ')}` : 'Places found: none yet');
     const nearSite = (Object.keys(SITES) as SiteId[]).some(id => Math.hypot(player.x - SITES[id].x, player.y - SITES[id].y) <= BALANCE.interactionRadius);
     this.root.querySelector('#site-button')?.classList.toggle('ready', nearSite);
-    this.setText('space-count', `${inventory.wood + inventory.food + inventory.fiber + inventory.stone}/${structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity}`);
+    this.setText('space-count', `${carriedCount(this.state)}/${structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity}`);
+    this.root.querySelector('#eat-ration-button')?.classList.toggle('ready', inventory.trailFood > 0);
+    this.root.querySelector('#prepare-button')?.classList.toggle('ready', !trailFoodBlocker(this.state));
+    this.setText('prepare-hint', trailFoodBlocker(this.state) ?? '1 berry · 12 seconds · 1 ration');
     this.root.querySelectorAll<HTMLButtonElement>('[data-drop]').forEach(button => {
       button.disabled = inventory[button.dataset.drop as keyof GameState['inventory']] <= 0;
     });
