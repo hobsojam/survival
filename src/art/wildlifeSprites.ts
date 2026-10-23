@@ -2,7 +2,7 @@ import type { PaletteKey } from './palette';
 import type { SpriteDef } from './sprites';
 
 type Grid = string[][];
-const blank = (width: number, height: number): Grid => Array.from({ length: height }, () => new Array(width).fill('.'));
+const blank = (width: number, height: number): Grid => Array.from({ length: height }, () => Array.from({ length: width }, () => '.'));
 const dot = (g: Grid, x: number, y: number, color: string): void => { if (g[y]?.[x] !== undefined) g[y][x] = color; };
 const box = (g: Grid, x: number, y: number, width: number, height: number, color: string): void => {
   for (let yy = y; yy < y + height; yy++) for (let xx = x; xx < x + width; xx++) dot(g, xx, yy, color);

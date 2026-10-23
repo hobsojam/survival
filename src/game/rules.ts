@@ -74,8 +74,7 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
   let next: GameState = {
     ...state,
     player: { ...state.player },
-    progress: { ...state.progress },
-    nodes: state.nodes.map(node => ({ ...node }))
+    progress: { ...state.progress }
   };
   let remaining = seconds;
   while (remaining > 0.000001) {

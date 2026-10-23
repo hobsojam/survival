@@ -1,7 +1,7 @@
 import type { SpriteDef } from './sprites';
 
 type Grid = string[][];
-const blank = (): Grid => Array.from({ length: 24 }, () => new Array(16).fill('.'));
+const blank = (): Grid => Array.from({ length: 24 }, () => Array.from({ length: 16 }, () => '.'));
 const dot = (g: Grid, x: number, y: number, color: string): void => { if (g[y]?.[x] !== undefined) g[y][x] = color; };
 const box = (g: Grid, x: number, y: number, width: number, height: number, color: string): void => {
   for (let yy = y; yy < y + height; yy++) for (let xx = x; xx < x + width; xx++) dot(g, xx, yy, color);
