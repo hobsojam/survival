@@ -1,8 +1,9 @@
-import { BALANCE, BUILDINGS, LOOKOUT, type GameState, type StructureId } from './state';
+import { BALANCE, BUILDINGS, LOOKOUT, SITES, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
   | { type: 'gather'; nodeId: string }
   | { type: 'chopTree'; treeId: string }
+  | { type: 'visitSite'; siteId: SiteId }
   | { type: 'drop'; resource: keyof GameState['inventory'] }
   | { type: 'build'; structureId: StructureId }
   | { type: 'move'; dx: number; dy: number }
@@ -215,6 +216,30 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
       }, BALANCE.chopSeconds, 'working'),
       message: 'Chopped the tree and collected two wood. A stump remains.'
     };
+  }
+  if (action.type === 'visitSite') {
+    const site = SITES[action.siteId];
+    if (!site || !near(state.player.x, state.player.y, site.x, site.y)) return { state, message: 'Move closer to a place along the path.' };
+    if (action.siteId === 'spring') {
+      const rested = advanceTime({ ...state, progress: { ...state.progress,
+        discoveries: { ...state.progress.discoveries, spring: true } } }, BALANCE.restSeconds, 'resting');
+      return {
+        state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + 20) } },
+        message: 'You pause beside the quiet spring and feel rested.'
+      };
+    }
+    if (state.progress.discoveries[action.siteId]) return { state, message: `You have already searched the ${site.name.toLowerCase()}.` };
+    const capacity = state.structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity;
+    const carried = state.inventory.wood + state.inventory.food + state.inventory.fiber + state.inventory.stone;
+    if (carried + 2 > capacity) return { state, message: 'Your bag needs two free spaces for this find.' };
+    const resource = action.siteId === 'basket' ? 'food' : 'stone';
+    const found = advanceTime({
+      ...state,
+      player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.gatherEnergyCost) },
+      inventory: { ...state.inventory, [resource]: state.inventory[resource] + 2 },
+      progress: { ...state.progress, discoveries: { ...state.progress.discoveries, [action.siteId]: true } }
+    }, BALANCE.gatherSeconds, 'working');
+    return { state: found, message: action.siteId === 'basket' ? 'An old basket holds two berries.' : 'You find two useful stones tucked in the cairn.' };
   }
   if (action.type === 'drop') {
     const amount = state.inventory[action.resource];

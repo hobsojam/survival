@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE, createGame } from '../src/game/state';
+import { BALANCE, SITES, createGame } from '../src/game/state';
 import { buildMap } from '../src/scene/map';
 
 describe('terrain composition', () => {
@@ -9,6 +9,9 @@ describe('terrain composition', () => {
     const map = buildMap(nodes);
     for (const target of createGame().trees) {
       expect(map.trees).toContainEqual({ x: target.x, y: target.y, sprite: target.sprite });
+    }
+    for (const site of Object.values(SITES)) {
+      expect(map.trees.every(tree => Math.hypot(tree.x - site.x, tree.y - site.y) >= 1.5)).toBe(true);
     }
     expect(buildMap(nodes)).toEqual(map);
     expect(map.trees.length).toBeGreaterThan(50);

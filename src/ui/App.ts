@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from '../game/state';
+import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type SiteId, type StructureId } from '../game/state';
 import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
@@ -43,12 +43,13 @@ export class App {
           <main class="game-panel">
             <div class="game-frame"><div id="game-canvas"></div><div class="prompt" id="prompt">WASD / arrows  Move</div></div>
             <div class="message" id="message">Gather a few branches. Your camp is waiting.</div>
-            <div class="shortcuts"><span><kbd>WASD</kbd> Move</span><span><kbd>E</kbd> Gather</span><span><kbd>F</kbd> Fire</span><span><kbd>R</kbd> Rest</span><span><kbd>Q</kbd> Eat</span><span><kbd>C</kbd> Cook</span><span><kbd>G</kbd> Stargaze</span><span><kbd>Z</kbd> Sleep</span><span><kbd>L</kbd> Lookout</span><span><kbd>X</kbd> Chop</span></div>
+            <div class="shortcuts"><span><kbd>WASD</kbd> Move</span><span><kbd>E</kbd> Gather</span><span><kbd>V</kbd> Explore</span><span><kbd>F</kbd> Fire</span><span><kbd>R</kbd> Rest</span><span><kbd>Q</kbd> Eat</span><span><kbd>C</kbd> Cook</span><span><kbd>G</kbd> Stargaze</span><span><kbd>Z</kbd> Sleep</span><span><kbd>L</kbd> Lookout</span><span><kbd>X</kbd> Chop</span></div>
           </main>
           <aside class="sidebar">
             <section class="panel forecast-panel" id="forecast-panel"><p class="eyebrow">THE FORECAST</p><h2 id="forecast-title">A cold front is coming</h2><p id="forecast-copy" class="forecast-copy"></p><div class="forecast-checks"><span id="forecast-shelter"></span><span id="forecast-fire"></span></div></section>
             <section class="panel lookout-panel" id="lookout-panel"><p class="eyebrow">A PLACE BEYOND CAMP</p><h2 id="lookout-title">The old lookout</h2><p id="lookout-copy" class="lookout-copy"></p><button type="button" id="lookout-button" data-action="repairLookout">Repair lookout</button><small id="lookout-cost">4 wood · 2 fiber · 2 stone</small></section>
             <section class="panel axe-panel"><p class="eyebrow">FOREST TOOLS</p><h2 id="axe-title">Stone axe</h2><p id="axe-copy" class="lookout-copy"></p><button type="button" id="axe-button" data-action="craftAxe">Craft stone axe</button><small id="axe-cost">1 wood · 1 fiber · 1 stone</small></section>
+            <section class="panel sites-panel"><p class="eyebrow">BEYOND CAMP</p><h2>Follow the paths</h2><p class="lookout-copy">An old basket, a quiet spring, and a stone cairn wait beyond the clearing.</p><p id="sites-seen" class="sites-seen">Places found: none yet</p><button type="button" id="site-button">Explore nearby place</button><small>Stand beside a place and press V</small></section>
             <section class="panel"><p class="eyebrow">YOUR SURVIVOR</p><h2>Take it one day at a time</h2>
               <div class="meter"><div class="meter-title"><span>Energy</span><b id="energy-value">100</b></div><div class="track"><div id="energy-bar" class="fill energy"></div></div></div>
               <div class="meter"><div class="meter-title"><span>Hunger</span><b id="hunger-value">100</b></div><div class="track"><div id="hunger-bar" class="fill hunger"></div></div></div>
@@ -83,6 +84,7 @@ export class App {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-build]');
       if (button) this.scene?.perform({ type: 'build', structureId: button.dataset.build as StructureId });
     });
+    this.root.querySelector('#site-button')!.addEventListener('click', () => this.scene?.visitNearestSite());
     this.root.querySelector('#new-game')!.addEventListener('click', () => this.beginNewGame());
     this.root.querySelector('#continue-game')!.addEventListener('click', () => this.continueGame());
     this.root.querySelector('#restart-game')!.addEventListener('click', () => this.beginNewGame());
@@ -231,6 +233,10 @@ export class App {
     this.setText('food-count', String(inventory.food));
     this.setText('fiber-count', String(inventory.fiber));
     this.setText('stone-count', String(inventory.stone));
+    const seenSites = (Object.keys(SITES) as SiteId[]).filter(id => this.state.progress.discoveries[id]);
+    this.setText('sites-seen', seenSites.length ? `Places found: ${seenSites.map(id => SITES[id].name).join(' · ')}` : 'Places found: none yet');
+    const nearSite = (Object.keys(SITES) as SiteId[]).some(id => Math.hypot(player.x - SITES[id].x, player.y - SITES[id].y) <= BALANCE.interactionRadius);
+    this.root.querySelector('#site-button')?.classList.toggle('ready', nearSite);
     this.setText('space-count', `${inventory.wood + inventory.food + inventory.fiber + inventory.stone}/${structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity}`);
     this.root.querySelectorAll<HTMLButtonElement>('[data-drop]').forEach(button => {
       button.disabled = inventory[button.dataset.drop as keyof GameState['inventory']] <= 0;

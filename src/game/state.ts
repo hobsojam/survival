@@ -13,6 +13,13 @@ export type StructureId = keyof typeof BUILDINGS;
 
 export const LOOKOUT = { x: 30, y: 8, cost: { wood: 4, fiber: 2, stone: 2 } } as const;
 
+export const SITES = {
+  basket: { name: 'Old basket', x: 8, y: 8 },
+  spring: { name: 'Quiet spring', x: 10, y: 20 },
+  cairn: { name: 'Stone cairn', x: 31, y: 21 }
+} as const;
+export type SiteId = keyof typeof SITES;
+
 export interface ResourceNode {
   id: string;
   kind: ResourceKind;
@@ -37,7 +44,8 @@ export interface GameState {
   inventory: { wood: number; food: number; fiber: number; stone: number };
   fireFuel: number;
   structures: Record<StructureId, boolean>;
-  progress: { nextStormDay: number | null; hearthUnlocked: boolean; lookoutRepaired: boolean; axeCrafted: boolean };
+  progress: { nextStormDay: number | null; hearthUnlocked: boolean; lookoutRepaired: boolean; axeCrafted: boolean;
+    discoveries: Record<SiteId, boolean> };
   nodes: ResourceNode[];
   trees: TreeNode[];
 }
@@ -118,7 +126,8 @@ export function createGame(): GameState {
     inventory: { wood: 0, food: 0, fiber: 0, stone: 0 },
     fireFuel: 0,
     structures: { shelter: false, bed: false, crate: false, hearth: false, dryingRack: false, windbreak: false },
-    progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false },
+    progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
+      discoveries: { basket: false, spring: false, cairn: false } },
     nodes,
     trees
   };
