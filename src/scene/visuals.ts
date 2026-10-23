@@ -1,4 +1,4 @@
-import { BALANCE, type GameState } from '../game/state';
+import { BALANCE, LOOKOUT, type GameState } from '../game/state';
 import { isColdNight } from '../game/rules';
 import { TILE, worldX, worldY } from './art';
 
@@ -62,6 +62,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: { id: 
   add('windbreak', state.structures.windbreak ? 'windbreak:built' : 'windbreakSite:still', x - 2, y + 2,
     state.structures.windbreak ? undefined : GROUND_DECAL_DEPTH);
   add('logSeat', 'logSeat:still', x - 1, y + 1);
+  add('lookout', state.progress.lookoutRepaired ? 'lookout:restored' : 'lookout:damaged', LOOKOUT.x, LOOKOUT.y);
   if (state.progress.hearthUnlocked && !state.structures.hearth) add('hearthSite', 'hearthSite:still', x + 1, y + 2, GROUND_DECAL_DEPTH);
   const fire = state.structures.hearth ? 'hearth' : 'firePit';
   const phase = Math.floor(timeMs / 180) % 4;

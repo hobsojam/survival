@@ -108,6 +108,53 @@ describe('gathering and inventory', () => {
   });
 });
 
+describe('lookout repair', () => {
+  const readyCamp = () => {
+    const state = createGame();
+    state.day = 4;
+    state.player.x = 30;
+    state.player.y = 8;
+    state.inventory.wood = 4;
+    state.inventory.fiber = 2;
+    state.inventory.stone = 2;
+    return state;
+  };
+
+  it('requires a weathered cold front and proximity to the lookout', () => {
+    const state = readyCamp();
+    const locked = applyAction(state, { type: 'repairLookout' });
+    expect(locked.state).toBe(state);
+    expect(locked.message).toMatch(/cold front/i);
+    state.progress.hearthUnlocked = true;
+    state.progress.nextStormDay = null;
+    state.player.x = 20;
+    state.player.y = 15;
+    expect(applyAction(state, { type: 'repairLookout' }).state).toBe(state);
+  });
+
+  it('spends eight carried materials and twelve seconds exactly once', () => {
+    const state = readyCamp();
+    state.progress.hearthUnlocked = true;
+    state.progress.nextStormDay = null;
+    const repaired = applyAction(state, { type: 'repairLookout' }).state;
+    expect(repaired.progress.lookoutRepaired).toBe(true);
+    expect(repaired.inventory).toEqual({ wood: 0, food: 0, fiber: 0, stone: 0 });
+    expect(repaired.timeOfDay).toBe(12);
+    expect(repaired.player.energy).toBe(94);
+    expect(applyAction(repaired, { type: 'repairLookout' }).state).toBe(repaired);
+  });
+
+  it('leaves supplies untouched when the repair cost is missing', () => {
+    const state = readyCamp();
+    state.progress.hearthUnlocked = true;
+    state.progress.nextStormDay = null;
+    state.inventory.stone = 1;
+    const result = applyAction(state, { type: 'repairLookout' });
+    expect(result.state).toBe(state);
+    expect(result.message).toMatch(/stone/i);
+  });
+});
+
 describe('time and gentle survival', () => {
   it('rolls the day over at 240 seconds and replenishes gathered nodes', async () => {
     const { advanceTime } = await import('../src/game/rules');
@@ -482,7 +529,7 @@ describe('more camp structures', () => {
 describe('forecast cold night', () => {
   it('forecasts day three and starts the front only at nightfall', () => {
     const state = createGame();
-    expect(state.progress).toEqual({ nextStormDay: 3, hearthUnlocked: false });
+    expect(state.progress).toEqual({ nextStormDay: 3, hearthUnlocked: false, lookoutRepaired: false });
     state.day = 3;
     state.timeOfDay = BALANCE.nightStart - 5;
     state.fireFuel = 20;
@@ -512,7 +559,7 @@ describe('forecast cold night', () => {
     expect(dawn.day).toBe(4);
     expect(dawn.timeOfDay).toBe(0);
     expect(dawn.fireFuel).toBe(20);
-    expect(dawn.progress).toEqual({ nextStormDay: null, hearthUnlocked: true });
+    expect(dawn.progress).toEqual({ nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false });
   });
 
   it('retries after a missed storm and costs the next morning', () => {
@@ -522,7 +569,7 @@ describe('forecast cold night', () => {
     state.structures.shelter = true;
     state.fireFuel = 90;
     const dawn = advanceTime(state, 80);
-    expect(dawn.progress).toEqual({ nextStormDay: 6, hearthUnlocked: false });
+    expect(dawn.progress).toEqual({ nextStormDay: 6, hearthUnlocked: false, lookoutRepaired: false });
     expect(dawn.day).toBe(4);
     expect(dawn.timeOfDay).toBe(30);
     expect(dawn.player.energy).toBe(25);

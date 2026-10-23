@@ -1,11 +1,11 @@
-import { BALANCE, BUILDINGS, type GameState, type StructureId } from './state';
+import { BALANCE, BUILDINGS, LOOKOUT, type GameState, type StructureId } from './state';
 
 export type GameAction =
   | { type: 'gather'; nodeId: string }
   | { type: 'drop'; resource: keyof GameState['inventory'] }
   | { type: 'build'; structureId: StructureId }
   | { type: 'move'; dx: number; dy: number }
-  | { type: 'eat' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' };
+  | { type: 'eat' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' };
 
 /** Awake time tires the survivor; work already costs energy, and resting doesn't. */
 export type Activity = 'awake' | 'working' | 'resting';
@@ -21,6 +21,20 @@ function near(x1: number, y1: number, x2: number, y2: number): boolean {
 
 export function isAtCamp(state: GameState): boolean {
   return Math.hypot(state.player.x - BALANCE.campX, state.player.y - BALANCE.campY) <= BALANCE.campRadius;
+}
+
+export function lookoutRepairBlocker(state: GameState): string | null {
+  if (state.progress.lookoutRepaired) return 'The lookout is already restored.';
+  if (!state.progress.hearthUnlocked) return 'Weather the cold front before repairing the lookout.';
+  if (!near(state.player.x, state.player.y, LOOKOUT.x, LOOKOUT.y)) return 'Stand beside the lookout to repair it.';
+  const { wood, fiber, stone } = LOOKOUT.cost;
+  if (state.inventory.wood < wood || state.inventory.fiber < fiber || state.inventory.stone < stone) {
+    const needed = [state.inventory.wood < wood ? `${wood} wood` : null,
+      state.inventory.fiber < fiber ? `${fiber} fiber` : null,
+      state.inventory.stone < stone ? `${stone} stone` : null].filter(Boolean).join(' and ');
+    return `Need ${needed} to repair the lookout.`;
+  }
+  return null;
 }
 
 export function isColdNight(state: GameState): boolean {
@@ -111,8 +125,8 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
       next.nodes = next.nodes.map(node => node.readyDay <= next.day ? { ...node, amount: 1 } : node);
       if (stormEnded) {
         next.progress = weathered
-          ? { nextStormDay: null, hearthUnlocked: true }
-          : { nextStormDay: next.day + BALANCE.coldNightRetryDays - 1, hearthUnlocked: false };
+          ? { ...next.progress, nextStormDay: null, hearthUnlocked: true }
+          : { ...next.progress, nextStormDay: next.day + BALANCE.coldNightRetryDays - 1, hearthUnlocked: false };
         if (!weathered) {
           next.player.energy = Math.min(next.player.energy, BALANCE.coldNightFailureEnergy);
           next.timeOfDay = BALANCE.coldNightFailureMorningLoss;
@@ -219,6 +233,20 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     return {
       state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood - 1 }, fireFuel: state.fireFuel + (state.structures.hearth ? BALANCE.hearthFireSecondsPerWood : BALANCE.fireSecondsPerWood) },
       message: 'The fire burns brighter.'
+    };
+  }
+  if (action.type === 'repairLookout') {
+    const blocker = lookoutRepairBlocker(state);
+    if (blocker) return { state, message: blocker };
+    const { wood, fiber, stone } = LOOKOUT.cost;
+    return {
+      state: advanceTime({
+        ...state,
+        inventory: { ...state.inventory, wood: state.inventory.wood - wood, fiber: state.inventory.fiber - fiber, stone: state.inventory.stone - stone },
+        player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.buildEnergyCost) },
+        progress: { ...state.progress, lookoutRepaired: true }
+      }, BALANCE.buildSeconds, 'working'),
+      message: 'The lookout stands again. From here, the camp feels like home.'
     };
   }
   if (action.type === 'build') {

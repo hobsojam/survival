@@ -3,7 +3,7 @@ import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from
 import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
-import { buildStatus, cookBlocker, isAtCamp, isColdNight, sleepBlocker, stargazeBlocker } from '../game/rules';
+import { buildStatus, cookBlocker, isAtCamp, isColdNight, lookoutRepairBlocker, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { forecastFireCheck } from '../game/forecast';
 import { dayPhase, formatClock, nextChange } from '../game/clock';
 
@@ -43,10 +43,11 @@ export class App {
           <main class="game-panel">
             <div class="game-frame"><div id="game-canvas"></div><div class="prompt" id="prompt">WASD / arrows  Move</div></div>
             <div class="message" id="message">Gather a few branches. Your camp is waiting.</div>
-            <div class="shortcuts"><span><kbd>WASD</kbd> Move</span><span><kbd>E</kbd> Gather</span><span><kbd>F</kbd> Fire</span><span><kbd>R</kbd> Rest</span><span><kbd>Q</kbd> Eat</span><span><kbd>C</kbd> Cook</span><span><kbd>G</kbd> Stargaze</span><span><kbd>Z</kbd> Sleep</span></div>
+            <div class="shortcuts"><span><kbd>WASD</kbd> Move</span><span><kbd>E</kbd> Gather</span><span><kbd>F</kbd> Fire</span><span><kbd>R</kbd> Rest</span><span><kbd>Q</kbd> Eat</span><span><kbd>C</kbd> Cook</span><span><kbd>G</kbd> Stargaze</span><span><kbd>Z</kbd> Sleep</span><span><kbd>L</kbd> Lookout</span></div>
           </main>
           <aside class="sidebar">
             <section class="panel forecast-panel" id="forecast-panel"><p class="eyebrow">THE FORECAST</p><h2 id="forecast-title">A cold front is coming</h2><p id="forecast-copy" class="forecast-copy"></p><div class="forecast-checks"><span id="forecast-shelter"></span><span id="forecast-fire"></span></div></section>
+            <section class="panel lookout-panel" id="lookout-panel"><p class="eyebrow">A PLACE BEYOND CAMP</p><h2 id="lookout-title">The old lookout</h2><p id="lookout-copy" class="lookout-copy"></p><button type="button" id="lookout-button" data-action="repairLookout">Repair lookout</button><small id="lookout-cost">4 wood · 2 fiber · 2 stone</small></section>
             <section class="panel"><p class="eyebrow">YOUR SURVIVOR</p><h2>Take it one day at a time</h2>
               <div class="meter"><div class="meter-title"><span>Energy</span><b id="energy-value">100</b></div><div class="track"><div id="energy-bar" class="fill energy"></div></div></div>
               <div class="meter"><div class="meter-title"><span>Hunger</span><b id="hunger-value">100</b></div><div class="track"><div id="hunger-bar" class="fill hunger"></div></div></div>
@@ -65,10 +66,11 @@ export class App {
           </aside>
         </div>
         <div id="start-screen" class="start-screen"><div class="start-card"><div class="start-mark">✦</div><p class="eyebrow">A SMALL SURVIVAL STORY</p><h1>Make a little place<br>feel like home.</h1><p class="start-copy">Gather what you need, keep a fire glowing, and build a refuge one day at a time.</p><p id="start-note" class="start-note"></p><div class="start-buttons"><button id="continue-game" class="primary-button" hidden>Continue your camp</button><button id="new-game" class="secondary-button">Start a new game</button></div><small>Single player · Saves in this browser</small></div></div>
+        <div id="lookout-ending" class="lookout-ending hidden" role="dialog" aria-modal="true" aria-labelledby="ending-title"><div class="start-card"><div class="start-mark">✦</div><p class="eyebrow">A VIEW FROM ABOVE</p><h1 id="ending-title">A place to call home.</h1><p class="start-copy">The lookout stands again. Below, your fire marks a warm clearing among the trees. There is still more to see whenever you are ready.</p><div class="start-buttons"><button id="continue-exploring" class="primary-button">Keep exploring</button></div></div></div>
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze';
+        const type = button.dataset.action as 'eat' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout';
         this.scene?.perform({ type });
       });
     });
@@ -83,6 +85,10 @@ export class App {
     this.root.querySelector('#new-game')!.addEventListener('click', () => this.beginNewGame());
     this.root.querySelector('#continue-game')!.addEventListener('click', () => this.continueGame());
     this.root.querySelector('#restart-game')!.addEventListener('click', () => this.beginNewGame());
+    this.root.querySelector('#continue-exploring')!.addEventListener('click', () => {
+      this.root.querySelector('#lookout-ending')?.classList.add('hidden');
+      this.game?.scene.resume('GameScene');
+    });
     window.addEventListener('pagehide', () => { if (this.scene) this.saveCurrent(); });
     document.addEventListener('visibilitychange', () => { if (document.hidden && this.scene) this.saveCurrent(); });
     this.showStartScreen();
@@ -93,6 +99,7 @@ export class App {
     this.gameResize?.disconnect();
     this.game?.destroy(true);
     this.root.querySelector('#start-screen')?.classList.add('hidden');
+    this.root.querySelector('#lookout-ending')?.classList.add('hidden');
     const restart = this.root.querySelector<HTMLButtonElement>('#restart-game');
     if (restart) restart.hidden = false;
     this.state = state;
@@ -102,6 +109,10 @@ export class App {
       const previous = this.state;
       this.state = next;
       this.render();
+      if (cause === 'action' && !previous.progress.lookoutRepaired && next.progress.lookoutRepaired) {
+        this.root.querySelector('#lookout-ending')?.classList.remove('hidden');
+        this.game?.scene.pause('GameScene');
+      }
       // Without storage there is nothing to retry; starting the game already said so once.
       if (!this.storage) return;
       // After a failed save, wait for the backoff instead of retrying on every action.
@@ -224,6 +235,24 @@ export class App {
       button.disabled = inventory[button.dataset.drop as keyof GameState['inventory']] <= 0;
     });
     this.setText('fire-status', this.state.fireFuel > 0 ? `Fire burning · ${Math.ceil(this.state.fireFuel)}s of warmth` : 'The fire is unlit');
+    const lookoutButton = this.root.querySelector<HTMLButtonElement>('#lookout-button');
+    if (lookoutButton) {
+      lookoutButton.disabled = !this.state.progress.hearthUnlocked || this.state.progress.lookoutRepaired;
+      lookoutButton.classList.toggle('ready', !lookoutRepairBlocker(this.state));
+    }
+    if (this.state.progress.lookoutRepaired) {
+      this.setText('lookout-title', 'A place to call home');
+      this.setText('lookout-copy', 'The old lookout stands again. The paths are still yours to explore.');
+      this.setText('lookout-cost', 'Restored');
+    } else if (this.state.progress.hearthUnlocked) {
+      this.setText('lookout-title', 'Restore the old lookout');
+      this.setText('lookout-copy', 'Follow the northeast path to the lookout. Bring the repair materials and stand beside it.');
+      this.setText('lookout-cost', '4 wood · 2 fiber · 2 stone');
+    } else {
+      this.setText('lookout-title', 'The old lookout');
+      this.setText('lookout-copy', 'A damaged lookout waits along the northeast path. Weather the cold front before repairing it.');
+      this.setText('lookout-cost', 'Unlocks after the cold front');
+    }
     const atCamp = isAtCamp(this.state);
     const afterDark = timeOfDay >= BALANCE.nightStart;
     this.setText('night-hint', !afterDark ? 'These small moments are waiting for nightfall.'

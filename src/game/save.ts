@@ -1,7 +1,7 @@
 import { BALANCE, createGame, type GameState } from './state';
 
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 6;
+const SAVE_VERSION = 7;
 const LEGACY_BRANCH_POSITIONS = [
   [22, 15], [18, 16], [21, 18], [16, 14], [24, 13], [13, 12],
   [27, 17], [19, 22], [29, 9], [10, 18], [32, 21], [7, 8]
@@ -61,10 +61,19 @@ function validStateV4(value: unknown): boolean {
     && typeof value.structures.windbreak === 'boolean';
 }
 
-function validState(value: unknown): value is GameState {
+function validStateV6(value: unknown): value is GameState {
   return validProgress(value, true, true, false) && object(value) && object(value.structures)
     && typeof value.structures.dryingRack === 'boolean'
     && typeof value.structures.windbreak === 'boolean';
+}
+
+function validState(value: unknown): value is GameState {
+  return validStateV6(value) && typeof value.progress.lookoutRepaired === 'boolean'
+    && (!value.progress.lookoutRepaired || value.progress.hearthUnlocked);
+}
+
+function withLookout(value: GameState): GameState {
+  return { ...value, progress: { ...value.progress, lookoutRepaired: false } };
 }
 
 function withFallenBranches(value: GameState): GameState {
@@ -101,9 +110,9 @@ function migrateV1(value: unknown): GameState | null {
   const migrated: GameState = {
     ...withFallenBranches(withStone(withFiber(legacy))),
     structures: { ...legacy.structures, hearth: false, dryingRack: false, windbreak: false },
-    progress: { nextStormDay: Math.max(BALANCE.coldNightStartDay, legacy.day + 2), hearthUnlocked: false }
+    progress: { nextStormDay: Math.max(BALANCE.coldNightStartDay, legacy.day + 2), hearthUnlocked: false, lookoutRepaired: false }
   };
-  return validState(migrated) ? migrated : null;
+  return validStateV6(migrated) ? migrated : null;
 }
 
 function migrateV2(value: unknown): GameState | null {
@@ -113,7 +122,7 @@ function migrateV2(value: unknown): GameState | null {
     ...withFiber(legacy),
     structures: { ...legacy.structures, dryingRack: false, windbreak: false }
   }));
-  return validState(migrated) ? migrated : null;
+  return validStateV6(migrated) ? migrated : null;
 }
 
 function migrateV3(value: unknown): GameState | null {
@@ -121,12 +130,12 @@ function migrateV3(value: unknown): GameState | null {
   const structures = value.structures;
   if (validProgress(value, false) && typeof structures.dryingRack === 'boolean' && typeof structures.windbreak === 'boolean') {
     const migrated = withFallenBranches(withStone(withFiber(value as unknown as GameState)));
-    return validState(migrated) ? migrated : null;
+    return validStateV6(migrated) ? migrated : null;
   }
   if (validProgress(value, true) && !('dryingRack' in structures) && !('windbreak' in structures)) {
     const legacy = value as unknown as GameState;
     const migrated: GameState = withFallenBranches(withStone({ ...legacy, structures: { ...legacy.structures, dryingRack: false, windbreak: false } }));
-    return validState(migrated) ? migrated : null;
+    return validStateV6(migrated) ? migrated : null;
   }
   return null;
 }
@@ -134,14 +143,14 @@ function migrateV3(value: unknown): GameState | null {
 function migrateV4(value: unknown): GameState | null {
   if (!validStateV4(value)) return null;
   const migrated = withFallenBranches(withStone(value as GameState));
-  return validState(migrated) ? migrated : null;
+  return validStateV6(migrated) ? migrated : null;
 }
 
 function migrateV5(value: unknown): GameState | null {
   if (!validProgress(value, true, true) || !object(value) || !object(value.structures)
     || typeof value.structures.dryingRack !== 'boolean' || typeof value.structures.windbreak !== 'boolean') return null;
   const migrated = withFallenBranches(value as unknown as GameState);
-  return validState(migrated) ? migrated : null;
+  return validStateV6(migrated) ? migrated : null;
 }
 
 function errorText(error: unknown): string {
@@ -177,7 +186,7 @@ export function loadGame(storage: Storage): LoadResult {
   } catch {
     return { kind: 'invalid', reason: 'The local save is not valid JSON.' };
   }
-  if (!object(parsed) || (parsed.version !== SAVE_VERSION && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1)) {
+  if (!object(parsed) || (parsed.version !== SAVE_VERSION && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1)) {
     return { kind: 'invalid', reason: 'This save uses an unsupported version.' };
   }
   let state: GameState | null = null;
@@ -186,7 +195,9 @@ export function loadGame(storage: Storage): LoadResult {
   else if (parsed.version === 3) state = migrateV3(parsed.state);
   else if (parsed.version === 4) state = migrateV4(parsed.state);
   else if (parsed.version === 5) state = migrateV5(parsed.state);
-  else if (validState(parsed.state)) state = parsed.state;
-  if (!state) return { kind: 'invalid', reason: 'The local save contains invalid game data.' };
+  else if (parsed.version === 6 && validStateV6(parsed.state)) state = parsed.state;
+  else if (parsed.version === SAVE_VERSION && validState(parsed.state)) state = parsed.state;
+  if (state && parsed.version !== SAVE_VERSION) state = withLookout(state);
+  if (!state || !validState(state)) return { kind: 'invalid', reason: 'The local save contains invalid game data.' };
   return { kind: 'loaded', state };
 }

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BALANCE, type GameState, type ResourceNode } from '../game/state';
+import { BALANCE, LOOKOUT, type GameState, type ResourceNode } from '../game/state';
 import { advanceTime, applyAction, isAtCamp, isColdNight, sleepBlocker, type GameAction } from '../game/rules';
 import { TILE, worldX, worldY, drawTerrain } from './art';
 import { sceneVisuals, playerVisualDepth } from './visuals';
@@ -47,7 +47,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setZoom(1);
     this.cameras.main.roundPixels = true;
     this.lighting = new SceneLighting(this, LOGICAL_WIDTH, LOGICAL_HEIGHT);
-    this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,C,G,Z') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,C,G,Z,L') as Record<string, Phaser.Input.Keyboard.Key>;
     this.paintObjects();
     this.onStateChange(this.state, 'tick');
   }
@@ -78,6 +78,7 @@ export class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.keys.C)) this.perform({ type: 'cook' });
     if (Phaser.Input.Keyboard.JustDown(this.keys.G)) this.perform({ type: 'stargaze' });
     if (Phaser.Input.Keyboard.JustDown(this.keys.Z)) this.perform({ type: 'sleep' });
+    if (Phaser.Input.Keyboard.JustDown(this.keys.L)) this.perform({ type: 'repairLookout' });
     const beforeTick = this.state;
     this.state = advanceTime(this.state, dt);
     this.reportWeather(beforeTick, this.state);
@@ -131,13 +132,20 @@ export class GameScene extends Phaser.Scene {
   getPrompt(): string {
     const node = this.closestNode();
     const canSleep = !sleepBlocker(this.state);
+    const byLookout = Math.hypot(this.state.player.x - LOOKOUT.x, this.state.player.y - LOOKOUT.y) <= BALANCE.interactionRadius;
+    let lookoutPrompt = '';
+    if (byLookout && this.state.progress.lookoutRepaired) lookoutPrompt = 'The lookout stands again';
+    else if (byLookout && this.state.progress.hearthUnlocked) lookoutPrompt = 'L  Repair lookout';
+    else if (byLookout) lookoutPrompt = 'Lookout · weather the cold front first';
     if (node) {
       let gather = 'E  Pick up fallen branches';
       if (node.kind === 'berry') gather = 'E  Pick berries';
       else if (node.kind === 'fiber') gather = 'E  Gather fiber';
       else if (node.kind === 'stone') gather = 'E  Collect stone';
+      if (lookoutPrompt) return `${gather} · ${lookoutPrompt}`;
       return canSleep ? `${gather} · Z Sleep until morning` : gather;
     }
+    if (lookoutPrompt) return lookoutPrompt;
     if (isAtCamp(this.state)) {
       if (canSleep) return 'At camp · C Cook · G Stargaze · Z Sleep · F Fire';
       if (this.state.timeOfDay >= BALANCE.nightStart) return 'At camp · C Cook · G Stargaze · F Fire · R Rest';
