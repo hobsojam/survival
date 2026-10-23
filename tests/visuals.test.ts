@@ -17,6 +17,7 @@ describe('native-size scene art', () => {
     expect(keys).toContain('dryingRackSite:still');
     expect(keys).toContain('windbreakSite:still');
     expect(keys).toContain('logSeat:still');
+    expect(keys).toContain('lookout:damaged');
     expect(keys).toContain('firePit:unlit');
     expect(keys).not.toContain('hearthSite:still');
     const sites = new Set(['shelter', 'crate', 'dryingRack', 'windbreak']);
@@ -26,6 +27,15 @@ describe('native-size scene art', () => {
       expect(Number.isInteger(item.x) && Number.isInteger(item.y)).toBe(true);
       expect(item.depth).toBe(sites.has(item.id) ? GROUND_DECAL_DEPTH : item.y);
     }
+  });
+
+  it('restores the lookout art after repair', () => {
+    const state = createGame();
+    state.progress.hearthUnlocked = true;
+    state.progress.nextStormDay = null;
+    state.progress.lookoutRepaired = true;
+    expect(sceneVisuals(state, 0).find(item => item.id === 'lookout')?.texture).toBe('lookout:restored');
+    expect(() => validateSprite(sprites.lookout)).not.toThrow();
   });
 
   it('changes sprite frames when nodes, structures, and the fire change', () => {

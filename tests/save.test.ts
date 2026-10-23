@@ -44,10 +44,37 @@ describe('local save', () => {
     state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
     state.nodes.find(node => node.kind === 'fiber')!.readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(6);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(7);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);
+  });
+
+  it('migrates a version six camp without resetting its storm progress or supplies', () => {
+    const storage = new MemoryStorage();
+    const old = createGame();
+    old.day = 5;
+    old.progress.nextStormDay = null;
+    old.progress.hearthUnlocked = true;
+    old.inventory.wood = 3;
+    delete (old.progress as Partial<typeof old.progress>).lookoutRepaired;
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 6, state: old }));
+    const loaded = loadGame(storage);
+    expect(loaded.kind).toBe('loaded');
+    if (loaded.kind === 'loaded') {
+      expect(loaded.state.progress).toEqual({ nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false });
+      expect(loaded.state.inventory.wood).toBe(3);
+    }
+  });
+
+  it('persists a repaired lookout in a version seven save', () => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    state.progress.nextStormDay = null;
+    state.progress.hearthUnlocked = true;
+    state.progress.lookoutRepaired = true;
+    expect(saveGame(storage, state).ok).toBe(true);
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
   });
 
   it('moves version five branches to their tree locations without losing gathered state', () => {
@@ -125,7 +152,7 @@ describe('local save', () => {
       expect(loaded.state.timeOfDay).toBe(105);
       expect(loaded.state.inventory.wood).toBe(3);
       expect(loaded.state.structures).toEqual({ shelter: true, bed: false, crate: false, hearth: false, dryingRack: false, windbreak: false });
-      expect(loaded.state.progress).toEqual({ nextStormDay: 10, hearthUnlocked: false });
+      expect(loaded.state.progress).toEqual({ nextStormDay: 10, hearthUnlocked: false, lookoutRepaired: false });
     }
     expect(storage.getItem(SAVE_KEY)).toBe(raw);
   });
@@ -249,7 +276,7 @@ describe('local save', () => {
       expect(loaded.state.timeOfDay).toBe(95);
       expect(loaded.state.inventory.wood).toBe(3);
       expect(loaded.state.structures).toEqual({ shelter: false, bed: false, crate: false, hearth: true, dryingRack: false, windbreak: false });
-      expect(loaded.state.progress).toEqual({ nextStormDay: null, hearthUnlocked: true });
+      expect(loaded.state.progress).toEqual({ nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false });
     }
     expect(storage.getItem(SAVE_KEY)).toBe(raw);
   });

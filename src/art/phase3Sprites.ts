@@ -178,6 +178,25 @@ function logSeat(g: Grid): void {
   oval(g, 4, 7, 3, 3, 'b'); oval(g, 4, 7, 2, 2, 'd'); dot(g, 4, 7, 'b');
   line(g, 8, 7, 18, 7, 'b');
 }
+function lookout(g: Grid, restored: boolean): void {
+  oval(g, 16, 29, 13, 2, 's');
+  for (const x of [5, 24]) {
+    box(g, x, 13, 3, 17, 'a'); box(g, x + 1, 14, 1, 15, 'c'); dot(g, x, 13, 'e');
+  }
+  box(g, 3, 19, 26, 4, 'a'); box(g, 4, 19, 24, 1, 'e');
+  line(g, 7, 23, 7, 29, 'c'); line(g, 11, 23, 11, 29, 'c');
+  for (const y of [25, 28]) line(g, 7, y, 11, y, 'd');
+  if (restored) {
+    box(g, 5, 10, 3, 9, 'd'); box(g, 24, 10, 3, 9, 'd');
+    box(g, 5, 10, 22, 2, 'c'); box(g, 5, 10, 22, 1, 'e');
+    line(g, 5, 8, 16, 2, 'c'); line(g, 16, 2, 27, 8, 'd');
+    box(g, 15, 2, 2, 3, 'e');
+  } else {
+    line(g, 5, 14, 11, 11, 'd'); line(g, 11, 11, 14, 15, 'a');
+    line(g, 23, 12, 27, 17, 'c'); dot(g, 27, 17, 'e');
+    box(g, 15, 20, 5, 2, 'z');
+  }
+}
 
 export const phase3Sprites: Record<string, SpriteDef> = {
   branchPile: define(16, 16, nodeLegend, { ready: g => branch(g, true), depleted: g => branch(g, false) }),
@@ -195,5 +214,6 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   dryingRack: define(32, 32, campLegend, { built: rack }),
   windbreakSite: define(48, 16, campLegend, { still: windbreakSite }),
   windbreak: define(48, 32, campLegend, { built: windbreak }),
-  logSeat: define(24, 12, campLegend, { still: logSeat })
+  logSeat: define(24, 12, campLegend, { still: logSeat }),
+  lookout: define(32, 32, campLegend, { damaged: g => lookout(g, false), restored: g => lookout(g, true) }, [16, 29])
 };

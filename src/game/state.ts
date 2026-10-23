@@ -11,6 +11,8 @@ export const BUILDINGS = {
 
 export type StructureId = keyof typeof BUILDINGS;
 
+export const LOOKOUT = { x: 30, y: 8, cost: { wood: 4, fiber: 2, stone: 2 } } as const;
+
 export interface ResourceNode {
   id: string;
   kind: ResourceKind;
@@ -27,7 +29,7 @@ export interface GameState {
   inventory: { wood: number; food: number; fiber: number; stone: number };
   fireFuel: number;
   structures: Record<StructureId, boolean>;
-  progress: { nextStormDay: number | null; hearthUnlocked: boolean };
+  progress: { nextStormDay: number | null; hearthUnlocked: boolean; lookoutRepaired: boolean };
   nodes: ResourceNode[];
 }
 
@@ -99,7 +101,7 @@ export function createGame(): GameState {
     inventory: { wood: 0, food: 0, fiber: 0, stone: 0 },
     fireFuel: 0,
     structures: { shelter: false, bed: false, crate: false, hearth: false, dryingRack: false, windbreak: false },
-    progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false },
+    progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false },
     nodes
   };
 }
