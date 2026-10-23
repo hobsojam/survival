@@ -155,6 +155,55 @@ describe('lookout repair', () => {
   });
 });
 
+describe('stone axe and tree chopping', () => {
+  it('crafts the axe at camp after the cold front using one of each material', () => {
+    const state = createGame();
+    state.inventory.wood = 1;
+    state.inventory.fiber = 1;
+    state.inventory.stone = 1;
+    expect(applyAction(state, { type: 'craftAxe' }).state).toBe(state);
+    state.progress.hearthUnlocked = true;
+    state.progress.nextStormDay = null;
+    const crafted = applyAction(state, { type: 'craftAxe' }).state;
+    expect(crafted.progress.axeCrafted).toBe(true);
+    expect(crafted.inventory).toEqual({ wood: 0, food: 0, fiber: 0, stone: 0 });
+    expect(crafted.timeOfDay).toBe(12);
+    expect(applyAction(crafted, { type: 'craftAxe' }).state).toBe(crafted);
+  });
+
+  it('cuts one mature tree for two wood, leaves a stump, and regrows it after three dawns', () => {
+    const state = createGame();
+    state.day = 4;
+    state.progress.hearthUnlocked = true;
+    state.progress.nextStormDay = null;
+    state.progress.axeCrafted = true;
+    state.player.x = state.trees[0].x;
+    state.player.y = state.trees[0].y;
+    const cut = applyAction(state, { type: 'chopTree', treeId: state.trees[0].id }).state;
+    expect(cut.inventory.wood).toBe(2);
+    expect(cut.player.energy).toBe(92);
+    expect(cut.timeOfDay).toBe(10);
+    expect(cut.trees[0].readyDay).toBe(7);
+    expect(applyAction(cut, { type: 'chopTree', treeId: cut.trees[0].id }).state).toBe(cut);
+    const regrown = advanceTime(cut, 3 * BALANCE.daySeconds);
+    expect(regrown.day).toBe(7);
+    expect(applyAction(regrown, { type: 'chopTree', treeId: regrown.trees[0].id }).state.inventory.wood).toBe(4);
+  });
+
+  it('does not chop from a distance or with fewer than two free bag slots', () => {
+    const state = createGame();
+    state.progress.axeCrafted = true;
+    const tree = state.trees[0];
+    expect(applyAction(state, { type: 'chopTree', treeId: tree.id }).state).toBe(state);
+    state.player.x = tree.x;
+    state.player.y = tree.y;
+    state.inventory.wood = 7;
+    const blocked = applyAction(state, { type: 'chopTree', treeId: tree.id });
+    expect(blocked.state).toBe(state);
+    expect(blocked.message).toMatch(/bag/i);
+  });
+});
+
 describe('time and gentle survival', () => {
   it('rolls the day over at 240 seconds and replenishes gathered nodes', async () => {
     const { advanceTime } = await import('../src/game/rules');
@@ -529,7 +578,7 @@ describe('more camp structures', () => {
 describe('forecast cold night', () => {
   it('forecasts day three and starts the front only at nightfall', () => {
     const state = createGame();
-    expect(state.progress).toEqual({ nextStormDay: 3, hearthUnlocked: false, lookoutRepaired: false });
+    expect(state.progress).toEqual({ nextStormDay: 3, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false });
     state.day = 3;
     state.timeOfDay = BALANCE.nightStart - 5;
     state.fireFuel = 20;
@@ -559,7 +608,7 @@ describe('forecast cold night', () => {
     expect(dawn.day).toBe(4);
     expect(dawn.timeOfDay).toBe(0);
     expect(dawn.fireFuel).toBe(20);
-    expect(dawn.progress).toEqual({ nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false });
+    expect(dawn.progress).toEqual({ nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false, axeCrafted: false });
   });
 
   it('retries after a missed storm and costs the next morning', () => {
@@ -569,7 +618,7 @@ describe('forecast cold night', () => {
     state.structures.shelter = true;
     state.fireFuel = 90;
     const dawn = advanceTime(state, 80);
-    expect(dawn.progress).toEqual({ nextStormDay: 6, hearthUnlocked: false, lookoutRepaired: false });
+    expect(dawn.progress).toEqual({ nextStormDay: 6, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false });
     expect(dawn.day).toBe(4);
     expect(dawn.timeOfDay).toBe(30);
     expect(dawn.player.energy).toBe(25);

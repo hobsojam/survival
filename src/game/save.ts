@@ -1,7 +1,7 @@
 import { BALANCE, createGame, type GameState } from './state';
 
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 7;
+const SAVE_VERSION = 8;
 const LEGACY_BRANCH_POSITIONS = [
   [22, 15], [18, 16], [21, 18], [16, 14], [24, 13], [13, 12],
   [27, 17], [19, 22], [29, 9], [10, 18], [32, 21], [7, 8]
@@ -67,13 +67,29 @@ function validStateV6(value: unknown): value is GameState {
     && typeof value.structures.windbreak === 'boolean';
 }
 
-function validState(value: unknown): value is GameState {
+function validStateV7(value: unknown): value is GameState {
   return validStateV6(value) && typeof value.progress.lookoutRepaired === 'boolean'
     && (!value.progress.lookoutRepaired || value.progress.hearthUnlocked);
 }
 
+function validState(value: unknown): value is GameState {
+  if (!validStateV7(value) || typeof value.progress.axeCrafted !== 'boolean' || !Array.isArray(value.trees)) return false;
+  if (value.progress.axeCrafted && !value.progress.hearthUnlocked) return false;
+  const expected = createGame().trees;
+  if (value.trees.length !== expected.length) return false;
+  return value.trees.every((tree, index) => {
+    const base = expected[index];
+    return object(tree) && tree.id === base.id && tree.x === base.x && tree.y === base.y && tree.sprite === base.sprite
+      && whole(tree.readyDay) && tree.readyDay >= 1 && tree.readyDay <= value.day + BALANCE.treeRegrowDays;
+  });
+}
+
 function withLookout(value: GameState): GameState {
   return { ...value, progress: { ...value.progress, lookoutRepaired: false } };
+}
+
+function withTrees(value: GameState): GameState {
+  return { ...value, progress: { ...value.progress, axeCrafted: false }, trees: createGame().trees };
 }
 
 function withFallenBranches(value: GameState): GameState {
@@ -110,7 +126,7 @@ function migrateV1(value: unknown): GameState | null {
   const migrated: GameState = {
     ...withFallenBranches(withStone(withFiber(legacy))),
     structures: { ...legacy.structures, hearth: false, dryingRack: false, windbreak: false },
-    progress: { nextStormDay: Math.max(BALANCE.coldNightStartDay, legacy.day + 2), hearthUnlocked: false, lookoutRepaired: false }
+    progress: { nextStormDay: Math.max(BALANCE.coldNightStartDay, legacy.day + 2), hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false }
   };
   return validStateV6(migrated) ? migrated : null;
 }
@@ -186,7 +202,7 @@ export function loadGame(storage: Storage): LoadResult {
   } catch {
     return { kind: 'invalid', reason: 'The local save is not valid JSON.' };
   }
-  if (!object(parsed) || (parsed.version !== SAVE_VERSION && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1)) {
+  if (!object(parsed) || (parsed.version !== SAVE_VERSION && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1)) {
     return { kind: 'invalid', reason: 'This save uses an unsupported version.' };
   }
   let state: GameState | null = null;
@@ -196,8 +212,10 @@ export function loadGame(storage: Storage): LoadResult {
   else if (parsed.version === 4) state = migrateV4(parsed.state);
   else if (parsed.version === 5) state = migrateV5(parsed.state);
   else if (parsed.version === 6 && validStateV6(parsed.state)) state = parsed.state;
+  else if (parsed.version === 7 && validStateV7(parsed.state)) state = parsed.state;
   else if (parsed.version === SAVE_VERSION && validState(parsed.state)) state = parsed.state;
-  if (state && parsed.version !== SAVE_VERSION) state = withLookout(state);
+  if (state && (parsed.version as number) < 7) state = withLookout(state);
+  if (state && (parsed.version as number) < SAVE_VERSION) state = withTrees(state);
   if (!state || !validState(state)) return { kind: 'invalid', reason: 'The local save contains invalid game data.' };
   return { kind: 'loaded', state };
 }

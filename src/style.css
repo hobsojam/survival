@@ -65,6 +65,12 @@ kbd { display: inline-block; border: 1px solid #d4ddce; border-bottom-width: 2px
 .lookout-panel button.ready { background: #588762; border-color: #42724d; color: #fffdf7; }
 .lookout-panel button:disabled { opacity: .55; cursor: default; }
 .lookout-panel small { display: block; margin-top: 7px; color: #887b66; text-align: center; font-size: 11px; }
+.axe-panel { background: linear-gradient(145deg, #eaf0e3, #fffdf7 72%); border-color: #d2dfc5; }
+.axe-panel h2 { margin-bottom: 7px; }
+.axe-panel button { width: 100%; border: 1px solid #bbd0b6; border-bottom-width: 2px; border-radius: 9px; background: #e7f0e2; color: #426447; padding: 10px; font-size: 12px; font-weight: 700; }
+.axe-panel button.ready { background: #588762; border-color: #42724d; color: #fffdf7; }
+.axe-panel button:disabled { opacity: .55; cursor: default; }
+.axe-panel small { display: block; margin-top: 7px; color: #6f836c; text-align: center; font-size: 11px; }
 .eyebrow { color: #b4865b; font-size: 10px; font-weight: 700; letter-spacing: .17em; margin: 0 0 8px; }
 h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px; color: #2e4a38; }
 .meter { margin: 14px 0; }

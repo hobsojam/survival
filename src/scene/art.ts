@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BALANCE, type ResourceNode } from '../game/state';
+import { BALANCE, type ResourceNode, type TreeNode } from '../game/state';
 import { buildMap, type MapItem } from './map';
 import { sprites } from '../art/sprites';
 
@@ -7,7 +7,7 @@ export const TILE = 16;
 export const worldX = (x: number) => (x + 0.5) * TILE;
 export const worldY = (y: number) => (y + 0.5) * TILE;
 
-export function drawTerrain(scene: Phaser.Scene, nodes: ResourceNode[]): void {
+export function drawTerrain(scene: Phaser.Scene, nodes: ResourceNode[], chopTargets: TreeNode[]): void {
   const map = buildMap(nodes);
   const canvas = document.createElement('canvas');
   canvas.width = BALANCE.mapWidth * TILE;
@@ -38,5 +38,5 @@ export function drawTerrain(scene: Phaser.Scene, nodes: ResourceNode[]): void {
       .setOrigin(def.anchor[0] / def.size[0], def.anchor[1] / def.size[1])
       .setDepth(Math.round(worldY(item.y)));
   };
-  map.trees.forEach(standing);
+  map.trees.filter(tree => !chopTargets.some(target => target.x === tree.x && target.y === tree.y)).forEach(standing);
 }

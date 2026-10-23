@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BALANCE, LOOKOUT, type GameState, type ResourceNode } from '../game/state';
+import { BALANCE, LOOKOUT, type GameState, type ResourceNode, type TreeNode } from '../game/state';
 import { advanceTime, applyAction, isAtCamp, isColdNight, sleepBlocker, type GameAction } from '../game/rules';
 import { TILE, worldX, worldY, drawTerrain } from './art';
 import { sceneVisuals, playerVisualDepth } from './visuals';
@@ -35,7 +35,7 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     registerSpriteTextures(this);
-    drawTerrain(this, this.state.nodes);
+    drawTerrain(this, this.state.nodes, this.state.trees);
     this.ambient = new AmbientLife(this);
     this.effects = new SceneEffects(this);
     const playerArt = sprites.survivor;
@@ -47,7 +47,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setZoom(1);
     this.cameras.main.roundPixels = true;
     this.lighting = new SceneLighting(this, LOGICAL_WIDTH, LOGICAL_HEIGHT);
-    this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,C,G,Z,L') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,C,G,Z,L,X') as Record<string, Phaser.Input.Keyboard.Key>;
     this.paintObjects();
     this.onStateChange(this.state, 'tick');
   }
@@ -79,6 +79,11 @@ export class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.keys.G)) this.perform({ type: 'stargaze' });
     if (Phaser.Input.Keyboard.JustDown(this.keys.Z)) this.perform({ type: 'sleep' });
     if (Phaser.Input.Keyboard.JustDown(this.keys.L)) this.perform({ type: 'repairLookout' });
+    if (Phaser.Input.Keyboard.JustDown(this.keys.X)) {
+      const tree = this.closestTree();
+      if (tree) this.perform({ type: 'chopTree', treeId: tree.id });
+      else this.onFeedback('Move closer to a mature tree.');
+    }
     const beforeTick = this.state;
     this.state = advanceTime(this.state, dt);
     this.reportWeather(beforeTick, this.state);
@@ -109,11 +114,16 @@ export class GameScene extends Phaser.Scene {
         const node = before.nodes.find(item => item.id === action.nodeId);
         if (node) this.effects?.trigger('gather', this.time.now, node.x, node.y, node.kind);
       }
+      if (action.type === 'chopTree') {
+        const tree = before.trees.find(item => item.id === action.treeId);
+        if (tree) this.effects?.trigger('gather', this.time.now, tree.x, tree.y, 'branch');
+      }
       if (action.type === 'cook' || action.type === 'stargaze')
         this.effects?.trigger(action.type, this.time.now, this.state.player.x, this.state.player.y);
     }
     if (result.state !== before && (action.type === 'gather' || action.type === 'rest' || action.type === 'cook' || action.type === 'stargaze'))
       this.visualAction = { kind: action.type, startedAtMs: this.time.now };
+    if (result.state !== before && action.type === 'chopTree') this.visualAction = { kind: 'gather', startedAtMs: this.time.now };
     if (action.type === 'gather') {
       const node = before.nodes.find(item => item.id === action.nodeId);
       const remaining = this.state.nodes.find(item => item.id === action.nodeId)?.amount;
@@ -131,21 +141,28 @@ export class GameScene extends Phaser.Scene {
 
   getPrompt(): string {
     const node = this.closestNode();
+    const tree = this.closestTree();
     const canSleep = !sleepBlocker(this.state);
     const byLookout = Math.hypot(this.state.player.x - LOOKOUT.x, this.state.player.y - LOOKOUT.y) <= BALANCE.interactionRadius;
     let lookoutPrompt = '';
     if (byLookout && this.state.progress.lookoutRepaired) lookoutPrompt = 'The lookout stands again';
     else if (byLookout && this.state.progress.hearthUnlocked) lookoutPrompt = 'L  Repair lookout';
     else if (byLookout) lookoutPrompt = 'Lookout · weather the cold front first';
+    let treePrompt = '';
+    if (tree && tree.readyDay > this.state.day) treePrompt = `Stump · regrows day ${tree.readyDay}`;
+    else if (tree && this.state.progress.axeCrafted) treePrompt = 'X  Chop mature tree';
+    else if (tree) treePrompt = 'Mature tree · craft an axe at camp';
     if (node) {
       let gather = 'E  Pick up fallen branches';
       if (node.kind === 'berry') gather = 'E  Pick berries';
       else if (node.kind === 'fiber') gather = 'E  Gather fiber';
       else if (node.kind === 'stone') gather = 'E  Collect stone';
       if (lookoutPrompt) return `${gather} · ${lookoutPrompt}`;
+      if (treePrompt) return `${gather} · ${treePrompt}`;
       return canSleep ? `${gather} · Z Sleep until morning` : gather;
     }
     if (lookoutPrompt) return lookoutPrompt;
+    if (treePrompt) return treePrompt;
     if (isAtCamp(this.state)) {
       if (canSleep) return 'At camp · C Cook · G Stargaze · Z Sleep · F Fire';
       if (this.state.timeOfDay >= BALANCE.nightStart) return 'At camp · C Cook · G Stargaze · F Fire · R Rest';
@@ -163,6 +180,12 @@ export class GameScene extends Phaser.Scene {
   private closestNode(): ResourceNode | undefined {
     return this.state.nodes
       .filter(node => node.amount > 0 && Math.hypot(node.x - this.state.player.x, node.y - this.state.player.y) <= BALANCE.interactionRadius)
+      .sort((a, b) => Math.hypot(a.x - this.state.player.x, a.y - this.state.player.y) - Math.hypot(b.x - this.state.player.x, b.y - this.state.player.y))[0];
+  }
+
+  private closestTree(): TreeNode | undefined {
+    return this.state.trees
+      .filter(tree => Math.hypot(tree.x - this.state.player.x, tree.y - this.state.player.y) <= BALANCE.interactionRadius)
       .sort((a, b) => Math.hypot(a.x - this.state.player.x, a.y - this.state.player.y) - Math.hypot(b.x - this.state.player.x, b.y - this.state.player.y))[0];
   }
 

@@ -38,6 +38,16 @@ describe('native-size scene art', () => {
     expect(() => validateSprite(sprites.lookout)).not.toThrow();
   });
 
+  it('shows chop targets as standing trees or stumps based on regrowth day', () => {
+    const state = createGame();
+    const tree = state.trees[0];
+    expect(sceneVisuals(state, 0).find(item => item.id === tree.id)?.texture).toBe(`${tree.sprite}:still`);
+    tree.readyDay = 4;
+    expect(sceneVisuals(state, 0).find(item => item.id === tree.id)?.texture).toBe('stump:still');
+    state.day = 4;
+    expect(sceneVisuals(state, 0).find(item => item.id === tree.id)?.texture).toBe(`${tree.sprite}:still`);
+  });
+
   it('changes sprite frames when nodes, structures, and the fire change', () => {
     const state = createGame();
     state.nodes[0].amount = 0;

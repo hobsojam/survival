@@ -43,11 +43,12 @@ export class App {
           <main class="game-panel">
             <div class="game-frame"><div id="game-canvas"></div><div class="prompt" id="prompt">WASD / arrows  Move</div></div>
             <div class="message" id="message">Gather a few branches. Your camp is waiting.</div>
-            <div class="shortcuts"><span><kbd>WASD</kbd> Move</span><span><kbd>E</kbd> Gather</span><span><kbd>F</kbd> Fire</span><span><kbd>R</kbd> Rest</span><span><kbd>Q</kbd> Eat</span><span><kbd>C</kbd> Cook</span><span><kbd>G</kbd> Stargaze</span><span><kbd>Z</kbd> Sleep</span><span><kbd>L</kbd> Lookout</span></div>
+            <div class="shortcuts"><span><kbd>WASD</kbd> Move</span><span><kbd>E</kbd> Gather</span><span><kbd>F</kbd> Fire</span><span><kbd>R</kbd> Rest</span><span><kbd>Q</kbd> Eat</span><span><kbd>C</kbd> Cook</span><span><kbd>G</kbd> Stargaze</span><span><kbd>Z</kbd> Sleep</span><span><kbd>L</kbd> Lookout</span><span><kbd>X</kbd> Chop</span></div>
           </main>
           <aside class="sidebar">
             <section class="panel forecast-panel" id="forecast-panel"><p class="eyebrow">THE FORECAST</p><h2 id="forecast-title">A cold front is coming</h2><p id="forecast-copy" class="forecast-copy"></p><div class="forecast-checks"><span id="forecast-shelter"></span><span id="forecast-fire"></span></div></section>
             <section class="panel lookout-panel" id="lookout-panel"><p class="eyebrow">A PLACE BEYOND CAMP</p><h2 id="lookout-title">The old lookout</h2><p id="lookout-copy" class="lookout-copy"></p><button type="button" id="lookout-button" data-action="repairLookout">Repair lookout</button><small id="lookout-cost">4 wood · 2 fiber · 2 stone</small></section>
+            <section class="panel axe-panel"><p class="eyebrow">FOREST TOOLS</p><h2 id="axe-title">Stone axe</h2><p id="axe-copy" class="lookout-copy"></p><button type="button" id="axe-button" data-action="craftAxe">Craft stone axe</button><small id="axe-cost">1 wood · 1 fiber · 1 stone</small></section>
             <section class="panel"><p class="eyebrow">YOUR SURVIVOR</p><h2>Take it one day at a time</h2>
               <div class="meter"><div class="meter-title"><span>Energy</span><b id="energy-value">100</b></div><div class="track"><div id="energy-bar" class="fill energy"></div></div></div>
               <div class="meter"><div class="meter-title"><span>Hunger</span><b id="hunger-value">100</b></div><div class="track"><div id="hunger-bar" class="fill hunger"></div></div></div>
@@ -70,7 +71,7 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout';
+        const type = button.dataset.action as 'eat' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe';
         this.scene?.perform({ type });
       });
     });
@@ -252,6 +253,26 @@ export class App {
       this.setText('lookout-title', 'The old lookout');
       this.setText('lookout-copy', 'A damaged lookout waits along the northeast path. Weather the cold front before repairing it.');
       this.setText('lookout-cost', 'Unlocks after the cold front');
+    }
+    const axeButton = this.root.querySelector<HTMLButtonElement>('#axe-button');
+    if (axeButton) {
+      axeButton.disabled = !this.state.progress.hearthUnlocked || this.state.progress.axeCrafted;
+      const canCraft = this.state.progress.hearthUnlocked && isAtCamp(this.state)
+        && inventory.wood >= 1 && inventory.fiber >= 1 && inventory.stone >= 1 && !this.state.progress.axeCrafted;
+      axeButton.classList.toggle('ready', canCraft);
+    }
+    if (this.state.progress.axeCrafted) {
+      this.setText('axe-title', 'Stone axe ready');
+      this.setText('axe-copy', 'Stand near a mature tree and press X to gather two wood. Stumps regrow after three dawns.');
+      this.setText('axe-cost', 'Crafted');
+    } else if (this.state.progress.hearthUnlocked) {
+      this.setText('axe-title', 'Craft a stone axe');
+      this.setText('axe-copy', 'Use stone, fiber, and wood at camp to work with the mature trees. Fallen branches remain easy to gather.');
+      this.setText('axe-cost', '1 wood · 1 fiber · 1 stone');
+    } else {
+      this.setText('axe-title', 'Stone axe');
+      this.setText('axe-copy', 'Weather the cold front to learn how to make a useful forest tool.');
+      this.setText('axe-cost', 'Unlocks after the cold front');
     }
     const atCamp = isAtCamp(this.state);
     const afterDark = timeOfDay >= BALANCE.nightStart;

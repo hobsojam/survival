@@ -2,10 +2,11 @@ import { BALANCE, BUILDINGS, LOOKOUT, type GameState, type StructureId } from '.
 
 export type GameAction =
   | { type: 'gather'; nodeId: string }
+  | { type: 'chopTree'; treeId: string }
   | { type: 'drop'; resource: keyof GameState['inventory'] }
   | { type: 'build'; structureId: StructureId }
   | { type: 'move'; dx: number; dy: number }
-  | { type: 'eat' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' };
+  | { type: 'eat' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' };
 
 /** Awake time tires the survivor; work already costs energy, and resting doesn't. */
 export type Activity = 'awake' | 'working' | 'resting';
@@ -88,7 +89,8 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
   let next: GameState = {
     ...state,
     player: { ...state.player },
-    progress: { ...state.progress }
+    progress: { ...state.progress },
+    trees: state.trees.map(tree => ({ ...tree }))
   };
   let remaining = seconds;
   while (remaining > 0.000001) {
@@ -178,6 +180,40 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
         nodes
       }, BALANCE.gatherSeconds, 'working'),
       message: { wood: 'Picked up fallen branches.', food: 'Picked berries.', fiber: 'Gathered fiber.', stone: 'Collected stone.' }[resource]
+    };
+  }
+  if (action.type === 'craftAxe') {
+    if (state.progress.axeCrafted) return { state, message: 'You already have a stone axe.' };
+    if (!state.progress.hearthUnlocked) return { state, message: 'Weather the cold front before crafting an axe.' };
+    if (!isAtCamp(state)) return { state, message: 'Return to camp to craft the axe.' };
+    if (state.inventory.wood < 1 || state.inventory.fiber < 1 || state.inventory.stone < 1)
+      return { state, message: 'Need 1 wood, 1 fiber, and 1 stone for the axe.' };
+    return {
+      state: advanceTime({
+        ...state,
+        inventory: { ...state.inventory, wood: state.inventory.wood - 1, fiber: state.inventory.fiber - 1, stone: state.inventory.stone - 1 },
+        player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.buildEnergyCost) },
+        progress: { ...state.progress, axeCrafted: true }
+      }, BALANCE.buildSeconds, 'working'),
+      message: 'Crafted a stone axe. Mature trees can now provide wood.'
+    };
+  }
+  if (action.type === 'chopTree') {
+    if (!state.progress.axeCrafted) return { state, message: 'Craft a stone axe before chopping trees.' };
+    const tree = state.trees.find(item => item.id === action.treeId);
+    if (!tree || !near(state.player.x, state.player.y, tree.x, tree.y)) return { state, message: 'Move closer to a mature tree.' };
+    if (tree.readyDay > state.day) return { state, message: 'This stump needs more time to regrow.' };
+    const capacity = state.structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity;
+    const carried = state.inventory.wood + state.inventory.food + state.inventory.fiber + state.inventory.stone;
+    if (carried + 2 > capacity) return { state, message: 'Your bag needs two free spaces for wood.' };
+    return {
+      state: advanceTime({
+        ...state,
+        player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.chopEnergyCost) },
+        inventory: { ...state.inventory, wood: state.inventory.wood + 2 },
+        trees: state.trees.map(item => item.id === tree.id ? { ...item, readyDay: state.day + BALANCE.treeRegrowDays } : item)
+      }, BALANCE.chopSeconds, 'working'),
+      message: 'Chopped the tree and collected two wood. A stump remains.'
     };
   }
   if (action.type === 'drop') {

@@ -48,6 +48,10 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: { id: 
     }
     add(node.id, `${sprite}:${frame}`, node.x, node.y);
   }
+  for (const tree of state.trees) {
+    const texture = tree.readyDay <= state.day ? `${tree.sprite}:still` : 'stump:still';
+    add(tree.id, texture, tree.x, tree.y);
+  }
   const { campX: x, campY: y } = BALANCE;
   let shelterTexture = 'shelterSite:still';
   if (state.structures.shelter) {
