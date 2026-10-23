@@ -77,6 +77,11 @@ kbd { display: inline-block; border: 1px solid #d4ddce; border-bottom-width: 2px
 .sites-panel button { width: 100%; border: 1px solid #bbd0b6; border-bottom-width: 2px; border-radius: 9px; background: #e7f0e2; color: #426447; padding: 10px; font-size: 12px; font-weight: 700; }
 .sites-panel button.ready { background: #588762; border-color: #42724d; color: #fffdf7; }
 .sites-panel small { display: block; margin-top: 7px; color: #6f836c; text-align: center; font-size: 11px; }
+.ration-panel { background: linear-gradient(145deg, #f2eddf, #fffdf7 72%); border-color: #e2d5b6; }
+.ration-panel h2 { margin-bottom: 7px; }
+.ration-panel button { width: 100%; border: 1px solid #d6c9a8; border-bottom-width: 2px; border-radius: 9px; background: #f3ebd9; color: #775d38; padding: 10px; font-size: 12px; font-weight: 700; }
+.ration-panel button.ready { background: #9a784a; border-color: #806139; color: #fffdf7; }
+.ration-panel small { display: block; margin-top: 7px; color: #806d50; text-align: center; font-size: 11px; }
 .eyebrow { color: #b4865b; font-size: 10px; font-weight: 700; letter-spacing: .17em; margin: 0 0 8px; }
 h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px; color: #2e4a38; }
 .meter { margin: 14px 0; }
@@ -93,10 +98,10 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
 .quick-actions button.ready { background: #3d5875; border-color: #2f4459; color: #f1f4fa; }
 .quick-actions button.ready:hover { background: #34506c; }
 .quick-actions button:active, .build-item:active:not(:disabled) { transform: translateY(1px); }
-.supplies { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; text-align: center; }
+.supplies { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; text-align: center; }
 .supplies > div { background: #f4f6ed; border: 1px solid #ecf0e4; border-radius: 11px; padding: 10px 3px; }
 .supply-icon { display: block; font-size: 19px; line-height: 20px; }
-.supply-icon.wood { color: #986b4e; }.supply-icon.food { color: #ba6c65; }.supply-icon.fiber { color: #8e9e5e; }.supply-icon.stone { color: #767b88; }.supply-icon.space { color: #80947a; }
+.supply-icon.wood { color: #986b4e; }.supply-icon.food { color: #ba6c65; }.supply-icon.fiber { color: #8e9e5e; }.supply-icon.stone { color: #767b88; }.supply-icon.ration { color: #9a784a; }.supply-icon.space { color: #80947a; }
 .supplies strong { display: block; margin-top: 6px; font-size: 17px; }
 .supplies small { color: #849486; font-size: 10px; }
 .drop-item { width: 100%; margin-top: 7px; padding: 3px 1px; border: 1px solid #d8e2d5; border-radius: 5px; background: #fffdf7; color: #5c7564; font-size: 9px; font-weight: 700; }

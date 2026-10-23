@@ -10,7 +10,7 @@ describe('new game', () => {
     expect(game.player.x).toBeLessThan(40);
     expect(game.player.y).toBeGreaterThanOrEqual(0);
     expect(game.player.y).toBeLessThan(30);
-    expect(game.inventory).toEqual({ wood: 0, food: 0, fiber: 0, stone: 0 });
+    expect(game.inventory).toEqual({ wood: 0, food: 0, fiber: 0, stone: 0, trailFood: 0 });
     expect(game.structures).toEqual({ shelter: false, bed: false, crate: false, hearth: false, dryingRack: false, windbreak: false });
     expect(BUILDINGS.dryingRack.cost).toEqual({ wood: 4, fiber: 0 });
     expect(BUILDINGS.windbreak.cost).toEqual({ wood: 5, fiber: 0 });

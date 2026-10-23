@@ -5,7 +5,7 @@ export const BUILDINGS = {
   bed: { name: 'Bed', description: 'Rest more deeply at camp', symbol: '▣', cost: { wood: 4, fiber: 1 }, prerequisite: 'shelter' },
   crate: { name: 'Storage crate', description: 'Carry up to 16 supplies', symbol: '▤', cost: { wood: 4, fiber: 0 }, prerequisite: null },
   hearth: { name: 'Stone hearth', description: 'Each log keeps the fire longer', symbol: '♨', cost: { wood: 2, fiber: 0, stone: 3 }, prerequisite: 'coldNight' },
-  dryingRack: { name: 'Drying rack', description: 'Cooked berries are more filling', symbol: '☼', cost: { wood: 4, fiber: 0 }, prerequisite: null },
+  dryingRack: { name: 'Drying rack', description: 'Prepare rations; improve cooked berries', symbol: '☼', cost: { wood: 4, fiber: 0 }, prerequisite: null },
   windbreak: { name: 'Windbreak', description: 'Stay warmer when the fire fades', symbol: '▥', cost: { wood: 5, fiber: 0 }, prerequisite: null }
 } as const;
 
@@ -41,7 +41,7 @@ export interface GameState {
   day: number;
   timeOfDay: number;
   player: { x: number; y: number; energy: number; hunger: number; warmth: number };
-  inventory: { wood: number; food: number; fiber: number; stone: number };
+  inventory: { wood: number; food: number; fiber: number; stone: number; trailFood: number };
   fireFuel: number;
   structures: Record<StructureId, boolean>;
   progress: { nextStormDay: number | null; hearthUnlocked: boolean; lookoutRepaired: boolean; axeCrafted: boolean;
@@ -68,6 +68,8 @@ export const BALANCE = {
   chopSeconds: 10,
   treeRegrowDays: 3,
   eatHungerGain: 25,
+  trailFoodHungerGain: 45,
+  trailFoodSeconds: 12,
   cookSeconds: 8,
   cookHungerGain: 35,
   rackCookHungerGain: 50,
@@ -123,7 +125,7 @@ export function createGame(): GameState {
     day: 1,
     timeOfDay: 0,
     player: { x: BALANCE.campX + 1, y: BALANCE.campY + 1, energy: 100, hunger: 100, warmth: 100 },
-    inventory: { wood: 0, food: 0, fiber: 0, stone: 0 },
+    inventory: { wood: 0, food: 0, fiber: 0, stone: 0, trailFood: 0 },
     fireFuel: 0,
     structures: { shelter: false, bed: false, crate: false, hearth: false, dryingRack: false, windbreak: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,

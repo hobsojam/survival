@@ -7,7 +7,7 @@ export type GameAction =
   | { type: 'drop'; resource: keyof GameState['inventory'] }
   | { type: 'build'; structureId: StructureId }
   | { type: 'move'; dx: number; dy: number }
-  | { type: 'eat' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' };
+  | { type: 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' };
 
 /** Awake time tires the survivor; work already costs energy, and resting doesn't. */
 export type Activity = 'awake' | 'working' | 'resting';
@@ -23,6 +23,18 @@ function near(x1: number, y1: number, x2: number, y2: number): boolean {
 
 export function isAtCamp(state: GameState): boolean {
   return Math.hypot(state.player.x - BALANCE.campX, state.player.y - BALANCE.campY) <= BALANCE.campRadius;
+}
+
+export function carriedCount(state: GameState): number {
+  const { wood, food, fiber, stone, trailFood } = state.inventory;
+  return wood + food + fiber + stone + trailFood;
+}
+
+export function trailFoodBlocker(state: GameState): string | null {
+  if (!state.structures.dryingRack) return 'Build a drying rack to prepare trail food.';
+  if (!isAtCamp(state)) return 'Return to camp to use the drying rack.';
+  if (state.inventory.food <= 0) return 'Gather a berry to prepare trail food.';
+  return null;
 }
 
 export function lookoutRepairBlocker(state: GameState): string | null {
@@ -163,7 +175,7 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     }
     if (node.amount <= 0) return { state, message: 'Nothing to gather yet.' };
     const capacity = state.structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity;
-    if (state.inventory.wood + state.inventory.food + state.inventory.fiber + state.inventory.stone >= capacity) {
+    if (carriedCount(state) >= capacity) {
       return { state, message: 'Your bag is full. Drop an item to make room.' };
     }
     let resource: keyof GameState['inventory'] = 'wood';
@@ -205,7 +217,7 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     if (!tree || !near(state.player.x, state.player.y, tree.x, tree.y)) return { state, message: 'Move closer to a mature tree.' };
     if (tree.readyDay > state.day) return { state, message: 'This stump needs more time to regrow.' };
     const capacity = state.structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity;
-    const carried = state.inventory.wood + state.inventory.food + state.inventory.fiber + state.inventory.stone;
+    const carried = carriedCount(state);
     if (carried + 2 > capacity) return { state, message: 'Your bag needs two free spaces for wood.' };
     return {
       state: advanceTime({
@@ -230,7 +242,7 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     }
     if (state.progress.discoveries[action.siteId]) return { state, message: `You have already searched the ${site.name.toLowerCase()}.` };
     const capacity = state.structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity;
-    const carried = state.inventory.wood + state.inventory.food + state.inventory.fiber + state.inventory.stone;
+    const carried = carriedCount(state);
     if (carried + 2 > capacity) return { state, message: 'Your bag needs two free spaces for this find.' };
     const resource = action.siteId === 'basket' ? 'food' : 'stone';
     const found = advanceTime({
@@ -244,7 +256,9 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
   if (action.type === 'drop') {
     const amount = state.inventory[action.resource];
     if (!amount) return { state, message: `No ${action.resource} to drop.` };
-    const item = action.resource === 'food' ? 'berry' : action.resource;
+    let item: string = action.resource;
+    if (action.resource === 'food') item = 'berry';
+    if (action.resource === 'trailFood') item = 'trail ration';
     return {
       state: { ...state, inventory: { ...state.inventory, [action.resource]: amount - 1 } },
       message: `Dropped one ${item}.`
@@ -259,6 +273,27 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
         player: { ...state.player, hunger: Math.min(100, state.player.hunger + BALANCE.eatHungerGain) }
       },
       message: 'Ate some berries.'
+    };
+  }
+  if (action.type === 'eatTrailFood') {
+    if (state.inventory.trailFood <= 0) return { state, message: 'No trail rations in your bag.' };
+    return {
+      state: { ...state,
+        inventory: { ...state.inventory, trailFood: state.inventory.trailFood - 1 },
+        player: { ...state.player, hunger: Math.min(100, state.player.hunger + BALANCE.trailFoodHungerGain) }
+      },
+      message: 'Ate a trail ration.'
+    };
+  }
+  if (action.type === 'prepareTrailFood') {
+    const blocker = trailFoodBlocker(state);
+    if (blocker) return { state, message: blocker };
+    return {
+      state: advanceTime({ ...state,
+        inventory: { ...state.inventory, food: state.inventory.food - 1, trailFood: state.inventory.trailFood + 1 },
+        player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.gatherEnergyCost) }
+      }, BALANCE.trailFoodSeconds, 'working'),
+      message: 'Dried a berry into one trail ration.'
     };
   }
   if (action.type === 'cook') {
