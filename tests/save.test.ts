@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createGame } from '../src/game/state';
+import { BALANCE, createGame } from '../src/game/state';
 import { autosaveDelayMs, loadGame, saveGame, SAVE_KEY } from '../src/game/save';
 
 class MemoryStorage implements Storage {
@@ -14,6 +14,8 @@ class MemoryStorage implements Storage {
 
 function legacySnapshot(): any {
   const state = JSON.parse(JSON.stringify(createGame()));
+  delete state.progress.axeCrafted;
+  delete state.trees;
   const oldBranches = [[22, 15], [18, 16], [21, 18], [16, 14], [24, 13], [13, 12], [27, 17], [19, 22], [29, 9], [10, 18], [32, 21], [7, 8]];
   state.nodes.filter((node: { kind: string }) => node.kind === 'branch').forEach((node: { x: number; y: number }, index: number) => {
     [node.x, node.y] = oldBranches[index];
@@ -44,10 +46,50 @@ describe('local save', () => {
     state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
     state.nodes.find(node => node.kind === 'fiber')!.readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(7);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(8);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);
+  });
+
+  it('migrates version seven lookout progress and adds ready trees without an axe', () => {
+    const storage = new MemoryStorage();
+    const old = createGame();
+    old.progress.hearthUnlocked = true;
+    old.progress.nextStormDay = null;
+    old.progress.lookoutRepaired = true;
+    delete (old.progress as Partial<typeof old.progress>).axeCrafted;
+    delete (old as Partial<typeof old>).trees;
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 7, state: old }));
+    const loaded = loadGame(storage);
+    expect(loaded.kind).toBe('loaded');
+    if (loaded.kind === 'loaded') {
+      expect(loaded.state.progress).toMatchObject({ hearthUnlocked: true, lookoutRepaired: true, axeCrafted: false });
+      expect(loaded.state.trees).toEqual(createGame().trees);
+    }
+  });
+
+  it('persists a crafted axe and chopped tree timing in version eight', () => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    state.day = 5;
+    state.progress.hearthUnlocked = true;
+    state.progress.nextStormDay = null;
+    state.progress.axeCrafted = true;
+    state.trees[0].readyDay = 8;
+    expect(saveGame(storage, state).ok).toBe(true);
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
+  });
+
+  it('rejects altered tree locations and impossible regrowth dates', () => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    state.trees[0].x += 1;
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 8, state }));
+    expect(loadGame(storage).kind).toBe('invalid');
+    state.trees[0] = { ...createGame().trees[0], readyDay: state.day + BALANCE.treeRegrowDays + 1 };
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 8, state }));
+    expect(loadGame(storage).kind).toBe('invalid');
   });
 
   it('migrates a version six camp without resetting its storm progress or supplies', () => {
@@ -58,16 +100,18 @@ describe('local save', () => {
     old.progress.hearthUnlocked = true;
     old.inventory.wood = 3;
     delete (old.progress as Partial<typeof old.progress>).lookoutRepaired;
+    delete (old.progress as Partial<typeof old.progress>).axeCrafted;
+    delete (old as Partial<typeof old>).trees;
     storage.setItem(SAVE_KEY, JSON.stringify({ version: 6, state: old }));
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') {
-      expect(loaded.state.progress).toEqual({ nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false });
+      expect(loaded.state.progress).toEqual({ nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false, axeCrafted: false });
       expect(loaded.state.inventory.wood).toBe(3);
     }
   });
 
-  it('persists a repaired lookout in a version seven save', () => {
+  it('persists a repaired lookout in the current save', () => {
     const storage = new MemoryStorage();
     const state = createGame();
     state.progress.nextStormDay = null;
@@ -152,7 +196,7 @@ describe('local save', () => {
       expect(loaded.state.timeOfDay).toBe(105);
       expect(loaded.state.inventory.wood).toBe(3);
       expect(loaded.state.structures).toEqual({ shelter: true, bed: false, crate: false, hearth: false, dryingRack: false, windbreak: false });
-      expect(loaded.state.progress).toEqual({ nextStormDay: 10, hearthUnlocked: false, lookoutRepaired: false });
+      expect(loaded.state.progress).toEqual({ nextStormDay: 10, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false });
     }
     expect(storage.getItem(SAVE_KEY)).toBe(raw);
   });
@@ -276,7 +320,7 @@ describe('local save', () => {
       expect(loaded.state.timeOfDay).toBe(95);
       expect(loaded.state.inventory.wood).toBe(3);
       expect(loaded.state.structures).toEqual({ shelter: false, bed: false, crate: false, hearth: true, dryingRack: false, windbreak: false });
-      expect(loaded.state.progress).toEqual({ nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false });
+      expect(loaded.state.progress).toEqual({ nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false, axeCrafted: false });
     }
     expect(storage.getItem(SAVE_KEY)).toBe(raw);
   });

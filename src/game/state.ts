@@ -22,6 +22,14 @@ export interface ResourceNode {
   readyDay: number;
 }
 
+export interface TreeNode {
+  id: string;
+  x: number;
+  y: number;
+  sprite: 'treeBroadleaf' | 'treePine';
+  readyDay: number;
+}
+
 export interface GameState {
   day: number;
   timeOfDay: number;
@@ -29,8 +37,9 @@ export interface GameState {
   inventory: { wood: number; food: number; fiber: number; stone: number };
   fireFuel: number;
   structures: Record<StructureId, boolean>;
-  progress: { nextStormDay: number | null; hearthUnlocked: boolean; lookoutRepaired: boolean };
+  progress: { nextStormDay: number | null; hearthUnlocked: boolean; lookoutRepaired: boolean; axeCrafted: boolean };
   nodes: ResourceNode[];
+  trees: TreeNode[];
 }
 
 export const BALANCE = {
@@ -47,6 +56,9 @@ export const BALANCE = {
   gatherSeconds: 6,
   buildEnergyCost: 6,
   buildSeconds: 12,
+  chopEnergyCost: 8,
+  chopSeconds: 10,
+  treeRegrowDays: 3,
   eatHungerGain: 25,
   cookSeconds: 8,
   cookHungerGain: 35,
@@ -86,6 +98,10 @@ const fiberPositions = [
   [27, 12], [10, 14], [30, 18], [8, 21]
 ];
 const stonePositions = [[8, 12], [31, 10], [11, 22], [29, 21], [6, 18], [33, 23]];
+const treePositions = [
+  [20, 7, 'treeBroadleaf'], [17, 9, 'treeBroadleaf'], [27, 5, 'treeBroadleaf'],
+  [22, 23, 'treePine'], [32, 14, 'treePine'], [15, 24, 'treePine']
+] as const;
 
 export function createGame(): GameState {
   const nodes: ResourceNode[] = [
@@ -94,6 +110,7 @@ export function createGame(): GameState {
     ...fiberPositions.map(([x, y], index) => ({ id: `fiber-${index}`, kind: 'fiber' as const, x, y, amount: 1, readyDay: 1 })),
     ...stonePositions.map(([x, y], index) => ({ id: `stone-${index}`, kind: 'stone' as const, x, y, amount: 1, readyDay: 1 }))
   ];
+  const trees: TreeNode[] = treePositions.map(([x, y, sprite], index) => ({ id: `tree-${index}`, x, y, sprite, readyDay: 1 }));
   return {
     day: 1,
     timeOfDay: 0,
@@ -101,7 +118,8 @@ export function createGame(): GameState {
     inventory: { wood: 0, food: 0, fiber: 0, stone: 0 },
     fireFuel: 0,
     structures: { shelter: false, bed: false, crate: false, hearth: false, dryingRack: false, windbreak: false },
-    progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false },
-    nodes
+    progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false },
+    nodes,
+    trees
   };
 }

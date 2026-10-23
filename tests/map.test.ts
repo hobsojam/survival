@@ -7,6 +7,9 @@ describe('terrain composition', () => {
 
   it('is deterministic and leaves the camp and nodes clear of tree trunks', () => {
     const map = buildMap(nodes);
+    for (const target of createGame().trees) {
+      expect(map.trees).toContainEqual({ x: target.x, y: target.y, sprite: target.sprite });
+    }
     expect(buildMap(nodes)).toEqual(map);
     expect(map.trees.length).toBeGreaterThan(50);
     for (const tree of map.trees) {
