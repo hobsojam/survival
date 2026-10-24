@@ -6,6 +6,7 @@ import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/sa
 import { buildStatus, carriedCount, cookBlocker, isAtCamp, isColdNight, lookoutRepairBlocker, sleepBlocker, stargazeBlocker, trailFoodBlocker } from '../game/rules';
 import { forecastFireCheck } from '../game/forecast';
 import { dayPhase, formatClock, nextChange } from '../game/clock';
+import { journalView } from './journal';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
 
@@ -33,6 +34,9 @@ export class App {
       const { name, description, symbol } = BUILDINGS[id];
       return `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>`;
     }).join('');
+    const mapMarkers = journalView(this.state).locations.map(place =>
+      `<span id="map-${place.id}" class="map-point" style="left:${place.x / BALANCE.mapWidth * 100}%;top:${place.y / BALANCE.mapHeight * 100}%">?</span>`
+    ).join('');
     this.root.innerHTML = `
       <div class="shell">
         <header class="topbar">
@@ -47,10 +51,10 @@ export class App {
           </main>
           <aside class="sidebar">
             <section class="panel forecast-panel" id="forecast-panel"><p class="eyebrow">THE FORECAST</p><h2 id="forecast-title">A cold front is coming</h2><p id="forecast-copy" class="forecast-copy"></p><div class="forecast-checks"><span id="forecast-shelter"></span><span id="forecast-fire"></span></div></section>
+            <section class="panel journal-panel"><p class="eyebrow">YOUR FIELD JOURNAL</p><h2>Paths from camp</h2><p id="journal-hint" class="journal-hint"></p><details open><summary>Map and milestones</summary><div class="journal-map" aria-hidden="true"><svg viewBox="0 0 40 30" preserveAspectRatio="none"><path d="M20 15 L8 8 M20 15 L30 8 M20 15 L10 20 M20 15 L31 21" /></svg><span class="map-point camp" style="left:50%;top:50%">✦</span>${mapMarkers}<span id="map-player" class="map-player"></span></div><p class="map-key">✦ Camp &nbsp; ● You &nbsp; ? Unexplored</p><ul id="journal-places" class="journal-list"></ul><p class="journal-subhead">Camp milestones</p><ul id="journal-milestones" class="journal-list"></ul></details><button type="button" id="site-button">Explore nearby place</button><small>Stand beside a place and press V</small></section>
             <section class="panel lookout-panel" id="lookout-panel"><p class="eyebrow">A PLACE BEYOND CAMP</p><h2 id="lookout-title">The old lookout</h2><p id="lookout-copy" class="lookout-copy"></p><button type="button" id="lookout-button" data-action="repairLookout">Repair lookout</button><small id="lookout-cost">4 wood · 2 fiber · 2 stone</small></section>
             <section class="panel axe-panel"><p class="eyebrow">FOREST TOOLS</p><h2 id="axe-title">Stone axe</h2><p id="axe-copy" class="lookout-copy"></p><button type="button" id="axe-button" data-action="craftAxe">Craft stone axe</button><small id="axe-cost">1 wood · 1 fiber · 1 stone</small></section>
             <section class="panel ration-panel"><p class="eyebrow">TRAIL FOOD</p><h2>Drying rack</h2><p class="lookout-copy">Dry a berry at camp for a ration you can eat anywhere. Each restores 45 hunger.</p><button type="button" id="prepare-button" data-action="prepareTrailFood">Prepare trail ration</button><small id="prepare-hint">Build a drying rack first.</small></section>
-            <section class="panel sites-panel"><p class="eyebrow">BEYOND CAMP</p><h2>Follow the paths</h2><p class="lookout-copy">An old basket, a quiet spring, and a stone cairn wait beyond the clearing.</p><p id="sites-seen" class="sites-seen">Places found: none yet</p><button type="button" id="site-button">Explore nearby place</button><small>Stand beside a place and press V</small></section>
             <section class="panel"><p class="eyebrow">YOUR SURVIVOR</p><h2>Take it one day at a time</h2>
               <div class="meter"><div class="meter-title"><span>Energy</span><b id="energy-value">100</b></div><div class="track"><div id="energy-bar" class="fill energy"></div></div></div>
               <div class="meter"><div class="meter-title"><span>Hunger</span><b id="hunger-value">100</b></div><div class="track"><div id="hunger-bar" class="fill hunger"></div></div></div>
@@ -236,8 +240,41 @@ export class App {
     this.setText('fiber-count', String(inventory.fiber));
     this.setText('stone-count', String(inventory.stone));
     this.setText('ration-count', String(inventory.trailFood));
-    const seenSites = (Object.keys(SITES) as SiteId[]).filter(id => this.state.progress.discoveries[id]);
-    this.setText('sites-seen', seenSites.length ? `Places found: ${seenSites.map(id => SITES[id].name).join(' · ')}` : 'Places found: none yet');
+    const journal = journalView(this.state);
+    this.setText('journal-hint', journal.nextHint);
+    const placeList = this.root.querySelector('#journal-places');
+    if (placeList) {
+      placeList.replaceChildren(...journal.locations.map(place => {
+        const item = document.createElement('li');
+        item.textContent = place.label;
+        item.classList.toggle('found', place.visited);
+        return item;
+      }));
+    }
+    const milestoneList = this.root.querySelector('#journal-milestones');
+    if (milestoneList) {
+      milestoneList.replaceChildren(...journal.milestones.map(milestone => {
+        const item = document.createElement('li');
+        item.textContent = `${milestone.done ? '✓' : '○'} ${milestone.label}`;
+        item.classList.toggle('found', milestone.done);
+        return item;
+      }));
+    }
+    for (const place of journal.locations) {
+      const marker = this.root.querySelector(`#map-${place.id}`);
+      if (marker) {
+        let symbol = '?';
+        if (place.id === 'lookout') symbol = '⌂';
+        else if (place.visited) symbol = '✓';
+        marker.textContent = symbol;
+        marker.classList.toggle('found', place.visited);
+      }
+    }
+    const playerMarker = this.root.querySelector<HTMLElement>('#map-player');
+    if (playerMarker) {
+      playerMarker.style.left = `${player.x / BALANCE.mapWidth * 100}%`;
+      playerMarker.style.top = `${player.y / BALANCE.mapHeight * 100}%`;
+    }
     const nearSite = (Object.keys(SITES) as SiteId[]).some(id => Math.hypot(player.x - SITES[id].x, player.y - SITES[id].y) <= BALANCE.interactionRadius);
     this.root.querySelector('#site-button')?.classList.toggle('ready', nearSite);
     this.setText('space-count', `${carriedCount(this.state)}/${structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity}`);
