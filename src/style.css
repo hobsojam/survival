@@ -177,6 +177,7 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
 }
 .phone-dock, .phone-meters, .phone-only { display: none; }
 @media (max-width: 600px) and (orientation: portrait) {
+  html, body { overscroll-behavior-y: none; }
   .shell { height: 100vh; height: 100dvh; min-height: 0; padding: 0; display: flex; flex-direction: column; overflow: hidden; }
   .topbar { flex: none; height: 50px; padding: 0 10px; }
   .brand-icon, .brand small { display: none; }

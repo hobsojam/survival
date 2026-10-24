@@ -10,7 +10,7 @@ import { LOGICAL_WIDTH, LOGICAL_HEIGHT } from './pixelScale';
 import { facingFromInput, selectSurvivorVisual, type Facing, type SurvivorAction } from './survivorVisual';
 import { SceneEffects } from './SceneEffects';
 import { SceneLighting } from './SceneLighting';
-import { hasArrived, moveStep, pickTapTarget, targetAction, type TapTarget } from './tapTarget';
+import { hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from './tapTarget';
 import { palette } from '../art/palette';
 
 export class GameScene extends Phaser.Scene {
@@ -66,7 +66,7 @@ export class GameScene extends Phaser.Scene {
     if (walking) {
       this.facing = facingFromInput(horizontal, vertical, this.facing);
       this.visualAction = undefined;
-      this.walkTarget = undefined;
+      this.walkTarget = nextWalk(this.walkTarget, { kind: 'keyMove' });
     }
     if (horizontal || vertical) {
       const length = Math.hypot(horizontal, vertical);
@@ -115,7 +115,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   perform(action: GameAction, announce = true): void {
-    if (action.type !== 'move') this.walkTarget = undefined;
+    if (action.type !== 'move') this.walkTarget = nextWalk(this.walkTarget, { kind: 'action' });
     const before = this.state;
     const result = applyAction(before, action);
     this.state = result.state;
@@ -211,12 +211,12 @@ export class GameScene extends Phaser.Scene {
     if (!this.tapGate()) return;
     const target = pickTapTarget(this.state, pixelX / TILE - 0.5, pixelY / TILE - 0.5);
     this.showTapMarker(target);
-    this.walkTarget = undefined;
-    if (!hasArrived(this.state, target)) this.walkTarget = target;
-    else {
-      const action = targetAction(target);
-      if (action) this.perform(action);
-    }
+    this.walkTarget = nextWalk(this.walkTarget, { kind: 'tap', target });
+    if (!hasArrived(this.state, target)) return;
+    const action = targetAction(target);
+    // Already in range: act now (which also ends the walk), or simply stop on tapped ground.
+    if (action) this.perform(action);
+    else this.walkTarget = undefined;
   }
 
   /** Walks one frame toward the tapped target, acting once on arrival. Returns whether the survivor moved. */

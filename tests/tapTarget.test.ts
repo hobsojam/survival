@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, LOOKOUT, SITES, createGame } from '../src/game/state';
-import { hasArrived, moveStep, pickTapTarget, targetAction } from '../src/scene/tapTarget';
+import { hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from '../src/scene/tapTarget';
 
 describe('tap targets', () => {
   it('picks a node within one tile of the tap', () => {
@@ -78,5 +78,45 @@ describe('tap targets', () => {
     expect(targetAction({ kind: 'lookout', x: 0, y: 0 })).toEqual({ type: 'repairLookout' });
     expect(targetAction({ kind: 'fire', x: 0, y: 0 })).toEqual({ type: 'stokeFire' });
     expect(targetAction({ kind: 'ground', x: 0, y: 0 })).toBeNull();
+  });
+
+  it('picks a tree when its canopy is tapped', () => {
+    const state = createGame();
+    state.nodes = [];
+    const tree = state.trees[0];
+    state.trees = [tree];
+    expect(pickTapTarget(state, tree.x, tree.y - 1.8)).toMatchObject({ kind: 'tree', id: tree.id });
+  });
+
+  it('picks the lookout when its roof is tapped', () => {
+    const state = createGame();
+    state.nodes = [];
+    state.trees = [];
+    expect(pickTapTarget(state, LOOKOUT.x, LOOKOUT.y - 1.4).kind).toBe('lookout');
+  });
+
+  it('still prefers a branch pile tapped at the foot of a tree', () => {
+    const state = createGame();
+    const tree = state.trees[0];
+    state.trees = [tree];
+    const node = state.nodes[0];
+    node.x = tree.x + 0.4; node.y = tree.y + 0.2;
+    state.nodes = [node];
+    expect(pickTapTarget(state, node.x, node.y)).toMatchObject({ kind: 'node', id: node.id });
+  });
+});
+
+describe('walk cancellation', () => {
+  const ground: TapTarget = { kind: 'ground', x: 3, y: 3 };
+  const fire: TapTarget = { kind: 'fire', x: BALANCE.campX, y: BALANCE.campY };
+
+  it('a new tap replaces the walk in progress', () => {
+    expect(nextWalk(ground, { kind: 'tap', target: fire })).toBe(fire);
+    expect(nextWalk(undefined, { kind: 'tap', target: ground })).toBe(ground);
+  });
+
+  it('a movement key or another action cancels the walk', () => {
+    expect(nextWalk(ground, { kind: 'keyMove' })).toBeUndefined();
+    expect(nextWalk(ground, { kind: 'action' })).toBeUndefined();
   });
 });

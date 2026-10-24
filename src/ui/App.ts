@@ -6,7 +6,7 @@ import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/sa
 import { buildStatus, carriedCount, cookBlocker, isAtCamp, isColdNight, lookoutRepairBlocker, sleepBlocker, stargazeBlocker, trailFoodBlocker } from '../game/rules';
 import { forecastFireCheck } from '../game/forecast';
 import { dayPhase, formatClock, nextChange } from '../game/clock';
-import { nextOpenTab, type DockTab } from './dock';
+import { gateTap, nextOpenTab, type DockTab } from './dock';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
 
@@ -138,9 +138,10 @@ export class App {
     }, message => this.setMessage(message));
     // A tap on the game while a phone sheet is open only closes the sheet.
     this.scene.setTapGate(() => {
-      if (!this.openTab) return true;
-      this.setOpenTab(null);
-      return false;
+      const dock = this.root.querySelector<HTMLElement>('.phone-dock');
+      const { allowTap, closeTab } = gateTap(this.openTab, Boolean(dock && getComputedStyle(dock).display !== 'none'));
+      if (closeTab) this.setOpenTab(null);
+      return allowTap;
     });
     this.game = new Phaser.Game({
       type: Phaser.AUTO,
