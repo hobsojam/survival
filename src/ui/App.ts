@@ -124,6 +124,7 @@ export class App {
     this.root.querySelector('#lookout-ending')?.classList.add('hidden');
     const restart = this.root.querySelector<HTMLButtonElement>('#restart-game');
     if (restart) restart.hidden = false;
+    this.setOpenTab(null);
     this.state = state;
     this.lastSaveAt = Date.now();
     this.saveFailures = 0;
@@ -253,7 +254,6 @@ export class App {
     this.root.querySelectorAll<HTMLButtonElement>('[data-tab-button]').forEach(button => {
       button.classList.toggle('active', button.dataset.tabButton === tab);
     });
-    this.scene?.cancelWalk();
   }
 
   private render(): void {
