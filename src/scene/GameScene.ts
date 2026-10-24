@@ -12,6 +12,7 @@ import { SceneEffects } from './SceneEffects';
 import { SceneLighting } from './SceneLighting';
 import { hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from './tapTarget';
 import { palette } from '../art/palette';
+import { sitePrompt } from '../game/sitePrompt';
 
 export class GameScene extends Phaser.Scene {
   private state: GameState;
@@ -164,19 +165,19 @@ export class GameScene extends Phaser.Scene {
     if (tree && tree.readyDay > this.state.day) treePrompt = `Stump · regrows day ${tree.readyDay}`;
     else if (tree && this.state.progress.axeCrafted) treePrompt = 'X  Chop mature tree';
     else if (tree) treePrompt = 'Mature tree · craft an axe at camp';
-    const sitePrompt = site ? `V  Explore ${site.name.toLowerCase()}` : '';
+    const nearbySitePrompt = site ? sitePrompt(this.state, site.id) : '';
     if (node) {
       let gather = 'E  Pick up fallen branches';
       if (node.kind === 'berry') gather = 'E  Pick berries';
       else if (node.kind === 'fiber') gather = 'E  Gather fiber';
       else if (node.kind === 'stone') gather = 'E  Collect stone';
       if (lookoutPrompt) return `${gather} · ${lookoutPrompt}`;
-      if (sitePrompt) return `${gather} · ${sitePrompt}`;
+      if (nearbySitePrompt) return `${gather} · ${nearbySitePrompt}`;
       if (treePrompt) return `${gather} · ${treePrompt}`;
       return canSleep ? `${gather} · Z Sleep until morning` : gather;
     }
     if (lookoutPrompt) return lookoutPrompt;
-    if (sitePrompt) return sitePrompt;
+    if (nearbySitePrompt) return nearbySitePrompt;
     if (treePrompt) return treePrompt;
     if (isAtCamp(this.state)) {
       if (canSleep) return 'At camp · C Cook · G Stargaze · Z Sleep · F Fire';

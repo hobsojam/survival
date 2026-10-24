@@ -71,12 +71,28 @@ kbd { display: inline-block; border: 1px solid #d4ddce; border-bottom-width: 2px
 .axe-panel button.ready { background: #588762; border-color: #42724d; color: #fffdf7; }
 .axe-panel button:disabled { opacity: .55; cursor: default; }
 .axe-panel small { display: block; margin-top: 7px; color: #6f836c; text-align: center; font-size: 11px; }
-.sites-panel { background: linear-gradient(145deg, #e9f0ec, #fffdf7 72%); border-color: #ccded6; }
-.sites-panel h2 { margin-bottom: 7px; }
-.sites-panel .sites-seen { color: #608474; font-size: 12px; line-height: 1.45; }
-.sites-panel button { width: 100%; border: 1px solid #bbd0b6; border-bottom-width: 2px; border-radius: 9px; background: #e7f0e2; color: #426447; padding: 10px; font-size: 12px; font-weight: 700; }
-.sites-panel button.ready { background: #588762; border-color: #42724d; color: #fffdf7; }
-.sites-panel small { display: block; margin-top: 7px; color: #6f836c; text-align: center; font-size: 11px; }
+.journal-panel { background: linear-gradient(145deg, #e9f0ec, #fffdf7 72%); border-color: #ccded6; }
+.journal-panel h2 { margin-bottom: 7px; }
+.journal-hint { color: #526e5d; font-size: 12px; line-height: 1.45; margin: 0 0 12px; }
+.journal-panel details { margin-bottom: 12px; }
+.journal-panel summary { cursor: pointer; color: #426447; font-size: 11px; font-weight: 700; margin-bottom: 10px; }
+.journal-panel summary:focus-visible { outline: 3px solid #d69c5d; outline-offset: 3px; }
+.journal-map { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border: 1px solid #abc8af; border-radius: 10px; background: radial-gradient(circle at 50% 50%, #d2c49d 0 13%, transparent 14%), repeating-linear-gradient(35deg, #dce9d7 0 13px, #d6e5d2 13px 26px); }
+.journal-map svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.journal-map path { fill: none; stroke: #b9946c; stroke-width: 1.4; stroke-linecap: round; stroke-dasharray: 1.5 1; }
+.map-point, .map-player { position: absolute; display: grid; place-items: center; transform: translate(-50%, -50%); border-radius: 50%; }
+.map-point { width: 21px; height: 21px; border: 2px solid #f7f5e9; background: #8b9b86; color: #fff; font-size: 12px; font-weight: 700; box-shadow: 0 1px 4px #29453666; }
+.map-point.found { background: #548361; }
+.map-point.camp { background: #c48255; z-index: 1; }
+.map-player { width: 10px; height: 10px; z-index: 2; border: 2px solid #fff; background: #334d70; box-shadow: 0 0 0 1px #334d70; }
+.map-key { margin: 7px 0 10px; color: #6c8372; font-size: 10px; }
+.journal-list { display: grid; gap: 4px; list-style: none; margin: 0 0 11px; padding: 0; }
+.journal-list li { padding: 6px 8px; border-radius: 6px; background: #edf2ea; color: #728474; font-size: 11px; }
+.journal-list li.found { color: #406b4d; background: #e0ecdd; font-weight: 700; }
+.journal-subhead { margin: 12px 0 7px; color: #5e7766; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.journal-panel button { width: 100%; border: 1px solid #bbd0b6; border-bottom-width: 2px; border-radius: 9px; background: #e7f0e2; color: #426447; padding: 10px; font-size: 12px; font-weight: 700; }
+.journal-panel button.ready { background: #588762; border-color: #42724d; color: #fffdf7; }
+.journal-panel small { display: block; margin-top: 7px; color: #6f836c; text-align: center; font-size: 11px; }
 .ration-panel { background: linear-gradient(145deg, #f2eddf, #fffdf7 72%); border-color: #e2d5b6; }
 .ration-panel h2 { margin-bottom: 7px; }
 .ration-panel button { width: 100%; border: 1px solid #d6c9a8; border-bottom-width: 2px; border-radius: 9px; background: #f3ebd9; color: #775d38; padding: 10px; font-size: 12px; font-weight: 700; }

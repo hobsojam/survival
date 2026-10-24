@@ -50,6 +50,8 @@ If you weather it with warmth above 20, you unlock the **stone hearth**. Build i
 
 The pale frames in camp mark future building sites. Branch piles, berry bushes, fiber plants, and rocks show when they are ready to gather; they fade after collection (rocks leave pebbles) and replenish at dawn. The scene art is drawn in Phaser, so there are no external image assets to install.
 
+The **field journal** in the sidebar shows the four paths from camp and your position on a small map. Places keep their names hidden until you visit them, while the lookout stays marked from the start. The journal also records shelter, cold front, and lookout milestones and suggests a next step. It reads your existing save progress, so returning camps show their discoveries immediately.
+
 The wilderness has a little life of its own. Birds peck in the meadows and flutter off if you come too close or when night falls. On most evenings a fox visits the edge of camp and sits by the fire until well after dark, unless you walk up to it. Fireflies drift around camp at night. None of this affects survival or the save.
 
 ## Saving

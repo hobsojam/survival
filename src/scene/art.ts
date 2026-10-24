@@ -21,6 +21,8 @@ export function drawTerrain(scene: Phaser.Scene, nodes: ResourceNode[], chopTarg
   };
   for (let y = 0; y < map.ground.length; y++) for (let x = 0; x < map.ground[y].length; x++)
     stamp(map.ground[y][x], x * TILE, y * TILE);
+  for (const item of map.pathTiles) stamp(item.sprite, item.x * TILE, item.y * TILE);
+  for (const item of map.campEdges) stamp(item.sprite, item.x * TILE, item.y * TILE);
   // Decorations sit on tile centres, like the nodes they keep clear of; rim stones trace the camp circle in tile-corner space.
   for (const item of map.decorations) {
     const def = sprites[item.sprite];
