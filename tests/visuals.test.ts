@@ -48,6 +48,20 @@ describe('native-size scene art', () => {
     expect(sceneVisuals(state, 0).find(item => item.id === tree.id)?.texture).toBe(`${tree.sprite}:still`);
   });
 
+  it('shows the path places and their searched states', () => {
+    const state = createGame();
+    const first = sceneVisuals(state, 0);
+    expect(first.find(item => item.id === 'site-basket')?.texture).toBe('oldBasket:full');
+    expect(first.find(item => item.id === 'site-spring')?.texture).toBe('spring:still');
+    expect(first.find(item => item.id === 'site-cairn')?.texture).toBe('cairn:full');
+    state.progress.discoveries.basket = true;
+    state.progress.discoveries.cairn = true;
+    const visited = sceneVisuals(state, 0);
+    expect(visited.find(item => item.id === 'site-basket')?.texture).toBe('oldBasket:empty');
+    expect(visited.find(item => item.id === 'site-cairn')?.texture).toBe('cairn:empty');
+    for (const name of ['oldBasket', 'spring', 'cairn']) expect(() => validateSprite(sprites[name])).not.toThrow();
+  });
+
   it('changes sprite frames when nodes, structures, and the fire change', () => {
     const state = createGame();
     state.nodes[0].amount = 0;

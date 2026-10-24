@@ -1,7 +1,7 @@
 import { BALANCE, createGame, type GameState } from './state';
 
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 8;
+const SAVE_VERSION = 10;
 const LEGACY_BRANCH_POSITIONS = [
   [22, 15], [18, 16], [21, 18], [16, 14], [24, 13], [13, 12],
   [27, 17], [19, 22], [29, 9], [10, 18], [32, 21], [7, 8]
@@ -72,7 +72,7 @@ function validStateV7(value: unknown): value is GameState {
     && (!value.progress.lookoutRepaired || value.progress.hearthUnlocked);
 }
 
-function validState(value: unknown): value is GameState {
+function validStateV8(value: unknown): value is GameState {
   if (!validStateV7(value) || typeof value.progress.axeCrafted !== 'boolean' || !Array.isArray(value.trees)) return false;
   if (value.progress.axeCrafted && !value.progress.hearthUnlocked) return false;
   const expected = createGame().trees;
@@ -84,12 +84,35 @@ function validState(value: unknown): value is GameState {
   });
 }
 
+function validStateV9(value: unknown): value is GameState {
+  return validStateV8(value) && object(value.progress.discoveries)
+    && typeof value.progress.discoveries.basket === 'boolean'
+    && typeof value.progress.discoveries.spring === 'boolean'
+    && typeof value.progress.discoveries.cairn === 'boolean';
+}
+
+function validState(value: unknown): value is GameState {
+  if (!validStateV9(value)) return false;
+  const count = value.inventory.trailFood;
+  const capacity = value.structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity;
+  return whole(count) && count >= 0
+    && value.inventory.wood + value.inventory.food + value.inventory.fiber + value.inventory.stone + count <= capacity;
+}
+
 function withLookout(value: GameState): GameState {
   return { ...value, progress: { ...value.progress, lookoutRepaired: false } };
 }
 
 function withTrees(value: GameState): GameState {
   return { ...value, progress: { ...value.progress, axeCrafted: false }, trees: createGame().trees };
+}
+
+function withSites(value: GameState): GameState {
+  return { ...value, progress: { ...value.progress, discoveries: { basket: false, spring: false, cairn: false } } };
+}
+
+function withTrailFood(value: GameState): GameState {
+  return { ...value, inventory: { ...value.inventory, trailFood: 0 } };
 }
 
 function withFallenBranches(value: GameState): GameState {
@@ -126,7 +149,8 @@ function migrateV1(value: unknown): GameState | null {
   const migrated: GameState = {
     ...withFallenBranches(withStone(withFiber(legacy))),
     structures: { ...legacy.structures, hearth: false, dryingRack: false, windbreak: false },
-    progress: { nextStormDay: Math.max(BALANCE.coldNightStartDay, legacy.day + 2), hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false }
+    progress: { nextStormDay: Math.max(BALANCE.coldNightStartDay, legacy.day + 2), hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
+      discoveries: { basket: false, spring: false, cairn: false } }
   };
   return validStateV6(migrated) ? migrated : null;
 }
@@ -202,7 +226,7 @@ export function loadGame(storage: Storage): LoadResult {
   } catch {
     return { kind: 'invalid', reason: 'The local save is not valid JSON.' };
   }
-  if (!object(parsed) || (parsed.version !== SAVE_VERSION && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1)) {
+  if (!object(parsed) || (parsed.version !== SAVE_VERSION && parsed.version !== 9 && parsed.version !== 8 && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1)) {
     return { kind: 'invalid', reason: 'This save uses an unsupported version.' };
   }
   let state: GameState | null = null;
@@ -213,9 +237,13 @@ export function loadGame(storage: Storage): LoadResult {
   else if (parsed.version === 5) state = migrateV5(parsed.state);
   else if (parsed.version === 6 && validStateV6(parsed.state)) state = parsed.state;
   else if (parsed.version === 7 && validStateV7(parsed.state)) state = parsed.state;
+  else if (parsed.version === 8 && validStateV8(parsed.state)) state = parsed.state;
+  else if (parsed.version === 9 && validStateV9(parsed.state)) state = parsed.state;
   else if (parsed.version === SAVE_VERSION && validState(parsed.state)) state = parsed.state;
   if (state && (parsed.version as number) < 7) state = withLookout(state);
-  if (state && (parsed.version as number) < SAVE_VERSION) state = withTrees(state);
+  if (state && (parsed.version as number) < 8) state = withTrees(state);
+  if (state && (parsed.version as number) < 9) state = withSites(state);
+  if (state && (parsed.version as number) < SAVE_VERSION) state = withTrailFood(state);
   if (!state || !validState(state)) return { kind: 'invalid', reason: 'The local save contains invalid game data.' };
   return { kind: 'loaded', state };
 }

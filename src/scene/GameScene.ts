@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BALANCE, LOOKOUT, type GameState, type ResourceNode, type TreeNode } from '../game/state';
+import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceNode, type SiteId, type TreeNode } from '../game/state';
 import { advanceTime, applyAction, isAtCamp, isColdNight, sleepBlocker, type GameAction } from '../game/rules';
 import { TILE, worldX, worldY, drawTerrain } from './art';
 import { sceneVisuals, playerVisualDepth } from './visuals';
@@ -47,7 +47,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setZoom(1);
     this.cameras.main.roundPixels = true;
     this.lighting = new SceneLighting(this, LOGICAL_WIDTH, LOGICAL_HEIGHT);
-    this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,C,G,Z,L,X') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,T,P,C,G,Z,L,X,V') as Record<string, Phaser.Input.Keyboard.Key>;
     this.paintObjects();
     this.onStateChange(this.state, 'tick');
   }
@@ -75,6 +75,8 @@ export class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.keys.F)) this.perform({ type: 'stokeFire' });
     if (Phaser.Input.Keyboard.JustDown(this.keys.R)) this.perform({ type: 'rest' });
     if (Phaser.Input.Keyboard.JustDown(this.keys.Q)) this.perform({ type: 'eat' });
+    if (Phaser.Input.Keyboard.JustDown(this.keys.T)) this.perform({ type: 'eatTrailFood' });
+    if (Phaser.Input.Keyboard.JustDown(this.keys.P)) this.perform({ type: 'prepareTrailFood' });
     if (Phaser.Input.Keyboard.JustDown(this.keys.C)) this.perform({ type: 'cook' });
     if (Phaser.Input.Keyboard.JustDown(this.keys.G)) this.perform({ type: 'stargaze' });
     if (Phaser.Input.Keyboard.JustDown(this.keys.Z)) this.perform({ type: 'sleep' });
@@ -84,6 +86,7 @@ export class GameScene extends Phaser.Scene {
       if (tree) this.perform({ type: 'chopTree', treeId: tree.id });
       else this.onFeedback('Move closer to a mature tree.');
     }
+    if (Phaser.Input.Keyboard.JustDown(this.keys.V)) this.visitNearestSite();
     const beforeTick = this.state;
     this.state = advanceTime(this.state, dt);
     this.reportWeather(beforeTick, this.state);
@@ -142,6 +145,7 @@ export class GameScene extends Phaser.Scene {
   getPrompt(): string {
     const node = this.closestNode();
     const tree = this.closestTree();
+    const site = this.closestSite();
     const canSleep = !sleepBlocker(this.state);
     const byLookout = Math.hypot(this.state.player.x - LOOKOUT.x, this.state.player.y - LOOKOUT.y) <= BALANCE.interactionRadius;
     let lookoutPrompt = '';
@@ -152,16 +156,19 @@ export class GameScene extends Phaser.Scene {
     if (tree && tree.readyDay > this.state.day) treePrompt = `Stump · regrows day ${tree.readyDay}`;
     else if (tree && this.state.progress.axeCrafted) treePrompt = 'X  Chop mature tree';
     else if (tree) treePrompt = 'Mature tree · craft an axe at camp';
+    const sitePrompt = site ? `V  Explore ${site.name.toLowerCase()}` : '';
     if (node) {
       let gather = 'E  Pick up fallen branches';
       if (node.kind === 'berry') gather = 'E  Pick berries';
       else if (node.kind === 'fiber') gather = 'E  Gather fiber';
       else if (node.kind === 'stone') gather = 'E  Collect stone';
       if (lookoutPrompt) return `${gather} · ${lookoutPrompt}`;
+      if (sitePrompt) return `${gather} · ${sitePrompt}`;
       if (treePrompt) return `${gather} · ${treePrompt}`;
       return canSleep ? `${gather} · Z Sleep until morning` : gather;
     }
     if (lookoutPrompt) return lookoutPrompt;
+    if (sitePrompt) return sitePrompt;
     if (treePrompt) return treePrompt;
     if (isAtCamp(this.state)) {
       if (canSleep) return 'At camp · C Cook · G Stargaze · Z Sleep · F Fire';
@@ -172,6 +179,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   getState(): GameState { return this.state; }
+
+  visitNearestSite(): void {
+    const site = this.closestSite();
+    if (site) this.perform({ type: 'visitSite', siteId: site.id });
+    else this.onFeedback('Follow a path and move closer to a place to explore.');
+  }
 
   resizeViewport(width: number, height: number): void {
     if (this.lighting) this.lighting.resize(width, height);
@@ -186,6 +199,13 @@ export class GameScene extends Phaser.Scene {
   private closestTree(): TreeNode | undefined {
     return this.state.trees
       .filter(tree => Math.hypot(tree.x - this.state.player.x, tree.y - this.state.player.y) <= BALANCE.interactionRadius)
+      .sort((a, b) => Math.hypot(a.x - this.state.player.x, a.y - this.state.player.y) - Math.hypot(b.x - this.state.player.x, b.y - this.state.player.y))[0];
+  }
+
+  private closestSite(): { id: SiteId; name: string; x: number; y: number } | undefined {
+    return (Object.keys(SITES) as SiteId[])
+      .map(id => ({ id, ...SITES[id] }))
+      .filter(site => Math.hypot(site.x - this.state.player.x, site.y - this.state.player.y) <= BALANCE.interactionRadius)
       .sort((a, b) => Math.hypot(a.x - this.state.player.x, a.y - this.state.player.y) - Math.hypot(b.x - this.state.player.x, b.y - this.state.player.y))[0];
   }
 

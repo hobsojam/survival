@@ -198,6 +198,29 @@ function lookout(g: Grid, restored: boolean): void {
   }
 }
 
+const siteLegend = { ...campLegend, u: 'flower4', v: 'frost' } as const;
+function oldBasket(g: Grid, full: boolean): void {
+  oval(g, 8, 14, 6, 2, 's');
+  line(g, 3, 9, 6, 5, 'd'); line(g, 6, 5, 10, 5, 'd'); line(g, 10, 5, 13, 9, 'd');
+  box(g, 2, 9, 12, 5, 'a'); box(g, 3, 10, 10, 3, 'c');
+  for (const x of [4, 7, 10]) line(g, x, 10, x + 1, 13, 'b');
+  if (full) for (const [x, y] of [[5, 8], [8, 7], [11, 8]]) { box(g, x, y, 2, 2, 'k'); dot(g, x, y, 'l'); }
+}
+function spring(g: Grid): void {
+  oval(g, 12, 13, 10, 2, 's'); oval(g, 12, 10, 10, 5, 'm');
+  oval(g, 12, 9, 8, 3, 'u'); line(g, 6, 9, 18, 9, 'v');
+  for (const [x, y] of [[3, 7], [7, 5], [17, 6], [20, 10]]) {
+    box(g, x, y, 3, 3, 'n'); dot(g, x, y, 'q');
+  }
+}
+function cairn(g: Grid, full: boolean): void {
+  oval(g, 8, 14, 6, 2, 's');
+  for (const [x, y, w] of [[3, 10, 5], [8, 9, 5], [5, 6, 6]]) {
+    box(g, x, y, w, 4, 'm'); box(g, x + 1, y, w - 2, 2, 'o'); dot(g, x + 1, y, 'q');
+  }
+  if (full) { box(g, 7, 3, 4, 4, 'n'); box(g, 8, 3, 2, 2, 'q'); }
+}
+
 export const phase3Sprites: Record<string, SpriteDef> = {
   branchPile: define(16, 16, nodeLegend, { ready: g => branch(g, true), depleted: g => branch(g, false) }),
   berryBush: define(16, 16, nodeLegend, { ready: g => bush(g, true), picked: g => bush(g, false), rustle0: g => bush(g, true, -1), rustle1: g => bush(g, true, 1) }, [8, 14],
@@ -215,5 +238,8 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   windbreakSite: define(48, 16, campLegend, { still: windbreakSite }),
   windbreak: define(48, 32, campLegend, { built: windbreak }),
   logSeat: define(24, 12, campLegend, { still: logSeat }),
-  lookout: define(32, 32, campLegend, { damaged: g => lookout(g, false), restored: g => lookout(g, true) }, [16, 29])
+  lookout: define(32, 32, campLegend, { damaged: g => lookout(g, false), restored: g => lookout(g, true) }, [16, 29]),
+  oldBasket: define(16, 16, siteLegend, { full: g => oldBasket(g, true), empty: g => oldBasket(g, false) }),
+  spring: define(24, 16, siteLegend, { still: spring }),
+  cairn: define(16, 16, siteLegend, { full: g => cairn(g, true), empty: g => cairn(g, false) })
 };

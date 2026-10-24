@@ -3,6 +3,46 @@ import { BALANCE, createGame } from '../src/game/state';
 import { advanceTime, applyAction } from '../src/game/rules';
 
 describe('gathering and inventory', () => {
+  it('prepares a trail ration only at a built rack in camp, including with a full bag', () => {
+    const state = createGame();
+    state.inventory.food = 1;
+    expect(applyAction(state, { type: 'prepareTrailFood' }).state).toBe(state);
+    state.structures.dryingRack = true;
+    state.player.x = 0;
+    expect(applyAction(state, { type: 'prepareTrailFood' }).state).toBe(state);
+    state.player.x = BALANCE.campX;
+    state.inventory.wood = 7;
+    const prepared = applyAction(state, { type: 'prepareTrailFood' }).state;
+    expect(prepared.inventory).toMatchObject({ wood: 7, food: 0, trailFood: 1 });
+    expect(prepared.timeOfDay).toBe(BALANCE.trailFoodSeconds);
+    expect(applyAction(prepared, { type: 'prepareTrailFood' }).state).toBe(prepared);
+    expect(applyAction(prepared, { type: 'gather', nodeId: 'branch-0' }).state).toBe(prepared);
+  });
+
+  it('eats a ration anywhere for 45 hunger and consumes exactly one', () => {
+    const state = createGame();
+    state.player.x = 0;
+    state.player.hunger = 40;
+    state.inventory.trailFood = 2;
+    const eaten = applyAction(state, { type: 'eatTrailFood' }).state;
+    expect(eaten.player.hunger).toBe(85);
+    expect(eaten.inventory.trailFood).toBe(1);
+    expect(applyAction({ ...eaten, player: { ...eaten.player, hunger: 90 } }, { type: 'eatTrailFood' }).state.player.hunger).toBe(100);
+  });
+
+  it('counts rations for discovery rewards and drops one ration at a time', () => {
+    const state = createGame();
+    state.inventory.trailFood = 7;
+    state.player.x = 8;
+    state.player.y = 8;
+    const blocked = applyAction(state, { type: 'visitSite', siteId: 'basket' });
+    expect(blocked.state).toBe(state);
+    expect(state.progress.discoveries.basket).toBe(false);
+    const dropped = applyAction(state, { type: 'drop', resource: 'trailFood' });
+    expect(dropped.state.inventory.trailFood).toBe(6);
+    expect(dropped.message).toContain('trail ration');
+    expect(applyAction(dropped.state, { type: 'visitSite', siteId: 'basket' }).state.progress.discoveries.basket).toBe(true);
+  });
   it('gathers nearby wood and spends energy without mutating the old state', () => {
     const before = createGame();
     const result = applyAction(before, { type: 'gather', nodeId: 'branch-0' });
@@ -138,7 +178,7 @@ describe('lookout repair', () => {
     state.progress.nextStormDay = null;
     const repaired = applyAction(state, { type: 'repairLookout' }).state;
     expect(repaired.progress.lookoutRepaired).toBe(true);
-    expect(repaired.inventory).toEqual({ wood: 0, food: 0, fiber: 0, stone: 0 });
+    expect(repaired.inventory).toEqual({ wood: 0, food: 0, fiber: 0, stone: 0, trailFood: 0 });
     expect(repaired.timeOfDay).toBe(12);
     expect(repaired.player.energy).toBe(94);
     expect(applyAction(repaired, { type: 'repairLookout' }).state).toBe(repaired);
@@ -166,7 +206,7 @@ describe('stone axe and tree chopping', () => {
     state.progress.nextStormDay = null;
     const crafted = applyAction(state, { type: 'craftAxe' }).state;
     expect(crafted.progress.axeCrafted).toBe(true);
-    expect(crafted.inventory).toEqual({ wood: 0, food: 0, fiber: 0, stone: 0 });
+    expect(crafted.inventory).toEqual({ wood: 0, food: 0, fiber: 0, stone: 0, trailFood: 0 });
     expect(crafted.timeOfDay).toBe(12);
     expect(applyAction(crafted, { type: 'craftAxe' }).state).toBe(crafted);
   });
@@ -201,6 +241,47 @@ describe('stone axe and tree chopping', () => {
     const blocked = applyAction(state, { type: 'chopTree', treeId: tree.id });
     expect(blocked.state).toBe(state);
     expect(blocked.message).toMatch(/bag/i);
+  });
+});
+
+describe('places beyond camp', () => {
+  it('finds berries in the old basket once without losing them to a full bag', () => {
+    const state = createGame();
+    state.player.x = 8;
+    state.player.y = 8;
+    state.inventory.wood = 7;
+    const blocked = applyAction(state, { type: 'visitSite', siteId: 'basket' });
+    expect(blocked.state).toBe(state);
+    expect(blocked.message).toMatch(/bag/i);
+    state.inventory.wood = 0;
+    const found = applyAction(state, { type: 'visitSite', siteId: 'basket' }).state;
+    expect(found.inventory.food).toBe(2);
+    expect(found.progress.discoveries.basket).toBe(true);
+    expect(applyAction(found, { type: 'visitSite', siteId: 'basket' }).state).toBe(found);
+  });
+
+  it('finds two stones at the cairn and refuses distant searches', () => {
+    const state = createGame();
+    expect(applyAction(state, { type: 'visitSite', siteId: 'cairn' }).state).toBe(state);
+    state.player.x = 31;
+    state.player.y = 21;
+    const found = applyAction(state, { type: 'visitSite', siteId: 'cairn' }).state;
+    expect(found.inventory.stone).toBe(2);
+    expect(found.progress.discoveries.cairn).toBe(true);
+  });
+
+  it('allows repeatable short rests at the spring and remembers the first visit', () => {
+    const state = createGame();
+    state.player.x = 10;
+    state.player.y = 20;
+    state.player.energy = 40;
+    const first = applyAction(state, { type: 'visitSite', siteId: 'spring' }).state;
+    expect(first.player.energy).toBe(60);
+    expect(first.timeOfDay).toBe(20);
+    expect(first.progress.discoveries.spring).toBe(true);
+    const second = applyAction(first, { type: 'visitSite', siteId: 'spring' }).state;
+    expect(second.player.energy).toBe(80);
+    expect(second.timeOfDay).toBe(40);
   });
 });
 
@@ -578,7 +659,7 @@ describe('more camp structures', () => {
 describe('forecast cold night', () => {
   it('forecasts day three and starts the front only at nightfall', () => {
     const state = createGame();
-    expect(state.progress).toEqual({ nextStormDay: 3, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false });
+    expect(state.progress).toMatchObject({ nextStormDay: 3, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false });
     state.day = 3;
     state.timeOfDay = BALANCE.nightStart - 5;
     state.fireFuel = 20;
@@ -608,7 +689,7 @@ describe('forecast cold night', () => {
     expect(dawn.day).toBe(4);
     expect(dawn.timeOfDay).toBe(0);
     expect(dawn.fireFuel).toBe(20);
-    expect(dawn.progress).toEqual({ nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false, axeCrafted: false });
+    expect(dawn.progress).toMatchObject({ nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false, axeCrafted: false });
   });
 
   it('retries after a missed storm and costs the next morning', () => {
@@ -618,7 +699,7 @@ describe('forecast cold night', () => {
     state.structures.shelter = true;
     state.fireFuel = 90;
     const dawn = advanceTime(state, 80);
-    expect(dawn.progress).toEqual({ nextStormDay: 6, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false });
+    expect(dawn.progress).toMatchObject({ nextStormDay: 6, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false });
     expect(dawn.day).toBe(4);
     expect(dawn.timeOfDay).toBe(30);
     expect(dawn.player.energy).toBe(25);

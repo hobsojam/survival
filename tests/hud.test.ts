@@ -5,15 +5,16 @@ import { buildStatus, cookBlocker, stargazeBlocker } from '../src/game/rules';
 describe('build buttons', () => {
   it('locks the hearth until the cold night is weathered', () => {
     const state = createGame();
-    state.inventory = { wood: 9, food: 0, fiber: 0, stone: 3 };
+    state.inventory = { wood: 9, food: 0, fiber: 0, stone: 3, trailFood: 0 };
     expect(buildStatus(state, 'hearth')).toBe('locked');
-    state.progress = { nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false, axeCrafted: false };
+    state.progress = { nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false, axeCrafted: false,
+      discoveries: { basket: false, spring: false, cairn: false } };
     expect(buildStatus(state, 'hearth')).toBe('ready');
   });
 
   it('blocks the bed until there is a shelter', () => {
     const state = createGame();
-    state.inventory = { wood: 6, food: 0, fiber: 2, stone: 0 };
+    state.inventory = { wood: 6, food: 0, fiber: 2, stone: 0, trailFood: 0 };
     expect(buildStatus(state, 'bed')).toBe('needsShelter');
     state.structures.shelter = true;
     expect(buildStatus(state, 'bed')).toBe('ready');
