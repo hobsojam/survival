@@ -22,21 +22,21 @@ describe('stormReadiness', () => {
     expect(forecastFireCheck(state)).toMatch(/^○/);
   });
 
-  it('counts two carried logs as enough, even with the fire unlit', () => {
+  it('does not count carried logs as firepit fuel when the fire is unlit', () => {
     const state = stormDay(100);
     state.fireFuel = 0;
     state.inventory.wood = 2;
-    expect(stormReadiness(state)).toMatchObject({ fuel: 2 * BALANCE.fireSecondsPerWood, ready: true });
-    expect(forecastFireCheck(state)).toBe(`✓ Fire: 180 / ${NIGHT_NEED}s for the night`);
+    expect(stormReadiness(state)).toMatchObject({ fuel: 0, ready: false, logsShort: 0 });
+    expect(forecastFireCheck(state)).toBe(`○ Fire: 0 / ${NIGHT_NEED}s for the night · add carried wood at nightfall`);
   });
 
-  it('counts only carried wood on days before the storm', () => {
+  it('counts only firepit fuel on days before the storm', () => {
     const state = createGame();
     state.day = state.progress.nextStormDay! - 1;
     state.fireFuel = 500;
     state.inventory.wood = 1;
-    expect(stormReadiness(state)).toMatchObject({ fuel: BALANCE.fireSecondsPerWood, ready: false, logsShort: 1 });
-    expect(forecastFireCheck(state)).toBe(`○ Fire: 90 / ${NIGHT_NEED}s for the night · 1 more log`);
+    expect(stormReadiness(state)).toMatchObject({ fuel: 0, ready: false, logsShort: 1 });
+    expect(forecastFireCheck(state)).toBe(`○ Fire: 0 / ${NIGHT_NEED}s for the night · 1 more log`);
   });
 
   it('during the storm, compares the fire with what is left until dawn and suggests a log', () => {
@@ -45,7 +45,7 @@ describe('stormReadiness', () => {
     expect(stormReadiness(state)).toMatchObject({ fuel: 60, needed: 80, ready: false, logsShort: 1 });
     expect(forecastFireCheck(state)).toBe('○ Fire: 60 / 80s to dawn · 1 more log');
     state.inventory.wood = 1;
-    expect(forecastFireCheck(state)).toBe('○ Fire: 60 / 80s to dawn · add a log');
+    expect(forecastFireCheck(state)).toBe('○ Fire: 60 / 80s to dawn · add carried wood to the fire');
     state.fireFuel = 81;
     expect(forecastFireCheck(state)).toBe('✓ Fire: 81 / 80s to dawn');
   });
@@ -54,7 +54,7 @@ describe('stormReadiness', () => {
     const state = stormDay(100);
     state.structures.hearth = true;
     state.inventory.wood = 1;
-    expect(stormReadiness(state).fuel).toBe(BALANCE.hearthFireSecondsPerWood);
+    expect(stormReadiness(state).fuel).toBe(0);
     expect(stormReadiness(state).logsShort).toBe(1);
   });
 });

@@ -1,6 +1,37 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, SITES, createGame } from '../src/game/state';
-import { buildMap } from '../src/scene/map';
+import { terrainSprites } from '../src/art/terrain';
+import { buildMap, type TerrainMap } from '../src/scene/map';
+
+function visibleGround(map: TerrainMap, x: number, y: number, pixelX = 8, pixelY = 8): string | undefined {
+  const base = terrainSprites[map.ground[y][x]];
+  let color = base.legend[base.frames.still[pixelY][pixelX]];
+  const path = map.pathTiles.find(item => item.x === x && item.y === y);
+  if (path) {
+    const sprite = terrainSprites[path.sprite];
+    const pixel = sprite.frames.still[pixelY][pixelX];
+    if (pixel !== '.') color = sprite.legend[pixel];
+  }
+  const edge = map.campEdges.find(item => item.x === x && item.y === y);
+  if (edge) {
+    const sprite = terrainSprites[edge.sprite];
+    const pixel = sprite.frames.still[pixelY][pixelX];
+    if (pixel !== '.') color = sprite.legend[pixel];
+  }
+  return color;
+}
+
+const pathEnds = [[9.5, 9.5], [30.5, 9.5], [10.5, 21.5], [30.5, 21.5]];
+function pathDistance(x: number, y: number): number {
+  const centerX = BALANCE.campX + .5;
+  const centerY = BALANCE.campY + .5;
+  return Math.min(...pathEnds.map(([endX, endY]) => {
+    const dx = endX - centerX;
+    const dy = endY - centerY;
+    const t = Math.max(0, Math.min(1, ((x - centerX) * dx + (y - centerY) * dy) / (dx * dx + dy * dy)));
+    return Math.hypot(x - centerX - t * dx, y - centerY - t * dy);
+  }));
+}
 
 describe('terrain composition', () => {
   const nodes = createGame().nodes;
@@ -38,6 +69,89 @@ describe('terrain composition', () => {
     expect(map.decorations.length).toBeLessThan(BALANCE.mapWidth * BALANCE.mapHeight / 4);
     expect(map.decorations.some(item => item.sprite === 'stump')).toBe(true);
     expect(map.decorations.some(item => item.sprite === 'mushrooms')).toBe(true);
+  });
+
+  it('keeps playable boundary tile centres visibly on earth', () => {
+    const map = buildMap(nodes);
+    for (const [dx, dy] of [[4, 0], [-4, 0], [0, 4], [0, -4], [3, 2], [-3, -2]]) {
+      expect(visibleGround(map, BALANCE.campX + dx, BALANCE.campY + dy), `${dx},${dy}`).toMatch(/^earth/);
+    }
+  });
+
+  it('cuts the east and southeast clearing edges at the actual four-tile radius', () => {
+    const map = buildMap(nodes);
+    expect(visibleGround(map, BALANCE.campX + 4, BALANCE.campY, 8, 8)).toMatch(/^earth/);
+    expect(visibleGround(map, BALANCE.campX + 4, BALANCE.campY, 9, 8)).toMatch(/^grass/);
+    expect(visibleGround(map, BALANCE.campX + 3, BALANCE.campY + 3, 5, 5)).toMatch(/^earth/);
+    expect(visibleGround(map, BALANCE.campX + 3, BALANCE.campY + 3, 6, 6)).toMatch(/^grass/);
+  });
+
+  it('keeps earth centres outside the camp radius confined to paths', () => {
+    const map = buildMap(nodes);
+    for (let y = 0; y < BALANCE.mapHeight; y++) for (let x = 0; x < BALANCE.mapWidth; x++) {
+      if (Math.hypot(x - BALANCE.campX, y - BALANCE.campY) <= BALANCE.campRadius + .5) continue;
+      if (pathDistance(x + .5, y + .5) < .75) continue;
+      expect(visibleGround(map, x, y), `unexpected earth at ${x},${y}`).not.toMatch(/^earth/);
+    }
+  });
+
+  it('keeps paths within one tile and connected to the clearing', () => {
+    const map = buildMap(nodes);
+    for (let y = BALANCE.campY - 7; y <= BALANCE.campY + 7; y++) {
+      for (let x = BALANCE.campX - 7; x <= BALANCE.campX + 7; x++) {
+        for (let py = 0; py < 16; py += 2) for (let px = 0; px < 16; px += 2) {
+          const worldX = x + (px + .5) / 16;
+          const worldY = y + (py + .5) / 16;
+          if (Math.hypot(worldX - BALANCE.campX - .5, worldY - BALANCE.campY - .5) <= BALANCE.campRadius + .1) continue;
+          if (visibleGround(map, x, y, px, py)?.startsWith('earth')) {
+            expect(pathDistance(worldX, worldY), `path too wide at ${worldX},${worldY}`).toBeLessThanOrEqual(.65);
+          }
+        }
+      }
+    }
+    for (const [endX, endY] of pathEnds) {
+      const dx = endX - BALANCE.campX - .5;
+      const dy = endY - BALANCE.campY - .5;
+      const length = Math.hypot(dx, dy);
+      for (let distance = BALANCE.campRadius + .5; distance < Math.min(length, BALANCE.campRadius + 3); distance += .5) {
+        const worldX = BALANCE.campX + .5 + dx * distance / length;
+        const worldY = BALANCE.campY + .5 + dy * distance / length;
+        const tileX = Math.floor(worldX);
+        const tileY = Math.floor(worldY);
+        const pixelX = Math.floor((worldX - tileX) * 16);
+        const pixelY = Math.floor((worldY - tileY) * 16);
+        expect(visibleGround(map, tileX, tileY, pixelX, pixelY), `path gap at ${worldX},${worldY}`).toMatch(/^earth/);
+      }
+    }
+  });
+
+  it('marks the camp circle with sixteen to twenty outlined high-contrast stones', () => {
+    const stones = buildMap(nodes).rimStones;
+    expect(stones.length).toBeGreaterThanOrEqual(16);
+    expect(stones.length).toBeLessThanOrEqual(20);
+    for (const stone of stones) {
+      expect(Math.hypot(stone.x - BALANCE.campX - .5, stone.y - BALANCE.campY - .5)).toBeCloseTo(BALANCE.campRadius);
+      const sprite = terrainSprites[stone.sprite];
+      expect(sprite.size[0]).toBeGreaterThanOrEqual(12);
+      expect(sprite.size[0]).toBeLessThanOrEqual(16);
+      const used = new Set(sprite.frames.still.join(''));
+      expect([...used].some(pixel => sprite.legend[pixel] === 'stone0')).toBe(true);
+      expect([...used].some(pixel => sprite.legend[pixel] === 'stone4')).toBe(true);
+    }
+  });
+
+  it('keeps the path centre corridors clear of rim stones', () => {
+    for (const stone of buildMap(nodes).rimStones) {
+      const sprite = terrainSprites[stone.sprite];
+      const left = Math.round(stone.x * 16 - sprite.anchor[0]);
+      const top = Math.round(stone.y * 16 - sprite.anchor[1]);
+      for (let y = 0; y < sprite.size[1]; y++) for (let x = 0; x < sprite.size[0]; x++) {
+        if (sprite.frames.still[y][x] === '.') continue;
+        const worldX = (left + x + .5) / 16;
+        const worldY = (top + y + .5) / 16;
+        expect(pathDistance(worldX, worldY), `stone at ${stone.x},${stone.y} blocks path`).toBeGreaterThanOrEqual(.55);
+      }
+    }
   });
 
   it('groups flowers into meadow patches', () => {

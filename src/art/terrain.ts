@@ -1,5 +1,7 @@
 import type { SpriteDef } from './sprites';
 import type { PaletteKey } from './palette';
+import { BALANCE } from '../game/state';
+import { pathDistance } from '../scene/mapGeometry';
 
 type Grid = string[][];
 const blank = (w: number, h: number, fill = '.'): Grid => Array.from({ length: h }, () => Array(w).fill(fill));
@@ -53,7 +55,56 @@ for (let mask = 0; mask < 16; mask++) {
   terrainSprites[`transition${mask}`] = sprite(g, groundLegend);
 }
 
-const decalLegend = { a: 'grass1', b: 'grass3', c: 'grass4', d: 'flower0', e: 'flower1', f: 'flower2', g: 'flower3', h: 'flower4', i: 'stone1', j: 'stone2', k: 'stone3', l: 'stone4', m: 'wood0', n: 'wood2', o: 'wood3', p: 'earth1', q: 'earth3', r: 'leaf2', s: 'leaf4', t: 'shadow' } as const;
+const campCircleTiles = new Map<string, 'full' | string>();
+const circleRadius = BALANCE.campRadius * 16;
+for (let dy = -BALANCE.campRadius; dy <= BALANCE.campRadius; dy++) {
+  for (let dx = -BALANCE.campRadius; dx <= BALANCE.campRadius; dx++) {
+    const g = blank(16, 16);
+    let filled = 0;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const distanceSquared = (dx * 16 + x - 8) ** 2 + (dy * 16 + y - 8) ** 2;
+      if (distanceSquared > circleRadius ** 2) continue;
+      g[y][x] = distanceSquared >= (circleRadius - 2) ** 2 ? 'e' : 'g';
+      filled++;
+    }
+    if (filled === 0) continue;
+    const offset = `${dx},${dy}`;
+    if (filled === 256) {
+      campCircleTiles.set(offset, 'full');
+    } else {
+      const name = `campCircle${dx >= 0 ? '+' : ''}${dx}_${dy >= 0 ? '+' : ''}${dy}`;
+      terrainSprites[name] = sprite(g, { e: 'earth0', g: 'earth2' });
+      campCircleTiles.set(offset, name);
+    }
+  }
+}
+
+export function campCircleTile(dx: number, dy: number): 'full' | string | undefined {
+  return campCircleTiles.get(`${dx},${dy}`);
+}
+
+const pathTiles = new Map<string, string>();
+for (let y = 0; y < BALANCE.mapHeight; y++) for (let x = 0; x < BALANCE.mapWidth; x++) {
+  if (pathDistance(x + .5, y + .5) > 1.25) continue;
+  const g = blank(16, 16);
+  let filled = 0;
+  for (let py = 0; py < 16; py++) for (let px = 0; px < 16; px++) {
+    const distance = pathDistance(x + (px + .5) / 16, y + (py + .5) / 16);
+    if (distance > .5) continue;
+    g[py][px] = distance >= .44 ? 'e' : 'g';
+    filled++;
+  }
+  if (filled === 0) continue;
+  const name = `pathTile${x}_${y}`;
+  terrainSprites[name] = sprite(g, groundLegend);
+  pathTiles.set(`${x},${y}`, name);
+}
+
+export function pathTile(x: number, y: number): string | undefined {
+  return pathTiles.get(`${x},${y}`);
+}
+
+const decalLegend = { a: 'grass1', b: 'grass3', c: 'grass4', d: 'flower0', e: 'flower1', f: 'flower2', g: 'flower3', h: 'flower4', i: 'stone1', j: 'stone2', k: 'stone3', l: 'stone4', m: 'wood0', n: 'wood2', o: 'wood3', p: 'earth1', q: 'earth3', r: 'leaf2', s: 'leaf4', t: 'shadow', u: 'stone0' } as const;
 function addDecal(name: string, draw: (g: Grid) => void, w = 8, h = 8): void {
   const g = blank(w, h); draw(g); terrainSprites[name] = sprite(g, decalLegend);
 }
@@ -69,8 +120,13 @@ addDecal('stump', g => { ellipse(g, 8, 13, 5, 2, 't'); rect(g, 4, 6, 9, 7, 'm');
 addDecal('mushrooms', g => { rect(g, 2, 4, 1, 3, 'l'); rect(g, 5, 5, 1, 2, 'l'); rect(g, 1, 3, 3, 2, 'q'); rect(g, 4, 4, 3, 2, 'q'); });
 addDecal('fallenLeaf', g => { rect(g, 2, 3, 4, 2, 'r'); rect(g, 3, 2, 2, 1, 's'); dot(g, 6, 5, 'r'); });
 for (let i = 0; i < 2; i++) addDecal(`rimStone${i}`, g => {
-  rect(g, 1, 5, 6, 2, 'i'); rect(g, 2, i ? 3 : 4, 5, 2, 'j'); rect(g, 2, i ? 3 : 4, 3, 1, 'k'); dot(g, 3, i ? 3 : 4, 'l');
-});
+  rect(g, 1, 6, 12, 4, 'u');
+  rect(g, 2, i ? 4 : 5, 10, 5, 'u');
+  rect(g, 2, 7, 10, 2, 'i');
+  rect(g, 3, i ? 5 : 6, 8, 3, 'j');
+  rect(g, 4, i ? 5 : 6, 6, 1, 'k');
+  rect(g, i ? 6 : 4, i ? 4 : 5, 4, 1, 'l');
+}, 14, 12);
 
 const treeLegend = { a: 'leaf0', b: 'leaf1', c: 'leaf2', d: 'leaf3', e: 'leaf4', f: 'wood0', g: 'wood1', h: 'wood2', i: 'wood3', s: 'shadow' } as const;
 function tree(name: string, w: number, h: number, shape: 'broad' | 'pine' | 'young'): void {
