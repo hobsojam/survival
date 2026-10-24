@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { displayScale, viewportSize, canvasOffset } from '../src/scene/pixelScale';
+import { displayScale, viewportSize, canvasOffset, portraitViewport } from '../src/scene/pixelScale';
 
 describe('pixel canvas scale', () => {
   it('uses whole-number desktop magnification and centers spare space', () => {
@@ -18,6 +18,17 @@ describe('pixel canvas scale', () => {
   it('grows the viewport to fill portrait phone frames', () => {
     expect(viewportSize(390, 640)).toEqual({ width: 390, height: 480 });
     expect(viewportSize(390, 400)).toEqual({ width: 390, height: 400 });
+  });
+
+  it('magnifies portrait phone frames so tiles are thumb-sized and fill the frame', () => {
+    expect(portraitViewport(390, 679)).toEqual({ scale: 2, width: 195, height: 339 });
+    expect(portraitViewport(320, 500)).toEqual({ scale: 2, width: 160, height: 250 });
+    expect(portraitViewport(390, 2000)).toEqual({ scale: 2, width: 195, height: 480 });
+  });
+
+  it('leaves landscape and desktop frames to the normal scale', () => {
+    expect(portraitViewport(1000, 640)).toBeNull();
+    expect(portraitViewport(800, 900)).toBeNull();
   });
 
   it('places the canvas on whole CSS pixels', () => {

@@ -18,3 +18,10 @@ export function viewportSize(width: number, height: number): { width: number; he
 export function canvasOffset(frameWidth: number, frameHeight: number, width: number, height: number, scale: number): { x: number; y: number } {
   return { x: Math.floor((frameWidth - width * scale) / 2), y: Math.floor((frameHeight - height * scale) / 2) };
 }
+
+/** Phone portrait frames (the CSS phone layout's width) get magnified art and a viewport that fills them; others return null. */
+export function portraitViewport(width: number, height: number): { scale: number; width: number; height: number } | null {
+  if (height <= width || width > 600) return null;
+  const scale = Math.max(1, Math.floor(width / 160));
+  return { scale, width: Math.min(LOGICAL_WIDTH, Math.floor(width / scale)), height: Math.min(PORTRAIT_MAX_HEIGHT, Math.floor(height / scale)) };
+}
