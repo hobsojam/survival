@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceNode, type SiteId, type TreeNode } from '../game/state';
 import { advanceTime, applyAction, isAtCamp, isColdNight, sleepBlocker, type GameAction } from '../game/rules';
 import { TILE, worldX, worldY, drawTerrain } from './art';
-import { sceneVisuals, playerVisualDepth } from './visuals';
+import { sceneVisuals, playerVisualDepth, WEATHER_DEPTH } from './visuals';
 import { sprites } from '../art/sprites';
 import { AmbientLife } from './ambientLife';
 import { registerSpriteTextures } from '../art/textures';
@@ -10,6 +10,8 @@ import { LOGICAL_WIDTH, LOGICAL_HEIGHT } from './pixelScale';
 import { facingFromInput, selectSurvivorVisual, type Facing, type SurvivorAction } from './survivorVisual';
 import { SceneEffects } from './SceneEffects';
 import { SceneLighting } from './SceneLighting';
+import { hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from './tapTarget';
+import { palette } from '../art/palette';
 import { sitePrompt } from '../game/sitePrompt';
 
 export class GameScene extends Phaser.Scene {
@@ -26,6 +28,8 @@ export class GameScene extends Phaser.Scene {
   private hudElapsed = 0;
   private facing: Facing = 'down';
   private visualAction?: { kind: SurvivorAction; startedAtMs: number };
+  private walkTarget?: TapTarget;
+  private tapGate: () => boolean = () => true;
 
   constructor(state: GameState, onStateChange: (state: GameState, cause: 'action' | 'tick') => void, onFeedback: (message: string) => void) {
     super({ key: 'GameScene' });
@@ -49,6 +53,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.roundPixels = true;
     this.lighting = new SceneLighting(this, LOGICAL_WIDTH, LOGICAL_HEIGHT);
     this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,T,P,C,G,Z,L,X,V') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => this.handleTap(pointer.worldX, pointer.worldY));
     this.paintObjects();
     this.onStateChange(this.state, 'tick');
   }
@@ -62,11 +67,13 @@ export class GameScene extends Phaser.Scene {
     if (walking) {
       this.facing = facingFromInput(horizontal, vertical, this.facing);
       this.visualAction = undefined;
+      this.walkTarget = nextWalk(this.walkTarget, { kind: 'keyMove' });
     }
     if (horizontal || vertical) {
       const length = Math.hypot(horizontal, vertical);
       this.perform({ type: 'move', dx: horizontal / length * dt * 3.5, dy: vertical / length * dt * 3.5 }, false);
     }
+    const tapWalking = this.walkTowardTarget(dt);
     if (Phaser.Input.Keyboard.JustDown(this.keys.E)) {
       const node = this.closestNode();
       if (node) this.perform({ type: 'gather', nodeId: node.id });
@@ -91,7 +98,7 @@ export class GameScene extends Phaser.Scene {
     const beforeTick = this.state;
     this.state = advanceTime(this.state, dt);
     this.reportWeather(beforeTick, this.state);
-    const visual = selectSurvivorVisual({ facing: this.facing, moving: walking, warmth: this.state.player.warmth,
+    const visual = selectSurvivorVisual({ facing: this.facing, moving: walking || tapWalking, warmth: this.state.player.warmth,
       nowMs: this.time.now, action: this.visualAction });
     if (this.playerSprite.texture.key !== visual.texture) this.playerSprite.setTexture(visual.texture);
     this.playerSprite.setPosition(Math.round(worldX(this.state.player.x)), Math.round(worldY(this.state.player.y)));
@@ -109,6 +116,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   perform(action: GameAction, announce = true): void {
+    if (action.type !== 'move') this.walkTarget = nextWalk(this.walkTarget, { kind: 'action' });
     const before = this.state;
     const result = applyAction(before, action);
     this.state = result.state;
@@ -181,6 +189,15 @@ export class GameScene extends Phaser.Scene {
 
   getState(): GameState { return this.state; }
 
+  /** Swallows taps while the gate says no, such as when a phone sheet is open. */
+  setTapGate(gate: () => boolean): void {
+    this.tapGate = gate;
+  }
+
+  cancelWalk(): void {
+    this.walkTarget = undefined;
+  }
+
   visitNearestSite(): void {
     const site = this.closestSite();
     if (site) this.perform({ type: 'visitSite', siteId: site.id });
@@ -189,6 +206,43 @@ export class GameScene extends Phaser.Scene {
 
   resizeViewport(width: number, height: number): void {
     if (this.lighting) this.lighting.resize(width, height);
+  }
+
+  private handleTap(pixelX: number, pixelY: number): void {
+    if (!this.tapGate()) return;
+    const target = pickTapTarget(this.state, pixelX / TILE - 0.5, pixelY / TILE - 0.5);
+    this.showTapMarker(target);
+    this.walkTarget = nextWalk(this.walkTarget, { kind: 'tap', target });
+    if (!hasArrived(this.state, target)) return;
+    const action = targetAction(target);
+    // Already in range: act now (which also ends the walk), or simply stop on tapped ground.
+    if (action) this.perform(action);
+    else this.walkTarget = undefined;
+  }
+
+  /** Walks one frame toward the tapped target, acting once on arrival. Returns whether the survivor moved. */
+  private walkTowardTarget(dt: number): boolean {
+    const target = this.walkTarget;
+    if (!target) return false;
+    if (hasArrived(this.state, target)) {
+      this.walkTarget = undefined;
+      const action = targetAction(target);
+      if (action) this.perform(action);
+      return false;
+    }
+    const step = moveStep(this.state, target, dt);
+    this.facing = facingFromInput(step.dx, step.dy, this.facing);
+    this.visualAction = undefined;
+    this.perform({ type: 'move', ...step }, false);
+    return true;
+  }
+
+  private showTapMarker(target: TapTarget): void {
+    const ring = this.add.graphics({ x: Math.round(worldX(target.x)), y: Math.round(worldY(target.y)) })
+      .lineStyle(1, Phaser.Display.Color.HexStringToColor(palette.paper).color, 1)
+      .strokeCircle(0, 0, 5)
+      .setDepth(WEATHER_DEPTH + 1);
+    this.tweens.add({ targets: ring, alpha: 0, scale: 1.4, duration: 400, onComplete: () => ring.destroy() });
   }
 
   private closestNode(): ResourceNode | undefined {
