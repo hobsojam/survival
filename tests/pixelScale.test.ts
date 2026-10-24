@@ -15,6 +15,11 @@ describe('pixel canvas scale', () => {
     expect(viewportSize(800, 500)).toEqual({ width: 480, height: 300 });
   });
 
+  it('grows the viewport to fill portrait phone frames', () => {
+    expect(viewportSize(390, 640)).toEqual({ width: 390, height: 480 });
+    expect(viewportSize(390, 400)).toEqual({ width: 390, height: 400 });
+  });
+
   it('places the canvas on whole CSS pixels', () => {
     expect(canvasOffset(1001, 641, 480, 300, 2)).toEqual({ x: 20, y: 20 });
   });

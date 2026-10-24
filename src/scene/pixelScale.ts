@@ -7,8 +7,12 @@ export function displayScale(width: number, height: number): number {
   return Math.max(1, Math.floor(fit));
 }
 
+/** The map's full height (30 tiles of 16 px); tall portrait frames may show all of it. */
+export const PORTRAIT_MAX_HEIGHT = 480;
+
 export function viewportSize(width: number, height: number): { width: number; height: number } {
-  return { width: Math.min(LOGICAL_WIDTH, Math.floor(width)), height: Math.min(LOGICAL_HEIGHT, Math.floor(height)) };
+  const maxHeight = height > width ? PORTRAIT_MAX_HEIGHT : LOGICAL_HEIGHT;
+  return { width: Math.min(LOGICAL_WIDTH, Math.floor(width)), height: Math.min(maxHeight, Math.floor(height)) };
 }
 
 export function canvasOffset(frameWidth: number, frameHeight: number, width: number, height: number, scale: number): { x: number; y: number } {
