@@ -1,7 +1,9 @@
 import { BALANCE, type ResourceNode } from '../game/state';
+import { campCircleTile, pathTile, terrainSprites } from '../art/terrain';
+import { CAMP_CENTER_X, CAMP_CENTER_Y, PATH_DESTINATIONS, distanceToPath, pathDistance } from './mapGeometry';
 
 export interface MapItem { x: number; y: number; sprite: string }
-export interface TerrainMap { ground: string[][]; decorations: MapItem[]; rimStones: MapItem[]; trees: MapItem[]; groves: MapItem[][] }
+export interface TerrainMap { ground: string[][]; pathTiles: MapItem[]; campEdges: MapItem[]; decorations: MapItem[]; rimStones: MapItem[]; trees: MapItem[]; groves: MapItem[][] }
 
 function hash(x: number, y: number, salt = 0): number {
   let n = Math.imul(x + salt * 31, 374761393) + Math.imul(y - salt * 17, 668265263);
@@ -9,33 +11,38 @@ function hash(x: number, y: number, salt = 0): number {
   return (n ^ (n >>> 16)) >>> 0;
 }
 
-const destinations = [[9, 9], [30, 9], [10, 21], [30, 21]];
 const flowerPatches = [[11, 8], [30, 7], [7, 23], [28, 23]];
-const campX = BALANCE.campX + .5, campY = BALANCE.campY + .5;
-function distanceToPath(x: number, y: number, endX: number, endY: number): number {
-  const dx = endX - campX, dy = endY - campY;
-  const t = Math.max(0, Math.min(1, ((x - campX) * dx + (y - campY) * dy) / (dx * dx + dy * dy)));
-  return Math.hypot(x - campX - t * dx, y - campY - t * dy);
-}
 function earthAt(x: number, y: number): boolean {
-  if (Math.hypot(x - campX, y - campY) <= BALANCE.campRadius) return true;
-  return destinations.some(([dx, dy]) => distanceToPath(x, y, dx + .5, dy + .5) < .55);
+  return Math.hypot(x - CAMP_CENTER_X, y - CAMP_CENTER_Y) <= BALANCE.campRadius || pathDistance(x, y) <= .5;
 }
 function clearForTree(x: number, y: number, nodes: ResourceNode[]): boolean {
   return Math.hypot(x - BALANCE.campX, y - BALANCE.campY) > BALANCE.campRadius + 1 &&
     nodes.every(node => Math.hypot(x - node.x, y - node.y) >= (node.kind === 'branch' ? 1.5 : 3.5)) &&
-    destinations.every(([dx, dy]) => distanceToPath(x + .5, y + .5, dx + .5, dy + .5) >= 1.35);
+    PATH_DESTINATIONS.every(([dx, dy]) => distanceToPath(x + .5, y + .5, dx, dy) >= 1.35);
+}
+
+function stoneClearsPaths(item: MapItem): boolean {
+  const stone = terrainSprites[item.sprite];
+  const left = Math.round(item.x * 16 - stone.anchor[0]);
+  const top = Math.round(item.y * 16 - stone.anchor[1]);
+  for (let y = 0; y < stone.size[1]; y++) for (let x = 0; x < stone.size[0]; x++) {
+    if (stone.frames.still[y][x] === '.') continue;
+    if (pathDistance((left + x + .5) / 16, (top + y + .5) / 16) < .55) return false;
+  }
+  return true;
 }
 
 export function buildMap(nodes: ResourceNode[]): TerrainMap {
   const ground: string[][] = [];
-  const decorations: MapItem[] = [], rimStones: MapItem[] = [], trees: MapItem[] = [];
+  const pathTiles: MapItem[] = [], campEdges: MapItem[] = [], decorations: MapItem[] = [], rimStones: MapItem[] = [], trees: MapItem[] = [];
   for (let y = 0; y < BALANCE.mapHeight; y++) {
     const row: string[] = [];
     for (let x = 0; x < BALANCE.mapWidth; x++) {
-      const mask = Number(earthAt(x, y)) | Number(earthAt(x + 1, y)) << 1 |
-        Number(earthAt(x + 1, y + 1)) << 2 | Number(earthAt(x, y + 1)) << 3;
-      row.push(mask === 0 ? `grass${hash(x, y) % 4}` : mask === 15 ? `earth${hash(x, y, 1) % 3}` : `transition${mask}`);
+      const circle = campCircleTile(x - BALANCE.campX, y - BALANCE.campY);
+      row.push(circle === 'full' ? `earth${hash(x, y, 1) % 3}` : `grass${hash(x, y) % 4}`);
+      const path = pathTile(x, y);
+      if (path && circle !== 'full') pathTiles.push({ x, y, sprite: path });
+      if (circle && circle !== 'full') campEdges.push({ x, y, sprite: circle });
       const edge = Math.min(x, y, BALANCE.mapWidth - 1 - x, BALANCE.mapHeight - 1 - y);
       const borderTree = edge <= 2 && hash(x, y, 2) % 5 !== 0;
       if (borderTree && clearForTree(x, y, nodes)) trees.push({ x, y, sprite: ['treeBroadleaf', 'treePine', 'treeYoung'][hash(x, y, 3) % 3] });
@@ -78,10 +85,11 @@ export function buildMap(nodes: ResourceNode[]): TerrainMap {
     chosenCenters.push([cx, cy]);
     trees.push(...grove);
   }
-  for (let i = 0; i < 12; i++) {
-    const angle = i * Math.PI * 2 / 12;
-    rimStones.push({ x: campX + Math.cos(angle) * BALANCE.campRadius, y: campY + Math.sin(angle) * BALANCE.campRadius,
-      sprite: `rimStone${i % 2}` });
+  for (let i = 0; i < 26; i++) {
+    const angle = i * Math.PI * 2 / 26;
+    const item = { x: CAMP_CENTER_X + Math.cos(angle) * BALANCE.campRadius,
+      y: CAMP_CENTER_Y + Math.sin(angle) * BALANCE.campRadius, sprite: `rimStone${i % 2}` };
+    if (stoneClearsPaths(item)) rimStones.push(item);
   }
-  return { ground, decorations, rimStones, trees, groves };
+  return { ground, pathTiles, campEdges, decorations, rimStones, trees, groves };
 }
