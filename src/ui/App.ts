@@ -6,18 +6,12 @@ import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/sa
 import { cookBlocker, isAtCamp, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { dayPhase, formatClock, nextChange } from '../game/clock';
 import { isLowMeter } from '../game/needs';
-import { gateTap, nextOpenTab, sidebarTab, type DockTab } from './dock';
+import { gateTap, nextOpenTab, wireSidebarTabs, type DockTab } from './dock';
 import { journalView, QUARRY_MARKER } from './journal';
 import { axeView, bagView, buildButtonView, forecastView, lookoutView, nightHint, pickaxeView, sitesFound, startNote, type ActionPanelView } from './panels';
 import { Soundscape } from '../game/soundscape';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
-
-const SIDEBAR_TAB_KEY = 'hearthwild.sidebarTab';
-
-function readSidebarTab(): string | null {
-  try { return localStorage.getItem(SIDEBAR_TAB_KEY); } catch { return null; }
-}
 
 export class App {
   private state: GameState;
@@ -72,7 +66,7 @@ export class App {
               <div class="meter"><div class="meter-title"><span>Warmth</span><b id="warmth-value">100</b></div><div class="track"><div id="warmth-bar" class="fill warmth"></div></div></div>
               <div class="quick-actions"><button data-action="eat">Eat berries</button><button data-action="eatTrailFood" id="eat-ration-button">Eat ration</button><button data-action="rest">Rest</button><button data-action="stokeFire">Feed fire</button><button data-action="sleep" id="sleep-button">Sleep</button></div>
             </section>
-            <div class="sidebar-tabs" role="tablist" aria-label="Sidebar"><button type="button" role="tab" data-sidebar-tab="bag">🎒 Bag</button><button type="button" role="tab" data-sidebar-tab="build">🔨 Build</button><button type="button" role="tab" data-sidebar-tab="camp">🌙 Camp</button></div>
+            <div class="sidebar-tabs" role="tablist" aria-label="Sidebar"><button type="button" role="tab" data-sidebar-button="bag">🎒 Bag</button><button type="button" role="tab" data-sidebar-button="build">🔨 Build</button><button type="button" role="tab" data-sidebar-button="camp">🌙 Camp</button></div>
             <div class="sidebar-pages">
               <section class="panel forecast-panel" id="forecast-panel" data-tab="camp"><p class="eyebrow">THE FORECAST</p><h2 id="forecast-title">A cold front is coming</h2><p id="forecast-copy" class="forecast-copy"></p><div class="forecast-checks"><span id="forecast-shelter"></span><span id="forecast-fire"></span></div></section>
               <section class="panel lookout-panel" id="lookout-panel" data-tab="build"><p class="eyebrow">A PLACE BEYOND CAMP</p><h2 id="lookout-title">The old lookout</h2><p id="lookout-copy" class="lookout-copy"></p><button type="button" id="lookout-button" data-action="repairLookout">Repair lookout</button><small id="lookout-cost">4 wood · 2 fiber · 2 stone</small></section>
@@ -125,10 +119,7 @@ export class App {
     this.root.querySelectorAll<HTMLButtonElement>('[data-tab-button]').forEach(button => {
       button.addEventListener('click', () => this.setOpenTab(nextOpenTab(this.openTab, button.dataset.tabButton as DockTab)));
     });
-    this.root.querySelectorAll<HTMLButtonElement>('[data-sidebar-tab]').forEach(button => {
-      button.addEventListener('click', () => this.setSidebarTab(button.dataset.sidebarTab as DockTab));
-    });
-    this.setSidebarTab(sidebarTab(readSidebarTab()));
+    wireSidebarTabs(this.root, this.storage);
     this.root.querySelector('#continue-exploring')!.addEventListener('click', () => {
       this.root.querySelector('#lookout-ending')?.classList.add('hidden');
       this.game?.scene.resume('GameScene');
@@ -265,17 +256,6 @@ export class App {
     element.classList.add('toast');
     window.clearTimeout(this.toastTimer);
     this.toastTimer = window.setTimeout(() => element.classList.remove('toast'), 3000);
-  }
-
-  /** Shows one group of panels in the desktop sidebar and remembers it for next time. */
-  private setSidebarTab(tab: DockTab): void {
-    this.root.querySelector<HTMLElement>('.layout')!.dataset.sidebarTab = tab;
-    this.root.querySelectorAll<HTMLButtonElement>('[data-sidebar-tab]').forEach(button => {
-      const selected = button.dataset.sidebarTab === tab;
-      button.classList.toggle('active', selected);
-      button.setAttribute('aria-selected', String(selected));
-    });
-    try { localStorage.setItem(SIDEBAR_TAB_KEY, tab); } catch { /* storage unavailable: the tab just isn't remembered */ }
   }
 
   private setOpenTab(tab: DockTab | null): void {
@@ -450,7 +430,7 @@ export class App {
     this.setText('build-hint', isAtCamp(this.state) ? 'At camp — click an upgrade to build.' : 'Stand inside the marked camp circle to build.');
     for (const id of buildOptions) this.renderBuildButton(id);
     const buildReady = Boolean(this.root.querySelector('[data-tab="build"] .ready'));
-    this.root.querySelectorAll('[data-tab-button="build"], [data-sidebar-tab="build"]').forEach(tab => tab.classList.toggle('has-dot', buildReady));
+    this.root.querySelectorAll('[data-tab-button="build"], [data-sidebar-button="build"]').forEach(tab => tab.classList.toggle('has-dot', buildReady));
   }
 
   private renderBuildButton(id: StructureId): void {
