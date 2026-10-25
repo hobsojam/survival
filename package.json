@@ -13,6 +13,7 @@
     "phaser": "^4.2.1"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^5.0.5",
     "oxlint": "1.88.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",

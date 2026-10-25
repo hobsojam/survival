@@ -23,6 +23,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # SonarCloud reads git blame to tell new code from old.
+          fetch-depth: 0
 
       # Skip Node steps until the Vite/Phaser project is scaffolded (plan Task 1).
       - id: project
@@ -43,8 +45,24 @@ jobs:
       - if: steps.project.outputs.exists == 'true' && github.event_name != 'schedule'
         run: npm run lint
       - if: steps.project.outputs.exists == 'true' && github.event_name != 'schedule'
-        run: npm test -- --run
+        run: npm test -- --run --coverage
       - if: steps.project.outputs.exists == 'true' && github.event_name != 'schedule'
         run: npm run build
       - if: steps.project.outputs.exists == 'true'
         run: npm audit --audit-level=moderate
+
+      # Dependabot PRs are never analysed. Forks don't get the token, so they skip the scan instead of failing.
+      - id: sonar
+        if: steps.project.outputs.exists == 'true' && github.event_name != 'schedule' && github.actor != 'dependabot[bot]'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -n "$SONAR_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::SONAR_TOKEN is not available; skipping SonarCloud analysis."
+          fi
+      - if: steps.sonar.outputs.enabled == 'true'
+        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
