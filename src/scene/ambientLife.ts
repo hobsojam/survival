@@ -29,6 +29,28 @@ function sprite(scene: Phaser.Scene, name: string, frame: string, depth = 0): Ph
 }
 
 /** Pixel wildlife reads game state but never changes it. */
+/** Fleeing birds climb and fade out, returning ones descend and fade in, short hops arc. */
+function flightArc(kind: BirdFlightKind, progress: number): { height: number; alpha: number } {
+  if (kind === 'flee') return { height: progress * 2, alpha: Math.min(1, (1 - progress) / 0.3) };
+  if (kind === 'return') return { height: (1 - progress) * 2, alpha: Math.min(1, progress / 0.3) };
+  return { height: Math.sin(progress * Math.PI) * 1.2, alpha: 1 };
+}
+
+function landBird(bird: Bird, flight: Flight, timeMs: number): void {
+  bird.flight = null;
+  if (flight.kind === 'flee') {
+    bird.away = flight.to;
+    bird.restSeconds = 8 + bird.index * 2.5;
+  } else if (flight.kind === 'forage') {
+    bird.ground = flight.to;
+    bird.forageUntilMs = timeMs + 3500;
+  } else {
+    bird.ground = bird.home;
+    bird.nextForageAtMs = timeMs + 12000 + bird.index * 1700;
+    if (flight.kind === 'return') bird.away = null;
+  }
+}
+
 export class AmbientLife {
   private readonly birds: Bird[];
   private readonly fox: Phaser.GameObjects.Image;
@@ -78,79 +100,61 @@ export class AmbientLife {
   private updateBird(bird: Bird, state: GameState, dark: number, seconds: number, timeMs: number): void {
     const player = state.player;
     bird.restSeconds = Math.max(0, bird.restSeconds - seconds);
-    if (bird.flight) {
-      const flight = bird.flight;
-      if (flight.kind === 'forage' || flight.kind === 'home') {
-        const progress = Math.min(1, flight.elapsed / flight.duration);
-        const position = { x: lerp(flight.from.x, flight.to.x, progress), y: lerp(flight.from.y, flight.to.y, progress) };
-        if (birdShouldLeave(position, player, dark)) {
-          this.startBirdFlee(bird, position, player, dark);
-          return;
-        }
-      }
-      flight.elapsed += seconds;
-      const progress = Math.min(1, flight.elapsed / flight.duration);
-      let height = Math.sin(progress * Math.PI) * 1.2;
-      let alpha = 1;
-      if (flight.kind === 'flee') {
-        height = progress * 2;
-        alpha = Math.min(1, (1 - progress) / 0.3);
-      } else if (flight.kind === 'return') {
-        height = (1 - progress) * 2;
-        alpha = Math.min(1, progress / 0.3);
-      }
-      const x = lerp(flight.from.x, flight.to.x, progress);
-      const y = lerp(flight.from.y, flight.to.y, progress) - height;
-      const facing = Math.sign(flight.to.x - flight.from.x) || 1;
-      this.show(bird.image, x, y, birdFlightFrame(flight.elapsed), facing, alpha);
-      if (progress >= 1) {
-        bird.flight = null;
-        if (flight.kind === 'flee') {
-          bird.away = flight.to;
-          bird.restSeconds = 8 + bird.index * 2.5;
-        } else if (flight.kind === 'forage') {
-          bird.ground = flight.to;
-          bird.forageUntilMs = timeMs + 3500;
-        } else {
-          bird.ground = bird.home;
-          bird.nextForageAtMs = timeMs + 12000 + bird.index * 1700;
-          if (flight.kind === 'return') bird.away = null;
-        }
-      }
-      return;
-    }
-    if (!bird.away && birdShouldLeave(bird.ground, player, dark)) {
-      this.startBirdFlee(bird, bird.ground, player, dark);
-    } else if (bird.away && bird.restSeconds <= 0 && birdMayReturn(bird.home, player, dark)) {
+    if (bird.flight) this.updateFlight(bird, bird.flight, player, dark, seconds, timeMs);
+    else if (!bird.away && birdShouldLeave(bird.ground, player, dark)) this.startBirdFlee(bird, bird.ground, player, dark);
+    else if (bird.away && bird.restSeconds <= 0 && birdMayReturn(bird.home, player, dark)) {
       bird.flight = { from: bird.away, to: bird.home, elapsed: 0, duration: FLIGHT_SECONDS * 1.4, kind: 'return' };
-    } else if (!bird.away) {
-      if (bird.forageUntilMs > 0) {
-        const bushReady = state.nodes.some(node => node.id === bird.forageNodeId && node.amount > 0);
-        if (timeMs >= bird.forageUntilMs || !bushReady) {
-          bird.forageUntilMs = 0;
-          bird.forageNodeId = null;
-          bird.flight = { from: bird.ground, to: bird.home, elapsed: 0, duration: FLIGHT_SECONDS, kind: 'home' };
-          return;
-        }
-        this.show(bird.image, bird.ground.x, bird.ground.y, `bird:peck${Math.floor(timeMs / 170) % 2}`);
+    } else if (!bird.away) this.updateGroundedBird(bird, state, timeMs);
+    else bird.image.setVisible(false);
+  }
+
+  private updateFlight(bird: Bird, flight: Flight, player: Point, dark: number, seconds: number, timeMs: number): void {
+    if (flight.kind === 'forage' || flight.kind === 'home') {
+      const progress = Math.min(1, flight.elapsed / flight.duration);
+      const position = { x: lerp(flight.from.x, flight.to.x, progress), y: lerp(flight.from.y, flight.to.y, progress) };
+      if (birdShouldLeave(position, player, dark)) {
+        this.startBirdFlee(bird, position, player, dark);
         return;
       }
-      if (timeMs >= bird.nextForageAtMs) {
-        const target = birdForageTarget(bird.home, state.nodes, Math.random());
-        bird.nextForageAtMs = timeMs + 12000 + bird.index * 1700;
-        if (target) {
-          bird.forageNodeId = target.id;
-          bird.flight = {
-            from: bird.ground, to: { x: target.x + 0.35, y: target.y + 0.65 },
-            elapsed: 0, duration: FLIGHT_SECONDS, kind: 'forage'
-          };
-          return;
-        }
+    }
+    flight.elapsed += seconds;
+    const progress = Math.min(1, flight.elapsed / flight.duration);
+    const { height, alpha } = flightArc(flight.kind, progress);
+    const x = lerp(flight.from.x, flight.to.x, progress);
+    const y = lerp(flight.from.y, flight.to.y, progress) - height;
+    const facing = Math.sign(flight.to.x - flight.from.x) || 1;
+    this.show(bird.image, x, y, birdFlightFrame(flight.elapsed), facing, alpha);
+    if (progress >= 1) landBird(bird, flight, timeMs);
+  }
+
+  /** A bird on the ground pecks at a bush, sets off to forage, or hops about at home. */
+  private updateGroundedBird(bird: Bird, state: GameState, timeMs: number): void {
+    if (bird.forageUntilMs > 0) {
+      const bushReady = state.nodes.some(node => node.id === bird.forageNodeId && node.amount > 0);
+      if (timeMs >= bird.forageUntilMs || !bushReady) {
+        bird.forageUntilMs = 0;
+        bird.forageNodeId = null;
+        bird.flight = { from: bird.ground, to: bird.home, elapsed: 0, duration: FLIGHT_SECONDS, kind: 'home' };
+        return;
       }
-      const frame = birdGroundFrame(bird.index, timeMs);
-      const hop = frame === 'bird:hop' ? 1 : 0;
-      this.show(bird.image, bird.ground.x, bird.ground.y - hop / 16, frame, bird.index % 2 ? 1 : -1);
-    } else bird.image.setVisible(false);
+      this.show(bird.image, bird.ground.x, bird.ground.y, `bird:peck${Math.floor(timeMs / 170) % 2}`);
+      return;
+    }
+    if (timeMs >= bird.nextForageAtMs) {
+      const target = birdForageTarget(bird.home, state.nodes, Math.random());
+      bird.nextForageAtMs = timeMs + 12000 + bird.index * 1700;
+      if (target) {
+        bird.forageNodeId = target.id;
+        bird.flight = {
+          from: bird.ground, to: { x: target.x + 0.35, y: target.y + 0.65 },
+          elapsed: 0, duration: FLIGHT_SECONDS, kind: 'forage'
+        };
+        return;
+      }
+    }
+    const frame = birdGroundFrame(bird.index, timeMs);
+    const hop = frame === 'bird:hop' ? 1 : 0;
+    this.show(bird.image, bird.ground.x, bird.ground.y - hop / 16, frame, bird.index % 2 ? 1 : -1);
   }
 
   private updateFox(state: GameState, seconds: number, timeMs: number): void {
