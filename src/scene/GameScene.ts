@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceKind, type SiteId, type TreeNode } from '../game/state';
-import { advanceTime, applyAction, isAtCamp, isColdNight, sleepBlocker, type GameAction } from '../game/rules';
+import { BALANCE, type GameState } from '../game/state';
+import { advanceTime, applyAction, isColdNight, type GameAction } from '../game/rules';
 import { TILE, worldX, worldY, drawTerrain } from './art';
 import { terrainKey } from './map';
 import { sceneVisuals, playerVisualDepth, WEATHER_DEPTH } from './visuals';
@@ -11,60 +11,10 @@ import { LOGICAL_WIDTH, LOGICAL_HEIGHT } from './pixelScale';
 import { facingFromInput, selectSurvivorVisual, type Facing, type SurvivorAction } from './survivorVisual';
 import { SceneEffects } from './SceneEffects';
 import { SceneLighting } from './SceneLighting';
-import { closestGatherable, hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type Gatherable, type TapTarget } from './tapTarget';
+import { hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from './tapTarget';
 import { palette } from '../art/palette';
-import { sitePrompt } from '../game/sitePrompt';
-import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 import type { SoundCue } from '../game/soundscape';
-
-/** Single-press keys that map straight to an action; E, X and V need a target and are handled apart. */
-const KEY_ACTIONS: [string, GameAction][] = [
-  ['F', { type: 'stokeFire' }], ['R', { type: 'rest' }], ['Q', { type: 'eat' }], ['T', { type: 'eatTrailFood' }],
-  ['P', { type: 'prepareTrailFood' }], ['C', { type: 'cook' }], ['G', { type: 'stargaze' }], ['Z', { type: 'sleep' }],
-  ['L', { type: 'repairLookout' }]
-];
-
-const ACTION_POSES: Partial<Record<GameAction['type'], SurvivorAction>> = {
-  gather: 'gather', rest: 'rest', cook: 'cook', stargaze: 'stargaze',
-  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather'
-};
-
-const GATHER_PROMPTS: Record<ResourceKind, string> = {
-  branch: 'E  Pick up fallen branches', berry: 'E  Pick berries', fiber: 'E  Gather fiber', stone: 'E  Collect stone'
-};
-
-function gatherPrompt(found: Gatherable): string {
-  if (found.kind === 'pile') return `E  Pick up stone (×${found.pile.count})`;
-  return found.kind === 'node' ? GATHER_PROMPTS[found.node.kind] : GATHER_PROMPTS.branch;
-}
-
-function gatherAction(found: Gatherable | undefined): GameAction | undefined {
-  switch (found?.kind) {
-    case 'node': return { type: 'gather', nodeId: found.node.id };
-    case 'pile': return { type: 'pickUpStone', pileId: found.pile.id };
-    case 'rubble': return { type: 'gatherRubble' };
-    case 'quarry': return { type: 'digQuarry' };
-    default: return undefined;
-  }
-}
-
-/** Where a gathering action happened, read from the state before it, for the pick-up sparkle. */
-function gatherSpot(action: GameAction, before: GameState): { x: number; y: number; kind: ResourceKind } | undefined {
-  switch (action.type) {
-    case 'gather': return before.nodes.find(item => item.id === action.nodeId);
-    case 'chopTree': {
-      const tree = before.trees.find(item => item.id === action.treeId);
-      return tree && { x: tree.x, y: tree.y, kind: 'branch' };
-    }
-    case 'pickUpStone': {
-      const pile = before.stonePiles.find(item => item.id === action.pileId);
-      return pile && { x: pile.x, y: pile.y, kind: 'stone' };
-    }
-    case 'gatherRubble': return { ...RUBBLE_SITE, kind: 'stone' };
-    case 'digQuarry': return { ...QUARRY_SITE, kind: 'stone' };
-    default: return undefined;
-  }
-}
+import { KEY_ACTIONS, actionPose, closestSite, closestTree, gatherKeyAction, gatherSpot, promptFor } from './prompts';
 
 export class GameScene extends Phaser.Scene {
   private state: GameState;
@@ -163,7 +113,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private pressGather(): void {
-    const action = gatherAction(closestGatherable(this.state)) ?? (isAtCamp(this.state) ? { type: 'rest' as const } : undefined);
+    const action = gatherKeyAction(this.state);
     if (action) this.perform(action);
     else {
       this.cancelWalk();
@@ -172,7 +122,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private pressChop(): void {
-    const tree = this.closestTree();
+    const tree = closestTree(this.state);
     if (tree) this.perform({ type: 'chopTree', treeId: tree.id });
     else {
       this.cancelWalk();
@@ -219,7 +169,7 @@ export class GameScene extends Phaser.Scene {
     if (spot) this.effects?.trigger('gather', this.time.now, spot.x, spot.y, spot.kind);
     if (action.type === 'cook' || action.type === 'stargaze')
       this.effects?.trigger(action.type, this.time.now, this.state.player.x, this.state.player.y);
-    const pose = ACTION_POSES[action.type];
+    const pose = actionPose(action.type);
     if (pose) this.visualAction = { kind: pose, startedAtMs: this.time.now };
   }
 
@@ -231,52 +181,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   getPrompt(): string {
-    const found = closestGatherable(this.state);
-    if (this.state.area === 'quarry') return this.quarryPrompt(found);
-    const site = this.closestSite();
-    const nearby = this.lookoutPrompt() || (site ? sitePrompt(this.state, site.id) : '') || this.treePrompt();
-    if (found) {
-      const gather = gatherPrompt(found);
-      if (nearby) return `${gather} · ${nearby}`;
-      return sleepBlocker(this.state) ? gather : `${gather} · Z Sleep until morning`;
-    }
-    return nearby || this.campPrompt();
-  }
-
-  private lookoutPrompt(): string {
-    if (!this.within(LOOKOUT)) return '';
-    if (this.state.progress.lookoutRepaired) return 'The lookout stands again';
-    if (this.state.progress.hearthUnlocked) return 'L  Repair lookout';
-    return 'Lookout · weather the cold front first';
-  }
-
-  private treePrompt(): string {
-    const tree = this.closestTree();
-    if (!tree) return '';
-    if (tree.readyDay > this.state.day) return `Stump · regrows day ${tree.readyDay}`;
-    if (this.state.progress.axeCrafted) return 'X  Chop mature tree';
-    return 'Mature tree · craft an axe at camp';
-  }
-
-  private campPrompt(): string {
-    if (pathOpen(this.state) && this.within(CAMP_EXIT)) return 'Walk west to leave camp';
-    if (!isAtCamp(this.state)) return 'WASD / arrows  Move';
-    if (!sleepBlocker(this.state)) return 'At camp · C Cook · G Stargaze · Z Sleep · F Fire';
-    if (this.state.timeOfDay >= BALANCE.nightStart) return 'At camp · C Cook · G Stargaze · F Fire · R Rest';
-    return 'At camp · F Fire · R Rest · Click an upgrade to build';
-  }
-
-  private quarryPrompt(found: Gatherable | undefined): string {
-    if (found?.kind === 'pile') return `E  Pick up stone (×${found.pile.count})`;
-    if (found?.kind === 'rubble') return 'E  Gather rubble';
-    if (found?.kind === 'quarry') return this.state.progress.pickaxeCrafted ? 'E  Dig the quarry' : 'Quarry · craft a pickaxe at the toolshed';
-    if (this.within(QUARRY_SITE) && this.state.quarryReadyDay > this.state.day) return 'Quarry · worked out until morning';
-    if (this.within(QUARRY_EXIT)) return 'Walk east to return to camp';
-    return 'WASD / arrows  Move';
-  }
-
-  private within(point: { x: number; y: number }): boolean {
-    return Math.hypot(this.state.player.x - point.x, this.state.player.y - point.y) <= BALANCE.interactionRadius;
+    return promptFor(this.state);
   }
 
   getState(): GameState { return this.state; }
@@ -291,7 +196,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   visitNearestSite(): void {
-    const site = this.closestSite();
+    const site = closestSite(this.state);
     if (site) this.perform({ type: 'visitSite', siteId: site.id });
     else {
       this.cancelWalk();
@@ -347,21 +252,6 @@ export class GameScene extends Phaser.Scene {
       .strokeCircle(0, 0, 5)
       .setDepth(WEATHER_DEPTH + 1);
     this.tweens.add({ targets: ring, alpha: 0, scale: 1.4, duration: 400, onComplete: () => ring.destroy() });
-  }
-
-  private closestTree(): TreeNode | undefined {
-    if (this.state.area !== 'camp') return undefined;
-    return this.state.trees
-      .filter(tree => Math.hypot(tree.x - this.state.player.x, tree.y - this.state.player.y) <= BALANCE.interactionRadius)
-      .sort((a, b) => Math.hypot(a.x - this.state.player.x, a.y - this.state.player.y) - Math.hypot(b.x - this.state.player.x, b.y - this.state.player.y))[0];
-  }
-
-  private closestSite(): { id: SiteId; name: string; x: number; y: number } | undefined {
-    if (this.state.area !== 'camp') return undefined;
-    return (Object.keys(SITES) as SiteId[])
-      .map(id => ({ id, ...SITES[id] }))
-      .filter(site => Math.hypot(site.x - this.state.player.x, site.y - this.state.player.y) <= BALANCE.interactionRadius)
-      .sort((a, b) => Math.hypot(a.x - this.state.player.x, a.y - this.state.player.y) - Math.hypot(b.x - this.state.player.x, b.y - this.state.player.y))[0];
   }
 
   private paintObjects(): void {
