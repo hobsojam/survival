@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BALANCE, LOOKOUT, createGame, type GameState } from '../src/game/state';
 import { QUARRY_SITE } from '../src/game/areas';
 import { advanceTime, applyAction, buildStatus } from '../src/game/rules';
-import { ALL_NEED_ALERTS, isExhausted, isHungry, isStarving, isTired, needAlerts, needsMessage } from '../src/game/needs';
+import { ALL_NEED_ALERTS, isExhausted, isLowMeter, isHungry, isStarving, isTired, needAlerts, needsMessage } from '../src/game/needs';
 
 /** A survivor at the fire with the given energy and hunger, wood for a crate, berries, and room in the bag. */
 function camp(energy: number, hunger = 100): GameState {
@@ -20,6 +20,10 @@ describe('need levels', () => {
     expect([isExhausted(camp(10)), isExhausted(camp(9.9))]).toEqual([false, true]);
     expect([isHungry(camp(100, 21)), isHungry(camp(100, 20))]).toEqual([false, true]);
     expect([isStarving(camp(100, 0.1)), isStarving(camp(100, 0))]).toEqual([false, true]);
+  });
+
+  it('marks any meter at 20 or less as low, for the amber bars', () => {
+    expect([isLowMeter(20.4), isLowMeter(20), isLowMeter(0)]).toEqual([false, true, true]);
   });
 });
 

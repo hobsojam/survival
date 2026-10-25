@@ -1,4 +1,5 @@
 import { BALANCE, BUILDINGS, SITES, type GameState, type SiteId, type StructureId } from '../game/state';
+import { workSeconds } from '../game/needs';
 import { axeBlocker, bagCapacity, buildStatus, carriedCount, isAtCamp, isColdNight, lookoutRepairBlocker, pickaxeBlocker, trailFoodBlocker } from '../game/rules';
 import { forecastFireCheck } from '../game/forecast';
 import type { LoadResult } from '../game/save';
@@ -92,7 +93,7 @@ export function bagView(state: GameState): BagView {
   return {
     spaces: `${carriedCount(state)}/${bagCapacity(state)}`,
     prepareReady: !prepareBlocker,
-    prepareHint: prepareBlocker ?? '1 berry · 12 seconds · 1 ration',
+    prepareHint: prepareBlocker ?? `1 berry · ${workSeconds(state, BALANCE.trailFoodSeconds)} seconds · 1 ration`,
     pileShown: pile,
     storedAtCamp: pile ? `+${state.storedStone} at camp` : '',
     pileStored: `Stored stone ${state.storedStone}/${BALANCE.stonePileCapacity}`,

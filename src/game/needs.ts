@@ -1,8 +1,11 @@
 import { BALANCE, type GameState } from './state';
 
-export const isTired = (state: GameState): boolean => state.player.energy <= BALANCE.lowNeed;
+/** Any meter at or below the low line: the bars turn amber and walking slows. */
+export const isLowMeter = (value: number): boolean => value <= BALANCE.lowNeed;
+
+export const isTired = (state: GameState): boolean => isLowMeter(state.player.energy);
 export const isExhausted = (state: GameState): boolean => state.player.energy < BALANCE.exhaustedEnergy;
-export const isHungry = (state: GameState): boolean => state.player.hunger <= BALANCE.lowNeed;
+export const isHungry = (state: GameState): boolean => isLowMeter(state.player.hunger);
 export const isStarving = (state: GameState): boolean => state.player.hunger <= 0;
 
 export const TOO_TIRED_MESSAGE = "You're too tired for heavy work. Rest or sleep first.";

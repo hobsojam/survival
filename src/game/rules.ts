@@ -1,5 +1,5 @@
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } from './areas';
-import { TOO_TIRED_MESSAGE, isExhausted, isHungry, recovery, workSeconds } from './needs';
+import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
@@ -91,7 +91,8 @@ export function isColdNight(state: GameState): boolean {
 }
 
 export function movementFactor(state: GameState): number {
-  return state.player.energy <= 20 || state.player.hunger <= 20 || state.player.warmth <= 20 ? 0.65 : 1;
+  const { energy, hunger, warmth } = state.player;
+  return isLowMeter(energy) || isLowMeter(hunger) || isLowMeter(warmth) ? 0.65 : 1;
 }
 
 /** Why the survivor can't sleep right now, or null if they can. */
