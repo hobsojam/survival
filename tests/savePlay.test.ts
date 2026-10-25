@@ -24,7 +24,7 @@ function seeded(seed: number): () => number {
 }
 
 const structures = Object.keys(BUILDINGS) as StructureId[];
-const simple = ['eat', 'stokeFire', 'rest', 'sleep', 'cook', 'stargaze'] as const;
+const simple = ['eat', 'stokeFire', 'rest', 'sleep', 'cook', 'stargaze', 'burnFiber', 'dropStone', 'storeStone', 'takeStone'] as const;
 const activities: Activity[] = ['awake', 'working', 'resting'];
 
 describe('saving during long random play', () => {
@@ -57,7 +57,11 @@ describe('saving during long random play', () => {
           goTo(BALANCE.campX + random() * 2 - 1, BALANCE.campY + random() * 2 - 1);
           act({ type: 'build', structureId: random() < 0.7 && goal ? goal : pick(structures) });
         } else if (roll < 0.97) act({ type: pick(simple) });
-        else act({ type: 'move', dx: (random() - 0.5) * 80, dy: (random() - 0.5) * 60 });
+        else if (roll < 0.985 && state.stonePiles.length) {
+          const pile = pick(state.stonePiles);
+          goTo(pile.x, pile.y);
+          act({ type: 'pickUpStone', pileId: pile.id });
+        } else act({ type: 'move', dx: (random() - 0.5) * 80, dy: (random() - 0.5) * 60 });
         const saved = saveGame(storage, state);
         expect(saved, `step ${step}, day ${state.day}`).toEqual({ ok: true });
       }
