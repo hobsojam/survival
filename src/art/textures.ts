@@ -3,26 +3,37 @@ import { palette } from './palette';
 import { sprites, type SpriteDef } from './sprites';
 
 export function validateSprite(def: SpriteDef): void {
-  const [width, height] = def.size;
-  const [anchorX, anchorY] = def.anchor;
-  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) throw new Error('Invalid sprite size.');
-  if (!Number.isInteger(anchorX) || !Number.isInteger(anchorY) || anchorX < 0 || anchorX >= width || anchorY < 0 || anchorY >= height) throw new Error('Invalid sprite anchor.');
+  validateBounds(def);
   for (const [symbol, color] of Object.entries(def.legend)) {
     if (symbol.length !== 1 || symbol === '.' || !(color in palette)) throw new Error(`Invalid palette symbol ${symbol}.`);
   }
   if (Object.keys(def.frames).length === 0) throw new Error('Sprite has no frames.');
-  for (const [name, rows] of Object.entries(def.frames)) {
-    if (rows.length !== height) throw new Error(`Frame ${name} has wrong height.`);
-    for (const row of rows) {
-      if (row.length !== width) throw new Error(`Frame ${name} has wrong width.`);
-      for (const symbol of row) if (symbol !== '.' && !(symbol in def.legend)) throw new Error(`Frame ${name} has unknown symbol ${symbol}.`);
-    }
+  for (const [name, rows] of Object.entries(def.frames)) validateFrame(def, name, rows);
+  for (const [name, animation] of Object.entries(def.animations ?? {})) validateAnimation(def, name, animation);
+}
+
+const inRange = (value: number, limit: number): boolean => Number.isInteger(value) && value >= 0 && value < limit;
+
+function validateBounds(def: SpriteDef): void {
+  const [width, height] = def.size;
+  const [anchorX, anchorY] = def.anchor;
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) throw new Error('Invalid sprite size.');
+  if (!inRange(anchorX, width) || !inRange(anchorY, height)) throw new Error('Invalid sprite anchor.');
+}
+
+function validateFrame(def: SpriteDef, name: string, rows: SpriteDef['frames'][string]): void {
+  const [width, height] = def.size;
+  if (rows.length !== height) throw new Error(`Frame ${name} has wrong height.`);
+  for (const row of rows) {
+    if (row.length !== width) throw new Error(`Frame ${name} has wrong width.`);
+    for (const symbol of row) if (symbol !== '.' && !(symbol in def.legend)) throw new Error(`Frame ${name} has unknown symbol ${symbol}.`);
   }
-  for (const [name, animation] of Object.entries(def.animations ?? {})) {
-    if (!animation.frames.length || !Number.isFinite(animation.frameRate) || animation.frameRate <= 0) throw new Error(`Invalid animation ${name}.`);
-    if (!Number.isInteger(animation.repeat) || animation.repeat < -1) throw new Error(`Invalid animation ${name} repeat.`);
-    for (const frame of animation.frames) if (!(frame in def.frames)) throw new Error(`Animation ${name} uses missing frame ${frame}.`);
-  }
+}
+
+function validateAnimation(def: SpriteDef, name: string, animation: NonNullable<SpriteDef['animations']>[string]): void {
+  if (!animation.frames.length || !Number.isFinite(animation.frameRate) || animation.frameRate <= 0) throw new Error(`Invalid animation ${name}.`);
+  if (!Number.isInteger(animation.repeat) || animation.repeat < -1) throw new Error(`Invalid animation ${name} repeat.`);
+  for (const frame of animation.frames) if (!(frame in def.frames)) throw new Error(`Animation ${name} uses missing frame ${frame}.`);
 }
 
 export function rasterizeFrame(def: SpriteDef, frame: string): Uint8ClampedArray {

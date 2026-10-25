@@ -126,7 +126,7 @@ export function buildStatus(state: GameState, id: StructureId): BuildStatus {
 
 export function advanceTime(state: GameState, seconds: number, activity: Activity = 'awake'): GameState {
   if (!Number.isFinite(seconds) || seconds <= 0) return state;
-  let next: GameState = {
+  const next: GameState = {
     ...state,
     player: { ...state.player },
     progress: { ...state.progress },
@@ -135,49 +135,51 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
   let remaining = seconds;
   while (remaining > 0.000001) {
     const step = Math.min(remaining, 1, BALANCE.daySeconds - next.timeOfDay);
-    const night = next.timeOfDay >= BALANCE.nightStart;
     const camp = isAtCamp(next);
-    const lit = next.fireFuel > 0;
     const coldNight = isColdNight(next);
     next.player.hunger = Math.max(0, next.player.hunger - step / 8);
     if (activity === 'awake') next.player.energy = Math.max(0, next.player.energy - step * BALANCE.energyDrainPerSecond);
-    let warmthChange = step / 10;
-    if (night && camp && lit) {
-      warmthChange = step / 2;
-    } else if (night && coldNight) {
-      const lossPerSecond = camp && next.structures.shelter
-        ? BALANCE.coldNightShelteredWarmthLossPerSecond
-        : BALANCE.coldNightOutdoorWarmthLossPerSecond;
-      warmthChange = -step * lossPerSecond;
-    } else if (night && camp && next.structures.shelter) {
-      warmthChange = -step / 4;
-    } else if (night) {
-      warmthChange = -step / 2;
-    }
-    if (night && camp && !lit && next.structures.windbreak && warmthChange < 0) warmthChange *= 0.5;
-    next.player.warmth = Math.max(0, Math.min(100, next.player.warmth + warmthChange));
+    next.player.warmth = Math.max(0, Math.min(100, next.player.warmth + warmthChange(next, step, camp, coldNight)));
     next.fireFuel = Math.max(0, next.fireFuel - step * (coldNight ? BALANCE.coldNightFireBurn : 1));
     next.timeOfDay += step;
     remaining -= step;
-    if (next.timeOfDay >= BALANCE.daySeconds - 0.000001) {
-      const stormEnded = next.progress.nextStormDay === next.day;
-      const weathered = stormEnded && camp && next.structures.shelter && next.fireFuel > 0 && next.player.warmth > 20;
-      next.day += 1;
-      next.timeOfDay = 0;
-      // Rocks give their stone once; everything else grows back at dawn.
-      next.nodes = next.nodes.map(node => node.kind !== 'stone' && node.readyDay <= next.day ? { ...node, amount: 1 } : node);
-      if (stormEnded) {
-        next.progress = weathered
-          ? { ...next.progress, nextStormDay: null, hearthUnlocked: true }
-          : { ...next.progress, nextStormDay: next.day + BALANCE.coldNightRetryDays - 1, hearthUnlocked: false };
-        if (!weathered) {
-          next.player.energy = Math.min(next.player.energy, BALANCE.coldNightFailureEnergy);
-          next.timeOfDay = BALANCE.coldNightFailureMorningLoss;
-        }
-      }
-    }
+    if (next.timeOfDay >= BALANCE.daySeconds - 0.000001) dawn(next, camp);
   }
   return next;
+}
+
+/** How much warmth one step of time adds or takes, read before the step's fire burn. */
+function warmthChange(state: GameState, step: number, camp: boolean, coldNight: boolean): number {
+  if (state.timeOfDay < BALANCE.nightStart) return step / 10;
+  const lit = state.fireFuel > 0;
+  if (camp && lit) return step / 2;
+  let change = -step / 2;
+  if (coldNight) {
+    change = -step * (camp && state.structures.shelter
+      ? BALANCE.coldNightShelteredWarmthLossPerSecond
+      : BALANCE.coldNightOutdoorWarmthLossPerSecond);
+  } else if (camp && state.structures.shelter) {
+    change = -step / 4;
+  }
+  return camp && !lit && state.structures.windbreak ? change * 0.5 : change;
+}
+
+/** Starts the next day in place: regrows nodes and settles the cold night if it just ended. */
+function dawn(next: GameState, camp: boolean): void {
+  const stormEnded = next.progress.nextStormDay === next.day;
+  const weathered = stormEnded && camp && next.structures.shelter && next.fireFuel > 0 && next.player.warmth > 20;
+  next.day += 1;
+  next.timeOfDay = 0;
+  // Rocks give their stone once; everything else grows back at dawn.
+  next.nodes = next.nodes.map(node => node.kind !== 'stone' && node.readyDay <= next.day ? { ...node, amount: 1 } : node);
+  if (!stormEnded) return;
+  if (weathered) {
+    next.progress = { ...next.progress, nextStormDay: null, hearthUnlocked: true };
+    return;
+  }
+  next.progress = { ...next.progress, nextStormDay: next.day + BALANCE.coldNightRetryDays - 1, hearthUnlocked: false };
+  next.player.energy = Math.min(next.player.energy, BALANCE.coldNightFailureEnergy);
+  next.timeOfDay = BALANCE.coldNightFailureMorningLoss;
 }
 
 export function applyAction(state: GameState, action: GameAction): ActionResult {

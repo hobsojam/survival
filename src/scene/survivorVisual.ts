@@ -24,6 +24,17 @@ export function facingFromInput(horizontal: number, vertical: number, previous: 
   return previous;
 }
 
+/** The pose for an action still playing out, or null once it has finished. */
+function actionVisual(state: SurvivorVisualState): SurvivorVisual | null {
+  if (!state.action) return null;
+  const { kind, startedAtMs } = state.action;
+  const elapsed = state.nowMs - startedAtMs;
+  if (elapsed < 0 || elapsed >= actionDurationMs[kind]) return null;
+  const frame = kind === 'gather' ? Math.min(1, Math.floor(elapsed / 250)) : Math.floor(elapsed / 250) % 2;
+  const sidePose = kind === 'gather' || kind === 'cook';
+  return { texture: `survivor:${kind}${frame}`, flipX: sidePose && state.facing === 'left' };
+}
+
 export function selectSurvivorVisual(state: SurvivorVisualState): SurvivorVisual {
   if (state.moving) {
     let group = 'walkSide';
@@ -32,15 +43,8 @@ export function selectSurvivorVisual(state: SurvivorVisualState): SurvivorVisual
     const frame = Math.floor(state.nowMs / 125) % 4;
     return { texture: `survivor:${group}${frame}`, flipX: state.facing === 'left' };
   }
-  if (state.action) {
-    const elapsed = state.nowMs - state.action.startedAtMs;
-    if (elapsed >= 0 && elapsed < actionDurationMs[state.action.kind]) {
-      let frame = Math.floor(elapsed / 250) % 2;
-      if (state.action.kind === 'gather') frame = Math.min(1, Math.floor(elapsed / 250));
-      const sidePose = state.action.kind === 'gather' || state.action.kind === 'cook';
-      return { texture: `survivor:${state.action.kind}${frame}`, flipX: sidePose && state.facing === 'left' };
-    }
-  }
+  const action = actionVisual(state);
+  if (action) return action;
   if (state.warmth <= 20) {
     const frame = Math.floor(state.nowMs / 500) % 2;
     return { texture: `survivor:shiver${frame}`, flipX: false };

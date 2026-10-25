@@ -136,15 +136,24 @@ function fireBase(g: Grid, hearth: boolean): void {
   line(g, cx - 6, cy + 3, cx + 5, cy - 2, 'a'); line(g, cx - 5, cy - 2, cx + 6, cy + 3, 'c');
   dot(g, cx - 6, cy + 3, 'e'); dot(g, cx - 5, cy - 2, 'e');
 }
+function flameHeight(hearth: boolean, low: boolean): number {
+  if (low) return 6;
+  return hearth ? 14 : 12;
+}
+/** White at the base, then yellow, then orange toward the tip. */
+function flameShade(y: number, height: number): string {
+  if (y < height * .3) return 'w';
+  return y < height * .6 ? 'v' : 't';
+}
 function flames(g: Grid, hearth: boolean, mode: 'burning' | 'low' | 'windy' | 'lowWindy', frame: number): void {
   const cx = g[0].length / 2, base = g.length - 8;
   const low = mode === 'low' || mode === 'lowWindy';
-  const height = low ? 6 : hearth ? 14 : 12;
+  const height = flameHeight(hearth, low);
   const lean = mode === 'windy' || mode === 'lowWindy' ? 3 : 0;
   for (let y = 0; y < height; y++) {
     const half = Math.max(0, Math.floor((height - y) / 4));
     const x = cx + Math.round(lean * y / height) + (frame % 2 && y > height / 2 ? 1 : 0);
-    box(g, x - half, base - y, half * 2 + 1, 1, y < height * .3 ? 'w' : y < height * .6 ? 'v' : 't');
+    box(g, x - half, base - y, half * 2 + 1, 1, flameShade(y, height));
   }
   box(g, cx - 2, base - 3, 4, 3, 'u'); box(g, cx - 1, base - 4, 2, 3, 'w');
   dot(g, cx + lean + frame - 1, base - height - frame % 2, low ? 'v' : 'w');
