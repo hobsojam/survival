@@ -1,4 +1,4 @@
-import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
+import { BALANCE, BUILDINGS, SITES, type GameState, type SiteId, type StructureId } from '../game/state';
 import { axeBlocker, bagCapacity, buildStatus, carriedCount, isAtCamp, isColdNight, lookoutRepairBlocker, pickaxeBlocker, trailFoodBlocker } from '../game/rules';
 import { forecastFireCheck } from '../game/forecast';
 import type { LoadResult } from '../game/save';
@@ -42,6 +42,12 @@ export function pickaxeView(state: GameState): ActionPanelView & { shown: boolea
     return { ...button, title: 'Pickaxe ready', copy: 'Stand at the quarry face and press E, or tap it, to dig a stone. It is ready again each dawn.', cost: 'Crafted' };
   }
   return { ...button, title: 'Craft a pickaxe', copy: blocker ?? 'Your toolshed is ready. Craft a pickaxe to work the quarry face.', cost: '2 wood · 1 fiber · 2 stone' };
+}
+
+/** The places along the paths found so far, for the Follow the paths panel. */
+export function sitesFound(state: GameState): string {
+  const found = (Object.keys(SITES) as SiteId[]).filter(id => state.progress.discoveries[id]).map(id => SITES[id].name);
+  return `Places found: ${found.length ? found.join(', ') : 'none yet'}`;
 }
 
 export function nightHint(state: GameState): string {

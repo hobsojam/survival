@@ -7,7 +7,7 @@ import { cookBlocker, isAtCamp, sleepBlocker, stargazeBlocker } from '../game/ru
 import { dayPhase, formatClock, nextChange } from '../game/clock';
 import { gateTap, nextOpenTab, type DockTab } from './dock';
 import { journalView, QUARRY_MARKER } from './journal';
-import { axeView, bagView, buildButtonView, forecastView, lookoutView, nightHint, pickaxeView, startNote, type ActionPanelView } from './panels';
+import { axeView, bagView, buildButtonView, forecastView, lookoutView, nightHint, pickaxeView, sitesFound, startNote, type ActionPanelView } from './panels';
 import { Soundscape } from '../game/soundscape';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
@@ -299,6 +299,7 @@ export class App {
     }
     const nearSite = this.state.area === 'camp' && (Object.keys(SITES) as SiteId[]).some(id => Math.hypot(player.x - SITES[id].x, player.y - SITES[id].y) <= BALANCE.interactionRadius);
     this.root.querySelector('#site-button')?.classList.toggle('ready', nearSite);
+    this.setText('sites-seen', sitesFound(this.state));
   }
 
   private renderBag(): void {

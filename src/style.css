@@ -63,10 +63,11 @@ kbd { display: inline-block; border: 1px solid #d4ddce; border-bottom-width: 2px
 .lookout-panel { background: linear-gradient(145deg, #f5efe1, #fffdf7 72%); border-color: #e7d9bd; }
 .lookout-panel h2 { margin-bottom: 7px; }
 .lookout-copy { min-height: 48px; margin: 0 0 12px; color: #6d725e; font-size: 12px; line-height: 1.45; }
-.lookout-panel button { width: 100%; border: 1px solid #bbd0b6; border-bottom-width: 2px; border-radius: 9px; background: #e7f0e2; color: #426447; padding: 10px; font-size: 12px; font-weight: 700; }
-.lookout-panel button.ready { background: #517d5b; border-color: #42724d; color: #fffdf7; }
+.lookout-panel button, .sites-panel button { width: 100%; border: 1px solid #bbd0b6; border-bottom-width: 2px; border-radius: 9px; background: #e7f0e2; color: #426447; padding: 10px; font-size: 12px; font-weight: 700; }
+.lookout-panel button.ready, .sites-panel button.ready { background: #517d5b; border-color: #42724d; color: #fffdf7; }
 .lookout-panel button:disabled { opacity: .55; cursor: default; }
-.lookout-panel small { display: block; margin-top: 7px; color: #887b66; text-align: center; font-size: 11px; }
+.sites-seen { margin: 0 0 12px; color: #4f6655; font-size: 12px; font-weight: 700; }
+.lookout-panel small, .sites-panel small { display: block; margin-top: 7px; color: #7a6d58; text-align: center; font-size: 11px; }
 .axe-panel { background: linear-gradient(145deg, #eaf0e3, #fffdf7 72%); border-color: #d2dfc5; }
 .axe-panel h2 { margin-bottom: 7px; }
 .axe-panel button { width: 100%; border: 1px solid #bbd0b6; border-bottom-width: 2px; border-radius: 9px; background: #e7f0e2; color: #426447; padding: 10px; font-size: 12px; font-weight: 700; }
