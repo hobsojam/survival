@@ -210,7 +210,9 @@ describe('stone axe and tree chopping', () => {
     expect(applyAction(cut, { type: 'chopTree', treeId: cut.trees[0].id }).state).toBe(cut);
     const regrown = advanceTime(cut, 3 * BALANCE.daySeconds);
     expect(regrown.day).toBe(7);
-    expect(applyAction(regrown, { type: 'chopTree', treeId: regrown.trees[0].id }).state.inventory.wood).toBe(4);
+    // Three days awake leaves the survivor exhausted; refresh them so only the tree is under test.
+    const refreshed = { ...regrown, player: { ...regrown.player, energy: 100, hunger: 100 } };
+    expect(applyAction(refreshed, { type: 'chopTree', treeId: regrown.trees[0].id }).state.inventory.wood).toBe(4);
   });
 
   it('does not chop from a distance or with fewer than two free bag slots', () => {

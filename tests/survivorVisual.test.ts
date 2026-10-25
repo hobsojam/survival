@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { facingFromInput, selectSurvivorVisual, type SurvivorVisualState } from '../src/scene/survivorVisual';
 
-const state: SurvivorVisualState = { facing: 'down', moving: false, warmth: 80, nowMs: 1000 };
+const state: SurvivorVisualState = { facing: 'down', moving: false, warmth: 80, energy: 80, hunger: 80, nowMs: 1000 };
 
 describe('survivor visual selection', () => {
   it('retains the last meaningful movement direction', () => {
@@ -41,5 +41,20 @@ describe('survivor visual selection', () => {
     expect(selectSurvivorVisual({ ...state, warmth: 20 }).texture).toBe('survivor:shiver0');
     expect(selectSurvivorVisual({ ...state, warmth: 20, nowMs: 1500 }).texture).toBe('survivor:shiver1');
     expect(selectSurvivorVisual({ ...state, warmth: 20, action }).texture).toBe('survivor:gather0');
+  });
+
+  it('slumps and yawns while idle and tired, after shivering', () => {
+    expect(selectSurvivorVisual({ ...state, energy: 20 }).texture).toBe('survivor:tired0');
+    expect(selectSurvivorVisual({ ...state, energy: 20, nowMs: 1500 }).texture).toBe('survivor:tired1');
+    expect(selectSurvivorVisual({ ...state, energy: 20, facing: 'left' })).toEqual({ texture: 'survivor:tired0', flipX: false });
+    expect(selectSurvivorVisual({ ...state, energy: 20, warmth: 20 }).texture).toBe('survivor:shiver0');
+    expect(selectSurvivorVisual({ ...state, energy: 20, moving: true }).texture).toBe('survivor:walkDown0');
+  });
+
+  it('holds a hungry stomach while idle, after tiredness', () => {
+    expect(selectSurvivorVisual({ ...state, hunger: 20 }).texture).toBe('survivor:hungry0');
+    expect(selectSurvivorVisual({ ...state, hunger: 20, nowMs: 1500 }).texture).toBe('survivor:hungry1');
+    expect(selectSurvivorVisual({ ...state, hunger: 20, energy: 20 }).texture).toBe('survivor:tired0');
+    expect(selectSurvivorVisual({ ...state, hunger: 20, action: { kind: 'rest', startedAtMs: 1000 } }).texture).toBe('survivor:rest0');
   });
 });

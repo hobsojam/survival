@@ -1,3 +1,5 @@
+import { isLowMeter } from '../game/needs';
+
 export type Facing = 'down' | 'up' | 'left' | 'right';
 export type SurvivorAction = 'gather' | 'rest' | 'cook' | 'stargaze';
 
@@ -5,6 +7,8 @@ export interface SurvivorVisualState {
   facing: Facing;
   moving: boolean;
   warmth: number;
+  energy: number;
+  hunger: number;
   nowMs: number;
   action?: { kind: SurvivorAction; startedAtMs: number };
 }
@@ -35,6 +39,14 @@ function actionVisual(state: SurvivorVisualState): SurvivorVisual | null {
   return { texture: `survivor:${kind}${frame}`, flipX: sidePose && state.facing === 'left' };
 }
 
+/** The idle pose a low meter calls for, coldest first: shivering, then tired, then hungry. */
+function idleNeedPose(state: SurvivorVisualState): 'shiver' | 'tired' | 'hungry' | null {
+  if (isLowMeter(state.warmth)) return 'shiver';
+  if (isLowMeter(state.energy)) return 'tired';
+  if (isLowMeter(state.hunger)) return 'hungry';
+  return null;
+}
+
 export function selectSurvivorVisual(state: SurvivorVisualState): SurvivorVisual {
   if (state.moving) {
     let group = 'walkSide';
@@ -45,10 +57,8 @@ export function selectSurvivorVisual(state: SurvivorVisualState): SurvivorVisual
   }
   const action = actionVisual(state);
   if (action) return action;
-  if (state.warmth <= 20) {
-    const frame = Math.floor(state.nowMs / 500) % 2;
-    return { texture: `survivor:shiver${frame}`, flipX: false };
-  }
+  const need = idleNeedPose(state);
+  if (need) return { texture: `survivor:${need}${Math.floor(state.nowMs / 500) % 2}`, flipX: false };
   if (state.facing === 'up') return { texture: 'survivor:walkUp0', flipX: false };
   if (state.facing === 'left' || state.facing === 'right') return { texture: 'survivor:walkSide0', flipX: state.facing === 'left' };
   const frame = Math.floor(state.nowMs / 500) % 2;

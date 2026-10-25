@@ -5,6 +5,7 @@ import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WID
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
 import { cookBlocker, isAtCamp, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { dayPhase, formatClock, nextChange } from '../game/clock';
+import { isLowMeter } from '../game/needs';
 import { gateTap, nextOpenTab, type DockTab } from './dock';
 import { journalView, QUARRY_MARKER } from './journal';
 import { axeView, bagView, buildButtonView, forecastView, lookoutView, nightHint, pickaxeView, sitesFound, startNote, type ActionPanelView } from './panels';
@@ -292,10 +293,14 @@ export class App {
     for (const key of ['energy', 'hunger', 'warmth'] as const) {
       const value = Math.round(player[key]);
       this.setText(`${key}-value`, String(value));
-      const bar = this.root.querySelector<HTMLElement>(`#${key}-bar`);
-      if (bar) bar.style.width = `${value}%`;
-      const mini = this.root.querySelector<HTMLElement>(`#mini-${key}`);
-      if (mini) mini.style.width = `${value}%`;
+      const low = isLowMeter(player[key]);
+      for (const id of [`${key}-bar`, `mini-${key}`]) {
+        const fill = this.root.querySelector<HTMLElement>(`#${id}`);
+        if (!fill) continue;
+        fill.style.width = `${value}%`;
+        fill.classList.toggle('low', low);
+      }
+      this.root.querySelector(`#${key}-value`)?.classList.toggle('low', low);
     }
     const nearSite = this.state.area === 'camp' && (Object.keys(SITES) as SiteId[]).some(id => Math.hypot(player.x - SITES[id].x, player.y - SITES[id].y) <= BALANCE.interactionRadius);
     this.root.querySelector('#site-button')?.classList.toggle('ready', nearSite);

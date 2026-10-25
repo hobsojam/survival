@@ -14,6 +14,7 @@ import { SceneLighting } from './SceneLighting';
 import { hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from './tapTarget';
 import { palette } from '../art/palette';
 import type { SoundCue } from '../game/soundscape';
+import { ALL_NEED_ALERTS, needAlerts, needsMessage, type NeedAlert } from '../game/needs';
 import { KEY_ACTIONS, actionPose, closestSite, closestTree, gatherKeyAction, gatherSpot, promptFor } from './prompts';
 
 export class GameScene extends Phaser.Scene {
@@ -36,6 +37,7 @@ export class GameScene extends Phaser.Scene {
   private terrain: Phaser.GameObjects.GameObject[] = [];
   private terrainShown = '';
   private areaShown = '';
+  private needsArmed: ReadonlySet<NeedAlert> = new Set(ALL_NEED_ALERTS);
 
   constructor(state: GameState, onStateChange: (state: GameState, cause: 'action' | 'tick') => void, onFeedback: (message: string) => void, onSound: (cue: SoundCue) => void = () => undefined) {
     super({ key: 'GameScene' });
@@ -131,7 +133,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private syncPlayerSprite(moving: boolean): void {
-    const visual = selectSurvivorVisual({ facing: this.facing, moving, warmth: this.state.player.warmth,
+    const { warmth, energy, hunger } = this.state.player;
+    const visual = selectSurvivorVisual({ facing: this.facing, moving, warmth, energy, hunger,
       nowMs: this.time.now, action: this.visualAction });
     if (this.playerSprite.texture.key !== visual.texture) this.playerSprite.setTexture(visual.texture);
     this.playerSprite.setPosition(Math.round(worldX(this.state.player.x)), Math.round(worldY(this.state.player.y)));
@@ -152,9 +155,8 @@ export class GameScene extends Phaser.Scene {
     this.showMorningFrost(before, this.state);
     if (result.state !== before) this.showActionDone(action, before);
     if (action.type === 'gather') this.noteBerryPicked(action.nodeId, before);
-    const weatherMessage = this.weatherMessage(before, this.state);
-    if (weatherMessage) this.onFeedback(weatherMessage);
-    else if (announce && result.message) this.onFeedback(result.message);
+    const message = this.weatherMessage(before, this.state) ?? (announce ? result.message : '');
+    this.say(message, this.needsAlert());
     if (announce) {
       this.onStateChange(this.state, 'action');
       if (this.playerSprite) this.paintObjects();
@@ -283,8 +285,19 @@ export class GameScene extends Phaser.Scene {
 
   private reportWeather(before: GameState, after: GameState): void {
     this.showMorningFrost(before, after);
-    const message = this.weatherMessage(before, after);
-    if (message) this.onFeedback(message);
+    this.say(this.weatherMessage(before, after), this.needsAlert());
+  }
+
+  /** The tired or hungry warning due now, if a meter just reached its line. */
+  private needsAlert(): string {
+    const { armed, fired } = needAlerts(this.needsArmed, this.state);
+    this.needsArmed = armed;
+    return needsMessage(fired);
+  }
+
+  private say(...messages: (string | null)[]): void {
+    const text = messages.filter(Boolean).join(' ');
+    if (text) this.onFeedback(text);
   }
 
   private showMorningFrost(before: GameState, after: GameState): void {

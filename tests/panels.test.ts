@@ -154,6 +154,23 @@ describe('build buttons', () => {
   });
 });
 
+describe('exhaustion in the panels', () => {
+  it('shows heavy work as not ready while exhausted', () => {
+    const tired = (state: GameState) => ({ ...state, player: { ...state.player, energy: 5 } });
+    const shed = game({ progress: { ...afterColdNight, quarryFound: true }, structures: { shelter: true, toolshed: true }, inventory: supplies });
+    expect(axeView(tired(shed)).ready).toBe(false);
+    expect(pickaxeView(tired(shed)).ready).toBe(false);
+    expect(buildButtonView(tired(game({ inventory: supplies })), 'crate').ready).toBe(false);
+    const atLookout = { ...shed, player: { ...shed.player, x: 30, y: 8 } };
+    expect(lookoutView(tired(atLookout)).ready).toBe(false);
+  });
+
+  it('quotes the slower ration time when tired', () => {
+    const rack = game({ structures: { dryingRack: true }, inventory: { food: 1 } });
+    expect(bagView({ ...rack, player: { ...rack.player, energy: 15 } }).prepareHint).toBe('1 berry · 18 seconds · 1 ration');
+  });
+});
+
 describe('places found', () => {
   it('lists the places found along the paths, in path order', () => {
     expect(sitesFound(game())).toBe('Places found: none yet');

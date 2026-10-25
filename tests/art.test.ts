@@ -12,7 +12,7 @@ describe('sprite pipeline', () => {
     const survivor = sprites.survivor;
     expect(survivor.size).toEqual([16, 24]);
     expect(survivor.anchor).toEqual([8, 22]);
-    const counts = { idleDown: 2, walkDown: 4, walkUp: 4, walkSide: 4, gather: 2, rest: 2, cook: 2, stargaze: 2, shiver: 2 };
+    const counts = { idleDown: 2, walkDown: 4, walkUp: 4, walkSide: 4, gather: 2, rest: 2, cook: 2, stargaze: 2, shiver: 2, tired: 2, hungry: 2 };
     for (const [name, count] of Object.entries(counts)) {
       const frameNames = Array.from({ length: count }, (_, index) => `${name}${index}`);
       for (const frame of frameNames) expect(survivor.frames[frame], frame).toBeDefined();
@@ -21,7 +21,7 @@ describe('sprite pipeline', () => {
       expect(animation?.frames, name).toEqual(frameNames.map(frame => ({ key: `survivor:${frame}` })));
       let expectedRate = 4;
       if (name.startsWith('walk')) expectedRate = 8;
-      else if (name === 'idleDown' || name === 'shiver') expectedRate = 2;
+      else if (['idleDown', 'shiver', 'tired', 'hungry'].includes(name)) expectedRate = 2;
       expect(animation?.frameRate, name).toBe(expectedRate);
       if (name === 'gather') expect(animation?.repeat).toBe(0);
     }
