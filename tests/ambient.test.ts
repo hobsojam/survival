@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { QUARRY_SITE } from '../src/game/areas';
 import { BALANCE, createGame } from '../src/game/state';
 import {
-  BIRD_FLEE_RADIUS, BIRD_FORAGE_RADIUS, BIRD_HOMES, FIREFLY_HOMES, FOX, birdForageTarget, birdMayReturn, birdShouldLeave, darkness, fireflyGlow, foxAt, foxVisits
+  BIRD_FLEE_RADIUS, BIRD_FORAGE_RADIUS, BIRD_HOMES, FIREFLY_HOMES, FOX, birdForageTarget, birdMayReturn, birdShouldLeave, EYE_SPOTS, darkness, eyesAt, fireflyGlow, foxAt, foxVisits
 } from '../src/scene/ambient';
 
 const visitDay = Array.from({ length: 20 }, (_, i) => i + 1).find(foxVisits)!;
@@ -99,5 +100,47 @@ describe('fireflies', () => {
       expect(y).toBeLessThanOrEqual(BALANCE.mapHeight - 2);
       expect(Math.hypot(x - BALANCE.campX, y - BALANCE.campY)).toBeGreaterThan(2);
     }
+  });
+});
+
+describe('quarry eyes', () => {
+  const far = { x: 38, y: 2 };
+  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
+
+  it('has six spots, each at least 5 tiles from the quarry site', () => {
+    expect(EYE_SPOTS).toHaveLength(6);
+    for (const spot of EYE_SPOTS) expect(dist(spot, QUARRY_SITE)).toBeGreaterThanOrEqual(5);
+  });
+
+  it('only shows in the dark', () => {
+    for (let i = 0; i < EYE_SPOTS.length; i++) for (let t = 0; t < 24000; t += 500) expect(eyesAt(i, t, 0.4, far)).toBeNull();
+  });
+
+  it('shows no more than three pairs at once, and every pair at some point', () => {
+    const seen = new Set<number>();
+    for (let t = 0; t < 60000; t += 250) {
+      const visible = EYE_SPOTS.map((_, i) => eyesAt(i, t, 1, far)).filter(Boolean).length;
+      expect(visible).toBeLessThanOrEqual(3);
+      EYE_SPOTS.forEach((_, i) => { if (eyesAt(i, t, 1, far)) seen.add(i); });
+    }
+    expect(seen.size).toBe(EYE_SPOTS.length);
+  });
+
+  it('backs off and fades near the survivor', () => {
+    const t = Array.from({ length: 48 }, (_, k) => k * 250).find(ms => eyesAt(0, ms, 1, far))! + 3000;
+    const spot = EYE_SPOTS[0];
+    const at = (d: number) => eyesAt(0, t, 1, { x: spot.x + d, y: spot.y });
+    expect(at(6)).not.toBeNull();
+    const near = at(-4.5)!;
+    expect(near).not.toBeNull();
+    expect(dist(near, { x: spot.x - 4.5, y: spot.y })).toBeGreaterThan(4.5);
+    expect(near.alpha).toBeLessThan(1);
+    expect(at(3.9)).toBeNull();
+  });
+
+  it('blinks', () => {
+    const frames = new Set<string>();
+    for (let t = 0; t < 12000; t += 50) { const e = eyesAt(0, t, 1, far); if (e) frames.add(e.frame); }
+    expect(frames).toEqual(new Set(['open', 'blink']));
   });
 });

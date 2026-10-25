@@ -4,8 +4,8 @@ import { worldX, worldY } from './art';
 import { LIGHT_DEPTH } from './visuals';
 import { sprites } from '../art/sprites';
 import {
-  BIRD_HOMES, FIREFLY_HOMES, FOX, birdForageTarget, birdMayReturn, birdShouldLeave, birdGroundFrame, birdFlightFrame,
-  darkness, fireflyFrame, fireflyGlow, fireflyOffset, foxAt, foxFrame, type Point
+  BIRD_HOMES, EYE_SPOTS, FIREFLY_HOMES, FOX, birdForageTarget, birdMayReturn, birdShouldLeave, birdGroundFrame, birdFlightFrame,
+  darkness, eyesAt, fireflyFrame, fireflyGlow, fireflyOffset, foxAt, foxFrame, type Point
 } from './ambient';
 
 type BirdFlightKind = 'flee' | 'return' | 'forage' | 'home';
@@ -55,6 +55,7 @@ export class AmbientLife {
   private readonly birds: Bird[];
   private readonly fox: Phaser.GameObjects.Image;
   private readonly fireflies: Phaser.GameObjects.Image[];
+  private readonly eyes: Phaser.GameObjects.Image[];
   private foxRun: Motion | null = null;
   private foxFledDay = 0;
   private started = false;
@@ -67,10 +68,13 @@ export class AmbientLife {
     }));
     this.fox = sprite(scene, 'fox', 'trot0');
     this.fireflies = FIREFLY_HOMES.map(() => sprite(scene, 'firefly', 'glow0', LIGHT_DEPTH));
+    this.eyes = EYE_SPOTS.map(() => sprite(scene, 'eyes', 'open', LIGHT_DEPTH));
   }
 
   update(state: GameState, seconds: number, timeMs: number): void {
-    // The birds, the fox and the fireflies live at camp.
+    // The birds, the fox and the fireflies live at camp; the eyes watch the quarry.
+    if (state.area === 'quarry') this.updateEyes(darkness(state.day, state.timeOfDay), state, timeMs);
+    else for (const image of this.eyes) image.setVisible(false);
     if (state.area !== 'camp') {
       for (const image of [...this.birds.map(bird => bird.image), this.fox, ...this.fireflies]) image.setVisible(false);
       return;
@@ -184,6 +188,15 @@ export class AmbientLife {
     }
     const foxPose = pose.sitting ? 'sit' : 'trot';
     this.show(this.fox, pose.x, pose.y, foxFrame(foxPose, timeMs / 1000), pose.facing);
+  }
+
+  private updateEyes(dark: number, state: GameState, timeMs: number): void {
+    this.eyes.forEach((image, index) => {
+      const eyes = eyesAt(index, timeMs, dark, state.player);
+      if (!eyes) { image.setVisible(false); return; }
+      image.setTexture(`eyes:${eyes.frame}`).setPosition(Math.round(worldX(eyes.x)), Math.round(worldY(eyes.y)))
+        .setAlpha(eyes.alpha).setVisible(true);
+    });
   }
 
   private updateFireflies(dark: number, timeMs: number): void {

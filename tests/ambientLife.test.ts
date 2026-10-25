@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createGame } from '../src/game/state';
 import { worldX } from '../src/scene/art';
-import { BIRD_HOMES } from '../src/scene/ambient';
+import { BIRD_HOMES, EYE_SPOTS } from '../src/scene/ambient';
 import { AmbientLife } from '../src/scene/ambientLife';
 
 function sceneWithImages() {
@@ -76,6 +76,33 @@ describe('ambient life by area', () => {
     life.update(state, 0.1, 0);
     expect(images.some(image => image.visible)).toBe(true);
     life.update({ ...state, area: 'quarry' }, 0.1, 100);
-    expect(images.filter(image => image.visible)).toEqual([]);
+    expect(images.slice(0, -EYE_SPOTS.length).filter(image => image.visible)).toEqual([]);
+  });
+});
+
+describe('ambient quarry eyes', () => {
+  it('shows no eyes at camp, by day or by night', () => {
+    const { scene, images } = sceneWithImages();
+    const life = new AmbientLife(scene as never);
+    const eyes = images.slice(-EYE_SPOTS.length);
+    const state = createGame();
+    state.timeOfDay = 200;
+    for (let t = 0; t < 12000; t += 500) life.update(state, 0.5, t);
+    expect(eyes.every(image => !image.visible)).toBe(true);
+  });
+
+  it('shows some eyes at the quarry at night, none by day', () => {
+    const { scene, images } = sceneWithImages();
+    const life = new AmbientLife(scene as never);
+    const eyes = images.slice(-EYE_SPOTS.length);
+    const state = createGame();
+    state.area = 'quarry';
+    state.player.x = 38; state.player.y = 2;
+    state.timeOfDay = 10;
+    life.update(state, 0.5, 3000);
+    expect(eyes.every(image => !image.visible)).toBe(true);
+    state.timeOfDay = 200;
+    life.update(state, 0.5, 3000);
+    expect(eyes.some(image => image.visible)).toBe(true);
   });
 });

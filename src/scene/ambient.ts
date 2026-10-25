@@ -94,6 +94,40 @@ export function fireflyGlow(index: number, timeMs: number, dark: number): number
   return dark * pulse * pulse;
 }
 
+/** Pairs of eyes that watch from the dark edges of the quarry. They are only a look; nothing follows the survivor. */
+export const EYE_SPOTS: Point[] = [
+  { x: 4, y: 5 }, { x: 9, y: 22 }, { x: 19, y: 6 }, { x: 22, y: 21 }, { x: 28, y: 11 }, { x: 33, y: 25 }
+];
+const EYE_CYCLE = 12;
+const EYE_WINDOW = 6;
+const EYE_NEAR = 4;
+const EYE_FAR = 6;
+
+/**
+ * One pair of eyes: visible about 6 s of every 12 s (three pairs at a time), only in the dark.
+ * Near the survivor a pair backs off up to a tile and fades, then vanishes inside 4 tiles.
+ */
+export function eyesAt(index: number, timeMs: number, dark: number, player: Point):
+  { x: number; y: number; alpha: number; frame: 'open' | 'blink' } | null {
+  if (dark < 0.5) return null;
+  const spot = EYE_SPOTS[index];
+  const seconds = timeMs / 1000;
+  const phase = (seconds + index * 2) % EYE_CYCLE;
+  if (phase >= EYE_WINDOW) return null;
+  const away = distance(spot, player);
+  if (away < EYE_NEAR) return null;
+  const near = Math.max(0, Math.min(1, (EYE_FAR - away) / (EYE_FAR - EYE_NEAR)));
+  const dx = away > 0 ? (spot.x - player.x) / away : 0;
+  const dy = away > 0 ? (spot.y - player.y) / away : 0;
+  const edge = Math.min(1, Math.min(phase, EYE_WINDOW - phase) / 0.6);
+  const blinking = (seconds + index * 0.7) % 3.5 > 3.25;
+  return {
+    x: spot.x + dx * near, y: spot.y + dy * near,
+    alpha: Math.min(1, dark) * edge * (1 - near * 0.8),
+    frame: blinking ? 'blink' : 'open'
+  };
+}
+
 export function birdGroundFrame(index: number, timeMs: number): string {
   const phase = (timeMs / 1000 + index * 1.37) % 4;
   if (phase > 3.6) return 'bird:hop';
