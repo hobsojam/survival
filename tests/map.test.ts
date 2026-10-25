@@ -37,6 +37,11 @@ function pathDistance(x: number, y: number): number {
 describe('terrain composition', () => {
   const nodes = createGame().nodes;
 
+  it('scatters quarry decorations across the open ground where the camp circle would be', () => {
+    const map = buildMap([], 'quarry');
+    expect(map.decorations.some(item => Math.hypot(item.x - BALANCE.campX, item.y - BALANCE.campY) <= BALANCE.campRadius)).toBe(true);
+  });
+
   it('is deterministic and leaves the camp and nodes clear of tree trunks', () => {
     const map = buildMap(nodes, 'camp');
     for (const target of createGame().trees) {

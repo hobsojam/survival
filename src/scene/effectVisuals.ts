@@ -28,7 +28,7 @@ export function effectVisuals(state: GameState, timeMs: number, events: EffectEv
   const results: EffectVisual[] = [];
   const fireX = Math.round(worldX(BALANCE.campX));
   const fireY = Math.round(worldY(BALANCE.campY));
-  if (state.fireFuel > 0) {
+  if (state.area === 'camp' && state.fireFuel > 0) {
     for (let i = 0; i < 2; i++) {
       const age = wrap(timeMs + i * 700, 1400);
       if (age < 1000) {
@@ -81,7 +81,7 @@ export function effectVisuals(state: GameState, timeMs: number, events: EffectEv
       results.push(visual(`event:${index}`, `shootingStar:star${frame}`, x - 60 + Math.floor(age / 16), y - 93,
         LIGHT_DEPTH + 0.1, 1 - age / 1200));
     }
-    if (event.kind === 'frost' && age < 30000) {
+    if (event.kind === 'frost' && state.area === 'camp' && age < 30000) {
       for (let i = 0; i < 3; i++) {
         const dx = [-32, 16, 48][i];
         const dy = [16, -32, 32][i];

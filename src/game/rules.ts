@@ -70,6 +70,7 @@ export function trailFoodBlocker(state: GameState): string | null {
 }
 
 export function lookoutRepairBlocker(state: GameState): string | null {
+  if (state.area !== 'camp') return 'There is nothing like that here.';
   if (state.progress.lookoutRepaired) return 'The lookout is already restored.';
   if (!state.progress.hearthUnlocked) return 'Weather the cold front before repairing the lookout.';
   if (!near(state.player.x, state.player.y, LOOKOUT.x, LOOKOUT.y)) return 'Stand beside the lookout to repair it.';

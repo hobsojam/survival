@@ -69,7 +69,7 @@ function buildQuarryMap(): TerrainMap {
       const edge = Math.min(x, y, BALANCE.mapWidth - 1 - x, BALANCE.mapHeight - 1 - y);
       if (edge <= 1 && x < 24 && hash(x, y, 2) % 3 !== 0 && clearForTree(x, y, [], routes)) {
         trees.push({ x, y, sprite: ['treeBroadleaf', 'treePine', 'treeYoung'][hash(x, y, 3) % 3] });
-      } else if (edge > 0 && !earthAt(x + .5, y + .5, routes) && !nearSite(x, y) && hash(x, y, 4) % 4 === 0) {
+      } else if (edge > 0 && pathDistance(x + .5, y + .5, routes) > .5 && !nearSite(x, y) && hash(x, y, 4) % 4 === 0) {
         const detail = hash(x, y, 5) % 4;
         decorations.push({ x, y, sprite: detail === 3 ? 'tuft0' : `pebbles${detail % 2}` });
       }

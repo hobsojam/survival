@@ -335,7 +335,7 @@ export class App {
       playerMarker.style.left = `${mapPosition.x / BALANCE.mapWidth * 100}%`;
       playerMarker.style.top = `${mapPosition.y / BALANCE.mapHeight * 100}%`;
     }
-    const nearSite = (Object.keys(SITES) as SiteId[]).some(id => Math.hypot(player.x - SITES[id].x, player.y - SITES[id].y) <= BALANCE.interactionRadius);
+    const nearSite = this.state.area === 'camp' && (Object.keys(SITES) as SiteId[]).some(id => Math.hypot(player.x - SITES[id].x, player.y - SITES[id].y) <= BALANCE.interactionRadius);
     this.root.querySelector('#site-button')?.classList.toggle('ready', nearSite);
     this.setText('space-count', `${carriedCount(this.state)}/${bagCapacity(this.state)}`);
     this.root.querySelector('#eat-ration-button')?.classList.toggle('ready', inventory.trailFood > 0);

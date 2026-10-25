@@ -54,6 +54,13 @@ describe('phase 5 scene effects', () => {
     }
   });
 
+  it('keeps the camp fire effects and morning frost out of the quarry', () => {
+    const quarry = { ...state, area: 'quarry' as const, fireFuel: 100 };
+    expect(effectVisuals(quarry, 2000, []).some(visual => visual.id.startsWith('fire:'))).toBe(false);
+    expect(effectVisuals({ ...quarry, area: 'camp' }, 2000, []).some(visual => visual.id.startsWith('fire:'))).toBe(true);
+    expect(effectVisuals(quarry, 1000, [event('frost')]).some(visual => visual.texture.startsWith('morningFrost:'))).toBe(false);
+  });
+
   it('fades optional morning frost after a failed front without changing state', () => {
     const before = structuredClone(state);
     const frost = [event('frost')];

@@ -970,6 +970,15 @@ describe('the stone pile at camp', () => {
     expect(crafted.storedStone).toBe(0);
   });
 
+  it('does not offer the lookout repair from the quarry area', () => {
+    const state = unlocked(createGame());
+    state.area = 'quarry';
+    state.player.x = LOOKOUT.x;
+    state.player.y = LOOKOUT.y;
+    state.inventory = { ...state.inventory, wood: 4, fiber: 2, stone: 3 };
+    expect(lookoutRepairBlocker(state)).toBe('There is nothing like that here.');
+  });
+
   it('repairs the lookout with pile stone from far away', () => {
     const state = unlocked(createGame());
     state.player.x = LOOKOUT.x;
@@ -996,6 +1005,16 @@ describe('the second area', () => {
     state.player.x = 0.05;
     state.player.y = 15;
     expect(applyAction(state, { type: 'move', dx: -1, dy: 0 }).state.area).toBe('quarry');
+  });
+
+  it('walking off the quarry east edge at the path returns to camp', () => {
+    const state = sheltered();
+    state.area = 'quarry';
+    state.player.x = BALANCE.mapWidth - 1 - 0.05;
+    state.player.y = 15;
+    const next = applyAction(state, { type: 'move', dx: 1, dy: 0 }).state;
+    expect(next.area).toBe('camp');
+    expect(next.player.x).toBe(0.5);
   });
 
   it('the west edge still blocks away from the path', () => {
