@@ -2,7 +2,7 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState } from './state';
 import { bagCapacity, carriedCount } from './rules';
 
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 11;
+const SAVE_VERSION = 12;
 export type SaveResult = { ok: true } | { ok: false; error: string };
 export type LoadResult = { kind: 'empty' } | { kind: 'loaded'; state: GameState } | { kind: 'invalid'; reason: string };
 
@@ -14,7 +14,7 @@ const whole = (value: unknown): value is number => Number.isInteger(value) && fi
 const count = (value: unknown): value is number => whole(value) && value >= 0;
 const onMap = (x: unknown, y: unknown): boolean => finite(x) && x >= 0 && x <= BALANCE.mapWidth - 1 && finite(y) && y >= 0 && y <= BALANCE.mapHeight - 1;
 
-/** Checks a version 11 save: today's shape, with stone counted at its bag weight. */
+/** Checks a version 12 save: two areas, the toolshed's tools and the quarry's timers. */
 function validState(value: unknown): value is GameState {
   if (!object(value) || !object(value.player) || !object(value.inventory) || !object(value.structures) || !object(value.progress)) return false;
   if (!Array.isArray(value.nodes) || !Array.isArray(value.trees) || !Array.isArray(value.stonePiles)) return false;
@@ -23,8 +23,13 @@ function validState(value: unknown): value is GameState {
   if (!onMap(player.x, player.y) || !meter(player.energy) || !meter(player.hunger) || !meter(player.warmth)) return false;
   if (!(['wood', 'food', 'fiber', 'stone', 'trailFood'] as const).every(key => count(inventory[key]))) return false;
   if (!(Object.keys(BUILDINGS) as (keyof typeof BUILDINGS)[]).every(id => typeof structures[id] === 'boolean')) return false;
+  if (value.area !== 'camp' && value.area !== 'quarry') return false;
   if (!finite(value.fireFuel) || value.fireFuel < 0) return false;
   if (typeof progress.hearthUnlocked !== 'boolean' || typeof progress.lookoutRepaired !== 'boolean' || typeof progress.axeCrafted !== 'boolean') return false;
+  if (typeof progress.quarryFound !== 'boolean' || typeof progress.pickaxeCrafted !== 'boolean') return false;
+  if ((value.area === 'quarry' || progress.quarryFound) && !structures.shelter) return false;
+  if (progress.pickaxeCrafted && !(progress.quarryFound && structures.toolshed)) return false;
+  if (progress.axeCrafted && !structures.toolshed) return false;
   if ((structures.hearth || progress.lookoutRepaired || progress.axeCrafted) && !progress.hearthUnlocked) return false;
   if (progress.hearthUnlocked ? progress.nextStormDay !== null
     : !(whole(progress.nextStormDay) && progress.nextStormDay >= BALANCE.coldNightStartDay && progress.nextStormDay >= value.day)) return false;
@@ -32,6 +37,8 @@ function validState(value: unknown): value is GameState {
   if (!object(discoveries) || !(Object.keys(SITES) as (keyof typeof SITES)[]).every(id => typeof discoveries[id] === 'boolean')) return false;
   if (!count(value.storedStone) || value.storedStone > BALANCE.stonePileCapacity || (!structures.stonePile && value.storedStone > 0)) return false;
   const day = value.day;
+  if (!whole(value.quarryReadyDay) || value.quarryReadyDay < 1 || value.quarryReadyDay > day + 1) return false;
+  if (!whole(value.rubbleReadyDay) || value.rubbleReadyDay < 1 || value.rubbleReadyDay > day + BALANCE.rubbleRegrowDays) return false;
   const fresh = createGame();
   const nodesMatch = value.nodes.length === fresh.nodes.length && value.nodes.every((node, index) => {
     const base = fresh.nodes[index];
@@ -44,7 +51,7 @@ function validState(value: unknown): value is GameState {
       && whole(tree.readyDay) && tree.readyDay >= 1 && tree.readyDay <= day + BALANCE.treeRegrowDays;
   });
   const pilesValid = value.stonePiles.every(pile => object(pile) && typeof pile.id === 'string' && onMap(pile.x, pile.y)
-    && whole(pile.count) && pile.count >= 1);
+    && whole(pile.count) && pile.count >= 1 && (pile.area === 'camp' || pile.area === 'quarry'));
   return nodesMatch && treesMatch && pilesValid && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

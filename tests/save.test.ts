@@ -46,7 +46,7 @@ describe('local save', () => {
     state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
     state.nodes.find(node => node.kind === 'fiber')!.readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(11);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(12);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);
@@ -69,6 +69,7 @@ describe('local save', () => {
     state.day = 5;
     state.progress.hearthUnlocked = true;
     state.progress.nextStormDay = null;
+    state.structures.toolshed = true;
     state.progress.axeCrafted = true;
     state.trees[0].readyDay = 8;
     expect(saveGame(storage, state).ok).toBe(true);
@@ -79,10 +80,10 @@ describe('local save', () => {
     const storage = new MemoryStorage();
     const state = createGame();
     state.trees[0].x += 1;
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 11, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 12, state }));
     expect(loadGame(storage).kind).toBe('invalid');
     state.trees[0] = { ...createGame().trees[0], readyDay: state.day + BALANCE.treeRegrowDays + 1 };
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 11, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 12, state }));
     expect(loadGame(storage).kind).toBe('invalid');
   });
 
@@ -119,7 +120,7 @@ describe('local save', () => {
     const storage = new MemoryStorage();
     const state = createGame();
     state.timeOfDay = 240;
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 11, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 12, state }));
     expect(loadGame(storage).kind).toBe('invalid');
   });
 
@@ -148,8 +149,45 @@ describe('local save', () => {
     expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
   });
 
+  it('round-trips a camp left in the quarry area', () => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    state.day = 2;
+    state.area = 'quarry';
+    state.structures.shelter = true;
+    state.structures.toolshed = true;
+    state.progress.quarryFound = true;
+    state.progress.pickaxeCrafted = true;
+    state.quarryReadyDay = 3;
+    state.rubbleReadyDay = 5;
+    state.stonePiles = [{ id: 'pile-2-12-12', x: 12, y: 12, count: 2, area: 'quarry' }];
+    expect(saveGame(storage, state)).toEqual({ ok: true });
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
+  });
+
+  it('rejects impossible quarry progress', () => {
+    const variants: ((state: any) => void)[] = [
+      state => { state.area = 'mine'; },
+      state => { state.area = 'quarry'; },
+      state => { state.progress.quarryFound = true; },
+      state => { state.structures.shelter = true; state.structures.toolshed = true; state.progress.pickaxeCrafted = true; },
+      state => { state.structures.shelter = true; state.progress.quarryFound = true; state.progress.pickaxeCrafted = true; },
+      state => { state.progress.hearthUnlocked = true; state.progress.nextStormDay = null; state.progress.axeCrafted = true; },
+      state => { state.quarryReadyDay = state.day + 2; },
+      state => { state.rubbleReadyDay = state.day + 4; },
+      state => { state.stonePiles = [{ id: 'p', x: 5, y: 5, count: 1 }]; }
+    ];
+    variants.forEach((change, index) => {
+      const storage = new MemoryStorage();
+      const state = createGame();
+      change(state);
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 12, state }));
+      expect(loadGame(storage).kind, `variant ${index}`).toBe('invalid');
+    });
+  });
+
   it('rejects every earlier version', () => {
-    for (let version = 1; version <= 10; version++) {
+    for (let version = 1; version <= 11; version++) {
       const storage = new MemoryStorage();
       storage.setItem(SAVE_KEY, JSON.stringify({ version, state: createGame() }));
       expect(loadGame(storage).kind, `version ${version}`).toBe('invalid');
@@ -160,7 +198,7 @@ describe('local save', () => {
     const storage = new MemoryStorage();
     const state = createGame();
     state.inventory.stone = 5;
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 11, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 12, state }));
     expect(loadGame(storage).kind).toBe('invalid');
   });
 
@@ -177,7 +215,7 @@ describe('local save', () => {
       const storage = new MemoryStorage();
       const state = createGame();
       change(state);
-      storage.setItem(SAVE_KEY, JSON.stringify({ version: 11, state }));
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 12, state }));
       expect(loadGame(storage).kind, `variant ${index}`).toBe('invalid');
     });
   });

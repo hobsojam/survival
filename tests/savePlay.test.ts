@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, BUILDINGS, createGame, type StructureId } from '../src/game/state';
 import { advanceTime, applyAction, isColdNight, type Activity, type GameAction } from '../src/game/rules';
+import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { loadGame, saveGame } from '../src/game/save';
 
 class MemoryStorage implements Storage {
@@ -24,7 +25,7 @@ function seeded(seed: number): () => number {
 }
 
 const structures = Object.keys(BUILDINGS) as StructureId[];
-const simple = ['eat', 'stokeFire', 'rest', 'sleep', 'cook', 'stargaze', 'burnFiber', 'dropStone', 'storeStone', 'takeStone'] as const;
+const simple = ['eat', 'stokeFire', 'rest', 'sleep', 'cook', 'stargaze', 'burnFiber', 'dropStone', 'storeStone', 'takeStone', 'craftAxe', 'craftPickaxe'] as const;
 const activities: Activity[] = ['awake', 'working', 'resting'];
 
 describe('saving during long random play', () => {
@@ -61,6 +62,18 @@ describe('saving during long random play', () => {
           const pile = pick(state.stonePiles);
           goTo(pile.x, pile.y);
           act({ type: 'pickUpStone', pileId: pile.id });
+        } else if (roll < 0.99) {
+          // Walk the west path, so runs cross between the areas.
+          const exit = state.area === 'camp' ? CAMP_EXIT : QUARRY_EXIT;
+          goTo(exit.x, exit.y);
+          act({ type: 'cross' });
+        } else if (roll < 0.995) {
+          // Work the quarry: walk to the face or the rubble and take stone.
+          if (state.area === 'quarry') {
+            const site = random() < 0.5 ? QUARRY_SITE : RUBBLE_SITE;
+            goTo(site.x, site.y);
+            act({ type: site === QUARRY_SITE ? 'digQuarry' : 'gatherRubble' });
+          } else act({ type: 'craftPickaxe' });
         } else act({ type: 'move', dx: (random() - 0.5) * 80, dy: (random() - 0.5) * 60 });
         const saved = saveGame(storage, state);
         expect(saved, `step ${step}, day ${state.day}`).toEqual({ ok: true });
