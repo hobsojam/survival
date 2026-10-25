@@ -51,9 +51,9 @@ jobs:
       - if: steps.project.outputs.exists == 'true'
         run: npm audit --audit-level=moderate
 
-      # Forks and Dependabot PRs don't get the token, so they skip the scan instead of failing.
+      # Dependabot PRs are never analysed. Forks don't get the token, so they skip the scan instead of failing.
       - id: sonar
-        if: steps.project.outputs.exists == 'true' && github.event_name != 'schedule'
+        if: steps.project.outputs.exists == 'true' && github.event_name != 'schedule' && github.actor != 'dependabot[bot]'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
