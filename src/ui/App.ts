@@ -3,7 +3,7 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type SiteId, typ
 import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
-import { buildStatus, carriedCount, cookBlocker, isAtCamp, isColdNight, lookoutRepairBlocker, sleepBlocker, stargazeBlocker, trailFoodBlocker } from '../game/rules';
+import { availableStone, bagCapacity, buildStatus, carriedCount, cookBlocker, isAtCamp, isColdNight, lookoutRepairBlocker, sleepBlocker, stargazeBlocker, trailFoodBlocker } from '../game/rules';
 import { forecastFireCheck } from '../game/forecast';
 import { dayPhase, formatClock, nextChange } from '../game/clock';
 import { gateTap, nextOpenTab, type DockTab } from './dock';
@@ -35,7 +35,8 @@ export class App {
     }
     const buildMarkup = buildOptions.map(id => {
       const { name, description, symbol } = BUILDINGS[id];
-      return `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>`;
+      return `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>`
+        + (id === 'stonePile' ? `<div id="stone-pile-controls" class="stone-pile-controls" hidden><span id="stone-pile-stored">Stored stone 0/${BALANCE.stonePileCapacity}</span><button type="button" data-action="storeStone">Store 1</button><button type="button" data-action="takeStone">Take 1</button></div>` : '');
     }).join('');
     const mapMarkers = journalView(this.state).locations.map(place =>
       `<span id="map-${place.id}" class="map-point" style="left:${place.x / BALANCE.mapWidth * 100}%;top:${place.y / BALANCE.mapHeight * 100}%">?</span>`
@@ -66,11 +67,11 @@ export class App {
               <div class="quick-actions"><button data-action="eat">Eat berries</button><button data-action="eatTrailFood" id="eat-ration-button">Eat ration</button><button data-action="rest">Rest</button><button data-action="stokeFire">Feed fire</button><button data-action="sleep" id="sleep-button">Sleep</button></div>
             </section>
             <section class="panel bag-panel" data-tab="bag"><p class="eyebrow">IN YOUR BAG</p><div class="supplies">
-              <div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small><button type="button" class="drop-item" data-drop="wood" aria-label="Drop one wood">Drop 1</button></div>
-              <div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small><button type="button" class="drop-item" data-drop="food" aria-label="Drop one berry">Drop 1</button></div>
-              <div><span class="supply-icon fiber">≋</span><strong id="fiber-count">0</strong><small>Fiber</small><button type="button" class="drop-item" data-drop="fiber" aria-label="Drop one fiber">Drop 1</button></div>
-              <div><span class="supply-icon stone">◆</span><strong id="stone-count">0</strong><small>Stone</small><button type="button" class="drop-item" data-drop="stone" aria-label="Drop one stone">Drop 1</button></div>
-              <div><span class="supply-icon ration">◇</span><strong id="ration-count">0</strong><small>Rations</small><button type="button" class="drop-item" data-drop="trailFood" aria-label="Drop one trail ration">Drop 1</button></div>
+              <div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small><button type="button" class="supply-action" data-action="stokeFire" data-supply="wood" aria-label="Burn one wood">Burn</button></div>
+              <div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small><button type="button" class="supply-action" data-action="eat" data-supply="food" aria-label="Eat one berry">Eat</button></div>
+              <div><span class="supply-icon fiber">≋</span><strong id="fiber-count">0</strong><small>Fiber</small><button type="button" class="supply-action" data-action="burnFiber" data-supply="fiber" aria-label="Burn one fiber">Burn</button></div>
+              <div><span class="supply-icon stone">◆</span><strong id="stone-count">0</strong><small>Stone</small><small id="stone-stored" class="stone-stored"></small><button type="button" class="supply-action" data-action="dropStone" data-supply="stone" aria-label="Drop one stone">Drop</button></div>
+              <div><span class="supply-icon ration">◇</span><strong id="ration-count">0</strong><small>Rations</small><button type="button" class="supply-action" data-action="eatTrailFood" data-supply="trailFood" aria-label="Eat one trail ration">Eat</button></div>
               <div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small>Carried</small></div>
             </div><div class="fire-status" id="fire-status">The fire is unlit</div></section>
             <section class="panel night-panel" data-tab="camp"><p class="eyebrow">AFTER DARK</p><h2>A little time for yourself</h2><p class="night-hint" id="night-hint">These small moments are waiting for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button></div></section>
@@ -87,13 +88,9 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe';
+        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone';
         this.scene?.perform({ type });
       });
-    });
-    this.root.querySelector('.supplies')!.addEventListener('click', event => {
-      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-drop]');
-      if (button) this.scene?.perform({ type: 'drop', resource: button.dataset.drop as keyof GameState['inventory'] });
     });
     this.root.querySelector('#build-list')!.addEventListener('click', event => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-build]');
@@ -318,13 +315,17 @@ export class App {
     }
     const nearSite = (Object.keys(SITES) as SiteId[]).some(id => Math.hypot(player.x - SITES[id].x, player.y - SITES[id].y) <= BALANCE.interactionRadius);
     this.root.querySelector('#site-button')?.classList.toggle('ready', nearSite);
-    this.setText('space-count', `${carriedCount(this.state)}/${structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity}`);
+    this.setText('space-count', `${carriedCount(this.state)}/${bagCapacity(this.state)}`);
     this.root.querySelector('#eat-ration-button')?.classList.toggle('ready', inventory.trailFood > 0);
     this.root.querySelector('#prepare-button')?.classList.toggle('ready', !trailFoodBlocker(this.state));
     this.setText('prepare-hint', trailFoodBlocker(this.state) ?? '1 berry · 12 seconds · 1 ration');
-    this.root.querySelectorAll<HTMLButtonElement>('[data-drop]').forEach(button => {
-      button.disabled = inventory[button.dataset.drop as keyof GameState['inventory']] <= 0;
+    this.root.querySelectorAll<HTMLButtonElement>('[data-supply]').forEach(button => {
+      button.disabled = inventory[button.dataset.supply as keyof GameState['inventory']] <= 0;
     });
+    this.setText('stone-stored', structures.stonePile ? `+${this.state.storedStone} at camp` : '');
+    const pileControls = this.root.querySelector<HTMLElement>('#stone-pile-controls');
+    if (pileControls) pileControls.hidden = !structures.stonePile;
+    this.setText('stone-pile-stored', `Stored stone ${this.state.storedStone}/${BALANCE.stonePileCapacity}`);
     this.setText('fire-status', this.state.fireFuel > 0 ? `Fire burning · ${Math.ceil(this.state.fireFuel)}s of warmth` : 'The fire is unlit');
     const lookoutButton = this.root.querySelector<HTMLButtonElement>('#lookout-button');
     if (lookoutButton) {
@@ -348,7 +349,7 @@ export class App {
     if (axeButton) {
       axeButton.disabled = !this.state.progress.hearthUnlocked || this.state.progress.axeCrafted;
       const canCraft = this.state.progress.hearthUnlocked && isAtCamp(this.state)
-        && inventory.wood >= 1 && inventory.fiber >= 1 && inventory.stone >= 1 && !this.state.progress.axeCrafted;
+        && inventory.wood >= 1 && inventory.fiber >= 1 && availableStone(this.state) >= 1 && !this.state.progress.axeCrafted;
       axeButton.classList.toggle('ready', canCraft);
     }
     if (this.state.progress.axeCrafted) {

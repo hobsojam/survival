@@ -1,10 +1,11 @@
-import { BALANCE, LOOKOUT, SITES, type GameState, type SiteId } from '../game/state';
+import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceNode, type SiteId, type StonePile } from '../game/state';
 import { isAtCamp, type GameAction } from '../game/rules';
 import { sprites } from '../art/sprites';
 
 /** What a tap on the map points at, in tile units like `state.player`. */
 export type TapTarget =
   | { kind: 'node'; id: string; x: number; y: number }
+  | { kind: 'pile'; id: string; x: number; y: number }
   | { kind: 'tree'; id: string; x: number; y: number }
   | { kind: 'site'; id: SiteId; x: number; y: number }
   | { kind: 'lookout'; x: number; y: number }
@@ -48,6 +49,7 @@ function tapDistance(target: TapTarget, sprite: string | undefined, x: number, y
 export function pickTapTarget(state: GameState, x: number, y: number): TapTarget {
   const candidates: { target: TapTarget; sprite?: string }[] = [
     ...state.nodes.filter(node => node.amount > 0).map(node => ({ target: { kind: 'node' as const, id: node.id, x: node.x, y: node.y } })),
+    ...state.stonePiles.map(pile => ({ target: { kind: 'pile' as const, id: pile.id, x: pile.x, y: pile.y } })),
     ...state.trees.map(tree => ({ target: { kind: 'tree' as const, id: tree.id, x: tree.x, y: tree.y }, sprite: tree.sprite })),
     ...(Object.keys(SITES) as SiteId[]).map(id => ({ target: { kind: 'site' as const, id, x: SITES[id].x, y: SITES[id].y } })),
     { target: { kind: 'lookout', x: LOOKOUT.x, y: LOOKOUT.y }, sprite: 'lookout' },
@@ -58,6 +60,16 @@ export function pickTapTarget(state: GameState, x: number, y: number): TapTarget
     .filter(({ away }) => away <= TAP_HIT_RADIUS)
     .sort((a, b) => a.away - b.away)[0];
   return hit?.target ?? { kind: 'ground', x: clamp(x, BALANCE.mapWidth - 1), y: clamp(y, BALANCE.mapHeight - 1) };
+}
+
+/** The nearest thing E can pick up: a ready node or a loose stone pile within reach. */
+export function closestGatherable(state: GameState): { kind: 'node'; node: ResourceNode } | { kind: 'pile'; pile: StonePile } | undefined {
+  const { x, y } = state.player;
+  const options = [
+    ...state.nodes.filter(node => node.amount > 0).map(node => ({ found: { kind: 'node' as const, node }, away: distance(node.x, node.y, x, y) })),
+    ...state.stonePiles.map(pile => ({ found: { kind: 'pile' as const, pile }, away: distance(pile.x, pile.y, x, y) }))
+  ];
+  return options.filter(option => option.away <= BALANCE.interactionRadius).sort((a, b) => a.away - b.away)[0]?.found;
 }
 
 /** Whether the survivor is close enough to act on the target. */
@@ -81,6 +93,7 @@ export function moveStep(state: GameState, target: TapTarget, dt: number): { dx:
 export function targetAction(target: TapTarget): GameAction | null {
   switch (target.kind) {
     case 'node': return { type: 'gather', nodeId: target.id };
+    case 'pile': return { type: 'pickUpStone', pileId: target.id };
     case 'tree': return { type: 'chopTree', treeId: target.id };
     case 'site': return { type: 'visitSite', siteId: target.id };
     case 'lookout': return { type: 'repairLookout' };
