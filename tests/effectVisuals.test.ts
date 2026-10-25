@@ -64,7 +64,7 @@ describe('phase 5 scene effects', () => {
   it('fades optional morning frost after a failed front without changing state', () => {
     const before = structuredClone(state);
     const frost = [event('frost')];
-    expect(effectVisuals(state, 1000, frost).filter(visual => visual.texture.startsWith('morningFrost:')).length).toBe(3);
+    expect(effectVisuals(state, 1000, frost).filter(visual => visual.texture.startsWith('morningFrost:'))).toHaveLength(3);
     expect(effectVisuals(state, 31000, frost).some(visual => visual.texture.startsWith('morningFrost:'))).toBe(false);
     expect(state).toEqual(before);
   });

@@ -4,7 +4,7 @@ import { BALANCE } from '../game/state';
 import { CAMP_OPEN_PATHS, CAMP_PATHS, QUARRY_PATHS, pathDistance, type PathRoute } from '../scene/mapGeometry';
 
 type Grid = string[][];
-const blank = (w: number, h: number, fill = '.'): Grid => Array.from({ length: h }, () => Array(w).fill(fill));
+const blank = (w: number, h: number, fill = '.'): Grid => Array.from({ length: h }, () => Array.from({ length: w }, () => fill));
 const dot = (g: Grid, x: number, y: number, c: string): void => { if (g[y]?.[x] !== undefined) g[y][x] = c; };
 const rect = (g: Grid, x: number, y: number, w: number, h: number, c: string): void => {
   for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) dot(g, i, j, c);

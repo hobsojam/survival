@@ -48,9 +48,9 @@ export function rasterizeFrame(def: SpriteDef, frame: string): Uint8ClampedArray
     const key = def.legend[symbol];
     const hex = palette[key].slice(1);
     const offset = (y * width + x) * 4;
-    bytes[offset] = parseInt(hex.slice(0, 2), 16);
-    bytes[offset + 1] = parseInt(hex.slice(2, 4), 16);
-    bytes[offset + 2] = parseInt(hex.slice(4, 6), 16);
+    bytes[offset] = Number.parseInt(hex.slice(0, 2), 16);
+    bytes[offset + 1] = Number.parseInt(hex.slice(2, 4), 16);
+    bytes[offset + 2] = Number.parseInt(hex.slice(4, 6), 16);
     bytes[offset + 3] = key === 'shadow' ? 115 : 255;
   }
   return bytes;

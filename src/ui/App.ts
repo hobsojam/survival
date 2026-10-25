@@ -19,7 +19,7 @@ export class App {
   private gameResize?: ResizeObserver;
   private readonly root: HTMLElement;
   private readonly soundscape: Soundscape;
-  private storage?: Storage;
+  private readonly storage?: Storage;
   private previousSave: LoadResult = { kind: 'empty' };
   private lastSaveAt = 0;
   private saveFailures = 0;
@@ -196,16 +196,18 @@ export class App {
     this.render();
   }
 
+  private startNote(): string {
+    if (!this.storage) return 'Browser storage is unavailable, so this camp will not be saved.';
+    if (this.previousSave.kind === 'loaded') return `Your camp is waiting on day ${this.previousSave.state.day}.`;
+    if (this.previousSave.kind === 'invalid') return `Your existing save could not be loaded: ${this.previousSave.reason}`;
+    return 'A fresh camp is ready whenever you are.';
+  }
+
   private showStartScreen(): void {
     const note = this.root.querySelector<HTMLElement>('#start-note');
     const continueButton = this.root.querySelector<HTMLButtonElement>('#continue-game');
     if (continueButton) continueButton.hidden = this.previousSave.kind !== 'loaded';
-    if (note && !this.storage) note.textContent = 'Browser storage is unavailable, so this camp will not be saved.';
-    else if (note) note.textContent = this.previousSave.kind === 'loaded'
-      ? `Your camp is waiting on day ${this.previousSave.state.day}.`
-      : this.previousSave.kind === 'invalid'
-        ? `Your existing save could not be loaded: ${this.previousSave.reason}`
-        : 'A fresh camp is ready whenever you are.';
+    if (note) note.textContent = this.startNote();
   }
 
   private beginNewGame(): void {
@@ -448,11 +450,10 @@ export class App {
 
   private renderNight(): void {
     const { timeOfDay } = this.state;
-    const atCamp = isAtCamp(this.state);
-    const afterDark = timeOfDay >= BALANCE.nightStart;
-    this.setText('night-hint', !afterDark ? 'These small moments are waiting for nightfall.'
-      : !atCamp ? 'Return to the camp circle for a quiet evening.'
-        : 'Optional comforts while the night passes.');
+    let nightHint = 'Optional comforts while the night passes.';
+    if (timeOfDay < BALANCE.nightStart) nightHint = 'These small moments are waiting for nightfall.';
+    else if (!isAtCamp(this.state)) nightHint = 'Return to the camp circle for a quiet evening.';
+    this.setText('night-hint', nightHint);
     this.root.querySelector('#cook-button')?.classList.toggle('ready', !cookBlocker(this.state));
     this.root.querySelector('#stargaze-button')?.classList.toggle('ready', !stargazeBlocker(this.state));
     const dockCook = this.root.querySelector<HTMLButtonElement>('#dock-cook');

@@ -73,7 +73,7 @@ export class GameScene extends Phaser.Scene {
   private readonly onSound: (cue: SoundCue) => void;
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private playerSprite!: Phaser.GameObjects.Image;
-  private objects = new Map<string, Phaser.GameObjects.Image>();
+  private readonly objects = new Map<string, Phaser.GameObjects.Image>();
   private gatheredBerry?: { id: string; atMs: number };
   private lighting!: SceneLighting;
   private ambient!: AmbientLife;
