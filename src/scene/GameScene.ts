@@ -13,11 +13,13 @@ import { SceneLighting } from './SceneLighting';
 import { closestGatherable, hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from './tapTarget';
 import { palette } from '../art/palette';
 import { sitePrompt } from '../game/sitePrompt';
+import type { SoundCue } from '../game/soundscape';
 
 export class GameScene extends Phaser.Scene {
   private state: GameState;
   private readonly onStateChange: (state: GameState, cause: 'action' | 'tick') => void;
   private readonly onFeedback: (message: string) => void;
+  private readonly onSound: (cue: SoundCue) => void;
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private playerSprite!: Phaser.GameObjects.Image;
   private objects = new Map<string, Phaser.GameObjects.Image>();
@@ -31,11 +33,12 @@ export class GameScene extends Phaser.Scene {
   private walkTarget?: TapTarget;
   private tapGate: () => boolean = () => true;
 
-  constructor(state: GameState, onStateChange: (state: GameState, cause: 'action' | 'tick') => void, onFeedback: (message: string) => void) {
+  constructor(state: GameState, onStateChange: (state: GameState, cause: 'action' | 'tick') => void, onFeedback: (message: string) => void, onSound: (cue: SoundCue) => void = () => undefined) {
     super({ key: 'GameScene' });
     this.state = state;
     this.onStateChange = onStateChange;
     this.onFeedback = onFeedback;
+    this.onSound = onSound;
   }
 
   create(): void {
@@ -132,6 +135,8 @@ export class GameScene extends Phaser.Scene {
     this.state = result.state;
     this.showMorningFrost(before, this.state);
     if (result.state !== before) {
+      if (action.type === 'gather' || action.type === 'chopTree' || action.type === 'pickUpStone') this.onSound('gather');
+      if (action.type === 'build') this.onSound('build');
       if (action.type === 'gather') {
         const node = before.nodes.find(item => item.id === action.nodeId);
         if (node) this.effects?.trigger('gather', this.time.now, node.x, node.y, node.kind);
