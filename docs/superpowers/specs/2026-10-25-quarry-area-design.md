@@ -44,6 +44,15 @@ This builds on the supplies rework (PR #63, merged) and assumes its rules: stone
 - **Everything else keeps running there:** the clock, hunger, warmth, energy, night, weather, and the cold-front schedule. The fire stays at camp, so being away costs warmth just as any trip away from camp does today. Camp actions such as feeding the fire, sleeping, building, and the stone pile only work in the camp area.
 - **Dropped stone stays in the area where it was dropped.** Loose piles belong to an area.
 
+### Night at the quarry: glowing eyes (decided)
+
+Night in the second area is **spooky but safe**.
+- After dark, pairs of glowing eyes appear here and there at the edge of the darkness, blink, and fade.
+- When the survivor walks toward a pair, it backs off and fades before they get close. My call: a pair vanishes inside about 4 tiles.
+- They never chase, block, or harm the survivor, and they have no effect on hunger, warmth, energy, or any rule. They're purely visual.
+- They live in the ambient-wildlife layer (`AmbientLife`, alongside the birds, fox, and fireflies), not in the game rules or the save.
+- My call: only a few pairs show at once, they never appear at camp, and the two eye pixels glow above the night overlay, as fireflies do.
+
 ### Finding the quarry
 
 - The first time the survivor comes within reach of the quarry (the usual 2-tile interaction radius), it counts as found. A message marks it, and the pickaxe appears in the build list.
@@ -110,6 +119,7 @@ This builds on the supplies rework (PR #63, merged) and assumes its rules: stone
   - the toolshed, its build site, and the built toolshed
   - the pickaxe icon
   - the second area's rocky ground
+  - the glowing eyes
 - Text contrast meets WCAG AA (4.5:1).
 - `npm run lint`, `npm test -- --run`, and `npm run build` pass. Update the README's play, building, places, and saving sections.
 
@@ -126,6 +136,7 @@ This builds on the supplies rework (PR #63, merged) and assumes its rules: stone
   - Digging needs the pickaxe and gives 1 stone once per day.
   - Piles stay in their area.
   - Version 12 round-trips, and older versions are rejected.
+  - Ambient timing: eyes only at night, only in the quarry area, and a pair within about 4 tiles of the survivor fades out.
   - Soft-lock check: from a state with 0 stone anywhere, the shelter built and the quarry found, repeated dawns plus rubble eventually afford the pickaxe.
 - **Browser check (desktop and a 390×844 phone):**
   - Build the shelter and watch the path appear.
@@ -133,6 +144,7 @@ This builds on the supplies rework (PR #63, merged) and assumes its rules: stone
   - Find the quarry, pick up rubble, build the toolshed, and craft the pickaxe.
   - Dig, and see the quarry spent until dawn.
   - Reload while in the quarry area and continue there.
+  - At night in the quarry area, glowing eyes appear and back away when approached. None appear at camp.
 
 ## Calls made in review (my calls)
 
