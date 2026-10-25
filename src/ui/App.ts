@@ -269,7 +269,19 @@ export class App {
   }
 
   private render(): void {
-    const { player, inventory, structures } = this.state;
+    this.renderClock();
+    this.renderSurvivor();
+    this.renderBag();
+    this.renderJournal();
+    this.renderLookout();
+    this.renderAxe();
+    this.renderPickaxe();
+    this.renderNight();
+    this.renderForecast();
+    this.renderBuild();
+  }
+
+  private renderClock(): void {
     const { timeOfDay } = this.state;
     const phase = dayPhase(timeOfDay);
     const change = nextChange(timeOfDay);
@@ -280,6 +292,10 @@ export class App {
     if (hand) hand.style.left = `${timeOfDay / BALANCE.daySeconds * 100}%`;
     this.root.querySelector('#sleep-button')?.classList.toggle('ready', !sleepBlocker(this.state));
     this.root.querySelector('#dock-sleep')?.classList.toggle('ready', !sleepBlocker(this.state));
+  }
+
+  private renderSurvivor(): void {
+    const { player } = this.state;
     for (const key of ['energy', 'hunger', 'warmth'] as const) {
       const value = Math.round(player[key]);
       this.setText(`${key}-value`, String(value));
@@ -288,11 +304,32 @@ export class App {
       const mini = this.root.querySelector<HTMLElement>(`#mini-${key}`);
       if (mini) mini.style.width = `${value}%`;
     }
+    const nearSite = this.state.area === 'camp' && (Object.keys(SITES) as SiteId[]).some(id => Math.hypot(player.x - SITES[id].x, player.y - SITES[id].y) <= BALANCE.interactionRadius);
+    this.root.querySelector('#site-button')?.classList.toggle('ready', nearSite);
+  }
+
+  private renderBag(): void {
+    const { inventory, structures } = this.state;
     this.setText('wood-count', String(inventory.wood));
     this.setText('food-count', String(inventory.food));
     this.setText('fiber-count', String(inventory.fiber));
     this.setText('stone-count', String(inventory.stone));
     this.setText('ration-count', String(inventory.trailFood));
+    this.setText('space-count', `${carriedCount(this.state)}/${bagCapacity(this.state)}`);
+    this.root.querySelector('#eat-ration-button')?.classList.toggle('ready', inventory.trailFood > 0);
+    this.root.querySelector('#prepare-button')?.classList.toggle('ready', !trailFoodBlocker(this.state));
+    this.setText('prepare-hint', trailFoodBlocker(this.state) ?? '1 berry · 12 seconds · 1 ration');
+    this.root.querySelectorAll<HTMLButtonElement>('[data-supply]').forEach(button => {
+      button.disabled = inventory[button.dataset.supply as keyof GameState['inventory']] <= 0;
+    });
+    this.setText('stone-stored', structures.stonePile ? `+${this.state.storedStone} at camp` : '');
+    const pileControls = this.root.querySelector<HTMLElement>('#stone-pile-controls');
+    if (pileControls) pileControls.hidden = !structures.stonePile;
+    this.setText('stone-pile-stored', `Stored stone ${this.state.storedStone}/${BALANCE.stonePileCapacity}`);
+    this.setText('fire-status', this.state.fireFuel > 0 ? `Fire burning · ${Math.ceil(this.state.fireFuel)}s of warmth` : 'The fire is unlit');
+  }
+
+  private renderJournal(): void {
     const journal = journalView(this.state);
     this.setText('journal-hint', journal.nextHint);
     const placeList = this.root.querySelector('#journal-places');
@@ -313,12 +350,17 @@ export class App {
         return item;
       }));
     }
-    const quarryPlace = journal.locations.find(place => place.id === 'quarry');
+    this.renderMap(journal.locations);
+  }
+
+  private renderMap(locations: ReturnType<typeof journalView>['locations']): void {
+    const { player } = this.state;
+    const quarryPlace = locations.find(place => place.id === 'quarry');
     const quarryMarker = this.root.querySelector<HTMLElement>('#map-quarry');
     if (quarryMarker) quarryMarker.hidden = !quarryPlace;
     const westPath = this.root.querySelector<SVGPathElement>('#map-west-path');
     if (westPath) westPath.style.display = quarryPlace ? '' : 'none';
-    for (const place of journal.locations) {
+    for (const place of locations) {
       const marker = this.root.querySelector(`#map-${place.id}`);
       if (marker) {
         let symbol = '?';
@@ -335,20 +377,9 @@ export class App {
       playerMarker.style.left = `${mapPosition.x / BALANCE.mapWidth * 100}%`;
       playerMarker.style.top = `${mapPosition.y / BALANCE.mapHeight * 100}%`;
     }
-    const nearSite = this.state.area === 'camp' && (Object.keys(SITES) as SiteId[]).some(id => Math.hypot(player.x - SITES[id].x, player.y - SITES[id].y) <= BALANCE.interactionRadius);
-    this.root.querySelector('#site-button')?.classList.toggle('ready', nearSite);
-    this.setText('space-count', `${carriedCount(this.state)}/${bagCapacity(this.state)}`);
-    this.root.querySelector('#eat-ration-button')?.classList.toggle('ready', inventory.trailFood > 0);
-    this.root.querySelector('#prepare-button')?.classList.toggle('ready', !trailFoodBlocker(this.state));
-    this.setText('prepare-hint', trailFoodBlocker(this.state) ?? '1 berry · 12 seconds · 1 ration');
-    this.root.querySelectorAll<HTMLButtonElement>('[data-supply]').forEach(button => {
-      button.disabled = inventory[button.dataset.supply as keyof GameState['inventory']] <= 0;
-    });
-    this.setText('stone-stored', structures.stonePile ? `+${this.state.storedStone} at camp` : '');
-    const pileControls = this.root.querySelector<HTMLElement>('#stone-pile-controls');
-    if (pileControls) pileControls.hidden = !structures.stonePile;
-    this.setText('stone-pile-stored', `Stored stone ${this.state.storedStone}/${BALANCE.stonePileCapacity}`);
-    this.setText('fire-status', this.state.fireFuel > 0 ? `Fire burning · ${Math.ceil(this.state.fireFuel)}s of warmth` : 'The fire is unlit');
+  }
+
+  private renderLookout(): void {
     const lookoutButton = this.root.querySelector<HTMLButtonElement>('#lookout-button');
     if (lookoutButton) {
       lookoutButton.disabled = !this.state.progress.hearthUnlocked || this.state.progress.lookoutRepaired;
@@ -367,6 +398,10 @@ export class App {
       this.setText('lookout-copy', 'A damaged lookout waits along the northeast path. Weather the cold front before repairing it.');
       this.setText('lookout-cost', 'Unlocks after the cold front');
     }
+  }
+
+  private renderAxe(): void {
+    const { inventory, structures } = this.state;
     const axeButton = this.root.querySelector<HTMLButtonElement>('#axe-button');
     if (axeButton) {
       axeButton.disabled = !this.state.progress.hearthUnlocked || this.state.progress.axeCrafted;
@@ -389,6 +424,9 @@ export class App {
       this.setText('axe-copy', 'Weather the cold front to learn how to make a useful forest tool.');
       this.setText('axe-cost', 'Unlocks after the cold front');
     }
+  }
+
+  private renderPickaxe(): void {
     const pickaxeRow = this.root.querySelector<HTMLElement>('#pickaxe-row');
     if (pickaxeRow) pickaxeRow.hidden = !this.state.progress.quarryFound;
     const pickaxeButton = this.root.querySelector<HTMLButtonElement>('#pickaxe-button');
@@ -406,6 +444,10 @@ export class App {
       this.setText('pickaxe-copy', pickaxeBlock ?? 'Your toolshed is ready. Craft a pickaxe to work the quarry face.');
       this.setText('pickaxe-cost', '2 wood · 1 fiber · 2 stone');
     }
+  }
+
+  private renderNight(): void {
+    const { timeOfDay } = this.state;
     const atCamp = isAtCamp(this.state);
     const afterDark = timeOfDay >= BALANCE.nightStart;
     this.setText('night-hint', !afterDark ? 'These small moments are waiting for nightfall.'
@@ -417,6 +459,10 @@ export class App {
     if (dockCook) dockCook.hidden = Boolean(cookBlocker(this.state));
     const dockStargaze = this.root.querySelector<HTMLButtonElement>('#dock-stargaze');
     if (dockStargaze) dockStargaze.hidden = Boolean(stargazeBlocker(this.state));
+  }
+
+  private renderForecast(): void {
+    const { structures } = this.state;
     const storm = isColdNight(this.state);
     const forecast = this.root.querySelector('#forecast-panel');
     forecast?.classList.toggle('active', storm);
@@ -433,40 +479,45 @@ export class App {
       this.setText('forecast-shelter', `${structures.shelter ? '✓' : '○'} Shelter ${structures.shelter ? 'ready' : 'needed'}`);
       this.setText('forecast-fire', forecastFireCheck(this.state));
     }
+  }
+
+  private renderBuild(): void {
     this.setText('prompt', this.scene?.getPrompt() ?? 'WASD / arrows  Move');
     this.setText('build-hint', isAtCamp(this.state) ? 'At camp — click an upgrade to build.' : 'Stand inside the marked camp circle to build.');
-    for (const id of buildOptions) {
-      const status = buildStatus(this.state, id);
-      const built = status === 'built';
-      const locked = status === 'locked';
-      const needsShelter = status === 'needsShelter';
-      const definition = BUILDINGS[id];
-      const cost = definition.cost;
-      const stoneCost = 'stone' in cost ? cost.stone : 0;
-      const button = this.root.querySelector<HTMLButtonElement>(`[data-build="${id}"]`)!;
-      button.disabled = built || locked || needsShelter;
-      button.classList.toggle('built', built);
-      button.classList.toggle('locked', locked || needsShelter);
-      button.classList.toggle('ready', status === 'ready');
-      button.querySelector<HTMLElement>('.build-copy small')!.textContent = needsShelter ? 'Requires shelter' : definition.description;
-      const fiberPrice = cost.fiber ? ` · ${cost.fiber} fiber` : '';
-      const stonePrice = stoneCost ? ` · ${stoneCost} stone` : '';
-      let verb = 'Build';
-      let price = `${cost.wood} wood${fiberPrice}${stonePrice}`;
-      if (built) {
-        verb = 'Built';
-        price = 'Complete';
-      } else if (locked) {
-        verb = 'Locked';
-        price = 'Weather cold night';
-      } else if (needsShelter) {
-        verb = 'Blocked';
-      }
-      button.querySelector<HTMLElement>('.build-verb')!.textContent = verb;
-      button.querySelector<HTMLElement>('.build-price')!.textContent = price;
-    }
+    for (const id of buildOptions) this.renderBuildButton(id);
     const buildReady = Boolean(this.root.querySelector('[data-tab="build"] .ready'));
     this.root.querySelector('[data-tab-button="build"]')?.classList.toggle('has-dot', buildReady);
+  }
+
+  private renderBuildButton(id: StructureId): void {
+    const status = buildStatus(this.state, id);
+    const built = status === 'built';
+    const locked = status === 'locked';
+    const needsShelter = status === 'needsShelter';
+    const definition = BUILDINGS[id];
+    const cost = definition.cost;
+    const stoneCost = 'stone' in cost ? cost.stone : 0;
+    const button = this.root.querySelector<HTMLButtonElement>(`[data-build="${id}"]`)!;
+    button.disabled = built || locked || needsShelter;
+    button.classList.toggle('built', built);
+    button.classList.toggle('locked', locked || needsShelter);
+    button.classList.toggle('ready', status === 'ready');
+    button.querySelector<HTMLElement>('.build-copy small')!.textContent = needsShelter ? 'Requires shelter' : definition.description;
+    const fiberPrice = cost.fiber ? ` · ${cost.fiber} fiber` : '';
+    const stonePrice = stoneCost ? ` · ${stoneCost} stone` : '';
+    let verb = 'Build';
+    let price = `${cost.wood} wood${fiberPrice}${stonePrice}`;
+    if (built) {
+      verb = 'Built';
+      price = 'Complete';
+    } else if (locked) {
+      verb = 'Locked';
+      price = 'Weather cold night';
+    } else if (needsShelter) {
+      verb = 'Blocked';
+    }
+    button.querySelector<HTMLElement>('.build-verb')!.textContent = verb;
+    button.querySelector<HTMLElement>('.build-price')!.textContent = price;
   }
 
   private setText(id: string, text: string): void {
