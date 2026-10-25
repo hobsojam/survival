@@ -101,14 +101,14 @@ export class App {
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
         const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone';
-        if (!this.pause.paused) this.scene?.perform({ type });
+        this.scene?.perform({ type });
       });
     });
     this.root.querySelector('#build-list')!.addEventListener('click', event => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-build]');
-      if (button && !this.pause.paused) this.scene?.perform({ type: 'build', structureId: button.dataset.build as StructureId });
+      if (button) this.scene?.perform({ type: 'build', structureId: button.dataset.build as StructureId });
     });
-    this.root.querySelector('#site-button')!.addEventListener('click', () => { if (!this.pause.paused) this.scene?.visitNearestSite(); });
+    this.root.querySelector('#site-button')!.addEventListener('click', () => this.scene?.visitNearestSite());
     this.root.querySelector('#new-game')!.addEventListener('click', () => this.beginNewGame());
     this.root.querySelector('#continue-game')!.addEventListener('click', () => this.continueGame());
     this.root.querySelector('#restart-game')!.addEventListener('click', () => this.beginNewGame());

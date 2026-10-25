@@ -98,6 +98,15 @@ describe('the pause button and card', () => {
     expect([view.label.textContent, view.overlay.hidden]).toEqual(['Pause', true]);
   });
 
+  it('skips anything missing from the page', () => {
+    const bare = { querySelector: () => null } as unknown as PausePage;
+    expect(() => renderPause(bare, pauseButtonView(true), true)).not.toThrow();
+    const view = page();
+    view.button.querySelector = () => null as never;
+    renderPause(view.root, pauseButtonView(true), true);
+    expect([view.button.title, view.overlay.hidden]).toEqual(['Resume the game (Esc)', false]);
+  });
+
   it('pauses from the top button, resumes from the card, and answers Esc', () => {
     const view = page();
     let keydown: ((event: { key: string; repeat: boolean; preventDefault(): void }) => void) | undefined;
@@ -153,7 +162,7 @@ describe('building the pause control for the page', () => {
 describe('pausing the sound', () => {
   it('is harmless before any audio has started', () => {
     const sound = new Soundscape();
-    expect(() => { sound.setPaused(true); sound.setPaused(false); sound.resume(); }).not.toThrow();
+    expect(() => { sound.setPaused(true); sound.resume(); sound.setPaused(false); }).not.toThrow();
     expect(sound.isMuted).toBe(false);
   });
 });

@@ -46,7 +46,8 @@ export class Soundscape {
   }
 
   resume(): void {
-    if (!this.context || this.muted || this.paused || this.context.state === 'running') return;
+    if (this.paused) return;
+    if (!this.context || this.muted || this.context.state === 'running') return;
     void this.context.resume().catch(() => undefined);
   }
 
