@@ -274,7 +274,7 @@ const gather: ActionHandler<'gather'> = (state, action) => {
   };
 };
 
-function axeBlocker(state: GameState): string | null {
+export function axeBlocker(state: GameState): string | null {
   if (state.progress.axeCrafted) return 'You already have a stone axe.';
   if (!state.progress.hearthUnlocked) return 'Weather the cold front before crafting an axe.';
   if (!state.structures.toolshed) return 'Build a toolshed first.';

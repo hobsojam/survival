@@ -3,11 +3,11 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type SiteId, typ
 import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
-import { availableStone, bagCapacity, buildStatus, carriedCount, cookBlocker, isAtCamp, isColdNight, lookoutRepairBlocker, pickaxeBlocker, sleepBlocker, stargazeBlocker, trailFoodBlocker } from '../game/rules';
-import { forecastFireCheck } from '../game/forecast';
+import { cookBlocker, isAtCamp, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { dayPhase, formatClock, nextChange } from '../game/clock';
 import { gateTap, nextOpenTab, type DockTab } from './dock';
 import { journalView, QUARRY_MARKER } from './journal';
+import { axeView, bagView, buildButtonView, forecastView, lookoutView, nightHint, pickaxeView, startNote, type ActionPanelView } from './panels';
 import { Soundscape } from '../game/soundscape';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
@@ -196,18 +196,11 @@ export class App {
     this.render();
   }
 
-  private startNote(): string {
-    if (!this.storage) return 'Browser storage is unavailable, so this camp will not be saved.';
-    if (this.previousSave.kind === 'loaded') return `Your camp is waiting on day ${this.previousSave.state.day}.`;
-    if (this.previousSave.kind === 'invalid') return `Your existing save could not be loaded: ${this.previousSave.reason}`;
-    return 'A fresh camp is ready whenever you are.';
-  }
-
   private showStartScreen(): void {
     const note = this.root.querySelector<HTMLElement>('#start-note');
     const continueButton = this.root.querySelector<HTMLButtonElement>('#continue-game');
     if (continueButton) continueButton.hidden = this.previousSave.kind !== 'loaded';
-    if (note) note.textContent = this.startNote();
+    if (note) note.textContent = startNote(this.previousSave, Boolean(this.storage));
   }
 
   private beginNewGame(): void {
@@ -275,9 +268,7 @@ export class App {
     this.renderSurvivor();
     this.renderBag();
     this.renderJournal();
-    this.renderLookout();
-    this.renderAxe();
-    this.renderPickaxe();
+    this.renderTools();
     this.renderNight();
     this.renderForecast();
     this.renderBuild();
@@ -311,24 +302,25 @@ export class App {
   }
 
   private renderBag(): void {
-    const { inventory, structures } = this.state;
+    const { inventory } = this.state;
+    const bag = bagView(this.state);
     this.setText('wood-count', String(inventory.wood));
     this.setText('food-count', String(inventory.food));
     this.setText('fiber-count', String(inventory.fiber));
     this.setText('stone-count', String(inventory.stone));
     this.setText('ration-count', String(inventory.trailFood));
-    this.setText('space-count', `${carriedCount(this.state)}/${bagCapacity(this.state)}`);
+    this.setText('space-count', bag.spaces);
     this.root.querySelector('#eat-ration-button')?.classList.toggle('ready', inventory.trailFood > 0);
-    this.root.querySelector('#prepare-button')?.classList.toggle('ready', !trailFoodBlocker(this.state));
-    this.setText('prepare-hint', trailFoodBlocker(this.state) ?? '1 berry · 12 seconds · 1 ration');
+    this.root.querySelector('#prepare-button')?.classList.toggle('ready', bag.prepareReady);
+    this.setText('prepare-hint', bag.prepareHint);
     this.root.querySelectorAll<HTMLButtonElement>('[data-supply]').forEach(button => {
       button.disabled = inventory[button.dataset.supply as keyof GameState['inventory']] <= 0;
     });
-    this.setText('stone-stored', structures.stonePile ? `+${this.state.storedStone} at camp` : '');
+    this.setText('stone-stored', bag.storedAtCamp);
     const pileControls = this.root.querySelector<HTMLElement>('#stone-pile-controls');
-    if (pileControls) pileControls.hidden = !structures.stonePile;
-    this.setText('stone-pile-stored', `Stored stone ${this.state.storedStone}/${BALANCE.stonePileCapacity}`);
-    this.setText('fire-status', this.state.fireFuel > 0 ? `Fire burning · ${Math.ceil(this.state.fireFuel)}s of warmth` : 'The fire is unlit');
+    if (pileControls) pileControls.hidden = !bag.pileShown;
+    this.setText('stone-pile-stored', bag.pileStored);
+    this.setText('fire-status', bag.fire);
   }
 
   private renderJournal(): void {
@@ -381,79 +373,29 @@ export class App {
     }
   }
 
-  private renderLookout(): void {
-    const lookoutButton = this.root.querySelector<HTMLButtonElement>('#lookout-button');
-    if (lookoutButton) {
-      lookoutButton.disabled = !this.state.progress.hearthUnlocked || this.state.progress.lookoutRepaired;
-      lookoutButton.classList.toggle('ready', !lookoutRepairBlocker(this.state));
+  /** Writes a one-button panel's view into the elements named after it, such as #axe-title and #axe-button. */
+  private renderActionPanel(name: string, view: ActionPanelView): void {
+    const button = this.root.querySelector<HTMLButtonElement>(`#${name}-button`);
+    if (button) {
+      button.disabled = view.disabled;
+      button.classList.toggle('ready', view.ready);
     }
-    if (this.state.progress.lookoutRepaired) {
-      this.setText('lookout-title', 'A place to call home');
-      this.setText('lookout-copy', 'The old lookout stands again. The paths are still yours to explore.');
-      this.setText('lookout-cost', 'Restored');
-    } else if (this.state.progress.hearthUnlocked) {
-      this.setText('lookout-title', 'Restore the old lookout');
-      this.setText('lookout-copy', 'Follow the northeast path to the lookout. Bring the repair materials and stand beside it.');
-      this.setText('lookout-cost', '4 wood · 2 fiber · 2 stone');
-    } else {
-      this.setText('lookout-title', 'The old lookout');
-      this.setText('lookout-copy', 'A damaged lookout waits along the northeast path. Weather the cold front before repairing it.');
-      this.setText('lookout-cost', 'Unlocks after the cold front');
-    }
+    this.setText(`${name}-title`, view.title);
+    this.setText(`${name}-copy`, view.copy);
+    this.setText(`${name}-cost`, view.cost);
   }
 
-  private renderAxe(): void {
-    const { inventory, structures } = this.state;
-    const axeButton = this.root.querySelector<HTMLButtonElement>('#axe-button');
-    if (axeButton) {
-      axeButton.disabled = !this.state.progress.hearthUnlocked || this.state.progress.axeCrafted;
-      const canCraft = this.state.progress.hearthUnlocked && structures.toolshed && isAtCamp(this.state)
-        && inventory.wood >= 1 && inventory.fiber >= 1 && availableStone(this.state) >= 1 && !this.state.progress.axeCrafted;
-      axeButton.classList.toggle('ready', canCraft);
-    }
-    if (this.state.progress.axeCrafted) {
-      this.setText('axe-title', 'Stone axe ready');
-      this.setText('axe-copy', 'Stand near a mature tree and press X to gather two wood. Stumps regrow after three dawns.');
-      this.setText('axe-cost', 'Crafted');
-    } else if (this.state.progress.hearthUnlocked) {
-      this.setText('axe-title', 'Craft a stone axe');
-      this.setText('axe-copy', structures.toolshed
-        ? 'Use stone, fiber, and wood at camp to work with the mature trees. Fallen branches remain easy to gather.'
-        : 'Build a toolshed first.');
-      this.setText('axe-cost', '1 wood · 1 fiber · 1 stone');
-    } else {
-      this.setText('axe-title', 'Stone axe');
-      this.setText('axe-copy', 'Weather the cold front to learn how to make a useful forest tool.');
-      this.setText('axe-cost', 'Unlocks after the cold front');
-    }
-  }
-
-  private renderPickaxe(): void {
+  private renderTools(): void {
+    this.renderActionPanel('lookout', lookoutView(this.state));
+    this.renderActionPanel('axe', axeView(this.state));
+    const pickaxe = pickaxeView(this.state);
     const pickaxeRow = this.root.querySelector<HTMLElement>('#pickaxe-row');
-    if (pickaxeRow) pickaxeRow.hidden = !this.state.progress.quarryFound;
-    const pickaxeButton = this.root.querySelector<HTMLButtonElement>('#pickaxe-button');
-    const pickaxeBlock = pickaxeBlocker(this.state);
-    if (pickaxeButton) {
-      pickaxeButton.disabled = !this.state.progress.quarryFound || this.state.progress.pickaxeCrafted;
-      pickaxeButton.classList.toggle('ready', this.state.progress.quarryFound && !pickaxeBlock);
-    }
-    if (this.state.progress.pickaxeCrafted) {
-      this.setText('pickaxe-title', 'Pickaxe ready');
-      this.setText('pickaxe-copy', 'Stand at the quarry face and press E, or tap it, to dig a stone. It is ready again each dawn.');
-      this.setText('pickaxe-cost', 'Crafted');
-    } else {
-      this.setText('pickaxe-title', 'Craft a pickaxe');
-      this.setText('pickaxe-copy', pickaxeBlock ?? 'Your toolshed is ready. Craft a pickaxe to work the quarry face.');
-      this.setText('pickaxe-cost', '2 wood · 1 fiber · 2 stone');
-    }
+    if (pickaxeRow) pickaxeRow.hidden = !pickaxe.shown;
+    this.renderActionPanel('pickaxe', pickaxe);
   }
 
   private renderNight(): void {
-    const { timeOfDay } = this.state;
-    let nightHint = 'Optional comforts while the night passes.';
-    if (timeOfDay < BALANCE.nightStart) nightHint = 'These small moments are waiting for nightfall.';
-    else if (!isAtCamp(this.state)) nightHint = 'Return to the camp circle for a quiet evening.';
-    this.setText('night-hint', nightHint);
+    this.setText('night-hint', nightHint(this.state));
     this.root.querySelector('#cook-button')?.classList.toggle('ready', !cookBlocker(this.state));
     this.root.querySelector('#stargaze-button')?.classList.toggle('ready', !stargazeBlocker(this.state));
     const dockCook = this.root.querySelector<HTMLButtonElement>('#dock-cook');
@@ -463,23 +405,14 @@ export class App {
   }
 
   private renderForecast(): void {
-    const { structures } = this.state;
-    const storm = isColdNight(this.state);
+    const view = forecastView(this.state);
     const forecast = this.root.querySelector('#forecast-panel');
-    forecast?.classList.toggle('active', storm);
-    forecast?.classList.toggle('weathered', this.state.progress.hearthUnlocked);
-    if (this.state.progress.hearthUnlocked) {
-      this.setText('forecast-title', 'The cold night is behind you');
-      this.setText('forecast-copy', 'You kept your camp warm through dawn. The stone hearth is ready to build.');
-      this.setText('forecast-shelter', '✓ Shelter held firm');
-      this.setText('forecast-fire', '✓ Hearth unlocked');
-    } else {
-      const day = this.state.progress.nextStormDay!;
-      this.setText('forecast-title', storm ? 'The cold front is here' : `Cold front · day ${day} night`);
-      this.setText('forecast-copy', storm ? 'Stay at camp and keep the fire alive until dawn.' : `Build a shelter and bring two logs to camp before nightfall on day ${day}.`);
-      this.setText('forecast-shelter', `${structures.shelter ? '✓' : '○'} Shelter ${structures.shelter ? 'ready' : 'needed'}`);
-      this.setText('forecast-fire', forecastFireCheck(this.state));
-    }
+    forecast?.classList.toggle('active', view.active);
+    forecast?.classList.toggle('weathered', view.weathered);
+    this.setText('forecast-title', view.title);
+    this.setText('forecast-copy', view.copy);
+    this.setText('forecast-shelter', view.shelter);
+    this.setText('forecast-fire', view.fire);
   }
 
   private renderBuild(): void {
@@ -491,35 +424,17 @@ export class App {
   }
 
   private renderBuildButton(id: StructureId): void {
-    const status = buildStatus(this.state, id);
-    const built = status === 'built';
-    const locked = status === 'locked';
-    const needsShelter = status === 'needsShelter';
-    const definition = BUILDINGS[id];
-    const cost = definition.cost;
-    const stoneCost = 'stone' in cost ? cost.stone : 0;
+    const view = buildButtonView(this.state, id);
     const button = this.root.querySelector<HTMLButtonElement>(`[data-build="${id}"]`)!;
-    button.disabled = built || locked || needsShelter;
-    button.classList.toggle('built', built);
-    button.classList.toggle('locked', locked || needsShelter);
-    button.classList.toggle('ready', status === 'ready');
-    button.querySelector<HTMLElement>('.build-copy small')!.textContent = needsShelter ? 'Requires shelter' : definition.description;
-    const fiberPrice = cost.fiber ? ` · ${cost.fiber} fiber` : '';
-    const stonePrice = stoneCost ? ` · ${stoneCost} stone` : '';
-    let verb = 'Build';
-    let price = `${cost.wood} wood${fiberPrice}${stonePrice}`;
-    if (built) {
-      verb = 'Built';
-      price = 'Complete';
-    } else if (locked) {
-      verb = 'Locked';
-      price = 'Weather cold night';
-    } else if (needsShelter) {
-      verb = 'Blocked';
-    }
-    button.querySelector<HTMLElement>('.build-verb')!.textContent = verb;
-    button.querySelector<HTMLElement>('.build-price')!.textContent = price;
+    button.disabled = view.disabled;
+    button.classList.toggle('built', view.built);
+    button.classList.toggle('locked', view.locked);
+    button.classList.toggle('ready', view.ready);
+    button.querySelector<HTMLElement>('.build-copy small')!.textContent = view.description;
+    button.querySelector<HTMLElement>('.build-verb')!.textContent = view.verb;
+    button.querySelector<HTMLElement>('.build-price')!.textContent = view.price;
   }
+
 
   private setText(id: string, text: string): void {
     const element = this.root.querySelector<HTMLElement>(`#${id}`);
