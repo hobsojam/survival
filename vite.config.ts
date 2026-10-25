@@ -1,7 +1,11 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
   // Relative asset paths so the build works under GitHub Pages' /survival/ path.
   base: './',
-  test: { environment: 'node' }
+  test: {
+    environment: 'node',
+    // Agent worktrees live under .superpowers/ and carry their own copies of the tests.
+    exclude: [...configDefaults.exclude, '.superpowers/**']
+  }
 });
