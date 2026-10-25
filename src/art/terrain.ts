@@ -1,10 +1,10 @@
 import type { SpriteDef } from './sprites';
 import type { PaletteKey } from './palette';
 import { BALANCE } from '../game/state';
-import { pathDistance } from '../scene/mapGeometry';
+import { CAMP_OPEN_PATHS, CAMP_PATHS, QUARRY_PATHS, pathDistance, type PathRoute } from '../scene/mapGeometry';
 
 type Grid = string[][];
-const blank = (w: number, h: number, fill = '.'): Grid => Array.from({ length: h }, () => Array(w).fill(fill));
+const blank = (w: number, h: number, fill = '.'): Grid => Array.from({ length: h }, () => Array.from({ length: w }, () => fill));
 const dot = (g: Grid, x: number, y: number, c: string): void => { if (g[y]?.[x] !== undefined) g[y][x] = c; };
 const rect = (g: Grid, x: number, y: number, w: number, h: number, c: string): void => {
   for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) dot(g, i, j, c);
@@ -55,7 +55,8 @@ for (let mask = 0; mask < 16; mask++) {
   terrainSprites[`transition${mask}`] = sprite(g, groundLegend);
 }
 
-const campCircleTiles = new Map<string, 'full' | string>();
+/** Camp circle tiles by offset: 'full' for solid earth, otherwise the edge sprite's name. */
+const campCircleTiles = new Map<string, string>();
 const circleRadius = BALANCE.campRadius * 16;
 for (let dy = -BALANCE.campRadius; dy <= BALANCE.campRadius; dy++) {
   for (let dx = -BALANCE.campRadius; dx <= BALANCE.campRadius; dx++) {
@@ -79,29 +80,55 @@ for (let dy = -BALANCE.campRadius; dy <= BALANCE.campRadius; dy++) {
   }
 }
 
-export function campCircleTile(dx: number, dy: number): 'full' | string | undefined {
+export function campCircleTile(dx: number, dy: number): string | undefined {
   return campCircleTiles.get(`${dx},${dy}`);
 }
 
-const pathTiles = new Map<string, string>();
-for (let y = 0; y < BALANCE.mapHeight; y++) for (let x = 0; x < BALANCE.mapWidth; x++) {
-  if (pathDistance(x + .5, y + .5) > 1.25) continue;
+/** Path tiles per route list, memoised; identical tiles share one sprite. */
+const pathTileSets = new Map<string, Map<string, string>>();
+const pathSprites = new Map<string, string>();
+function pathTiles(destinations: readonly PathRoute[]): Map<string, string> {
+  const key = JSON.stringify(destinations);
+  const cached = pathTileSets.get(key);
+  if (cached) return cached;
+  const tiles = new Map<string, string>();
+  for (let y = 0; y < BALANCE.mapHeight; y++) for (let x = 0; x < BALANCE.mapWidth; x++) {
+    const g = pathTileGrid(x, y, destinations);
+    if (g) tiles.set(`${x},${y}`, pathSpriteFor(g));
+  }
+  pathTileSets.set(key, tiles);
+  return tiles;
+}
+
+/** The path pixels on one tile, or null when no path crosses it. */
+function pathTileGrid(x: number, y: number, destinations: readonly PathRoute[]): Grid | null {
+  if (pathDistance(x + .5, y + .5, destinations) > 1.25) return null;
   const g = blank(16, 16);
   let filled = 0;
   for (let py = 0; py < 16; py++) for (let px = 0; px < 16; px++) {
-    const distance = pathDistance(x + (px + .5) / 16, y + (py + .5) / 16);
+    const distance = pathDistance(x + (px + .5) / 16, y + (py + .5) / 16, destinations);
     if (distance > .5) continue;
     g[py][px] = distance >= .44 ? 'e' : 'g';
     filled++;
   }
-  if (filled === 0) continue;
-  const name = `pathTile${x}_${y}`;
-  terrainSprites[name] = sprite(g, groundLegend);
-  pathTiles.set(`${x},${y}`, name);
+  return filled ? g : null;
 }
 
-export function pathTile(x: number, y: number): string | undefined {
-  return pathTiles.get(`${x},${y}`);
+function pathSpriteFor(g: Grid): string {
+  const shape = g.map(row => row.join('')).join('/');
+  let name = pathSprites.get(shape);
+  if (!name) {
+    name = `pathTile${pathSprites.size}`;
+    terrainSprites[name] = sprite(g, groundLegend);
+    pathSprites.set(shape, name);
+  }
+  return name;
+}
+// Build every area's paths up front so their sprites are registered as textures with the rest.
+for (const routes of [CAMP_PATHS, CAMP_OPEN_PATHS, QUARRY_PATHS]) pathTiles(routes);
+
+export function pathTile(x: number, y: number, destinations: readonly PathRoute[]): string | undefined {
+  return pathTiles(destinations).get(`${x},${y}`);
 }
 
 const decalLegend = { a: 'grass1', b: 'grass3', c: 'grass4', d: 'flower0', e: 'flower1', f: 'flower2', g: 'flower3', h: 'flower4', i: 'stone1', j: 'stone2', k: 'stone3', l: 'stone4', m: 'wood0', n: 'wood2', o: 'wood3', p: 'earth1', q: 'earth3', r: 'leaf2', s: 'leaf4', t: 'shadow', u: 'stone0' } as const;

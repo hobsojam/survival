@@ -22,13 +22,13 @@ button:focus-visible { outline: 3px solid #d69c5d; outline-offset: 3px; }
   width: 43px; height: 43px; border-radius: 14px;
   background: linear-gradient(145deg, #e5b176, #bd7951);
   box-shadow: inset 0 1px #fff7ddaa, 0 5px 12px #9c754450;
-  color: #fff8e8; display: grid; place-items: center; font-size: 25px;
+  color: #2e1a0b; display: grid; place-items: center; font-size: 25px;
 }
 .brand strong { display: block; font: 700 27px/1.05 'Fraunces', serif; letter-spacing: -.035em; }
 .brand small { display: block; margin-top: 4px; color: #788678; font-size: 10px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
 .top-actions { display: flex; align-items: center; gap: 13px; }
 .sound-toggle { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #cbd8c8; border-radius: 999px; background: #f6f7ee; color: #4b6b50; padding: 7px 10px; font-size: 11px; font-weight: 700; white-space: nowrap; }
-.sound-toggle[aria-pressed="false"] { color: #7d8377; background: #f0f0e9; }
+.sound-toggle[aria-pressed="false"] { color: #5f665b; background: #f0f0e9; }
 .save-status { color: #5f6e63; font-size: 11px; white-space: nowrap; }
 .restart-button { border: 0; background: transparent; color: #58715c; font-size: 11px; font-weight: 700; text-decoration: underline; }
 .day-pill { display: flex; align-items: center; gap: 10px; background: #dce8d6; color: #3f684b; border: 1px solid #cbdcc7; border-radius: 100px; padding: 10px 17px; font-weight: 700; font-size: 12px; white-space: nowrap; box-shadow: inset 0 1px #fff9; transition: background .6s, color .6s, border-color .6s; }
@@ -72,7 +72,9 @@ kbd { display: inline-block; border: 1px solid #d4ddce; border-bottom-width: 2px
 .axe-panel button { width: 100%; border: 1px solid #bbd0b6; border-bottom-width: 2px; border-radius: 9px; background: #e7f0e2; color: #426447; padding: 10px; font-size: 12px; font-weight: 700; }
 .axe-panel button.ready { background: #517d5b; border-color: #42724d; color: #fffdf7; }
 .axe-panel button:disabled { opacity: .55; cursor: default; }
-.axe-panel small { display: block; margin-top: 7px; color: #6f836c; text-align: center; font-size: 11px; }
+.axe-panel small { display: block; margin-top: 7px; color: #4f6655; text-align: center; font-size: 11px; }
+.axe-panel .lookout-copy { color: #5b604e; }
+.tool-row + .tool-row { margin-top: 14px; padding-top: 12px; border-top: 1px solid #d2dfc5; }
 .journal-panel { background: linear-gradient(145deg, #e9f0ec, #fffdf7 72%); border-color: #ccded6; }
 .journal-panel h2 { margin-bottom: 7px; }
 .journal-hint { color: #526e5d; font-size: 12px; line-height: 1.45; margin: 0 0 12px; }
@@ -167,7 +169,7 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
 .lookout-ending { position: fixed; inset: 0; z-index: 31; display: grid; place-items: center; padding: 16px; background: #173326e0; backdrop-filter: blur(7px); }
 .lookout-ending.hidden { display: none; }
 .start-card { width: min(440px, 100%); padding: 40px; border: 1px solid #f2dfba; border-radius: 22px; background: radial-gradient(circle at 50% 0%, #fff9e9 0, #fffdf6 58%); text-align: center; box-shadow: 0 30px 90px #12251b55; }
-.start-mark { width: 56px; height: 56px; margin: 0 auto 19px; border-radius: 16px; background: linear-gradient(145deg, #eab477, #c7865b); color: #fff9eb; display: grid; place-items: center; font-size: 29px; box-shadow: 0 5px 15px #ae7a5366; }
+.start-mark { width: 56px; height: 56px; margin: 0 auto 19px; border-radius: 16px; background: linear-gradient(145deg, #eab477, #c7865b); color: #2e1a0b; display: grid; place-items: center; font-size: 29px; box-shadow: 0 5px 15px #ae7a5366; }
 .start-card h1 { margin: 8px 0 13px; color: #304837; font: 600 32px/1.15 'Fraunces', Georgia, serif; letter-spacing: -.04em; }
 .start-copy { color: #64766a; line-height: 1.55; font-size: 14px; }
 .start-note { min-height: 35px; color: #926e50; font-size: 12px; line-height: 1.4; }
@@ -176,7 +178,7 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
 .primary-button { background: #4d7559; color: #fff; }.primary-button:hover { background: #3e664b; }
 .secondary-button { background: #f4f7ee; color: #46674d; }.secondary-button:hover { background: #e7efe1; }
 .start-card > small { color: #9ca99c; font-size: 10px; letter-spacing: .05em; }
-[hidden] { display: none !important; }
+[hidden] { display: none; }
 @media (max-width: 920px) {
   .layout { grid-template-columns: 1fr; }
   .sidebar { display: grid; grid-template-columns: repeat(2, 1fr); }

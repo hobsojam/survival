@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE, LOOKOUT, SITES, createGame } from '../src/game/state';
-import { FULL_BAG_MESSAGE, advanceTime, applyAction, buildStatus, carriedCount, freeSpaces, lookoutRepairBlocker } from '../src/game/rules';
+import { BALANCE, BUILDINGS, LOOKOUT, SITES, createGame } from '../src/game/state';
+import { QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
+import { FULL_BAG_MESSAGE, advanceTime, isAtCamp, applyAction, buildStatus, carriedCount, freeSpaces, lookoutRepairBlocker, pickaxeBlocker } from '../src/game/rules';
 
 describe('gathering and inventory', () => {
   it('prepares a trail ration only at a built rack in camp, including with a full bag', () => {
@@ -185,6 +186,7 @@ describe('stone axe and tree chopping', () => {
     expect(applyAction(state, { type: 'craftAxe' }).state).toBe(state);
     state.progress.hearthUnlocked = true;
     state.progress.nextStormDay = null;
+    state.structures.toolshed = true;
     const crafted = applyAction(state, { type: 'craftAxe' }).state;
     expect(crafted.progress.axeCrafted).toBe(true);
     expect(crafted.inventory).toEqual({ wood: 0, food: 0, fiber: 0, stone: 0, trailFood: 0 });
@@ -831,7 +833,7 @@ describe('loose stone', () => {
     const state = at(5, 5);
     const dropped = applyAction(state, { type: 'dropStone' }).state;
     expect(dropped.inventory.stone).toBe(1);
-    expect(dropped.stonePiles).toEqual([{ id: expect.any(String), x: 5, y: 5, count: 1 }]);
+    expect(dropped.stonePiles).toEqual([{ id: expect.any(String), x: 5, y: 5, count: 1, area: 'camp' }]);
     const empty = at(5, 5, 0);
     expect(applyAction(empty, { type: 'dropStone' }).state).toBe(empty);
   });
@@ -841,7 +843,7 @@ describe('loose stone', () => {
     state = applyAction(state, { type: 'dropStone' }).state;
     state = { ...state, player: { ...state.player, x: 5.8 } };
     state = applyAction(state, { type: 'dropStone' }).state;
-    expect(state.stonePiles).toEqual([{ id: expect.any(String), x: 5, y: 5, count: 2 }]);
+    expect(state.stonePiles).toEqual([{ id: expect.any(String), x: 5, y: 5, count: 2, area: 'camp' }]);
     state = { ...state, player: { ...state.player, x: 6.5 } };
     state = applyAction(state, { type: 'dropStone' }).state;
     expect(state.stonePiles).toHaveLength(2);
@@ -852,12 +854,12 @@ describe('loose stone', () => {
     state = advanceTime(state, BALANCE.daySeconds);
     state = { ...state, player: { ...state.player, x: 5.8 } };
     state = applyAction(state, { type: 'dropStone' }).state;
-    expect(state.stonePiles).toEqual([{ id: expect.any(String), x: 5, y: 5, count: 2 }]);
+    expect(state.stonePiles).toEqual([{ id: expect.any(String), x: 5, y: 5, count: 2, area: 'camp' }]);
   });
 
   it('picks up one stone from a nearby pile with two free spaces', () => {
     const state = at(5, 5, 0);
-    state.stonePiles = [{ id: 'pile-a', x: 6.5, y: 5, count: 2 }];
+    state.stonePiles = [{ id: 'pile-a', x: 6.5, y: 5, count: 2, area: 'camp' }];
     const picked = applyAction(state, { type: 'pickUpStone', pileId: 'pile-a' }).state;
     expect(picked.stonePiles[0].count).toBe(1);
     expect(picked.inventory.stone).toBe(1);
@@ -865,18 +867,18 @@ describe('loose stone', () => {
     expect(picked.player.energy).toBe(state.player.energy);
     const full = at(5, 5, 0);
     full.inventory.wood = 7;
-    full.stonePiles = [{ id: 'pile-a', x: 6.5, y: 5, count: 2 }];
+    full.stonePiles = [{ id: 'pile-a', x: 6.5, y: 5, count: 2, area: 'camp' }];
     const refused = applyAction(full, { type: 'pickUpStone', pileId: 'pile-a' });
     expect(refused.state).toBe(full);
     expect(refused.message).toBe(FULL_BAG_MESSAGE);
     const far = at(5, 5, 0);
-    far.stonePiles = [{ id: 'pile-a', x: 8, y: 5, count: 2 }];
+    far.stonePiles = [{ id: 'pile-a', x: 8, y: 5, count: 2, area: 'camp' }];
     expect(applyAction(far, { type: 'pickUpStone', pileId: 'pile-a' }).state).toBe(far);
   });
 
   it('removes a pile when its last stone is picked up', () => {
     const state = at(5, 5, 0);
-    state.stonePiles = [{ id: 'pile-a', x: 5, y: 5, count: 1 }];
+    state.stonePiles = [{ id: 'pile-a', x: 5, y: 5, count: 1, area: 'camp' }];
     expect(applyAction(state, { type: 'pickUpStone', pileId: 'pile-a' }).state.stonePiles).toEqual([]);
   });
 
@@ -962,9 +964,19 @@ describe('the stone pile at camp', () => {
     state.inventory.wood = 1;
     state.inventory.fiber = 1;
     state.storedStone = 1;
+    state.structures.toolshed = true;
     const crafted = applyAction(state, { type: 'craftAxe' }).state;
     expect(crafted.progress.axeCrafted).toBe(true);
     expect(crafted.storedStone).toBe(0);
+  });
+
+  it('does not offer the lookout repair from the quarry area', () => {
+    const state = unlocked(createGame());
+    state.area = 'quarry';
+    state.player.x = LOOKOUT.x;
+    state.player.y = LOOKOUT.y;
+    state.inventory = { ...state.inventory, wood: 4, fiber: 2, stone: 3 };
+    expect(lookoutRepairBlocker(state)).toBe('There is nothing like that here.');
   });
 
   it('repairs the lookout with pile stone from far away', () => {
@@ -978,5 +990,248 @@ describe('the stone pile at camp', () => {
     const repaired = applyAction(state, { type: 'repairLookout' }).state;
     expect(repaired.progress.lookoutRepaired).toBe(true);
     expect(repaired.storedStone).toBe(1);
+  });
+});
+
+describe('the second area', () => {
+  function sheltered() {
+    const state = createGame();
+    state.structures.shelter = true;
+    return state;
+  }
+
+  it('walking off the west edge at the path crosses into the quarry', () => {
+    const state = sheltered();
+    state.player.x = 0.05;
+    state.player.y = 15;
+    expect(applyAction(state, { type: 'move', dx: -1, dy: 0 }).state.area).toBe('quarry');
+  });
+
+  it('walking off the quarry east edge at the path returns to camp', () => {
+    const state = sheltered();
+    state.area = 'quarry';
+    state.player.x = BALANCE.mapWidth - 1 - 0.05;
+    state.player.y = 15;
+    const next = applyAction(state, { type: 'move', dx: 1, dy: 0 }).state;
+    expect(next.area).toBe('camp');
+    expect(next.player.x).toBe(0.5);
+  });
+
+  it('the west edge still blocks away from the path', () => {
+    const state = sheltered();
+    state.player.x = 0.05;
+    state.player.y = 10;
+    const moved = applyAction(state, { type: 'move', dx: -1, dy: 0 }).state;
+    expect(moved.area).toBe('camp');
+    expect(moved.player.x).toBe(0);
+  });
+
+  it('cross needs to stand at the path end', () => {
+    const state = sheltered();
+    state.player.x = 5;
+    state.player.y = 15;
+    const refused = applyAction(state, { type: 'cross' });
+    expect(refused.state).toBe(state);
+    expect(refused.message).toBe('Walk to the end of the west path to cross.');
+    state.player.x = 0.4;
+    expect(applyAction(state, { type: 'cross' }).state.area).toBe('quarry');
+  });
+
+  it('camp actions need the camp area', () => {
+    const state = sheltered();
+    state.area = 'quarry';
+    state.timeOfDay = BALANCE.nightStart;
+    state.player.x = 20;
+    state.player.y = 15;
+    state.inventory.wood = 20;
+    state.inventory.fiber = 20;
+    expect(isAtCamp(state)).toBe(false);
+    for (const action of [{ type: 'stokeFire' }, { type: 'sleep' }, { type: 'build', structureId: 'bed' }] as const) {
+      const result = applyAction(state, action);
+      expect(result.state).toBe(state);
+      expect(result.message).toMatch(/^Return to/);
+    }
+  });
+
+  it('sites and the lookout only answer in the camp area', () => {
+    const state = createGame();
+    state.area = 'quarry';
+    state.player.x = SITES.spring.x;
+    state.player.y = SITES.spring.y;
+    expect(applyAction(state, { type: 'visitSite', siteId: 'spring' }).message).toBe('There is nothing like that here.');
+    expect(applyAction(state, { type: 'repairLookout' }).message).toBe('There is nothing like that here.');
+  });
+
+  it('the cold front counts the quarry as away from camp', () => {
+    const make = (area: 'camp' | 'quarry') => {
+      const state = createGame();
+      state.area = area;
+      state.day = 3;
+      state.timeOfDay = 170;
+      state.player.warmth = 80;
+      state.player.x = 20;
+      state.player.y = 15;
+      state.structures.shelter = true;
+      state.structures.windbreak = true;
+      return state;
+    };
+    const atCamp = advanceTime(make('camp'), 4).player.warmth;
+    const away = advanceTime(make('quarry'), 4).player.warmth;
+    expect(away).toBeLessThan(atCamp);
+  });
+});
+
+describe('quarry and tools', () => {
+  function inQuarry(x: number, y: number) {
+    const state = createGame();
+    state.area = 'quarry';
+    state.player.x = x;
+    state.player.y = y;
+    return state;
+  }
+  function atCamp() {
+    const state = createGame();
+    state.player.x = BALANCE.campX;
+    state.player.y = BALANCE.campY;
+    return state;
+  }
+
+  it('reaching the quarry finds it', () => {
+    const state = inQuarry(QUARRY_SITE.x + 3, QUARRY_SITE.y);
+    expect(applyAction(state, { type: 'move', dx: -0.5, dy: 0 }).state.progress.quarryFound).toBe(false);
+    const found = applyAction(state, { type: 'move', dx: -1.5, dy: 0 });
+    expect(found.state.progress.quarryFound).toBe(true);
+    expect(found.message).toBe('You found an old quarry. A pickaxe could work this stone.');
+  });
+
+  it('rubble gives one stone and refills three dawns later', () => {
+    const state = inQuarry(RUBBLE_SITE.x + 1, RUBBLE_SITE.y);
+    const first = applyAction(state, { type: 'gatherRubble' }).state;
+    expect(first.inventory.stone).toBe(1);
+    expect(first.rubbleReadyDay).toBe(state.day + 3);
+    const again = applyAction(first, { type: 'gatherRubble' });
+    expect(again.state).toBe(first);
+    expect(again.message).toBe('The rubble is picked over. More will loosen in a few days.');
+    const later = { ...first, day: state.day + 3 };
+    expect(applyAction(later, { type: 'gatherRubble' }).state.inventory.stone).toBe(2);
+  });
+
+  it('rubble needs room for heavy stone', () => {
+    const state = inQuarry(RUBBLE_SITE.x, RUBBLE_SITE.y);
+    state.inventory.wood = 7;
+    const result = applyAction(state, { type: 'gatherRubble' });
+    expect(result.message).toBe(FULL_BAG_MESSAGE);
+    expect(result.state).toBe(state);
+  });
+
+  it('the toolshed needs the shelter and costs 5 wood and 2 fiber', () => {
+    const state = atCamp();
+    state.inventory.wood = 5;
+    state.inventory.fiber = 2;
+    expect(BUILDINGS.toolshed.cost).toEqual({ wood: 5, fiber: 2 });
+    expect(buildStatus(state, 'toolshed')).toBe('needsShelter');
+    state.structures.shelter = true;
+    expect(buildStatus(state, 'toolshed')).toBe('ready');
+    const built = applyAction(state, { type: 'build', structureId: 'toolshed' }).state;
+    expect(built.structures.toolshed).toBe(true);
+    expect(built.inventory.wood).toBe(0);
+    expect(built.inventory.fiber).toBe(0);
+  });
+
+  it('the axe needs the toolshed', () => {
+    const state = atCamp();
+    state.progress.hearthUnlocked = true;
+    state.progress.nextStormDay = null;
+    state.inventory = { ...state.inventory, wood: 1, fiber: 1, stone: 1 };
+    const result = applyAction(state, { type: 'craftAxe' });
+    expect(result.state).toBe(state);
+    expect(result.message).toBe('Build a toolshed first.');
+  });
+
+  it('the pickaxe needs the toolshed and the quarry, not the axe', () => {
+    const state = atCamp();
+    state.inventory = { ...state.inventory, wood: 2, fiber: 1, stone: 1 };
+    state.storedStone = 1;
+    state.structures.stonePile = true;
+    expect(applyAction(state, { type: 'craftPickaxe' }).message).toBe('Find the quarry first.');
+    state.progress.quarryFound = true;
+    expect(applyAction(state, { type: 'craftPickaxe' }).message).toBe('Build a toolshed first.');
+    state.structures.toolshed = true;
+    expect(pickaxeBlocker(state)).toBeNull();
+    const crafted = applyAction(state, { type: 'craftPickaxe' }).state;
+    expect(crafted.progress.pickaxeCrafted).toBe(true);
+    expect(crafted.progress.axeCrafted).toBe(false);
+    expect(crafted.inventory.stone).toBe(0);
+    expect(crafted.storedStone).toBe(0);
+    expect(crafted.inventory.wood).toBe(0);
+    expect(crafted.inventory.fiber).toBe(0);
+  });
+
+  it('digging needs the pickaxe and works once a day', () => {
+    const state = inQuarry(QUARRY_SITE.x + 1, QUARRY_SITE.y);
+    const refused = applyAction(state, { type: 'digQuarry' });
+    expect(refused.state).toBe(state);
+    expect(refused.message).toBe('You need a pickaxe to work the quarry.');
+    state.progress.pickaxeCrafted = true;
+    const dug = applyAction(state, { type: 'digQuarry' }).state;
+    expect(dug.inventory.stone).toBe(1);
+    expect(dug.player.energy).toBe(state.player.energy - 8);
+    expect(dug.timeOfDay).toBe(state.timeOfDay + 10);
+    expect(dug.quarryReadyDay).toBe(state.day + 1);
+    const again = applyAction(dug, { type: 'digQuarry' });
+    expect(again.state).toBe(dug);
+    expect(again.message).toBe('The quarry face is worked out until morning.');
+  });
+
+  it('dropped stone stays in its area', () => {
+    const state = inQuarry(10, 10);
+    state.inventory.stone = 2;
+    const dropped = applyAction(state, { type: 'dropStone' }).state;
+    expect(dropped.stonePiles).toEqual([{ id: expect.stringContaining('quarry'), x: 10, y: 10, count: 1, area: 'quarry' }]);
+    const home = { ...dropped, area: 'camp' as const };
+    const inCamp = applyAction(home, { type: 'dropStone' }).state;
+    expect(inCamp.stonePiles).toHaveLength(2);
+    expect(inCamp.stonePiles[0].count).toBe(1);
+    const pileId = dropped.stonePiles[0].id;
+    const picked = applyAction({ ...home, inventory: { ...home.inventory, stone: 0 } }, { type: 'pickUpStone', pileId });
+    expect(picked.message).toBe('There is no stone pile within reach.');
+    expect(picked.state.inventory.stone).toBe(0);
+  });
+
+  it("camp nodes and trees can't be used from the quarry area", () => {
+    const state = createGame();
+    state.area = 'quarry';
+    state.progress.axeCrafted = true;
+    const node = state.nodes[0];
+    state.player.x = node.x;
+    state.player.y = node.y;
+    expect(applyAction(state, { type: 'gather', nodeId: node.id }).state).toBe(state);
+    const tree = state.trees[0];
+    state.player.x = tree.x;
+    state.player.y = tree.y;
+    const chop = applyAction(state, { type: 'chopTree', treeId: tree.id });
+    expect(chop.state).toBe(state);
+    expect(chop.message).toBe('Move closer to a mature tree.');
+  });
+
+  it('rubble and dawns alone always lead to a pickaxe', () => {
+    let state = createGame();
+    state.nodes = state.nodes.map(node => node.kind === 'stone' ? { ...node, amount: 0 } : node);
+    state.progress.discoveries.cairn = true;
+    state.structures.shelter = true;
+    state.structures.toolshed = true;
+    state.progress.quarryFound = true;
+    state.inventory.wood = 2;
+    state.inventory.fiber = 1;
+    let crafted = false;
+    for (let day = 0; day < 20 && !crafted; day += 1) {
+      state = { ...state, area: 'quarry', player: { ...state.player, x: RUBBLE_SITE.x, y: RUBBLE_SITE.y } };
+      state = applyAction(state, { type: 'gatherRubble' }).state;
+      state = { ...state, area: 'camp', player: { ...state.player, x: BALANCE.campX, y: BALANCE.campY } };
+      state = applyAction(state, { type: 'craftPickaxe' }).state;
+      crafted = state.progress.pickaxeCrafted;
+      state = advanceTime({ ...state, player: { ...state.player, energy: 100, hunger: 100, warmth: 100 } }, BALANCE.daySeconds - state.timeOfDay);
+    }
+    expect(crafted).toBe(true);
   });
 });

@@ -1,14 +1,17 @@
 import Phaser from 'phaser';
-import { BALANCE, type ResourceNode, type TreeNode } from '../game/state';
-import { buildMap, type MapItem } from './map';
+import { BALANCE, type GameState } from '../game/state';
+import { buildMap, terrainKey, type MapItem } from './map';
 import { sprites } from '../art/sprites';
 
 export const TILE = 16;
 export const worldX = (x: number) => (x + 0.5) * TILE;
 export const worldY = (y: number) => (y + 0.5) * TILE;
 
-export function drawTerrain(scene: Phaser.Scene, nodes: ResourceNode[], chopTargets: TreeNode[]): void {
-  const map = buildMap(nodes);
+/** Draws the terrain for the state's current terrain key and returns every object it added. */
+export function drawTerrain(scene: Phaser.Scene, state: GameState): Phaser.GameObjects.GameObject[] {
+  const key = terrainKey(state);
+  const camp = key !== 'quarry';
+  const map = buildMap(camp ? state.nodes : [], key);
   const canvas = document.createElement('canvas');
   canvas.width = BALANCE.mapWidth * TILE;
   canvas.height = BALANCE.mapHeight * TILE;
@@ -32,13 +35,16 @@ export function drawTerrain(scene: Phaser.Scene, nodes: ResourceNode[], chopTarg
     const def = sprites[item.sprite];
     stamp(item.sprite, Math.round(item.x * TILE - def.anchor[0]), Math.round(item.y * TILE - def.anchor[1]));
   }
-  scene.textures.addCanvas('terrainMap', canvas);
-  scene.add.image(0, 0, 'terrainMap').setOrigin(0).setDepth(-100);
+  scene.textures.addCanvas(`terrain-${key}`, canvas);
+  const objects: Phaser.GameObjects.GameObject[] = [scene.add.image(0, 0, `terrain-${key}`).setOrigin(0).setDepth(-100)];
   const standing = (item: MapItem) => {
     const def = sprites[item.sprite];
-    scene.add.image(Math.round(worldX(item.x)), Math.round(worldY(item.y)), `${item.sprite}:still`)
+    return scene.add.image(Math.round(worldX(item.x)), Math.round(worldY(item.y)), `${item.sprite}:still`)
       .setOrigin(def.anchor[0] / def.size[0], def.anchor[1] / def.size[1])
       .setDepth(Math.round(worldY(item.y)));
   };
-  map.trees.filter(tree => !chopTargets.some(target => target.x === tree.x && target.y === tree.y)).forEach(standing);
+  // The camp's choppable trees are drawn as objects of their own.
+  const chopTargets = camp ? state.trees : [];
+  objects.push(...map.trees.filter(tree => !chopTargets.some(target => target.x === tree.x && target.y === tree.y)).map(standing));
+  return objects;
 }

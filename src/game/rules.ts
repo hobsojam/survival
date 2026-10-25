@@ -1,4 +1,5 @@
-import { BALANCE, BUILDINGS, LOOKOUT, SITES, type GameState, type SiteId, type StructureId } from './state';
+import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } from './areas';
+import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
   | { type: 'gather'; nodeId: string }
@@ -6,7 +7,7 @@ export type GameAction =
   | { type: 'visitSite'; siteId: SiteId }
   | { type: 'build'; structureId: StructureId }
   | { type: 'move'; dx: number; dy: number }
-  | { type: 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' }
+  | { type: 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' }
   | { type: 'pickUpStone'; pileId: string };
 
 /** Awake time tires the survivor; work already costs energy, and resting doesn't. */
@@ -21,8 +22,12 @@ function near(x1: number, y1: number, x2: number, y2: number): boolean {
   return Math.hypot(x1 - x2, y1 - y2) <= BALANCE.interactionRadius;
 }
 
+function near2(x1: number, y1: number, x2: number, y2: number, radius: number): boolean {
+  return Math.hypot(x1 - x2, y1 - y2) <= radius;
+}
+
 export function isAtCamp(state: GameState): boolean {
-  return Math.hypot(state.player.x - BALANCE.campX, state.player.y - BALANCE.campY) <= BALANCE.campRadius;
+  return state.area === 'camp' && Math.hypot(state.player.x - BALANCE.campX, state.player.y - BALANCE.campY) <= BALANCE.campRadius;
 }
 
 export const FULL_BAG_MESSAGE = 'Your bag is full. Eat, burn, or set something down at camp to make room.';
@@ -65,6 +70,7 @@ export function trailFoodBlocker(state: GameState): string | null {
 }
 
 export function lookoutRepairBlocker(state: GameState): string | null {
+  if (state.area !== 'camp') return 'There is nothing like that here.';
   if (state.progress.lookoutRepaired) return 'The lookout is already restored.';
   if (!state.progress.hearthUnlocked) return 'Weather the cold front before repairing the lookout.';
   if (!near(state.player.x, state.player.y, LOOKOUT.x, LOOKOUT.y)) return 'Stand beside the lookout to repair it.';
@@ -107,6 +113,18 @@ export function cookBlocker(state: GameState): string | null {
 export function stargazeBlocker(state: GameState): string | null {
   if (state.timeOfDay < BALANCE.nightStart) return 'Wait until nightfall to watch the stars.';
   if (!isAtCamp(state)) return 'Return to camp to watch the stars.';
+  return null;
+}
+
+/** Why the pickaxe can't be crafted right now, or null if it can. */
+export function pickaxeBlocker(state: GameState): string | null {
+  if (state.progress.pickaxeCrafted) return 'You already have a pickaxe.';
+  if (!state.progress.quarryFound) return 'Find the quarry first.';
+  if (!state.structures.toolshed) return 'Build a toolshed first.';
+  if (!isAtCamp(state)) return 'Return to camp to craft the pickaxe.';
+  const { wood, fiber, stone } = PICKAXE.cost;
+  if (state.inventory.wood < wood || state.inventory.fiber < fiber || availableStone(state) < stone)
+    return `Need ${wood} wood, ${fiber} fiber, and ${stone} stone for the pickaxe.`;
   return null;
 }
 
@@ -182,269 +200,383 @@ function dawn(next: GameState, camp: boolean): void {
   next.timeOfDay = BALANCE.coldNightFailureMorningLoss;
 }
 
-export function applyAction(state: GameState, action: GameAction): ActionResult {
-  if (action.type === 'move') {
-    const factor = movementFactor(state);
-    return {
-      state: {
-        ...state,
-        player: {
-          ...state.player,
-          x: Math.max(0, Math.min(BALANCE.mapWidth - 1, state.player.x + action.dx * factor)),
-          y: Math.max(0, Math.min(BALANCE.mapHeight - 1, state.player.y + action.dy * factor))
-        }
-      },
-      message: ''
-    };
+type ActionOf<T extends GameAction['type']> = Extract<GameAction, { type: T }>;
+type ActionHandler<T extends GameAction['type']> = (state: GameState, action: ActionOf<T>) => ActionResult;
+
+function refuse(state: GameState, message: string): ActionResult {
+  return { state, message };
+}
+
+function tire(state: GameState, cost: number): GameState['player'] {
+  return { ...state.player, energy: Math.max(0, state.player.energy - cost) };
+}
+
+/** Pays wood and fiber from the bag and stone from the bag or pile, then spends build time. */
+function payAndBuild(state: GameState, cost: { wood: number; fiber: number; stone: number }, changes: Partial<GameState>): GameState {
+  const paid = spendStone(state, cost.stone);
+  return advanceTime({
+    ...paid,
+    inventory: { ...paid.inventory, wood: state.inventory.wood - cost.wood, fiber: state.inventory.fiber - cost.fiber },
+    player: tire(state, BALANCE.buildEnergyCost),
+    ...changes
+  }, BALANCE.buildSeconds, 'working');
+}
+
+function quarryFoundOnArrival(moved: GameState): ActionResult {
+  if (moved.area === 'quarry' && !moved.progress.quarryFound && near2(moved.player.x, moved.player.y, QUARRY_SITE.x, QUARRY_SITE.y, 2)) {
+    return { state: { ...moved, progress: { ...moved.progress, quarryFound: true } }, message: 'You found an old quarry. A pickaxe could work this stone.' };
   }
-  if (action.type === 'gather') {
-    const index = state.nodes.findIndex(node => node.id === action.nodeId);
-    const node = state.nodes[index];
-    if (!node || !near(state.player.x, state.player.y, node.x, node.y)) {
-      return { state, message: 'Move closer to gather.' };
-    }
-    if (node.amount <= 0) return { state, message: 'Nothing to gather yet.' };
-    let resource: keyof GameState['inventory'] = 'wood';
-    if (node.kind === 'berry') resource = 'food';
-    else if (node.kind === 'fiber') resource = 'fiber';
-    else if (node.kind === 'stone') resource = 'stone';
-    if (freeSpaces(state) < spaceFor(resource)) return { state, message: FULL_BAG_MESSAGE };
-    const nodes = state.nodes.map((item, itemIndex) => itemIndex === index
-      ? { ...item, amount: item.amount - 1, readyDay: state.day + 1 }
-      : item);
-    return {
-      state: advanceTime({
-        ...state,
-        player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.gatherEnergyCost) },
-        inventory: { ...state.inventory, [resource]: state.inventory[resource] + 1 },
-        nodes
-      }, BALANCE.gatherSeconds, 'working'),
-      message: { wood: 'Picked up fallen branches.', food: 'Picked berries.', fiber: 'Gathered fiber.', stone: 'Collected stone.' }[resource]
-    };
-  }
-  if (action.type === 'craftAxe') {
-    if (state.progress.axeCrafted) return { state, message: 'You already have a stone axe.' };
-    if (!state.progress.hearthUnlocked) return { state, message: 'Weather the cold front before crafting an axe.' };
-    if (!isAtCamp(state)) return { state, message: 'Return to camp to craft the axe.' };
-    if (state.inventory.wood < 1 || state.inventory.fiber < 1 || availableStone(state) < 1)
-      return { state, message: 'Need 1 wood, 1 fiber, and 1 stone for the axe.' };
-    const paid = spendStone(state, 1);
-    return {
-      state: advanceTime({
-        ...paid,
-        inventory: { ...paid.inventory, wood: state.inventory.wood - 1, fiber: state.inventory.fiber - 1 },
-        player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.buildEnergyCost) },
-        progress: { ...state.progress, axeCrafted: true }
-      }, BALANCE.buildSeconds, 'working'),
-      message: 'Crafted a stone axe. Mature trees can now provide wood.'
-    };
-  }
-  if (action.type === 'chopTree') {
-    if (!state.progress.axeCrafted) return { state, message: 'Craft a stone axe before chopping trees.' };
-    const tree = state.trees.find(item => item.id === action.treeId);
-    if (!tree || !near(state.player.x, state.player.y, tree.x, tree.y)) return { state, message: 'Move closer to a mature tree.' };
-    if (tree.readyDay > state.day) return { state, message: 'This stump needs more time to regrow.' };
-    if (freeSpaces(state) < 2 * spaceFor('wood')) return { state, message: 'Your bag needs two free spaces for wood.' };
-    return {
-      state: advanceTime({
-        ...state,
-        player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.chopEnergyCost) },
-        inventory: { ...state.inventory, wood: state.inventory.wood + 2 },
-        trees: state.trees.map(item => item.id === tree.id ? { ...item, readyDay: state.day + BALANCE.treeRegrowDays } : item)
-      }, BALANCE.chopSeconds, 'working'),
-      message: 'Chopped the tree and collected two wood. A stump remains.'
-    };
-  }
-  if (action.type === 'visitSite') {
-    const site = SITES[action.siteId];
-    if (!site || !near(state.player.x, state.player.y, site.x, site.y)) return { state, message: 'Move closer to a place along the path.' };
-    if (action.siteId === 'spring') {
-      const rested = advanceTime({ ...state, progress: { ...state.progress,
-        discoveries: { ...state.progress.discoveries, spring: true } } }, BALANCE.restSeconds, 'resting');
-      return {
-        state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + 20) } },
-        message: 'You pause beside the quiet spring and feel rested.'
-      };
-    }
-    if (state.progress.discoveries[action.siteId]) return { state, message: `You have already searched the ${site.name.toLowerCase()}.` };
-    const resource = action.siteId === 'basket' ? 'food' : 'stone';
-    const needed = 2 * spaceFor(resource);
-    if (freeSpaces(state) < needed) return { state, message: `Your bag needs ${needed} free spaces for this find.` };
-    const found = advanceTime({
+  return { state: moved, message: '' };
+}
+
+const move: ActionHandler<'move'> = (state, action) => {
+  const factor = movementFactor(state);
+  const rawX = state.player.x + action.dx * factor;
+  const rawY = state.player.y + action.dy * factor;
+  const crossed = crossing(state, rawX, rawY);
+  const player = crossed
+    ? { ...state.player, x: crossed.x, y: crossed.y }
+    : { ...state.player, x: Math.max(0, Math.min(BALANCE.mapWidth - 1, rawX)), y: Math.max(0, Math.min(BALANCE.mapHeight - 1, rawY)) };
+  return quarryFoundOnArrival({ ...state, ...(crossed ? { area: crossed.area } : {}), player });
+};
+
+const cross: ActionHandler<'cross'> = state => {
+  const toQuarry = state.area === 'camp';
+  const exit = toQuarry ? CAMP_EXIT : QUARRY_EXIT;
+  if (!near2(state.player.x, state.player.y, exit.x, exit.y, 0.5)) return refuse(state, 'Walk to the end of the west path to cross.');
+  if (!pathOpen(state)) return refuse(state, 'Build a shelter to open the west path.');
+  return {
+    state: { ...state, area: toQuarry ? 'quarry' : 'camp', player: { ...state.player, x: toQuarry ? BALANCE.mapWidth - 1.5 : 0.5, y: exit.y } },
+    message: ''
+  };
+};
+
+const NODE_RESOURCE: Record<GameState['nodes'][number]['kind'], keyof GameState['inventory']> = { branch: 'wood', berry: 'food', fiber: 'fiber', stone: 'stone' };
+const GATHER_MESSAGE: Partial<Record<keyof GameState['inventory'], string>> = {
+  wood: 'Picked up fallen branches.', food: 'Picked berries.', fiber: 'Gathered fiber.', stone: 'Collected stone.'
+};
+
+const gather: ActionHandler<'gather'> = (state, action) => {
+  const node = state.nodes.find(item => item.id === action.nodeId);
+  if (!node || state.area !== 'camp' || !near(state.player.x, state.player.y, node.x, node.y)) return refuse(state, 'Move closer to gather.');
+  if (node.amount <= 0) return refuse(state, 'Nothing to gather yet.');
+  const resource = NODE_RESOURCE[node.kind];
+  if (freeSpaces(state) < spaceFor(resource)) return refuse(state, FULL_BAG_MESSAGE);
+  const nodes = state.nodes.map(item => item === node ? { ...item, amount: item.amount - 1, readyDay: state.day + 1 } : item);
+  return {
+    state: advanceTime({
       ...state,
-      player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.gatherEnergyCost) },
-      inventory: { ...state.inventory, [resource]: state.inventory[resource] + 2 },
-      progress: { ...state.progress, discoveries: { ...state.progress.discoveries, [action.siteId]: true } }
-    }, BALANCE.gatherSeconds, 'working');
-    return { state: found, message: action.siteId === 'basket' ? 'An old basket holds two berries.' : 'You find two useful stones tucked in the cairn.' };
-  }
-  if (action.type === 'storeStone' || action.type === 'takeStone') {
-    if (!state.structures.stonePile) return { state, message: 'Build a stone pile first.' };
-    if (!isAtCamp(state)) return { state, message: 'Return to camp to use the stone pile.' };
-    if (action.type === 'storeStone') {
-      if (state.inventory.stone < 1) return { state, message: 'You have no stone to store.' };
-      if (state.storedStone >= BALANCE.stonePileCapacity) return { state, message: 'The stone pile is full.' };
-      return { state: { ...state, inventory: { ...state.inventory, stone: state.inventory.stone - 1 }, storedStone: state.storedStone + 1 }, message: 'Stored a stone.' };
-    }
-    if (state.storedStone < 1) return { state, message: 'The stone pile is empty.' };
-    if (freeSpaces(state) < spaceFor('stone')) return { state, message: FULL_BAG_MESSAGE };
-    return { state: { ...state, inventory: { ...state.inventory, stone: state.inventory.stone + 1 }, storedStone: state.storedStone - 1 }, message: 'Took a stone from the pile.' };
-  }
-  if (action.type === 'dropStone') {
-    if (state.inventory.stone < 1) return { state, message: 'You have no stone to set down.' };
-    const { x, y } = state.player;
-    const nearby = state.stonePiles.find(pile => Math.hypot(pile.x - x, pile.y - y) <= BALANCE.pileMergeRadius);
-    const stonePiles = nearby
-      ? state.stonePiles.map(pile => pile === nearby ? { ...pile, count: pile.count + 1 } : pile)
-      : [...state.stonePiles, { id: `pile-${state.day}-${Math.round(x * 10)}-${Math.round(y * 10)}`, x, y, count: 1 }];
-    return { state: { ...state, inventory: { ...state.inventory, stone: state.inventory.stone - 1 }, stonePiles }, message: 'Set down one stone.' };
-  }
-  if (action.type === 'pickUpStone') {
-    const pile = state.stonePiles.find(item => item.id === action.pileId);
-    if (!pile || !near(state.player.x, state.player.y, pile.x, pile.y)) return { state, message: 'Move closer to the stones.' };
-    if (freeSpaces(state) < spaceFor('stone')) return { state, message: FULL_BAG_MESSAGE };
-    const stonePiles = state.stonePiles
-      .map(item => item === pile ? { ...item, count: item.count - 1 } : item)
-      .filter(item => item.count > 0);
-    return {
-      state: advanceTime({ ...state, inventory: { ...state.inventory, stone: state.inventory.stone + 1 }, stonePiles }, BALANCE.pickUpSeconds, 'resting'),
-      message: 'Picked up a stone.'
-    };
-  }
-  if (action.type === 'burnFiber') {
-    if (!isAtCamp(state)) return { state, message: 'Return to the marked camp area to tend the fire.' };
-    if (state.inventory.fiber < 1) return { state, message: 'You have no fiber to burn.' };
-    return {
-      state: { ...state, inventory: { ...state.inventory, fiber: state.inventory.fiber - 1 }, fireFuel: state.fireFuel + BALANCE.fiberFireSeconds },
-      message: 'The kindling flares up.'
-    };
-  }
-  if (action.type === 'eat') {
-    if (state.inventory.food <= 0) return { state, message: 'No food in your bag.' };
-    return {
-      state: {
-        ...state,
-        inventory: { ...state.inventory, food: state.inventory.food - 1 },
-        player: { ...state.player, hunger: Math.min(100, state.player.hunger + BALANCE.eatHungerGain) }
-      },
-      message: 'Ate some berries.'
-    };
-  }
-  if (action.type === 'eatTrailFood') {
-    if (state.inventory.trailFood <= 0) return { state, message: 'No trail rations in your bag.' };
-    return {
-      state: { ...state,
-        inventory: { ...state.inventory, trailFood: state.inventory.trailFood - 1 },
-        player: { ...state.player, hunger: Math.min(100, state.player.hunger + BALANCE.trailFoodHungerGain) }
-      },
-      message: 'Ate a trail ration.'
-    };
-  }
-  if (action.type === 'prepareTrailFood') {
-    const blocker = trailFoodBlocker(state);
-    if (blocker) return { state, message: blocker };
-    return {
-      state: advanceTime({ ...state,
-        inventory: { ...state.inventory, food: state.inventory.food - 1, trailFood: state.inventory.trailFood + 1 },
-        player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.gatherEnergyCost) }
-      }, BALANCE.trailFoodSeconds, 'working'),
-      message: 'Dried a berry into one trail ration.'
-    };
-  }
-  if (action.type === 'cook') {
-    const blocker = cookBlocker(state);
-    if (blocker) return { state, message: blocker };
-    const cooked = advanceTime({ ...state, inventory: { ...state.inventory, food: state.inventory.food - 1 } }, BALANCE.cookSeconds, 'resting');
-    return {
-      state: { ...cooked, player: { ...cooked.player,
-        hunger: Math.min(100, cooked.player.hunger + (state.structures.dryingRack ? BALANCE.rackCookHungerGain : BALANCE.cookHungerGain)),
-        warmth: Math.min(100, cooked.player.warmth + BALANCE.cookWarmthGain)
-      } },
-      message: 'You toast a berry by the fire. A warm little meal.'
-    };
-  }
-  if (action.type === 'stargaze') {
-    const blocker = stargazeBlocker(state);
-    if (blocker) return { state, message: blocker };
-    const restored = { ...state, player: { ...state.player, energy: Math.min(100, state.player.energy + BALANCE.stargazeEnergyGain) } };
-    const watched = advanceTime(restored, BALANCE.stargazeSeconds, 'resting');
-    const thoughts = [
-      'The stars shine between the trees.',
-      'A quiet patch of sky opens above camp.',
-      'The moon makes the clearing look silver.'
-    ];
-    return {
-      state: watched,
-      message: `${thoughts[(state.day - 1) % thoughts.length]} You feel a little rested.`
-    };
-  }
-  if (action.type === 'stokeFire') {
-    if (!isAtCamp(state)) return { state, message: 'Return to the marked camp area to tend the fire.' };
-    if (state.inventory.wood < 1) return { state, message: 'You need wood for the fire.' };
-    return {
-      state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood - 1 }, fireFuel: state.fireFuel + (state.structures.hearth ? BALANCE.hearthFireSecondsPerWood : BALANCE.fireSecondsPerWood) },
-      message: 'The fire burns brighter.'
-    };
-  }
-  if (action.type === 'repairLookout') {
-    const blocker = lookoutRepairBlocker(state);
-    if (blocker) return { state, message: blocker };
-    const { wood, fiber, stone } = LOOKOUT.cost;
-    const paid = spendStone(state, stone);
-    return {
-      state: advanceTime({
-        ...paid,
-        inventory: { ...paid.inventory, wood: state.inventory.wood - wood, fiber: state.inventory.fiber - fiber },
-        player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.buildEnergyCost) },
-        progress: { ...state.progress, lookoutRepaired: true }
-      }, BALANCE.buildSeconds, 'working'),
-      message: 'The lookout stands again. From here, the camp feels like home.'
-    };
-  }
-  if (action.type === 'build') {
-    if (!isAtCamp(state)) return { state, message: 'Return to the marked camp area to build.' };
-    const definition = BUILDINGS[action.structureId];
-    if (!definition) return { state, message: 'That structure is unavailable.' };
-    if (definition.prerequisite === 'coldNight' && !state.progress.hearthUnlocked) return { state, message: 'Weather the cold night to unlock the hearth.' };
-    if (state.structures[action.structureId]) return { state, message: 'Already built.' };
-    if (definition.prerequisite === 'shelter' && !state.structures.shelter) return { state, message: 'Build a shelter first.' };
-    const cost = definition.cost;
-    const stoneCost = 'stone' in cost ? cost.stone : 0;
-    if (state.inventory.wood < cost.wood || state.inventory.fiber < cost.fiber || availableStone(state) < stoneCost) {
-      const needed = [state.inventory.wood < cost.wood ? `${cost.wood} wood` : null,
-        state.inventory.fiber < cost.fiber ? `${cost.fiber} fiber` : null,
-        availableStone(state) < stoneCost ? `${stoneCost} stone` : null].filter(Boolean).join(' and ');
-      return { state, message: `Need ${needed} to build this.` };
-    }
-    const paid = spendStone(state, stoneCost);
-    return {
-      state: advanceTime({
-        ...paid,
-        inventory: { ...paid.inventory, wood: state.inventory.wood - cost.wood, fiber: state.inventory.fiber - cost.fiber },
-        player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.buildEnergyCost) },
-        structures: { ...state.structures, [action.structureId]: true }
-      }, BALANCE.buildSeconds, 'working'),
-      message: `Built the ${definition.name.toLowerCase()}.`
-    };
-  }
-  if (action.type === 'rest') {
-    if (!isAtCamp(state)) return { state, message: 'Return to the marked camp area to rest.' };
-    const rested = advanceTime(state, BALANCE.restSeconds, 'resting');
-    return {
-      state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + (rested.structures.bed ? BALANCE.bedRestEnergyGain : BALANCE.restEnergyGain)) } },
-      message: 'You take a short rest.'
-    };
-  }
-  if (action.type === 'sleep') {
-    const blocked = sleepBlocker(state);
-    if (blocked) return { state, message: blocked };
-    const energy = state.structures.bed ? 100 : Math.min(100, state.player.energy + BALANCE.sleepEnergyGain);
-    const slept = advanceTime({ ...state, player: { ...state.player, energy } }, BALANCE.daySeconds - state.timeOfDay, 'resting');
-    const fireDied = state.fireFuel > 0 && slept.fireFuel <= 0;
-    return {
-      state: slept,
-      message: fireDied ? 'You sleep until morning. The fire burned out in the night.' : 'You sleep until morning.'
-    };
-  }
-  return { state, message: 'That action is not available yet.' };
+      player: tire(state, BALANCE.gatherEnergyCost),
+      inventory: { ...state.inventory, [resource]: state.inventory[resource] + 1 },
+      nodes
+    }, BALANCE.gatherSeconds, 'working'),
+    message: GATHER_MESSAGE[resource] ?? ''
+  };
+};
+
+export function axeBlocker(state: GameState): string | null {
+  if (state.progress.axeCrafted) return 'You already have a stone axe.';
+  if (!state.progress.hearthUnlocked) return 'Weather the cold front before crafting an axe.';
+  if (!state.structures.toolshed) return 'Build a toolshed first.';
+  if (!isAtCamp(state)) return 'Return to camp to craft the axe.';
+  if (state.inventory.wood < 1 || state.inventory.fiber < 1 || availableStone(state) < 1) return 'Need 1 wood, 1 fiber, and 1 stone for the axe.';
+  return null;
+}
+
+const craftAxe: ActionHandler<'craftAxe'> = state => {
+  const blocker = axeBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  return {
+    state: payAndBuild(state, { wood: 1, fiber: 1, stone: 1 }, { progress: { ...state.progress, axeCrafted: true } }),
+    message: 'Crafted a stone axe. Mature trees can now provide wood.'
+  };
+};
+
+const craftPickaxe: ActionHandler<'craftPickaxe'> = state => {
+  const blocker = pickaxeBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  return {
+    state: payAndBuild(state, PICKAXE.cost, { progress: { ...state.progress, pickaxeCrafted: true } }),
+    message: 'Crafted a pickaxe. The quarry face can be worked now.'
+  };
+};
+
+const gatherRubble: ActionHandler<'gatherRubble'> = state => {
+  if (state.area !== 'quarry' || !near(state.player.x, state.player.y, RUBBLE_SITE.x, RUBBLE_SITE.y)) return refuse(state, 'Move closer to the rubble.');
+  if (state.rubbleReadyDay > state.day) return refuse(state, 'The rubble is picked over. More will loosen in a few days.');
+  if (freeSpaces(state) < spaceFor('stone')) return refuse(state, FULL_BAG_MESSAGE);
+  return {
+    state: advanceTime({
+      ...state,
+      player: tire(state, BALANCE.gatherEnergyCost),
+      inventory: { ...state.inventory, stone: state.inventory.stone + 1 },
+      rubbleReadyDay: state.day + BALANCE.rubbleRegrowDays
+    }, BALANCE.gatherSeconds, 'working'),
+    message: 'Pried a stone from the rubble.'
+  };
+};
+
+const digQuarry: ActionHandler<'digQuarry'> = state => {
+  if (!state.progress.pickaxeCrafted) return refuse(state, 'You need a pickaxe to work the quarry.');
+  if (state.area !== 'quarry' || !near(state.player.x, state.player.y, QUARRY_SITE.x, QUARRY_SITE.y)) return refuse(state, 'Move closer to the quarry face.');
+  if (state.quarryReadyDay > state.day) return refuse(state, 'The quarry face is worked out until morning.');
+  if (freeSpaces(state) < spaceFor('stone')) return refuse(state, FULL_BAG_MESSAGE);
+  return {
+    state: advanceTime({
+      ...state,
+      player: tire(state, BALANCE.digEnergyCost),
+      inventory: { ...state.inventory, stone: state.inventory.stone + 1 },
+      quarryReadyDay: state.day + 1
+    }, BALANCE.digSeconds, 'working'),
+    message: 'Broke a good stone from the quarry face.'
+  };
+};
+
+const chopTree: ActionHandler<'chopTree'> = (state, action) => {
+  if (!state.progress.axeCrafted) return refuse(state, 'Craft a stone axe before chopping trees.');
+  const tree = state.trees.find(item => item.id === action.treeId);
+  if (!tree || state.area !== 'camp' || !near(state.player.x, state.player.y, tree.x, tree.y)) return refuse(state, 'Move closer to a mature tree.');
+  if (tree.readyDay > state.day) return refuse(state, 'This stump needs more time to regrow.');
+  if (freeSpaces(state) < 2 * spaceFor('wood')) return refuse(state, 'Your bag needs two free spaces for wood.');
+  return {
+    state: advanceTime({
+      ...state,
+      player: tire(state, BALANCE.chopEnergyCost),
+      inventory: { ...state.inventory, wood: state.inventory.wood + 2 },
+      trees: state.trees.map(item => item.id === tree.id ? { ...item, readyDay: state.day + BALANCE.treeRegrowDays } : item)
+    }, BALANCE.chopSeconds, 'working'),
+    message: 'Chopped the tree and collected two wood. A stump remains.'
+  };
+};
+
+function restAtSpring(state: GameState): ActionResult {
+  const rested = advanceTime({ ...state, progress: { ...state.progress,
+    discoveries: { ...state.progress.discoveries, spring: true } } }, BALANCE.restSeconds, 'resting');
+  return {
+    state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + 20) } },
+    message: 'You pause beside the quiet spring and feel rested.'
+  };
+}
+
+const visitSite: ActionHandler<'visitSite'> = (state, action) => {
+  if (state.area !== 'camp') return refuse(state, 'There is nothing like that here.');
+  const site = SITES[action.siteId];
+  if (!site || !near(state.player.x, state.player.y, site.x, site.y)) return refuse(state, 'Move closer to a place along the path.');
+  if (action.siteId === 'spring') return restAtSpring(state);
+  if (state.progress.discoveries[action.siteId]) return refuse(state, `You have already searched the ${site.name.toLowerCase()}.`);
+  const resource = action.siteId === 'basket' ? 'food' : 'stone';
+  const needed = 2 * spaceFor(resource);
+  if (freeSpaces(state) < needed) return refuse(state, `Your bag needs ${needed} free spaces for this find.`);
+  const found = advanceTime({
+    ...state,
+    player: tire(state, BALANCE.gatherEnergyCost),
+    inventory: { ...state.inventory, [resource]: state.inventory[resource] + 2 },
+    progress: { ...state.progress, discoveries: { ...state.progress.discoveries, [action.siteId]: true } }
+  }, BALANCE.gatherSeconds, 'working');
+  return { state: found, message: action.siteId === 'basket' ? 'An old basket holds two berries.' : 'You find two useful stones tucked in the cairn.' };
+};
+
+function stonePileBlocker(state: GameState): string | null {
+  if (!state.structures.stonePile) return 'Build a stone pile first.';
+  if (!isAtCamp(state)) return 'Return to camp to use the stone pile.';
+  return null;
+}
+
+const storeStone: ActionHandler<'storeStone'> = state => {
+  const blocker = stonePileBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  if (state.inventory.stone < 1) return refuse(state, 'You have no stone to store.');
+  if (state.storedStone >= BALANCE.stonePileCapacity) return refuse(state, 'The stone pile is full.');
+  return { state: { ...state, inventory: { ...state.inventory, stone: state.inventory.stone - 1 }, storedStone: state.storedStone + 1 }, message: 'Stored a stone.' };
+};
+
+const takeStone: ActionHandler<'takeStone'> = state => {
+  const blocker = stonePileBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  if (state.storedStone < 1) return refuse(state, 'The stone pile is empty.');
+  if (freeSpaces(state) < spaceFor('stone')) return refuse(state, FULL_BAG_MESSAGE);
+  return { state: { ...state, inventory: { ...state.inventory, stone: state.inventory.stone + 1 }, storedStone: state.storedStone - 1 }, message: 'Took a stone from the pile.' };
+};
+
+const dropStone: ActionHandler<'dropStone'> = state => {
+  if (state.inventory.stone < 1) return refuse(state, 'You have no stone to set down.');
+  const { x, y } = state.player;
+  const nearby = state.stonePiles.find(pile => pile.area === state.area && Math.hypot(pile.x - x, pile.y - y) <= BALANCE.pileMergeRadius);
+  const stonePiles = nearby
+    ? state.stonePiles.map(pile => pile === nearby ? { ...pile, count: pile.count + 1 } : pile)
+    : [...state.stonePiles, { id: `pile-${state.area}-${state.day}-${Math.round(x * 10)}-${Math.round(y * 10)}`, x, y, count: 1, area: state.area }];
+  return { state: { ...state, inventory: { ...state.inventory, stone: state.inventory.stone - 1 }, stonePiles }, message: 'Set down one stone.' };
+};
+
+const pickUpStone: ActionHandler<'pickUpStone'> = (state, action) => {
+  const pile = state.stonePiles.find(item => item.id === action.pileId && item.area === state.area);
+  if (!pile) return refuse(state, 'There is no stone pile within reach.');
+  if (!near(state.player.x, state.player.y, pile.x, pile.y)) return refuse(state, 'Move closer to the stones.');
+  if (freeSpaces(state) < spaceFor('stone')) return refuse(state, FULL_BAG_MESSAGE);
+  const stonePiles = state.stonePiles
+    .map(item => item === pile ? { ...item, count: item.count - 1 } : item)
+    .filter(item => item.count > 0);
+  return {
+    state: advanceTime({ ...state, inventory: { ...state.inventory, stone: state.inventory.stone + 1 }, stonePiles }, BALANCE.pickUpSeconds, 'resting'),
+    message: 'Picked up a stone.'
+  };
+};
+
+const burnFiber: ActionHandler<'burnFiber'> = state => {
+  if (!isAtCamp(state)) return refuse(state, 'Return to the marked camp area to tend the fire.');
+  if (state.inventory.fiber < 1) return refuse(state, 'You have no fiber to burn.');
+  return {
+    state: { ...state, inventory: { ...state.inventory, fiber: state.inventory.fiber - 1 }, fireFuel: state.fireFuel + BALANCE.fiberFireSeconds },
+    message: 'The kindling flares up.'
+  };
+};
+
+const eat: ActionHandler<'eat'> = state => {
+  if (state.inventory.food <= 0) return refuse(state, 'No food in your bag.');
+  return {
+    state: {
+      ...state,
+      inventory: { ...state.inventory, food: state.inventory.food - 1 },
+      player: { ...state.player, hunger: Math.min(100, state.player.hunger + BALANCE.eatHungerGain) }
+    },
+    message: 'Ate some berries.'
+  };
+};
+
+const eatTrailFood: ActionHandler<'eatTrailFood'> = state => {
+  if (state.inventory.trailFood <= 0) return refuse(state, 'No trail rations in your bag.');
+  return {
+    state: { ...state,
+      inventory: { ...state.inventory, trailFood: state.inventory.trailFood - 1 },
+      player: { ...state.player, hunger: Math.min(100, state.player.hunger + BALANCE.trailFoodHungerGain) }
+    },
+    message: 'Ate a trail ration.'
+  };
+};
+
+const prepareTrailFood: ActionHandler<'prepareTrailFood'> = state => {
+  const blocker = trailFoodBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  return {
+    state: advanceTime({ ...state,
+      inventory: { ...state.inventory, food: state.inventory.food - 1, trailFood: state.inventory.trailFood + 1 },
+      player: tire(state, BALANCE.gatherEnergyCost)
+    }, BALANCE.trailFoodSeconds, 'working'),
+    message: 'Dried a berry into one trail ration.'
+  };
+};
+
+const cook: ActionHandler<'cook'> = state => {
+  const blocker = cookBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  const cooked = advanceTime({ ...state, inventory: { ...state.inventory, food: state.inventory.food - 1 } }, BALANCE.cookSeconds, 'resting');
+  return {
+    state: { ...cooked, player: { ...cooked.player,
+      hunger: Math.min(100, cooked.player.hunger + (state.structures.dryingRack ? BALANCE.rackCookHungerGain : BALANCE.cookHungerGain)),
+      warmth: Math.min(100, cooked.player.warmth + BALANCE.cookWarmthGain)
+    } },
+    message: 'You toast a berry by the fire. A warm little meal.'
+  };
+};
+
+const STARGAZE_THOUGHTS = [
+  'The stars shine between the trees.',
+  'A quiet patch of sky opens above camp.',
+  'The moon makes the clearing look silver.'
+];
+
+const stargaze: ActionHandler<'stargaze'> = state => {
+  const blocker = stargazeBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  const restored = { ...state, player: { ...state.player, energy: Math.min(100, state.player.energy + BALANCE.stargazeEnergyGain) } };
+  return {
+    state: advanceTime(restored, BALANCE.stargazeSeconds, 'resting'),
+    message: `${STARGAZE_THOUGHTS[(state.day - 1) % STARGAZE_THOUGHTS.length]} You feel a little rested.`
+  };
+};
+
+const stokeFire: ActionHandler<'stokeFire'> = state => {
+  if (!isAtCamp(state)) return refuse(state, 'Return to the marked camp area to tend the fire.');
+  if (state.inventory.wood < 1) return refuse(state, 'You need wood for the fire.');
+  return {
+    state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood - 1 }, fireFuel: state.fireFuel + (state.structures.hearth ? BALANCE.hearthFireSecondsPerWood : BALANCE.fireSecondsPerWood) },
+    message: 'The fire burns brighter.'
+  };
+};
+
+const repairLookout: ActionHandler<'repairLookout'> = state => {
+  if (state.area !== 'camp') return refuse(state, 'There is nothing like that here.');
+  const blocker = lookoutRepairBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  return {
+    state: payAndBuild(state, LOOKOUT.cost, { progress: { ...state.progress, lookoutRepaired: true } }),
+    message: 'The lookout stands again. From here, the camp feels like home.'
+  };
+};
+
+function missingCost(state: GameState, cost: { wood: number; fiber: number; stone: number }): string | null {
+  const needed = [
+    state.inventory.wood < cost.wood ? `${cost.wood} wood` : null,
+    state.inventory.fiber < cost.fiber ? `${cost.fiber} fiber` : null,
+    availableStone(state) < cost.stone ? `${cost.stone} stone` : null
+  ].filter(Boolean);
+  return needed.length ? `Need ${needed.join(' and ')} to build this.` : null;
+}
+
+function buildBlocker(state: GameState, structureId: StructureId): string | null {
+  if (!isAtCamp(state)) return 'Return to the marked camp area to build.';
+  const definition = BUILDINGS[structureId];
+  if (!definition) return 'That structure is unavailable.';
+  if (definition.prerequisite === 'coldNight' && !state.progress.hearthUnlocked) return 'Weather the cold night to unlock the hearth.';
+  if (state.structures[structureId]) return 'Already built.';
+  if (definition.prerequisite === 'shelter' && !state.structures.shelter) return 'Build a shelter first.';
+  return missingCost(state, buildingCost(structureId));
+}
+
+function buildingCost(structureId: StructureId): { wood: number; fiber: number; stone: number } {
+  const cost = BUILDINGS[structureId].cost;
+  return { wood: cost.wood, fiber: cost.fiber, stone: 'stone' in cost ? cost.stone : 0 };
+}
+
+const build: ActionHandler<'build'> = (state, action) => {
+  const blocker = buildBlocker(state, action.structureId);
+  if (blocker) return refuse(state, blocker);
+  return {
+    state: payAndBuild(state, buildingCost(action.structureId), { structures: { ...state.structures, [action.structureId]: true } }),
+    message: `Built the ${BUILDINGS[action.structureId].name.toLowerCase()}.`
+  };
+};
+
+const rest: ActionHandler<'rest'> = state => {
+  if (!isAtCamp(state)) return refuse(state, 'Return to the marked camp area to rest.');
+  const rested = advanceTime(state, BALANCE.restSeconds, 'resting');
+  const gain = rested.structures.bed ? BALANCE.bedRestEnergyGain : BALANCE.restEnergyGain;
+  return {
+    state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + gain) } },
+    message: 'You take a short rest.'
+  };
+};
+
+const sleep: ActionHandler<'sleep'> = state => {
+  const blocked = sleepBlocker(state);
+  if (blocked) return refuse(state, blocked);
+  const energy = state.structures.bed ? 100 : Math.min(100, state.player.energy + BALANCE.sleepEnergyGain);
+  const slept = advanceTime({ ...state, player: { ...state.player, energy } }, BALANCE.daySeconds - state.timeOfDay, 'resting');
+  const fireDied = state.fireFuel > 0 && slept.fireFuel <= 0;
+  return {
+    state: slept,
+    message: fireDied ? 'You sleep until morning. The fire burned out in the night.' : 'You sleep until morning.'
+  };
+};
+
+const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
+  move, cross, gather, craftAxe, craftPickaxe, gatherRubble, digQuarry, chopTree, visitSite,
+  storeStone, takeStone, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
+  cook, stargaze, stokeFire, repairLookout, build, rest, sleep
+};
+
+export function applyAction(state: GameState, action: GameAction): ActionResult {
+  const handler = HANDLERS[action.type] as ActionHandler<GameAction['type']> | undefined;
+  if (!handler) return refuse(state, 'That action is not available yet.');
+  return handler(state, action as never);
 }

@@ -1,6 +1,7 @@
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceNode, type SiteId, type StonePile } from '../game/state';
 import { isAtCamp, type GameAction } from '../game/rules';
 import { sprites } from '../art/sprites';
+import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 
 /** What a tap on the map points at, in tile units like `state.player`. */
 export type TapTarget =
@@ -10,6 +11,9 @@ export type TapTarget =
   | { kind: 'site'; id: SiteId; x: number; y: number }
   | { kind: 'lookout'; x: number; y: number }
   | { kind: 'fire'; x: number; y: number }
+  | { kind: 'crossing'; x: number; y: number }
+  | { kind: 'quarry'; x: number; y: number }
+  | { kind: 'rubble'; x: number; y: number }
   | { kind: 'ground'; x: number; y: number };
 
 /** A tap this close to something counts as tapping it. */
@@ -17,6 +21,8 @@ export const TAP_HIT_RADIUS = 1;
 /** Tiles per second, matching keyboard walking. */
 export const WALK_SPEED = 3.5;
 const GROUND_ARRIVAL = 0.1;
+/** Inside the 0.5 tile that `cross` allows, so arriving at the path's end always crosses. */
+const CROSSING_ARRIVAL = 0.4;
 /** Matches TILE in art.ts, which can't be imported here without pulling in Phaser. */
 const TILE_PIXELS = 16;
 
@@ -47,13 +53,21 @@ function tapDistance(target: TapTarget, sprite: string | undefined, x: number, y
 
 /** The closest interactive thing near the tap, or the tapped ground. */
 export function pickTapTarget(state: GameState, x: number, y: number): TapTarget {
-  const candidates: { target: TapTarget; sprite?: string }[] = [
+  const piles = state.stonePiles.filter(pile => pile.area === state.area)
+    .map(pile => ({ target: { kind: 'pile' as const, id: pile.id, x: pile.x, y: pile.y } }));
+  const candidates: { target: TapTarget; sprite?: string }[] = state.area === 'quarry' ? [
+    ...piles,
+    { target: { kind: 'quarry', x: QUARRY_SITE.x, y: QUARRY_SITE.y }, sprite: 'quarry' },
+    { target: { kind: 'rubble', x: RUBBLE_SITE.x, y: RUBBLE_SITE.y } },
+    { target: { kind: 'crossing', x: QUARRY_EXIT.x, y: QUARRY_EXIT.y } }
+  ] : [
     ...state.nodes.filter(node => node.amount > 0).map(node => ({ target: { kind: 'node' as const, id: node.id, x: node.x, y: node.y } })),
-    ...state.stonePiles.map(pile => ({ target: { kind: 'pile' as const, id: pile.id, x: pile.x, y: pile.y } })),
+    ...piles,
     ...state.trees.map(tree => ({ target: { kind: 'tree' as const, id: tree.id, x: tree.x, y: tree.y }, sprite: tree.sprite })),
     ...(Object.keys(SITES) as SiteId[]).map(id => ({ target: { kind: 'site' as const, id, x: SITES[id].x, y: SITES[id].y } })),
     { target: { kind: 'lookout', x: LOOKOUT.x, y: LOOKOUT.y }, sprite: 'lookout' },
-    { target: { kind: 'fire', x: BALANCE.campX, y: BALANCE.campY } }
+    { target: { kind: 'fire', x: BALANCE.campX, y: BALANCE.campY } },
+    ...(pathOpen(state) ? [{ target: { kind: 'crossing' as const, x: CAMP_EXIT.x, y: CAMP_EXIT.y } }] : [])
   ];
   const hit = candidates
     .map(({ target, sprite }) => ({ target, away: tapDistance(target, sprite, x, y) }))
@@ -62,13 +76,20 @@ export function pickTapTarget(state: GameState, x: number, y: number): TapTarget
   return hit?.target ?? { kind: 'ground', x: clamp(x, BALANCE.mapWidth - 1), y: clamp(y, BALANCE.mapHeight - 1) };
 }
 
-/** The nearest thing E can pick up: a ready node or a loose stone pile within reach. */
-export function closestGatherable(state: GameState): { kind: 'node'; node: ResourceNode } | { kind: 'pile'; pile: StonePile } | undefined {
+/** What E can act on: a node, a loose pile, the rubble or the quarry face. */
+export type Gatherable = { kind: 'node'; node: ResourceNode } | { kind: 'pile'; pile: StonePile } | { kind: 'rubble' } | { kind: 'quarry' };
+
+/** The nearest thing E can act on within reach: ready camp nodes and this area's loose piles, or the quarry's rubble and face when ready. */
+export function closestGatherable(state: GameState): Gatherable | undefined {
   const { x, y } = state.player;
-  const options = [
-    ...state.nodes.filter(node => node.amount > 0).map(node => ({ found: { kind: 'node' as const, node }, away: distance(node.x, node.y, x, y) })),
-    ...state.stonePiles.map(pile => ({ found: { kind: 'pile' as const, pile }, away: distance(pile.x, pile.y, x, y) }))
-  ];
+  const options: { found: Gatherable; away: number }[] =
+    state.stonePiles.filter(pile => pile.area === state.area).map(pile => ({ found: { kind: 'pile' as const, pile }, away: distance(pile.x, pile.y, x, y) }));
+  if (state.area === 'quarry') {
+    if (state.rubbleReadyDay <= state.day) options.push({ found: { kind: 'rubble' }, away: distance(RUBBLE_SITE.x, RUBBLE_SITE.y, x, y) });
+    if (state.quarryReadyDay <= state.day) options.push({ found: { kind: 'quarry' }, away: distance(QUARRY_SITE.x, QUARRY_SITE.y, x, y) });
+  } else {
+    options.push(...state.nodes.filter(node => node.amount > 0).map(node => ({ found: { kind: 'node' as const, node }, away: distance(node.x, node.y, x, y) })));
+  }
   return options.filter(option => option.away <= BALANCE.interactionRadius).sort((a, b) => a.away - b.away)[0]?.found;
 }
 
@@ -76,7 +97,8 @@ export function closestGatherable(state: GameState): { kind: 'node'; node: Resou
 export function hasArrived(state: GameState, target: TapTarget): boolean {
   if (target.kind === 'fire') return isAtCamp(state);
   const away = distance(state.player.x, state.player.y, target.x, target.y);
-  return away <= (target.kind === 'ground' ? GROUND_ARRIVAL : BALANCE.interactionRadius);
+  if (target.kind === 'ground') return away <= GROUND_ARRIVAL;
+  return away <= (target.kind === 'crossing' ? CROSSING_ARRIVAL : BALANCE.interactionRadius);
 }
 
 /** One frame of walking toward the target, before the movement factor, never overshooting. */
@@ -98,6 +120,9 @@ export function targetAction(target: TapTarget): GameAction | null {
     case 'site': return { type: 'visitSite', siteId: target.id };
     case 'lookout': return { type: 'repairLookout' };
     case 'fire': return { type: 'stokeFire' };
+    case 'crossing': return { type: 'cross' };
+    case 'quarry': return { type: 'digQuarry' };
+    case 'rubble': return { type: 'gatherRubble' };
     case 'ground': return null;
   }
 }

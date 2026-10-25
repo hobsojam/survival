@@ -228,6 +228,56 @@ function stonePile(g: Grid): void {
   box(g, 1, 10, 14, 4, 'a'); box(g, 2, 10, 12, 1, 'e'); line(g, 2, 12, 13, 12, 'c');
   stoneLump(g, 2, 6, 6, 5); stoneLump(g, 8, 6, 6, 5); stoneLump(g, 5, 2, 6, 5);
 }
+/** One cut terrace of the quarry: a flat top lit from the top-left over a seamed front face. */
+function quarryTier(g: Grid, x: number, y: number, w: number, face: number, seam: number): void {
+  box(g, x, y, w, 3, 'p'); box(g, x + 1, y, Math.floor(w / 2), 1, 'q'); dot(g, x, y, 'q');
+  box(g, x, y + 3, w, face, 'o'); line(g, x, y + 3, x + w - 1, y + 3, 'n');
+  for (let sx = x + seam; sx < x + w - 2; sx += 9) line(g, sx, y + 4, sx, y + 2 + face, 'n');
+  line(g, x + w - 1, y, x + w - 1, y + 2 + face, 'm'); line(g, x, y + 2 + face, x + w - 1, y + 2 + face, 'm');
+}
+/** The quarry: three cut terraces of grey stone, with a loose block ready to break free, or a fresh notch where one was. */
+function quarry(g: Grid, ready: boolean): void {
+  oval(g, 21, 29, 18, 2, 's');
+  quarryTier(g, 8, 2, 25, 5, 6);
+  quarryTier(g, 3, 10, 34, 5, 4);
+  quarryTier(g, 0, 18, 40, 7, 7);
+  if (ready) {
+    box(g, 24, 21, 10, 8, 'm'); box(g, 24, 21, 9, 3, 'p'); box(g, 24, 21, 4, 1, 'q');
+    box(g, 24, 24, 9, 4, 'o'); line(g, 26, 26, 30, 26, 'p');
+  } else {
+    box(g, 24, 20, 9, 6, 'm'); box(g, 25, 20, 7, 1, 'n'); dot(g, 24, 20, 'n');
+    for (const [x, y] of [[19, 27], [23, 28], [29, 28], [34, 27], [37, 28]]) { dot(g, x, y, 'p'); dot(g, x + 1, y, 'n'); }
+  }
+}
+/** Loose rubble at the quarry's foot: a heap of small broken stones, or just grit once it's picked over. */
+function rubble(g: Grid, ready: boolean): void {
+  oval(g, 12, 13, ready ? 9 : 7, 2, 's');
+  if (!ready) {
+    for (const [x, y, c] of [[4, 12, 'o'], [8, 13, 'n'], [11, 11, 'p'], [14, 13, 'o'], [17, 12, 'p'], [19, 13, 'n']] as const) { dot(g, x, y, c); dot(g, x + 1, y, 'n'); }
+    return;
+  }
+  stoneLump(g, 2, 9, 6, 4); stoneLump(g, 16, 9, 6, 4); stoneLump(g, 8, 8, 8, 5);
+  stoneLump(g, 5, 5, 6, 5); stoneLump(g, 11, 4, 6, 5); stoneLump(g, 9, 1, 5, 4);
+  for (const [x, y] of [[1, 13], [21, 13], [14, 13]]) dot(g, x, y, 'p');
+}
+function toolshedSite(g: Grid): void {
+  for (const [x, y] of [[1, 5], [21, 5], [1, 11], [21, 11]]) stake(g, x, y);
+  line(g, 3, 6, 21, 6, 'h'); line(g, 3, 12, 21, 12, 'h');
+  box(g, 6, 9, 11, 2, 'a'); box(g, 6, 9, 11, 1, 'c'); dot(g, 6, 9, 'e');
+}
+/** A small plank shed: a lit roof over a seamed front wall, a pick hung inside the open door and an axe on the wall. */
+function toolshed(g: Grid): void {
+  oval(g, 13, 26, 10, 2, 's');
+  box(g, 2, 10, 20, 16, 'a'); box(g, 3, 11, 18, 14, 'c');
+  for (const x of [8, 15, 19]) line(g, x, 11, x, 24, 'b');
+  box(g, 4, 13, 9, 13, 'a'); line(g, 4, 13, 12, 13, 'd'); line(g, 4, 13, 4, 25, 'd');
+  dot(g, 6, 18, 'p'); dot(g, 7, 17, 'p'); line(g, 8, 16, 10, 16, 'q'); dot(g, 11, 17, 'p'); line(g, 9, 17, 9, 24, 'c');
+  line(g, 17, 15, 17, 23, 'e'); box(g, 15, 15, 2, 3, 'o'); dot(g, 15, 15, 'q');
+  box(g, 0, 3, 24, 6, 'd'); box(g, 1, 3, 11, 1, 'e');
+  for (const [x, top] of [[6, 4], [12, 5], [18, 4]]) line(g, x, top, x, 8, 'c');
+  line(g, 23, 3, 23, 8, 'b'); box(g, 0, 9, 24, 1, 'b'); box(g, 0, 10, 24, 1, 'a');
+  box(g, 2, 25, 20, 1, 'a');
+}
 const DIGITS: Record<string, string[]> = {
   2: ['###', '..#', '###', '#..', '###'], 3: ['###', '..#', '.##', '..#', '###'], 4: ['#.#', '#.#', '###', '..#', '..#'],
   5: ['###', '#..', '###', '..#', '###'], 6: ['###', '#..', '###', '#.#', '###'], 7: ['###', '..#', '.#.', '.#.', '.#.'],
@@ -289,6 +339,10 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   looseStones: define(16, 16, campLegend, { one: g => looseStones(g, 1), two: g => looseStones(g, 2), many: g => looseStones(g, 3) }),
   stonePileSite: define(16, 16, campLegend, { still: stonePileSite }),
   stonePile: define(16, 16, campLegend, { built: stonePile }),
+  quarry: define(40, 32, campLegend, { ready: g => quarry(g, true), spent: g => quarry(g, false) }, [20, 29]),
+  rubble: define(24, 16, campLegend, { ready: g => rubble(g, true), gathered: g => rubble(g, false) }),
+  toolshedSite: define(24, 16, campLegend, { still: toolshedSite }),
+  toolshed: define(24, 28, campLegend, { built: toolshed }),
   pileCount: define(13, 7, countLegend, {
     ...Object.fromEntries([2, 3, 4, 5, 6, 7, 8, 9].map(n => [`n${n}`, (g: Grid) => pileCount(g, [String(n)])])),
     lots: g => pileCount(g, ['9', '+'])

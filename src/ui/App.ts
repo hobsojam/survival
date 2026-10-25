@@ -3,11 +3,11 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type SiteId, typ
 import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
-import { availableStone, bagCapacity, buildStatus, carriedCount, cookBlocker, isAtCamp, isColdNight, lookoutRepairBlocker, sleepBlocker, stargazeBlocker, trailFoodBlocker } from '../game/rules';
-import { forecastFireCheck } from '../game/forecast';
+import { cookBlocker, isAtCamp, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { dayPhase, formatClock, nextChange } from '../game/clock';
 import { gateTap, nextOpenTab, type DockTab } from './dock';
-import { journalView } from './journal';
+import { journalView, QUARRY_MARKER } from './journal';
+import { axeView, bagView, buildButtonView, forecastView, lookoutView, nightHint, pickaxeView, startNote, type ActionPanelView } from './panels';
 import { Soundscape } from '../game/soundscape';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
@@ -19,7 +19,7 @@ export class App {
   private gameResize?: ResizeObserver;
   private readonly root: HTMLElement;
   private readonly soundscape: Soundscape;
-  private storage?: Storage;
+  private readonly storage?: Storage;
   private previousSave: LoadResult = { kind: 'empty' };
   private lastSaveAt = 0;
   private saveFailures = 0;
@@ -41,8 +41,10 @@ export class App {
       return `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>`
         + (id === 'stonePile' ? `<div id="stone-pile-controls" class="stone-pile-controls" hidden><span id="stone-pile-stored">Stored stone 0/${BALANCE.stonePileCapacity}</span><button type="button" data-action="storeStone">Store 1</button><button type="button" data-action="takeStone">Take 1</button></div>` : '');
     }).join('');
-    const mapMarkers = journalView(this.state).locations.map(place =>
-      `<span id="map-${place.id}" class="map-point" style="left:${place.x / BALANCE.mapWidth * 100}%;top:${place.y / BALANCE.mapHeight * 100}%">?</span>`
+    // The quarry marker is always in the markup and shown only once the west path opens.
+    const markerPlaces = [...journalView(this.state).locations.filter(place => place.id !== 'quarry'), { id: 'quarry', ...QUARRY_MARKER }];
+    const mapMarkers = markerPlaces.map(place =>
+      `<span id="map-${place.id}" class="map-point" style="left:${place.x / BALANCE.mapWidth * 100}%;top:${place.y / BALANCE.mapHeight * 100}%"${place.id === 'quarry' ? ' hidden' : ''}>?</span>`
     ).join('');
     this.root.innerHTML = `
       <div class="shell">
@@ -59,10 +61,10 @@ export class App {
           <aside class="sidebar">
             <section class="panel forecast-panel" id="forecast-panel" data-tab="camp"><p class="eyebrow">THE FORECAST</p><h2 id="forecast-title">A cold front is coming</h2><p id="forecast-copy" class="forecast-copy"></p><div class="forecast-checks"><span id="forecast-shelter"></span><span id="forecast-fire"></span></div></section>
             <section class="panel lookout-panel" id="lookout-panel" data-tab="build"><p class="eyebrow">A PLACE BEYOND CAMP</p><h2 id="lookout-title">The old lookout</h2><p id="lookout-copy" class="lookout-copy"></p><button type="button" id="lookout-button" data-action="repairLookout">Repair lookout</button><small id="lookout-cost">4 wood · 2 fiber · 2 stone</small></section>
-            <section class="panel axe-panel" data-tab="build"><p class="eyebrow">FOREST TOOLS</p><h2 id="axe-title">Stone axe</h2><p id="axe-copy" class="lookout-copy"></p><button type="button" id="axe-button" data-action="craftAxe">Craft stone axe</button><small id="axe-cost">1 wood · 1 fiber · 1 stone</small></section>
+            <section class="panel axe-panel" data-tab="build"><p class="eyebrow">FOREST TOOLS</p><div class="tool-row"><h2 id="axe-title">Stone axe</h2><p id="axe-copy" class="lookout-copy"></p><button type="button" id="axe-button" data-action="craftAxe">Craft stone axe</button><small id="axe-cost">1 wood · 1 fiber · 1 stone</small></div><div id="pickaxe-row" class="tool-row" hidden><h2 id="pickaxe-title">Pickaxe</h2><p id="pickaxe-copy" class="lookout-copy"></p><button type="button" id="pickaxe-button" data-action="craftPickaxe">Craft pickaxe</button><small id="pickaxe-cost">2 wood · 1 fiber · 2 stone</small></div></section>
             <section class="panel ration-panel" data-tab="bag"><p class="eyebrow">TRAIL FOOD</p><h2>Drying rack</h2><p class="lookout-copy">Dry a berry at camp for a ration you can eat anywhere. Each restores 45 hunger.</p><button type="button" id="prepare-button" data-action="prepareTrailFood">Prepare trail ration</button><small id="prepare-hint">Build a drying rack first.</small></section>
             <section class="panel sites-panel" data-tab="camp"><p class="eyebrow">BEYOND CAMP</p><h2>Follow the paths</h2><p class="lookout-copy">An old basket, a quiet spring, and a stone cairn wait beyond the clearing.</p><p id="sites-seen" class="sites-seen">Places found: none yet</p><button type="button" id="site-button">Explore nearby place</button><small>Stand beside a place and press V</small></section>
-            <section class="panel journal-panel" data-tab="camp"><p class="eyebrow">YOUR FIELD JOURNAL</p><h2>Paths from camp</h2><p id="journal-hint" class="journal-hint"></p><details open><summary>Map and milestones</summary><div class="journal-map" aria-hidden="true"><svg viewBox="0 0 40 30" preserveAspectRatio="none"><path d="M20 15 L8 8 M20 15 L30 8 M20 15 L10 20 M20 15 L31 21" /></svg><span class="map-point camp" style="left:50%;top:50%">✦</span>${mapMarkers}<span id="map-player" class="map-player"></span></div><p class="map-key">✦ Camp &nbsp; ● You &nbsp; ? Unexplored</p><ul id="journal-places" class="journal-list"></ul><p class="journal-subhead">Camp milestones</p><ul id="journal-milestones" class="journal-list"></ul></details></section>
+            <section class="panel journal-panel" data-tab="camp"><p class="eyebrow">YOUR FIELD JOURNAL</p><h2>Paths from camp</h2><p id="journal-hint" class="journal-hint"></p><details open><summary>Map and milestones</summary><div class="journal-map" aria-hidden="true"><svg viewBox="0 0 40 30" preserveAspectRatio="none"><path d="M20 15 L8 8 M20 15 L30 8 M20 15 L10 20 M20 15 L31 21" /><path id="map-west-path" d="M20 15 L1 15" style="display:none" /></svg><span class="map-point camp" style="left:50%;top:50%">✦</span>${mapMarkers}<span id="map-player" class="map-player"></span></div><p class="map-key">✦ Camp &nbsp; ● You &nbsp; ? Unexplored</p><ul id="journal-places" class="journal-list"></ul><p class="journal-subhead">Camp milestones</p><ul id="journal-milestones" class="journal-list"></ul></details></section>
             <section class="panel survivor-panel" data-tab="bag"><p class="eyebrow">YOUR SURVIVOR</p><h2>Take it one day at a time</h2>
               <div class="meter"><div class="meter-title"><span>Energy</span><b id="energy-value">100</b></div><div class="track"><div id="energy-bar" class="fill energy"></div></div></div>
               <div class="meter"><div class="meter-title"><span>Hunger</span><b id="hunger-value">100</b></div><div class="track"><div id="hunger-bar" class="fill hunger"></div></div></div>
@@ -91,7 +93,7 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone';
+        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone';
         this.scene?.perform({ type });
       });
     });
@@ -198,12 +200,7 @@ export class App {
     const note = this.root.querySelector<HTMLElement>('#start-note');
     const continueButton = this.root.querySelector<HTMLButtonElement>('#continue-game');
     if (continueButton) continueButton.hidden = this.previousSave.kind !== 'loaded';
-    if (note && !this.storage) note.textContent = 'Browser storage is unavailable, so this camp will not be saved.';
-    else if (note) note.textContent = this.previousSave.kind === 'loaded'
-      ? `Your camp is waiting on day ${this.previousSave.state.day}.`
-      : this.previousSave.kind === 'invalid'
-        ? `Your existing save could not be loaded: ${this.previousSave.reason}`
-        : 'A fresh camp is ready whenever you are.';
+    if (note) note.textContent = startNote(this.previousSave, Boolean(this.storage));
   }
 
   private beginNewGame(): void {
@@ -216,7 +213,7 @@ export class App {
   private continueGame(): void {
     if (this.previousSave.kind !== 'loaded') return;
     this.startGame(this.previousSave.state);
-    this.setMessage('Welcome back to your camp.');
+    this.setMessage(this.previousSave.state.area === 'quarry' ? 'Welcome back. You are out by the old quarry.' : 'Welcome back to your camp.');
     this.setText('save-status', 'Loaded locally');
   }
 
@@ -267,7 +264,17 @@ export class App {
   }
 
   private render(): void {
-    const { player, inventory, structures } = this.state;
+    this.renderClock();
+    this.renderSurvivor();
+    this.renderBag();
+    this.renderJournal();
+    this.renderTools();
+    this.renderNight();
+    this.renderForecast();
+    this.renderBuild();
+  }
+
+  private renderClock(): void {
     const { timeOfDay } = this.state;
     const phase = dayPhase(timeOfDay);
     const change = nextChange(timeOfDay);
@@ -278,6 +285,10 @@ export class App {
     if (hand) hand.style.left = `${timeOfDay / BALANCE.daySeconds * 100}%`;
     this.root.querySelector('#sleep-button')?.classList.toggle('ready', !sleepBlocker(this.state));
     this.root.querySelector('#dock-sleep')?.classList.toggle('ready', !sleepBlocker(this.state));
+  }
+
+  private renderSurvivor(): void {
+    const { player } = this.state;
     for (const key of ['energy', 'hunger', 'warmth'] as const) {
       const value = Math.round(player[key]);
       this.setText(`${key}-value`, String(value));
@@ -286,11 +297,33 @@ export class App {
       const mini = this.root.querySelector<HTMLElement>(`#mini-${key}`);
       if (mini) mini.style.width = `${value}%`;
     }
+    const nearSite = this.state.area === 'camp' && (Object.keys(SITES) as SiteId[]).some(id => Math.hypot(player.x - SITES[id].x, player.y - SITES[id].y) <= BALANCE.interactionRadius);
+    this.root.querySelector('#site-button')?.classList.toggle('ready', nearSite);
+  }
+
+  private renderBag(): void {
+    const { inventory } = this.state;
+    const bag = bagView(this.state);
     this.setText('wood-count', String(inventory.wood));
     this.setText('food-count', String(inventory.food));
     this.setText('fiber-count', String(inventory.fiber));
     this.setText('stone-count', String(inventory.stone));
     this.setText('ration-count', String(inventory.trailFood));
+    this.setText('space-count', bag.spaces);
+    this.root.querySelector('#eat-ration-button')?.classList.toggle('ready', inventory.trailFood > 0);
+    this.root.querySelector('#prepare-button')?.classList.toggle('ready', bag.prepareReady);
+    this.setText('prepare-hint', bag.prepareHint);
+    this.root.querySelectorAll<HTMLButtonElement>('[data-supply]').forEach(button => {
+      button.disabled = inventory[button.dataset.supply as keyof GameState['inventory']] <= 0;
+    });
+    this.setText('stone-stored', bag.storedAtCamp);
+    const pileControls = this.root.querySelector<HTMLElement>('#stone-pile-controls');
+    if (pileControls) pileControls.hidden = !bag.pileShown;
+    this.setText('stone-pile-stored', bag.pileStored);
+    this.setText('fire-status', bag.fire);
+  }
+
+  private renderJournal(): void {
     const journal = journalView(this.state);
     this.setText('journal-hint', journal.nextHint);
     const placeList = this.root.querySelector('#journal-places');
@@ -311,7 +344,17 @@ export class App {
         return item;
       }));
     }
-    for (const place of journal.locations) {
+    this.renderMap(journal.locations);
+  }
+
+  private renderMap(locations: ReturnType<typeof journalView>['locations']): void {
+    const { player } = this.state;
+    const quarryKnown = locations.some(place => place.id === 'quarry');
+    const quarryMarker = this.root.querySelector<HTMLElement>('#map-quarry');
+    if (quarryMarker) quarryMarker.hidden = !quarryKnown;
+    const westPath = this.root.querySelector<SVGPathElement>('#map-west-path');
+    if (westPath) westPath.style.display = quarryKnown ? '' : 'none';
+    for (const place of locations) {
       const marker = this.root.querySelector(`#map-${place.id}`);
       if (marker) {
         let symbol = '?';
@@ -323,123 +366,75 @@ export class App {
     }
     const playerMarker = this.root.querySelector<HTMLElement>('#map-player');
     if (playerMarker) {
-      playerMarker.style.left = `${player.x / BALANCE.mapWidth * 100}%`;
-      playerMarker.style.top = `${player.y / BALANCE.mapHeight * 100}%`;
+      // The camp map can't show the quarry area, so away there the survivor sits at the west path's end.
+      const mapPosition = this.state.area === 'camp' ? player : QUARRY_MARKER;
+      playerMarker.style.left = `${mapPosition.x / BALANCE.mapWidth * 100}%`;
+      playerMarker.style.top = `${mapPosition.y / BALANCE.mapHeight * 100}%`;
     }
-    const nearSite = (Object.keys(SITES) as SiteId[]).some(id => Math.hypot(player.x - SITES[id].x, player.y - SITES[id].y) <= BALANCE.interactionRadius);
-    this.root.querySelector('#site-button')?.classList.toggle('ready', nearSite);
-    this.setText('space-count', `${carriedCount(this.state)}/${bagCapacity(this.state)}`);
-    this.root.querySelector('#eat-ration-button')?.classList.toggle('ready', inventory.trailFood > 0);
-    this.root.querySelector('#prepare-button')?.classList.toggle('ready', !trailFoodBlocker(this.state));
-    this.setText('prepare-hint', trailFoodBlocker(this.state) ?? '1 berry · 12 seconds · 1 ration');
-    this.root.querySelectorAll<HTMLButtonElement>('[data-supply]').forEach(button => {
-      button.disabled = inventory[button.dataset.supply as keyof GameState['inventory']] <= 0;
-    });
-    this.setText('stone-stored', structures.stonePile ? `+${this.state.storedStone} at camp` : '');
-    const pileControls = this.root.querySelector<HTMLElement>('#stone-pile-controls');
-    if (pileControls) pileControls.hidden = !structures.stonePile;
-    this.setText('stone-pile-stored', `Stored stone ${this.state.storedStone}/${BALANCE.stonePileCapacity}`);
-    this.setText('fire-status', this.state.fireFuel > 0 ? `Fire burning · ${Math.ceil(this.state.fireFuel)}s of warmth` : 'The fire is unlit');
-    const lookoutButton = this.root.querySelector<HTMLButtonElement>('#lookout-button');
-    if (lookoutButton) {
-      lookoutButton.disabled = !this.state.progress.hearthUnlocked || this.state.progress.lookoutRepaired;
-      lookoutButton.classList.toggle('ready', !lookoutRepairBlocker(this.state));
+  }
+
+  /** Writes a one-button panel's view into the elements named after it, such as #axe-title and #axe-button. */
+  private renderActionPanel(name: string, view: ActionPanelView): void {
+    const button = this.root.querySelector<HTMLButtonElement>(`#${name}-button`);
+    if (button) {
+      button.disabled = view.disabled;
+      button.classList.toggle('ready', view.ready);
     }
-    if (this.state.progress.lookoutRepaired) {
-      this.setText('lookout-title', 'A place to call home');
-      this.setText('lookout-copy', 'The old lookout stands again. The paths are still yours to explore.');
-      this.setText('lookout-cost', 'Restored');
-    } else if (this.state.progress.hearthUnlocked) {
-      this.setText('lookout-title', 'Restore the old lookout');
-      this.setText('lookout-copy', 'Follow the northeast path to the lookout. Bring the repair materials and stand beside it.');
-      this.setText('lookout-cost', '4 wood · 2 fiber · 2 stone');
-    } else {
-      this.setText('lookout-title', 'The old lookout');
-      this.setText('lookout-copy', 'A damaged lookout waits along the northeast path. Weather the cold front before repairing it.');
-      this.setText('lookout-cost', 'Unlocks after the cold front');
-    }
-    const axeButton = this.root.querySelector<HTMLButtonElement>('#axe-button');
-    if (axeButton) {
-      axeButton.disabled = !this.state.progress.hearthUnlocked || this.state.progress.axeCrafted;
-      const canCraft = this.state.progress.hearthUnlocked && isAtCamp(this.state)
-        && inventory.wood >= 1 && inventory.fiber >= 1 && availableStone(this.state) >= 1 && !this.state.progress.axeCrafted;
-      axeButton.classList.toggle('ready', canCraft);
-    }
-    if (this.state.progress.axeCrafted) {
-      this.setText('axe-title', 'Stone axe ready');
-      this.setText('axe-copy', 'Stand near a mature tree and press X to gather two wood. Stumps regrow after three dawns.');
-      this.setText('axe-cost', 'Crafted');
-    } else if (this.state.progress.hearthUnlocked) {
-      this.setText('axe-title', 'Craft a stone axe');
-      this.setText('axe-copy', 'Use stone, fiber, and wood at camp to work with the mature trees. Fallen branches remain easy to gather.');
-      this.setText('axe-cost', '1 wood · 1 fiber · 1 stone');
-    } else {
-      this.setText('axe-title', 'Stone axe');
-      this.setText('axe-copy', 'Weather the cold front to learn how to make a useful forest tool.');
-      this.setText('axe-cost', 'Unlocks after the cold front');
-    }
-    const atCamp = isAtCamp(this.state);
-    const afterDark = timeOfDay >= BALANCE.nightStart;
-    this.setText('night-hint', !afterDark ? 'These small moments are waiting for nightfall.'
-      : !atCamp ? 'Return to the camp circle for a quiet evening.'
-        : 'Optional comforts while the night passes.');
+    this.setText(`${name}-title`, view.title);
+    this.setText(`${name}-copy`, view.copy);
+    this.setText(`${name}-cost`, view.cost);
+  }
+
+  private renderTools(): void {
+    this.renderActionPanel('lookout', lookoutView(this.state));
+    this.renderActionPanel('axe', axeView(this.state));
+    const pickaxe = pickaxeView(this.state);
+    const pickaxeRow = this.root.querySelector<HTMLElement>('#pickaxe-row');
+    if (pickaxeRow) pickaxeRow.hidden = !pickaxe.shown;
+    this.renderActionPanel('pickaxe', pickaxe);
+  }
+
+  private renderNight(): void {
+    this.setText('night-hint', nightHint(this.state));
     this.root.querySelector('#cook-button')?.classList.toggle('ready', !cookBlocker(this.state));
     this.root.querySelector('#stargaze-button')?.classList.toggle('ready', !stargazeBlocker(this.state));
     const dockCook = this.root.querySelector<HTMLButtonElement>('#dock-cook');
     if (dockCook) dockCook.hidden = Boolean(cookBlocker(this.state));
     const dockStargaze = this.root.querySelector<HTMLButtonElement>('#dock-stargaze');
     if (dockStargaze) dockStargaze.hidden = Boolean(stargazeBlocker(this.state));
-    const storm = isColdNight(this.state);
+  }
+
+  private renderForecast(): void {
+    const view = forecastView(this.state);
     const forecast = this.root.querySelector('#forecast-panel');
-    forecast?.classList.toggle('active', storm);
-    forecast?.classList.toggle('weathered', this.state.progress.hearthUnlocked);
-    if (this.state.progress.hearthUnlocked) {
-      this.setText('forecast-title', 'The cold night is behind you');
-      this.setText('forecast-copy', 'You kept your camp warm through dawn. The stone hearth is ready to build.');
-      this.setText('forecast-shelter', '✓ Shelter held firm');
-      this.setText('forecast-fire', '✓ Hearth unlocked');
-    } else {
-      const day = this.state.progress.nextStormDay!;
-      this.setText('forecast-title', storm ? 'The cold front is here' : `Cold front · day ${day} night`);
-      this.setText('forecast-copy', storm ? 'Stay at camp and keep the fire alive until dawn.' : `Build a shelter and bring two logs to camp before nightfall on day ${day}.`);
-      this.setText('forecast-shelter', `${structures.shelter ? '✓' : '○'} Shelter ${structures.shelter ? 'ready' : 'needed'}`);
-      this.setText('forecast-fire', forecastFireCheck(this.state));
-    }
+    forecast?.classList.toggle('active', view.active);
+    forecast?.classList.toggle('weathered', view.weathered);
+    this.setText('forecast-title', view.title);
+    this.setText('forecast-copy', view.copy);
+    this.setText('forecast-shelter', view.shelter);
+    this.setText('forecast-fire', view.fire);
+  }
+
+  private renderBuild(): void {
     this.setText('prompt', this.scene?.getPrompt() ?? 'WASD / arrows  Move');
     this.setText('build-hint', isAtCamp(this.state) ? 'At camp — click an upgrade to build.' : 'Stand inside the marked camp circle to build.');
-    for (const id of buildOptions) {
-      const status = buildStatus(this.state, id);
-      const built = status === 'built';
-      const locked = status === 'locked';
-      const needsShelter = status === 'needsShelter';
-      const definition = BUILDINGS[id];
-      const cost = definition.cost;
-      const stoneCost = 'stone' in cost ? cost.stone : 0;
-      const button = this.root.querySelector<HTMLButtonElement>(`[data-build="${id}"]`)!;
-      button.disabled = built || locked || needsShelter;
-      button.classList.toggle('built', built);
-      button.classList.toggle('locked', locked || needsShelter);
-      button.classList.toggle('ready', status === 'ready');
-      button.querySelector<HTMLElement>('.build-copy small')!.textContent = needsShelter ? 'Requires shelter' : definition.description;
-      const fiberPrice = cost.fiber ? ` · ${cost.fiber} fiber` : '';
-      const stonePrice = stoneCost ? ` · ${stoneCost} stone` : '';
-      let verb = 'Build';
-      let price = `${cost.wood} wood${fiberPrice}${stonePrice}`;
-      if (built) {
-        verb = 'Built';
-        price = 'Complete';
-      } else if (locked) {
-        verb = 'Locked';
-        price = 'Weather cold night';
-      } else if (needsShelter) {
-        verb = 'Blocked';
-      }
-      button.querySelector<HTMLElement>('.build-verb')!.textContent = verb;
-      button.querySelector<HTMLElement>('.build-price')!.textContent = price;
-    }
+    for (const id of buildOptions) this.renderBuildButton(id);
     const buildReady = Boolean(this.root.querySelector('[data-tab="build"] .ready'));
     this.root.querySelector('[data-tab-button="build"]')?.classList.toggle('has-dot', buildReady);
   }
+
+  private renderBuildButton(id: StructureId): void {
+    const view = buildButtonView(this.state, id);
+    const button = this.root.querySelector<HTMLButtonElement>(`[data-build="${id}"]`)!;
+    button.disabled = view.disabled;
+    button.classList.toggle('built', view.built);
+    button.classList.toggle('locked', view.locked);
+    button.classList.toggle('ready', view.ready);
+    button.querySelector<HTMLElement>('.build-copy small')!.textContent = view.description;
+    button.querySelector<HTMLElement>('.build-verb')!.textContent = view.verb;
+    button.querySelector<HTMLElement>('.build-price')!.textContent = view.price;
+  }
+
 
   private setText(id: string, text: string): void {
     const element = this.root.querySelector<HTMLElement>(`#${id}`);

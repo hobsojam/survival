@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, createGame } from '../src/game/state';
-import { buildStatus, cookBlocker, stargazeBlocker } from '../src/game/rules';
+import { buildStatus, cookBlocker, pickaxeBlocker, stargazeBlocker } from '../src/game/rules';
 
 describe('build buttons', () => {
   it('locks the hearth until the cold night is weathered', () => {
     const state = createGame();
     state.inventory = { wood: 9, food: 0, fiber: 0, stone: 3, trailFood: 0 };
     expect(buildStatus(state, 'hearth')).toBe('locked');
-    state.progress = { nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false, axeCrafted: false,
+    state.progress = { nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false, axeCrafted: false, quarryFound: false, pickaxeCrafted: false,
       discoveries: { basket: false, spring: false, cairn: false } };
     expect(buildStatus(state, 'hearth')).toBe('ready');
   });
@@ -49,5 +49,19 @@ describe('after-dark actions', () => {
     state.player.x = BALANCE.campX + BALANCE.campRadius + 1;
     expect(cookBlocker(state)).toMatch(/camp/);
     expect(stargazeBlocker(state)).toMatch(/camp/);
+  });
+});
+
+describe('pickaxe blocker', () => {
+  it('names what is missing and clears when crafting is possible', () => {
+    const state = createGame();
+    state.inventory = { wood: 2, food: 0, fiber: 1, stone: 2, trailFood: 0 };
+    expect(pickaxeBlocker(state)).toBe('Find the quarry first.');
+    state.progress.quarryFound = true;
+    expect(pickaxeBlocker(state)).toBe('Build a toolshed first.');
+    state.structures.toolshed = true;
+    expect(pickaxeBlocker(state)).toBeNull();
+    state.inventory.stone = 1;
+    expect(pickaxeBlocker(state)).toMatch(/stone/);
   });
 });

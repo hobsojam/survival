@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, BUILDINGS, createGame, type StructureId } from '../src/game/state';
 import { advanceTime, applyAction, isColdNight, type Activity, type GameAction } from '../src/game/rules';
+import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { loadGame, saveGame } from '../src/game/save';
 
 class MemoryStorage implements Storage {
@@ -24,8 +25,11 @@ function seeded(seed: number): () => number {
 }
 
 const structures = Object.keys(BUILDINGS) as StructureId[];
-const simple = ['eat', 'stokeFire', 'rest', 'sleep', 'cook', 'stargaze', 'burnFiber', 'dropStone', 'storeStone', 'takeStone'] as const;
+const simple = ['eat', 'stokeFire', 'rest', 'sleep', 'cook', 'stargaze', 'burnFiber', 'dropStone', 'storeStone', 'takeStone', 'craftAxe', 'craftPickaxe'] as const;
 const activities: Activity[] = ['awake', 'working', 'resting'];
+
+let reachedQuarry = false;
+let foundQuarry = false;
 
 describe('saving during long random play', () => {
   for (const seed of [1, 2, 3, 4, 5]) {
@@ -43,6 +47,14 @@ describe('saving during long random play', () => {
           // Mostly hold camp through the storm, so some runs weather it and unlock the hearth.
           goTo(BALANCE.campX + 1, BALANCE.campY + 1);
           act({ type: pick(['stokeFire', 'rest', 'cook', 'stargaze'] as const) });
+        } else if (state.area === 'quarry' && roll < 0.6) {
+          // In the quarry: look over the face, work it or the rubble, and sometimes walk home.
+          const site = pick([QUARRY_SITE, RUBBLE_SITE, QUARRY_EXIT]);
+          goTo(site.x, site.y);
+          act({ type: site === QUARRY_SITE ? pick(['digQuarry', 'craftPickaxe'] as const) : site === RUBBLE_SITE ? 'gatherRubble' : 'cross' });
+        } else if (state.area === 'camp' && state.structures.shelter && roll < 0.3) {
+          goTo(CAMP_EXIT.x, CAMP_EXIT.y);
+          act({ type: 'cross' });
         } else if (roll < 0.2) state = advanceTime(state, random() * 40, pick(activities));
         else if (roll < 0.55) {
           // Mostly gather what the next structure still needs, so runs build and reach the storm prepared.
@@ -61,7 +73,21 @@ describe('saving during long random play', () => {
           const pile = pick(state.stonePiles);
           goTo(pile.x, pile.y);
           act({ type: 'pickUpStone', pileId: pile.id });
+        } else if (roll < 0.99) {
+          // Walk the west path, so runs cross between the areas.
+          const exit = state.area === 'camp' ? CAMP_EXIT : QUARRY_EXIT;
+          goTo(exit.x, exit.y);
+          act({ type: 'cross' });
+        } else if (roll < 0.995) {
+          // Work the quarry: walk to the face or the rubble and take stone.
+          if (state.area === 'quarry') {
+            const site = random() < 0.5 ? QUARRY_SITE : RUBBLE_SITE;
+            goTo(site.x, site.y);
+            act({ type: site === QUARRY_SITE ? 'digQuarry' : 'gatherRubble' });
+          } else act({ type: 'craftPickaxe' });
         } else act({ type: 'move', dx: (random() - 0.5) * 80, dy: (random() - 0.5) * 60 });
+        reachedQuarry ||= state.area === 'quarry';
+        foundQuarry ||= state.progress.quarryFound;
         const saved = saveGame(storage, state);
         expect(saved, `step ${step}, day ${state.day}`).toEqual({ ok: true });
       }
@@ -70,4 +96,11 @@ describe('saving during long random play', () => {
       expect(loaded).toEqual({ kind: 'loaded', state });
     });
   }
+});
+
+describe('random play coverage', () => {
+  it('reaches the quarry area and finds the quarry in at least one seed', () => {
+    expect(reachedQuarry).toBe(true);
+    expect(foundQuarry).toBe(true);
+  });
 });

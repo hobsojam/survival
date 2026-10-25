@@ -2,7 +2,7 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState } from './state';
 import { bagCapacity, carriedCount } from './rules';
 
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 11;
+const SAVE_VERSION = 12;
 export type SaveResult = { ok: true } | { ok: false; error: string };
 export type LoadResult = { kind: 'empty' } | { kind: 'loaded'; state: GameState } | { kind: 'invalid'; reason: string };
 
@@ -14,38 +14,77 @@ const whole = (value: unknown): value is number => Number.isInteger(value) && fi
 const count = (value: unknown): value is number => whole(value) && value >= 0;
 const onMap = (x: unknown, y: unknown): boolean => finite(x) && x >= 0 && x <= BALANCE.mapWidth - 1 && finite(y) && y >= 0 && y <= BALANCE.mapHeight - 1;
 
-/** Checks a version 11 save: today's shape, with stone counted at its bag weight. */
-function validState(value: unknown): value is GameState {
-  if (!object(value) || !object(value.player) || !object(value.inventory) || !object(value.structures) || !object(value.progress)) return false;
-  if (!Array.isArray(value.nodes) || !Array.isArray(value.trees) || !Array.isArray(value.stonePiles)) return false;
-  const { player, inventory, structures, progress } = value;
-  if (!whole(value.day) || value.day < 1 || !finite(value.timeOfDay) || value.timeOfDay < 0 || value.timeOfDay >= BALANCE.daySeconds) return false;
-  if (!onMap(player.x, player.y) || !meter(player.energy) || !meter(player.hunger) || !meter(player.warmth)) return false;
-  if (!(['wood', 'food', 'fiber', 'stone', 'trailFood'] as const).every(key => count(inventory[key]))) return false;
-  if (!(Object.keys(BUILDINGS) as (keyof typeof BUILDINGS)[]).every(id => typeof structures[id] === 'boolean')) return false;
-  if (!finite(value.fireFuel) || value.fireFuel < 0) return false;
-  if (typeof progress.hearthUnlocked !== 'boolean' || typeof progress.lookoutRepaired !== 'boolean' || typeof progress.axeCrafted !== 'boolean') return false;
-  if ((structures.hearth || progress.lookoutRepaired || progress.axeCrafted) && !progress.hearthUnlocked) return false;
-  if (progress.hearthUnlocked ? progress.nextStormDay !== null
-    : !(whole(progress.nextStormDay) && progress.nextStormDay >= BALANCE.coldNightStartDay && progress.nextStormDay >= value.day)) return false;
+type SaveShape = ObjectValue & { player: ObjectValue; inventory: ObjectValue; structures: ObjectValue; progress: ObjectValue; nodes: unknown[]; trees: unknown[]; stonePiles: unknown[] };
+const bool = (value: unknown): value is boolean => typeof value === 'boolean';
+
+function hasShape(value: unknown): value is SaveShape {
+  return object(value) && object(value.player) && object(value.inventory) && object(value.structures) && object(value.progress)
+    && Array.isArray(value.nodes) && Array.isArray(value.trees) && Array.isArray(value.stonePiles);
+}
+
+function validClock(value: SaveShape): boolean {
+  return whole(value.day) && value.day >= 1 && finite(value.timeOfDay) && value.timeOfDay >= 0 && value.timeOfDay < BALANCE.daySeconds
+    && finite(value.fireFuel) && value.fireFuel >= 0;
+}
+
+function validSurvivor({ player, inventory, area }: SaveShape): boolean {
+  return onMap(player.x, player.y) && meter(player.energy) && meter(player.hunger) && meter(player.warmth)
+    && (['wood', 'food', 'fiber', 'stone', 'trailFood'] as const).every(key => count(inventory[key]))
+    && (area === 'camp' || area === 'quarry');
+}
+
+/** Flags are booleans, and nothing is unlocked without what unlocks it. */
+function validProgress({ structures, progress, area }: SaveShape): boolean {
+  if (!(Object.keys(BUILDINGS) as (keyof typeof BUILDINGS)[]).every(id => bool(structures[id]))) return false;
+  if (!(['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'pickaxeCrafted'] as const).every(key => bool(progress[key]))) return false;
+  if ((area === 'quarry' || progress.quarryFound) && !structures.shelter) return false;
+  if (progress.pickaxeCrafted && !(progress.quarryFound && structures.toolshed)) return false;
+  if (progress.axeCrafted && !structures.toolshed) return false;
+  const needsColdNight = [structures.hearth, progress.lookoutRepaired, progress.axeCrafted].includes(true);
+  return progress.hearthUnlocked === true || !needsColdNight;
+}
+
+function validStorm({ progress, day }: SaveShape): boolean {
+  if (progress.hearthUnlocked) return progress.nextStormDay === null;
+  return whole(progress.nextStormDay) && whole(day) && progress.nextStormDay >= BALANCE.coldNightStartDay && progress.nextStormDay >= day;
+}
+
+function validDiscoveries({ progress }: SaveShape): boolean {
   const discoveries = progress.discoveries;
-  if (!object(discoveries) || !(Object.keys(SITES) as (keyof typeof SITES)[]).every(id => typeof discoveries[id] === 'boolean')) return false;
-  if (!count(value.storedStone) || value.storedStone > BALANCE.stonePileCapacity || (!structures.stonePile && value.storedStone > 0)) return false;
-  const day = value.day;
+  return object(discoveries) && (Object.keys(SITES) as (keyof typeof SITES)[]).every(id => bool(discoveries[id]));
+}
+
+const readyBy = (value: unknown, latest: number): boolean => whole(value) && value >= 1 && value <= latest;
+
+function validStone({ structures, storedStone, quarryReadyDay, rubbleReadyDay, day }: SaveShape): boolean {
+  const today = day as number;
+  return count(storedStone) && storedStone <= BALANCE.stonePileCapacity && (structures.stonePile === true || storedStone === 0)
+    && readyBy(quarryReadyDay, today + 1) && readyBy(rubbleReadyDay, today + BALANCE.rubbleRegrowDays);
+}
+
+function validWorld({ nodes, trees, stonePiles, day }: SaveShape): boolean {
+  const today = day as number;
   const fresh = createGame();
-  const nodesMatch = value.nodes.length === fresh.nodes.length && value.nodes.every((node, index) => {
+  const nodesMatch = nodes.length === fresh.nodes.length && nodes.every((node, index) => {
     const base = fresh.nodes[index];
     return object(node) && node.id === base.id && node.kind === base.kind && node.x === base.x && node.y === base.y
-      && (node.amount === 0 || node.amount === 1) && whole(node.readyDay) && node.readyDay >= 1 && node.readyDay <= day + 1;
+      && (node.amount === 0 || node.amount === 1) && readyBy(node.readyDay, today + 1);
   });
-  const treesMatch = value.trees.length === fresh.trees.length && value.trees.every((tree, index) => {
+  const treesMatch = trees.length === fresh.trees.length && trees.every((tree, index) => {
     const base = fresh.trees[index];
     return object(tree) && tree.id === base.id && tree.x === base.x && tree.y === base.y && tree.sprite === base.sprite
-      && whole(tree.readyDay) && tree.readyDay >= 1 && tree.readyDay <= day + BALANCE.treeRegrowDays;
+      && readyBy(tree.readyDay, today + BALANCE.treeRegrowDays);
   });
-  const pilesValid = value.stonePiles.every(pile => object(pile) && typeof pile.id === 'string' && onMap(pile.x, pile.y)
-    && whole(pile.count) && pile.count >= 1);
-  return nodesMatch && treesMatch && pilesValid && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
+  const pilesValid = stonePiles.every(pile => object(pile) && typeof pile.id === 'string' && onMap(pile.x, pile.y)
+    && whole(pile.count) && pile.count >= 1 && (pile.area === 'camp' || pile.area === 'quarry'));
+  return nodesMatch && treesMatch && pilesValid;
+}
+
+/** Checks a version 12 save: two areas, the toolshed's tools and the quarry's timers. */
+function validState(value: unknown): value is GameState {
+  if (!hasShape(value)) return false;
+  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWorld];
+  return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 
 function errorText(error: unknown): string {

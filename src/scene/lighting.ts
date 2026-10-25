@@ -7,7 +7,7 @@ import { darkness } from './ambient';
 export interface LightingTint { color: number; alpha: number }
 export interface LightRadii { inner: number; middle: number; outer: number }
 
-const color = (hex: string): number => parseInt(hex.slice(1), 16);
+const color = (hex: string): number => Number.parseInt(hex.slice(1), 16);
 const mixColor = (from: number, to: number, amount: number): number => {
   const channel = (shift: number) => Math.round(((from >> shift) & 255) * (1 - amount) + ((to >> shift) & 255) * amount);
   return (channel(16) << 16) | (channel(8) << 8) | channel(0);
@@ -43,6 +43,12 @@ export function fireRadii(fuel: number, hearth: boolean, timeMs: number): LightR
     middle: Math.round(36 * strength) + flicker + extra,
     outer: Math.round(54 * strength) + flicker + extra
   };
+}
+
+/** The camp fire's glow, or null when it's out or the survivor is in another area. */
+export function fireGlow(state: GameState, timeMs: number): LightRadii | null {
+  if (state.area !== 'camp') return null;
+  return fireRadii(state.fireFuel, state.structures.hearth, timeMs);
 }
 
 /** A white alpha mask for ERASE blending into the lighting RenderTexture. */

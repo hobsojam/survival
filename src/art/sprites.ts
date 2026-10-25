@@ -14,7 +14,7 @@ export interface SpriteDef {
 
 const grassPlain: SpriteDef = {
   size: [16, 16], anchor: [8, 15], legend: { g: 'grass2' },
-  frames: { plain: Array(16).fill('gggggggggggggggg') }
+  frames: { plain: Array.from({ length: 16 }, () => 'gggggggggggggggg') }
 };
 
 const branchPile: SpriteDef = {
