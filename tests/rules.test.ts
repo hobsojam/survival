@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE, SITES, createGame } from '../src/game/state';
-import { FULL_BAG_MESSAGE, advanceTime, applyAction, carriedCount, freeSpaces } from '../src/game/rules';
+import { BALANCE, LOOKOUT, SITES, createGame } from '../src/game/state';
+import { FULL_BAG_MESSAGE, advanceTime, applyAction, buildStatus, carriedCount, freeSpaces, lookoutRepairBlocker } from '../src/game/rules';
 
 describe('gathering and inventory', () => {
   it('prepares a trail ration only at a built rack in camp, including with a full bag', () => {
@@ -887,5 +887,96 @@ describe('loose stone', () => {
     state.inventory = { ...state.inventory, wood: 6, fiber: 2 };
     state = { ...state, player: { ...state.player, x: BALANCE.campX, y: BALANCE.campY } };
     expect(applyAction(state, { type: 'build', structureId: 'shelter' }).state.structures.shelter).toBe(true);
+  });
+});
+
+describe('the stone pile at camp', () => {
+  const camp = () => {
+    const state = createGame();
+    state.player.x = BALANCE.campX;
+    state.player.y = BALANCE.campY;
+    return state;
+  };
+  const unlocked = (state: ReturnType<typeof createGame>) => {
+    state.progress = { ...state.progress, hearthUnlocked: true, nextStormDay: null };
+    return state;
+  };
+
+  it('builds the stone pile from three wood', () => {
+    const state = camp();
+    state.inventory.wood = 3;
+    expect(buildStatus(state, 'stonePile')).toBe('ready');
+    const built = applyAction(state, { type: 'build', structureId: 'stonePile' }).state;
+    expect(built.structures.stonePile).toBe(true);
+    expect(built.inventory.wood).toBe(0);
+  });
+
+  it('stores and takes stone at camp, up to twelve', () => {
+    const state = camp();
+    state.inventory.stone = 1;
+    expect(applyAction(state, { type: 'storeStone' }).state).toBe(state);
+    state.structures.stonePile = true;
+    const stored = applyAction(state, { type: 'storeStone' }).state;
+    expect(stored.inventory.stone).toBe(0);
+    expect(stored.storedStone).toBe(1);
+    const full = { ...state, storedStone: BALANCE.stonePileCapacity };
+    expect(applyAction(full, { type: 'storeStone' }).state).toBe(full);
+    const crowded = { ...stored, inventory: { ...stored.inventory, wood: 7 } };
+    expect(applyAction(crowded, { type: 'takeStone' }).state).toBe(crowded);
+    const taken = applyAction(stored, { type: 'takeStone' }).state;
+    expect(taken.inventory.stone).toBe(1);
+    expect(taken.storedStone).toBe(0);
+    const away = { ...stored, player: { ...stored.player, x: 0, y: 0 } };
+    expect(applyAction(away, { type: 'takeStone' }).state).toBe(away);
+    const awayStore = { ...state, player: { ...state.player, x: 0, y: 0 } };
+    expect(applyAction(awayStore, { type: 'storeStone' }).state).toBe(awayStore);
+  });
+
+  it('pays for the hearth from the bag first, then the pile', () => {
+    const state = unlocked(camp());
+    state.structures.stonePile = true;
+    state.inventory.wood = 2;
+    state.inventory.stone = 1;
+    state.storedStone = 2;
+    expect(buildStatus(state, 'hearth')).toBe('ready');
+    const built = applyAction(state, { type: 'build', structureId: 'hearth' }).state;
+    expect(built.structures.hearth).toBe(true);
+    expect(built.inventory.stone).toBe(0);
+    expect(built.storedStone).toBe(0);
+  });
+
+  it('spends bag stone before touching the pile', () => {
+    const state = unlocked(camp());
+    state.structures.stonePile = true;
+    state.inventory.wood = 2;
+    state.inventory.stone = 3;
+    state.storedStone = 2;
+    const built = applyAction(state, { type: 'build', structureId: 'hearth' }).state;
+    expect(built.inventory.stone).toBe(0);
+    expect(built.storedStone).toBe(2);
+  });
+
+  it('crafts the axe with stone from the pile', () => {
+    const state = unlocked(camp());
+    state.structures.stonePile = true;
+    state.inventory.wood = 1;
+    state.inventory.fiber = 1;
+    state.storedStone = 1;
+    const crafted = applyAction(state, { type: 'craftAxe' }).state;
+    expect(crafted.progress.axeCrafted).toBe(true);
+    expect(crafted.storedStone).toBe(0);
+  });
+
+  it('repairs the lookout with pile stone from far away', () => {
+    const state = unlocked(createGame());
+    state.player.x = LOOKOUT.x;
+    state.player.y = LOOKOUT.y + 1;
+    state.structures.stonePile = true;
+    state.inventory = { ...state.inventory, wood: 4, fiber: 2, stone: 0 };
+    state.storedStone = 3;
+    expect(lookoutRepairBlocker(state)).toBeNull();
+    const repaired = applyAction(state, { type: 'repairLookout' }).state;
+    expect(repaired.progress.lookoutRepaired).toBe(true);
+    expect(repaired.storedStone).toBe(1);
   });
 });

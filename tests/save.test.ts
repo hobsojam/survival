@@ -252,7 +252,7 @@ describe('local save', () => {
       expect(loaded.state.day).toBe(8);
       expect(loaded.state.timeOfDay).toBe(105);
       expect(loaded.state.inventory.wood).toBe(3);
-      expect(loaded.state.structures).toEqual({ shelter: true, bed: false, crate: false, hearth: false, dryingRack: false, windbreak: false });
+      expect(loaded.state.structures).toEqual({ shelter: true, bed: false, crate: false, hearth: false, dryingRack: false, windbreak: false, stonePile: false });
       expect(loaded.state.progress).toMatchObject({ nextStormDay: 10, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false });
     }
     expect(storage.getItem(SAVE_KEY)).toBe(raw);
@@ -376,7 +376,7 @@ describe('local save', () => {
       expect(loaded.state.day).toBe(5);
       expect(loaded.state.timeOfDay).toBe(95);
       expect(loaded.state.inventory.wood).toBe(3);
-      expect(loaded.state.structures).toEqual({ shelter: false, bed: false, crate: false, hearth: true, dryingRack: false, windbreak: false });
+      expect(loaded.state.structures).toEqual({ shelter: false, bed: false, crate: false, hearth: true, dryingRack: false, windbreak: false, stonePile: false });
       expect(loaded.state.progress).toMatchObject({ nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false, axeCrafted: false });
     }
     expect(storage.getItem(SAVE_KEY)).toBe(raw);

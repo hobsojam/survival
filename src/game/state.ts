@@ -6,6 +6,7 @@ export const BUILDINGS = {
   crate: { name: 'Storage crate', description: 'Carry up to 16 supplies', symbol: '▤', cost: { wood: 4, fiber: 0 }, prerequisite: null },
   hearth: { name: 'Stone hearth', description: 'Each log keeps the fire longer', symbol: '♨', cost: { wood: 2, fiber: 0, stone: 3 }, prerequisite: 'coldNight' },
   dryingRack: { name: 'Drying rack', description: 'Prepare rations; improve cooked berries', symbol: '☼', cost: { wood: 4, fiber: 0 }, prerequisite: null },
+  stonePile: { name: 'Stone pile', description: 'Keep up to 12 stone at camp', symbol: '◆', cost: { wood: 3, fiber: 0 }, prerequisite: null },
   windbreak: { name: 'Windbreak', description: 'Stay warmer when the fire fades', symbol: '▥', cost: { wood: 5, fiber: 0 }, prerequisite: null }
 } as const;
 
@@ -57,6 +58,8 @@ export interface GameState {
   nodes: ResourceNode[];
   trees: TreeNode[];
   stonePiles: StonePile[];
+  /** Stone kept in the camp stone pile, outside the bag. */
+  storedStone: number;
 }
 
 export const BALANCE = {
@@ -98,6 +101,7 @@ export const BALANCE = {
   /** A stone dropped this close to a pile joins it. */
   pileMergeRadius: 1,
   pickUpSeconds: 2,
+  stonePileCapacity: 12,
   hearthFireSecondsPerWood: 150,
   coldNightStartDay: 3,
   coldNightRetryDays: 3,
@@ -143,11 +147,12 @@ export function createGame(): GameState {
     player: { x: BALANCE.campX + 1, y: BALANCE.campY + 1, energy: 100, hunger: 100, warmth: 100 },
     inventory: { wood: 0, food: 0, fiber: 0, stone: 0, trailFood: 0 },
     fireFuel: 0,
-    structures: { shelter: false, bed: false, crate: false, hearth: false, dryingRack: false, windbreak: false },
+    structures: { shelter: false, bed: false, crate: false, hearth: false, dryingRack: false, windbreak: false, stonePile: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
       discoveries: { basket: false, spring: false, cairn: false } },
     nodes,
     trees,
-    stonePiles: []
+    stonePiles: [],
+    storedStone: 0
   };
 }
