@@ -53,7 +53,10 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.roundPixels = true;
     this.lighting = new SceneLighting(this, LOGICAL_WIDTH, LOGICAL_HEIGHT);
     this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,T,P,C,G,Z,L,X,V') as Record<string, Phaser.Input.Keyboard.Key>;
-    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => this.handleTap(pointer.worldX, pointer.worldY));
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      // Right and middle clicks don't walk; touches report button 0.
+      if (pointer.button === 0) this.handleTap(pointer.worldX, pointer.worldY);
+    });
     this.paintObjects();
     this.onStateChange(this.state, 'tick');
   }
@@ -78,7 +81,10 @@ export class GameScene extends Phaser.Scene {
       const node = this.closestNode();
       if (node) this.perform({ type: 'gather', nodeId: node.id });
       else if (isAtCamp(this.state)) this.perform({ type: 'rest' });
-      else this.onFeedback('Nothing to gather here.');
+      else {
+        this.cancelWalk();
+        this.onFeedback('Nothing to gather here.');
+      }
     }
     if (Phaser.Input.Keyboard.JustDown(this.keys.F)) this.perform({ type: 'stokeFire' });
     if (Phaser.Input.Keyboard.JustDown(this.keys.R)) this.perform({ type: 'rest' });
@@ -92,7 +98,10 @@ export class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.keys.X)) {
       const tree = this.closestTree();
       if (tree) this.perform({ type: 'chopTree', treeId: tree.id });
-      else this.onFeedback('Move closer to a mature tree.');
+      else {
+        this.cancelWalk();
+        this.onFeedback('Move closer to a mature tree.');
+      }
     }
     if (Phaser.Input.Keyboard.JustDown(this.keys.V)) this.visitNearestSite();
     const beforeTick = this.state;
@@ -195,13 +204,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   cancelWalk(): void {
-    this.walkTarget = undefined;
+    this.walkTarget = nextWalk(this.walkTarget, { kind: 'action' });
   }
 
   visitNearestSite(): void {
     const site = this.closestSite();
     if (site) this.perform({ type: 'visitSite', siteId: site.id });
-    else this.onFeedback('Follow a path and move closer to a place to explore.');
+    else {
+      this.cancelWalk();
+      this.onFeedback('Follow a path and move closer to a place to explore.');
+    }
   }
 
   resizeViewport(width: number, height: number): void {
