@@ -37,6 +37,14 @@ export interface TreeNode {
   readyDay: number;
 }
 
+/** Stone set down on the ground; it stays until picked back up. */
+export interface StonePile {
+  id: string;
+  x: number;
+  y: number;
+  count: number;
+}
+
 export interface GameState {
   day: number;
   timeOfDay: number;
@@ -48,6 +56,7 @@ export interface GameState {
     discoveries: Record<SiteId, boolean> };
   nodes: ResourceNode[];
   trees: TreeNode[];
+  stonePiles: StonePile[];
 }
 
 export const BALANCE = {
@@ -86,6 +95,9 @@ export const BALANCE = {
   fiberFireSeconds: 30,
   /** Stone is heavy: each one takes this many bag spaces. */
   stoneSpaces: 2,
+  /** A stone dropped this close to a pile joins it. */
+  pileMergeRadius: 1,
+  pickUpSeconds: 2,
   hearthFireSecondsPerWood: 150,
   coldNightStartDay: 3,
   coldNightRetryDays: 3,
@@ -135,6 +147,7 @@ export function createGame(): GameState {
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
       discoveries: { basket: false, spring: false, cairn: false } },
     nodes,
-    trees
+    trees,
+    stonePiles: []
   };
 }

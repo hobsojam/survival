@@ -817,3 +817,75 @@ describe('heavy stone and fiber fuel', () => {
     expect(morning.nodes.find(node => node.id === 'branch-0')!.amount).toBe(1);
   });
 });
+
+describe('loose stone', () => {
+  const at = (x: number, y: number, stone = 2) => {
+    const state = createGame();
+    state.player.x = x;
+    state.player.y = y;
+    state.inventory.stone = stone;
+    return state;
+  };
+
+  it('drops one stone where the survivor stands', () => {
+    const state = at(5, 5);
+    const dropped = applyAction(state, { type: 'dropStone' }).state;
+    expect(dropped.inventory.stone).toBe(1);
+    expect(dropped.stonePiles).toEqual([{ id: expect.any(String), x: 5, y: 5, count: 1 }]);
+    const empty = at(5, 5, 0);
+    expect(applyAction(empty, { type: 'dropStone' }).state).toBe(empty);
+  });
+
+  it('adds to a pile within one tile instead of starting another', () => {
+    let state = at(5, 5, 3);
+    state = applyAction(state, { type: 'dropStone' }).state;
+    state = { ...state, player: { ...state.player, x: 5.8 } };
+    state = applyAction(state, { type: 'dropStone' }).state;
+    expect(state.stonePiles).toEqual([{ id: expect.any(String), x: 5, y: 5, count: 2 }]);
+    state = { ...state, player: { ...state.player, x: 6.5 } };
+    state = applyAction(state, { type: 'dropStone' }).state;
+    expect(state.stonePiles).toHaveLength(2);
+  });
+
+  it('joins a pile dropped on an earlier day', () => {
+    let state = applyAction(at(5, 5), { type: 'dropStone' }).state;
+    state = advanceTime(state, BALANCE.daySeconds);
+    state = { ...state, player: { ...state.player, x: 5.8 } };
+    state = applyAction(state, { type: 'dropStone' }).state;
+    expect(state.stonePiles).toEqual([{ id: expect.any(String), x: 5, y: 5, count: 2 }]);
+  });
+
+  it('picks up one stone from a nearby pile with two free spaces', () => {
+    const state = at(5, 5, 0);
+    state.stonePiles = [{ id: 'pile-a', x: 6.5, y: 5, count: 2 }];
+    const picked = applyAction(state, { type: 'pickUpStone', pileId: 'pile-a' }).state;
+    expect(picked.stonePiles[0].count).toBe(1);
+    expect(picked.inventory.stone).toBe(1);
+    expect(picked.timeOfDay).toBeCloseTo(BALANCE.pickUpSeconds);
+    expect(picked.player.energy).toBe(state.player.energy);
+    const full = at(5, 5, 0);
+    full.inventory.wood = 7;
+    full.stonePiles = [{ id: 'pile-a', x: 6.5, y: 5, count: 2 }];
+    const refused = applyAction(full, { type: 'pickUpStone', pileId: 'pile-a' });
+    expect(refused.state).toBe(full);
+    expect(refused.message).toBe(FULL_BAG_MESSAGE);
+    const far = at(5, 5, 0);
+    far.stonePiles = [{ id: 'pile-a', x: 8, y: 5, count: 2 }];
+    expect(applyAction(far, { type: 'pickUpStone', pileId: 'pile-a' }).state).toBe(far);
+  });
+
+  it('removes a pile when its last stone is picked up', () => {
+    const state = at(5, 5, 0);
+    state.stonePiles = [{ id: 'pile-a', x: 5, y: 5, count: 1 }];
+    expect(applyAction(state, { type: 'pickUpStone', pileId: 'pile-a' }).state.stonePiles).toEqual([]);
+  });
+
+  it('can set down a stone-filled bag and still build the shelter', () => {
+    let state = at(5, 5, 4);
+    for (let i = 0; i < 4; i++) state = applyAction(state, { type: 'dropStone' }).state;
+    expect(state.inventory.stone).toBe(0);
+    state.inventory = { ...state.inventory, wood: 6, fiber: 2 };
+    state = { ...state, player: { ...state.player, x: BALANCE.campX, y: BALANCE.campY } };
+    expect(applyAction(state, { type: 'build', structureId: 'shelter' }).state.structures.shelter).toBe(true);
+  });
+});

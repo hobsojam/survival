@@ -6,7 +6,8 @@ export type GameAction =
   | { type: 'visitSite'; siteId: SiteId }
   | { type: 'build'; structureId: StructureId }
   | { type: 'move'; dx: number; dy: number }
-  | { type: 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'burnFiber' };
+  | { type: 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'burnFiber' | 'dropStone' }
+  | { type: 'pickUpStone'; pileId: string };
 
 /** Awake time tires the survivor; work already costs energy, and resting doesn't. */
 export type Activity = 'awake' | 'working' | 'resting';
@@ -262,6 +263,27 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
       progress: { ...state.progress, discoveries: { ...state.progress.discoveries, [action.siteId]: true } }
     }, BALANCE.gatherSeconds, 'working');
     return { state: found, message: action.siteId === 'basket' ? 'An old basket holds two berries.' : 'You find two useful stones tucked in the cairn.' };
+  }
+  if (action.type === 'dropStone') {
+    if (state.inventory.stone < 1) return { state, message: 'You have no stone to set down.' };
+    const { x, y } = state.player;
+    const nearby = state.stonePiles.find(pile => Math.hypot(pile.x - x, pile.y - y) <= BALANCE.pileMergeRadius);
+    const stonePiles = nearby
+      ? state.stonePiles.map(pile => pile === nearby ? { ...pile, count: pile.count + 1 } : pile)
+      : [...state.stonePiles, { id: `pile-${state.day}-${Math.round(x * 10)}-${Math.round(y * 10)}`, x, y, count: 1 }];
+    return { state: { ...state, inventory: { ...state.inventory, stone: state.inventory.stone - 1 }, stonePiles }, message: 'Set down one stone.' };
+  }
+  if (action.type === 'pickUpStone') {
+    const pile = state.stonePiles.find(item => item.id === action.pileId);
+    if (!pile || !near(state.player.x, state.player.y, pile.x, pile.y)) return { state, message: 'Move closer to the stones.' };
+    if (freeSpaces(state) < spaceFor('stone')) return { state, message: FULL_BAG_MESSAGE };
+    const stonePiles = state.stonePiles
+      .map(item => item === pile ? { ...item, count: item.count - 1 } : item)
+      .filter(item => item.count > 0);
+    return {
+      state: advanceTime({ ...state, inventory: { ...state.inventory, stone: state.inventory.stone + 1 }, stonePiles }, BALANCE.pickUpSeconds, 'resting'),
+      message: 'Picked up a stone.'
+    };
   }
   if (action.type === 'burnFiber') {
     if (!isAtCamp(state)) return { state, message: 'Return to the marked camp area to tend the fire.' };
