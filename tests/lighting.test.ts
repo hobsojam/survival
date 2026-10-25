@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createGame } from '../src/game/state';
 import { palette } from '../src/art/palette';
-import { fireRadii, lightMaskPixels, lightScreenPosition, lightingTint } from '../src/scene/lighting';
+import { fireGlow, fireRadii, lightMaskPixels, lightScreenPosition, lightingTint } from '../src/scene/lighting';
 
 const rgb = (hex: string) => parseInt(hex.slice(1), 16);
 const state = createGame();
@@ -54,5 +54,14 @@ describe('stepped light masks', () => {
 
   it('snaps moving world lights to whole screen pixels', () => {
     expect(lightScreenPosition(328, 248, 84.6, 97.4)).toEqual({ x: 243, y: 151 });
+  });
+});
+
+describe('fire glow by area', () => {
+  it('glows at camp while the fire burns, and never in the quarry area', () => {
+    const lit = { ...state, fireFuel: 40 };
+    expect(fireGlow(lit, 0)).toEqual(fireRadii(40, false, 0));
+    expect(fireGlow({ ...lit, fireFuel: 0 }, 0)).toBeNull();
+    expect(fireGlow({ ...lit, area: 'quarry' }, 0)).toBeNull();
   });
 });

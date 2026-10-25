@@ -45,6 +45,12 @@ export function fireRadii(fuel: number, hearth: boolean, timeMs: number): LightR
   };
 }
 
+/** The camp fire's glow, or null when it's out or the survivor is in another area. */
+export function fireGlow(state: GameState, timeMs: number): LightRadii | null {
+  if (state.area !== 'camp') return null;
+  return fireRadii(state.fireFuel, state.structures.hearth, timeMs);
+}
+
 /** A white alpha mask for ERASE blending into the lighting RenderTexture. */
 export function lightMaskPixels(radii: LightRadii): { size: number; pixels: Uint8ClampedArray } {
   const size = radii.outer * 2 + 1;

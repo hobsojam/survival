@@ -3,7 +3,7 @@ import type { GameState } from '../game/state';
 import { BALANCE } from '../game/state';
 import { FIREFLY_HOMES, fireflyGlow, fireflyOffset } from './ambient';
 import { worldX, worldY } from './art';
-import { fireRadii, lightMaskPixels, lightScreenPosition, lightingTint, type LightRadii } from './lighting';
+import { fireGlow, lightMaskPixels, lightScreenPosition, lightingTint, type LightRadii } from './lighting';
 import { NIGHT_DEPTH } from './visuals';
 
 /** One screen-sized tint with palette-aware, stepped light holes erased from it. */
@@ -29,12 +29,13 @@ export class SceneLighting {
     this.layer.clear();
     this.layer.fill(tint.color, tint.alpha);
     const camera = this.scene.cameras.main;
-    const radii = fireRadii(state.fireFuel, state.structures.hearth, timeMs);
+    const radii = fireGlow(state, timeMs);
     if (radii) {
       const position = lightScreenPosition(worldX(BALANCE.campX), worldY(BALANCE.campY), camera.scrollX, camera.scrollY);
       this.layer.erase(this.mask(radii), position.x, position.y);
     }
-    FIREFLY_HOMES.forEach((home, index) => {
+    // Fireflies live at camp, so the quarry area has none.
+    if (state.area === 'camp') FIREFLY_HOMES.forEach((home, index) => {
       const glow = fireflyGlow(index, timeMs, tint.alpha / 0.55);
       if (glow < 0.08) return;
       const offset = fireflyOffset(index, timeMs);

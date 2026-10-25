@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, LOOKOUT, SITES, createGame } from '../src/game/state';
+import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { closestGatherable, hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from '../src/scene/tapTarget';
 
 describe('tap targets', () => {
@@ -148,5 +149,93 @@ describe('walk cancellation', () => {
   it('a movement key or another action cancels the walk', () => {
     expect(nextWalk(ground, { kind: 'keyMove' })).toBeUndefined();
     expect(nextWalk(ground, { kind: 'action' })).toBeUndefined();
+  });
+});
+
+describe('the quarry area', () => {
+  const quarryState = () => ({ ...createGame(), area: 'quarry' as const });
+
+  it('taps in the quarry area never pick camp things', () => {
+    const state = quarryState();
+    const node = state.nodes.find(item => item.id === 'branch-0')!;
+    expect(pickTapTarget(state, node.x, node.y)).toEqual({ kind: 'ground', x: node.x, y: node.y });
+    const tree = state.trees[0];
+    expect(pickTapTarget(state, tree.x, tree.y).kind).toBe('ground');
+    expect(pickTapTarget(state, SITES.spring.x, SITES.spring.y).kind).toBe('ground');
+    expect(pickTapTarget(state, LOOKOUT.x, LOOKOUT.y).kind).toBe('ground');
+    expect(pickTapTarget(state, BALANCE.campX, BALANCE.campY).kind).toBe('ground');
+    state.stonePiles = [{ id: 'camp-pile', x: 30, y: 20, count: 1, area: 'camp' }, { id: 'quarry-pile', x: 30, y: 25, count: 1, area: 'quarry' }];
+    expect(pickTapTarget(state, 30, 20).kind).toBe('ground');
+    expect(pickTapTarget(state, 30, 25)).toMatchObject({ kind: 'pile', id: 'quarry-pile' });
+  });
+
+  it('taps at camp never pick quarry-area piles or the quarry', () => {
+    const state = createGame();
+    state.nodes = [];
+    state.trees = [];
+    state.stonePiles = [{ id: 'quarry-pile', x: 30, y: 25, count: 1, area: 'quarry' }];
+    expect(pickTapTarget(state, 30, 25).kind).toBe('ground');
+    expect(pickTapTarget(state, QUARRY_SITE.x, QUARRY_SITE.y).kind).toBe('ground');
+    expect(pickTapTarget(state, RUBBLE_SITE.x, RUBBLE_SITE.y).kind).toBe('ground');
+  });
+
+  it('picks the quarry and the rubble', () => {
+    const state = quarryState();
+    expect(pickTapTarget(state, QUARRY_SITE.x + 0.3, QUARRY_SITE.y)).toEqual({ kind: 'quarry', x: QUARRY_SITE.x, y: QUARRY_SITE.y });
+    expect(pickTapTarget(state, RUBBLE_SITE.x, RUBBLE_SITE.y + 0.4)).toEqual({ kind: 'rubble', x: RUBBLE_SITE.x, y: RUBBLE_SITE.y });
+  });
+
+  it('tapping the path end picks the crossing once open', () => {
+    const state = createGame();
+    expect(pickTapTarget(state, 0.3, 15).kind).not.toBe('crossing');
+    state.structures.shelter = true;
+    expect(pickTapTarget(state, 0.3, 15)).toEqual({ kind: 'crossing', x: CAMP_EXIT.x, y: CAMP_EXIT.y });
+    expect(pickTapTarget(state, -0.5, 15)).toEqual({ kind: 'crossing', x: CAMP_EXIT.x, y: CAMP_EXIT.y });
+    const quarry = quarryState();
+    expect(pickTapTarget(quarry, 38.7, 15)).toEqual({ kind: 'crossing', x: QUARRY_EXIT.x, y: QUARRY_EXIT.y });
+    expect(pickTapTarget(quarry, 0.3, 15).kind).toBe('ground');
+  });
+
+  it('arrives at the crossing within 0.4 tile of the exit', () => {
+    const state = createGame();
+    const target: TapTarget = { kind: 'crossing', x: CAMP_EXIT.x, y: CAMP_EXIT.y };
+    state.player.x = 0.39; state.player.y = 15;
+    expect(hasArrived(state, target)).toBe(true);
+    state.player.x = 0.45;
+    expect(hasArrived(state, target)).toBe(false);
+  });
+
+  it('closestGatherable finds rubble and the quarry', () => {
+    const state = quarryState();
+    state.player.x = RUBBLE_SITE.x + 1; state.player.y = RUBBLE_SITE.y;
+    expect(closestGatherable(state)).toEqual({ kind: 'rubble' });
+    state.rubbleReadyDay = state.day + 1;
+    expect(closestGatherable(state)).toBeUndefined();
+    state.player.x = QUARRY_SITE.x; state.player.y = QUARRY_SITE.y + 1;
+    expect(closestGatherable(state)).toEqual({ kind: 'quarry' });
+    state.progress.pickaxeCrafted = true;
+    expect(closestGatherable(state)).toEqual({ kind: 'quarry' });
+    state.quarryReadyDay = state.day + 1;
+    expect(closestGatherable(state)).toBeUndefined();
+    const camp = createGame();
+    camp.nodes = [];
+    camp.player.x = QUARRY_SITE.x; camp.player.y = QUARRY_SITE.y;
+    expect(closestGatherable(camp)).toBeUndefined();
+  });
+
+  it('closestGatherable ignores camp nodes and other-area piles', () => {
+    const state = quarryState();
+    const node = state.nodes[0];
+    state.player.x = node.x; state.player.y = node.y;
+    state.stonePiles = [{ id: 'camp-pile', x: node.x, y: node.y, count: 1, area: 'camp' }];
+    expect(closestGatherable(state)).toBeUndefined();
+    state.stonePiles = [{ id: 'quarry-pile', x: node.x, y: node.y, count: 1, area: 'quarry' }];
+    expect(closestGatherable(state)).toMatchObject({ kind: 'pile', pile: { id: 'quarry-pile' } });
+  });
+
+  it('maps the new targets to actions', () => {
+    expect(targetAction({ kind: 'crossing', x: 0, y: 15 })).toEqual({ type: 'cross' });
+    expect(targetAction({ kind: 'quarry', x: 12, y: 12 })).toEqual({ type: 'digQuarry' });
+    expect(targetAction({ kind: 'rubble', x: 16, y: 16 })).toEqual({ type: 'gatherRubble' });
   });
 });

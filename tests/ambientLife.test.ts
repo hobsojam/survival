@@ -65,3 +65,17 @@ describe('ambient bird foraging', () => {
     expect(images[0].texture).toMatch(/^bird:fly/);
   });
 });
+
+describe('ambient life by area', () => {
+  it('hides the birds, the fox and the fireflies in the quarry area', () => {
+    const { scene, images } = sceneWithImages();
+    const life = new AmbientLife(scene as never);
+    const state = createGame();
+    state.day = 2;
+    state.timeOfDay = 200;
+    life.update(state, 0.1, 0);
+    expect(images.some(image => image.visible)).toBe(true);
+    life.update({ ...state, area: 'quarry' }, 0.1, 100);
+    expect(images.filter(image => image.visible)).toEqual([]);
+  });
+});

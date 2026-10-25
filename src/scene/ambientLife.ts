@@ -70,6 +70,11 @@ export class AmbientLife {
   }
 
   update(state: GameState, seconds: number, timeMs: number): void {
+    // The birds, the fox and the fireflies live at camp.
+    if (state.area !== 'camp') {
+      for (const image of [...this.birds.map(bird => bird.image), this.fox, ...this.fireflies]) image.setVisible(false);
+      return;
+    }
     const dark = darkness(state.day, state.timeOfDay);
     if (!this.started) {
       this.started = true;

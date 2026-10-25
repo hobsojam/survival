@@ -11,9 +11,10 @@ import { LOGICAL_WIDTH, LOGICAL_HEIGHT } from './pixelScale';
 import { facingFromInput, selectSurvivorVisual, type Facing, type SurvivorAction } from './survivorVisual';
 import { SceneEffects } from './SceneEffects';
 import { SceneLighting } from './SceneLighting';
-import { closestGatherable, hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from './tapTarget';
+import { closestGatherable, hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type Gatherable, type TapTarget } from './tapTarget';
 import { palette } from '../art/palette';
 import { sitePrompt } from '../game/sitePrompt';
+import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 import type { SoundCue } from '../game/soundscape';
 
 export class GameScene extends Phaser.Scene {
@@ -35,6 +36,7 @@ export class GameScene extends Phaser.Scene {
   private tapGate: () => boolean = () => true;
   private terrain: Phaser.GameObjects.GameObject[] = [];
   private terrainShown = '';
+  private areaShown = '';
 
   constructor(state: GameState, onStateChange: (state: GameState, cause: 'action' | 'tick') => void, onFeedback: (message: string) => void, onSound: (cue: SoundCue) => void = () => undefined) {
     super({ key: 'GameScene' });
@@ -54,6 +56,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(playerArt.anchor[0] / playerArt.size[0], playerArt.anchor[1] / playerArt.size[1]);
     this.playerSprite.setDepth(playerVisualDepth(this.state));
     this.cameras.main.startFollow(this.playerSprite, true, 0.09, 0.09);
+    this.areaShown = this.state.area;
     this.cameras.main.setZoom(1);
     this.cameras.main.roundPixels = true;
     this.lighting = new SceneLighting(this, LOGICAL_WIDTH, LOGICAL_HEIGHT);
@@ -87,6 +90,8 @@ export class GameScene extends Phaser.Scene {
       const found = closestGatherable(this.state);
       if (found?.kind === 'node') this.perform({ type: 'gather', nodeId: found.node.id });
       else if (found?.kind === 'pile') this.perform({ type: 'pickUpStone', pileId: found.pile.id });
+      else if (found?.kind === 'rubble') this.perform({ type: 'gatherRubble' });
+      else if (found?.kind === 'quarry') this.perform({ type: 'digQuarry' });
       else if (isAtCamp(this.state)) this.perform({ type: 'rest' });
       else {
         this.cancelWalk();
@@ -120,6 +125,11 @@ export class GameScene extends Phaser.Scene {
     this.playerSprite.setPosition(Math.round(worldX(this.state.player.x)), Math.round(worldY(this.state.player.y)));
     this.playerSprite.setDepth(playerVisualDepth(this.state));
     this.playerSprite.setFlipX(visual.flipX);
+    if (this.state.area !== this.areaShown) {
+      // Crossing to the other area snaps the camera instead of panning across the map.
+      this.areaShown = this.state.area;
+      this.cameras.main.centerOn(this.playerSprite.x, this.playerSprite.y);
+    }
     this.paintObjects();
     this.ambient.update(this.state, dt, this.time.now);
     this.effects.update(this.state, this.time.now);
@@ -152,12 +162,14 @@ export class GameScene extends Phaser.Scene {
         const pile = before.stonePiles.find(item => item.id === action.pileId);
         if (pile) this.effects?.trigger('gather', this.time.now, pile.x, pile.y, 'stone');
       }
+      if (action.type === 'gatherRubble') this.effects?.trigger('gather', this.time.now, RUBBLE_SITE.x, RUBBLE_SITE.y, 'stone');
+      if (action.type === 'digQuarry') this.effects?.trigger('gather', this.time.now, QUARRY_SITE.x, QUARRY_SITE.y, 'stone');
       if (action.type === 'cook' || action.type === 'stargaze')
         this.effects?.trigger(action.type, this.time.now, this.state.player.x, this.state.player.y);
     }
     if (result.state !== before && (action.type === 'gather' || action.type === 'rest' || action.type === 'cook' || action.type === 'stargaze'))
       this.visualAction = { kind: action.type, startedAtMs: this.time.now };
-    if (result.state !== before && (action.type === 'chopTree' || action.type === 'pickUpStone')) this.visualAction = { kind: 'gather', startedAtMs: this.time.now };
+    if (result.state !== before && ['chopTree', 'pickUpStone', 'gatherRubble', 'digQuarry'].includes(action.type)) this.visualAction = { kind: 'gather', startedAtMs: this.time.now };
     if (action.type === 'gather') {
       const node = before.nodes.find(item => item.id === action.nodeId);
       const remaining = this.state.nodes.find(item => item.id === action.nodeId)?.amount;
@@ -175,10 +187,11 @@ export class GameScene extends Phaser.Scene {
 
   getPrompt(): string {
     const found = closestGatherable(this.state);
+    if (this.state.area === 'quarry') return this.quarryPrompt(found);
     const tree = this.closestTree();
     const site = this.closestSite();
     const canSleep = !sleepBlocker(this.state);
-    const byLookout = Math.hypot(this.state.player.x - LOOKOUT.x, this.state.player.y - LOOKOUT.y) <= BALANCE.interactionRadius;
+    const byLookout = this.state.area === 'camp' && Math.hypot(this.state.player.x - LOOKOUT.x, this.state.player.y - LOOKOUT.y) <= BALANCE.interactionRadius;
     let lookoutPrompt = '';
     if (byLookout && this.state.progress.lookoutRepaired) lookoutPrompt = 'The lookout stands again';
     else if (byLookout && this.state.progress.hearthUnlocked) lookoutPrompt = 'L  Repair lookout';
@@ -190,10 +203,11 @@ export class GameScene extends Phaser.Scene {
     const nearbySitePrompt = site ? sitePrompt(this.state, site.id) : '';
     if (found) {
       let gather = 'E  Pick up fallen branches';
+      const node = found.kind === 'node' ? found.node.kind : undefined;
       if (found.kind === 'pile') gather = `E  Pick up stone (×${found.pile.count})`;
-      else if (found.node.kind === 'berry') gather = 'E  Pick berries';
-      else if (found.node.kind === 'fiber') gather = 'E  Gather fiber';
-      else if (found.node.kind === 'stone') gather = 'E  Collect stone';
+      else if (node === 'berry') gather = 'E  Pick berries';
+      else if (node === 'fiber') gather = 'E  Gather fiber';
+      else if (node === 'stone') gather = 'E  Collect stone';
       if (lookoutPrompt) return `${gather} · ${lookoutPrompt}`;
       if (nearbySitePrompt) return `${gather} · ${nearbySitePrompt}`;
       if (treePrompt) return `${gather} · ${treePrompt}`;
@@ -202,12 +216,26 @@ export class GameScene extends Phaser.Scene {
     if (lookoutPrompt) return lookoutPrompt;
     if (nearbySitePrompt) return nearbySitePrompt;
     if (treePrompt) return treePrompt;
+    if (pathOpen(this.state) && this.within(CAMP_EXIT)) return 'Walk west to leave camp';
     if (isAtCamp(this.state)) {
       if (canSleep) return 'At camp · C Cook · G Stargaze · Z Sleep · F Fire';
       if (this.state.timeOfDay >= BALANCE.nightStart) return 'At camp · C Cook · G Stargaze · F Fire · R Rest';
       return 'At camp · F Fire · R Rest · Click an upgrade to build';
     }
     return 'WASD / arrows  Move';
+  }
+
+  private quarryPrompt(found: Gatherable | undefined): string {
+    if (found?.kind === 'pile') return `E  Pick up stone (×${found.pile.count})`;
+    if (found?.kind === 'rubble') return 'E  Gather rubble';
+    if (found?.kind === 'quarry') return this.state.progress.pickaxeCrafted ? 'E  Dig the quarry' : 'Quarry · craft a pickaxe at the toolshed';
+    if (this.within(QUARRY_SITE) && this.state.quarryReadyDay > this.state.day) return 'Quarry · worked out until morning';
+    if (this.within(QUARRY_EXIT)) return 'Walk east to return to camp';
+    return 'WASD / arrows  Move';
+  }
+
+  private within(point: { x: number; y: number }): boolean {
+    return Math.hypot(this.state.player.x - point.x, this.state.player.y - point.y) <= BALANCE.interactionRadius;
   }
 
   getState(): GameState { return this.state; }
@@ -281,12 +309,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private closestTree(): TreeNode | undefined {
+    if (this.state.area !== 'camp') return undefined;
     return this.state.trees
       .filter(tree => Math.hypot(tree.x - this.state.player.x, tree.y - this.state.player.y) <= BALANCE.interactionRadius)
       .sort((a, b) => Math.hypot(a.x - this.state.player.x, a.y - this.state.player.y) - Math.hypot(b.x - this.state.player.x, b.y - this.state.player.y))[0];
   }
 
   private closestSite(): { id: SiteId; name: string; x: number; y: number } | undefined {
+    if (this.state.area !== 'camp') return undefined;
     return (Object.keys(SITES) as SiteId[])
       .map(id => ({ id, ...SITES[id] }))
       .filter(site => Math.hypot(site.x - this.state.player.x, site.y - this.state.player.y) <= BALANCE.interactionRadius)

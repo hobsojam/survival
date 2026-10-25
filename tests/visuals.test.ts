@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BALANCE, createGame } from '../src/game/state';
 import { sceneVisuals, playerVisualDepth, GROUND_DECAL_DEPTH, NIGHT_DEPTH, LIGHT_DEPTH, WEATHER_DEPTH } from '../src/scene/visuals';
 import { sprites } from '../src/art/sprites';
+import { QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { validateSprite } from '../src/art/textures';
 
 describe('native-size scene art', () => {
@@ -20,7 +21,7 @@ describe('native-size scene art', () => {
     expect(keys).toContain('lookout:damaged');
     expect(keys).toContain('firePit:unlit');
     expect(keys).not.toContain('hearthSite:still');
-    const sites = new Set(['shelter', 'crate', 'dryingRack', 'windbreak', 'stonePile']);
+    const sites = new Set(['shelter', 'crate', 'dryingRack', 'windbreak', 'stonePile', 'toolshed']);
     for (const item of visuals) {
       const [name, frame] = item.texture.split(':');
       expect(sprites[name]?.frames[frame], item.texture).toBeDefined();
@@ -191,6 +192,75 @@ describe('native-size scene art', () => {
     expect(playerVisualDepth(state)).toBe((state.player.y + 0.5) * 16);
     state.player.x = BALANCE.campX;
     state.fireFuel = 0;
+    expect(playerVisualDepth(state)).toBe((state.player.y + 0.5) * 16);
+  });
+});
+
+describe('the quarry area', () => {
+  const quarryState = () => ({ ...createGame(), area: 'quarry' as const });
+
+  it('the quarry area shows only its own things', () => {
+    const state = quarryState();
+    state.stonePiles = [{ id: 'here', x: 14, y: 14, count: 1, area: 'quarry' }, { id: 'there', x: 5, y: 5, count: 1, area: 'camp' }];
+    state.fireFuel = 40;
+    state.timeOfDay = 200;
+    const visuals = sceneVisuals(state, 0);
+    const ids = visuals.map(item => item.id);
+    const keys = visuals.map(item => item.texture);
+    expect(keys).toContain('quarry:ready');
+    expect(keys).toContain('rubble:ready');
+    expect(ids).toContain('here');
+    expect(ids).not.toContain('there');
+    for (const node of state.nodes) expect(ids).not.toContain(node.id);
+    for (const tree of state.trees) expect(ids).not.toContain(tree.id);
+    for (const id of ['shelter', 'crate', 'dryingRack', 'windbreak', 'stonePile', 'toolshed', 'logSeat', 'hearthSite', 'fire', 'flame', 'lookout', 'site-basket', 'site-spring', 'site-cairn'])
+      expect(ids).not.toContain(id);
+    const quarry = visuals.find(item => item.id === 'quarry')!;
+    expect(quarry.x).toBe((QUARRY_SITE.x + 0.5) * 16);
+    expect(visuals.find(item => item.id === 'rubble')!.y).toBe((RUBBLE_SITE.y + 0.5) * 16);
+    for (const item of visuals) expect(item.depth).toBe(item.y);
+  });
+
+  it('spent quarry and gathered rubble', () => {
+    const state = quarryState();
+    state.quarryReadyDay = state.day + 1;
+    state.rubbleReadyDay = state.day + 3;
+    const keys = sceneVisuals(state, 0).map(item => item.texture);
+    expect(keys).toContain('quarry:spent');
+    expect(keys).toContain('rubble:gathered');
+    state.day += 3;
+    expect(sceneVisuals(state, 0).map(item => item.texture)).toEqual(expect.arrayContaining(['quarry:ready', 'rubble:ready']));
+    for (const name of ['quarry', 'rubble']) expect(() => validateSprite(sprites[name])).not.toThrow();
+  });
+
+  it('the toolshed site, then the toolshed', () => {
+    const state = createGame();
+    const site = sceneVisuals(state, 0).find(item => item.id === 'toolshed')!;
+    expect(site.texture).toBe('toolshedSite:still');
+    expect(site.depth).toBe(GROUND_DECAL_DEPTH);
+    state.structures.toolshed = true;
+    const built = sceneVisuals(state, 0).find(item => item.id === 'toolshed')!;
+    expect(built.texture).toBe('toolshed:built');
+    expect(built.depth).toBe(built.y);
+    for (const name of ['toolshed', 'toolshedSite']) expect(() => validateSprite(sprites[name])).not.toThrow();
+  });
+
+  it('the camp view never shows quarry-area piles', () => {
+    const state = createGame();
+    state.stonePiles = [{ id: 'here', x: 5, y: 5, count: 3, area: 'camp' }, { id: 'away', x: 8, y: 5, count: 3, area: 'quarry' }];
+    const ids = sceneVisuals(state, 0).map(item => item.id);
+    expect(ids).toEqual(expect.arrayContaining(['here', 'here-count']));
+    expect(ids).not.toContain('away');
+    expect(ids).not.toContain('away-count');
+    expect(ids).not.toContain('quarry');
+    expect(ids).not.toContain('rubble');
+  });
+
+  it('keeps the survivor in normal depth order by the quarry, with no camp fire there', () => {
+    const state = quarryState();
+    state.player.x = BALANCE.campX;
+    state.player.y = BALANCE.campY;
+    state.fireFuel = 20;
     expect(playerVisualDepth(state)).toBe((state.player.y + 0.5) * 16);
   });
 });

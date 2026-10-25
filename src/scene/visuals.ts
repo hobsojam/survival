@@ -1,6 +1,7 @@
 import { BALANCE, LOOKOUT, SITES, type GameState } from '../game/state';
 import { isColdNight } from '../game/rules';
 import { TILE, worldX, worldY } from './art';
+import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 
 export const NIGHT_DEPTH = BALANCE.mapHeight * TILE + 1;
 export const LIGHT_DEPTH = NIGHT_DEPTH + 1;
@@ -8,7 +9,7 @@ export const WEATHER_DEPTH = LIGHT_DEPTH + 1;
 export const GROUND_DECAL_DEPTH = -50;
 
 export function playerVisualDepth(state: GameState): number {
-  const nearFire = state.fireFuel > 0 && Math.hypot(state.player.x - BALANCE.campX, state.player.y - BALANCE.campY) < 1;
+  const nearFire = state.area === 'camp' && state.fireFuel > 0 && Math.hypot(state.player.x - BALANCE.campX, state.player.y - BALANCE.campY) < 1;
   return nearFire ? LIGHT_DEPTH + 0.5 : Math.round(worldY(state.player.y));
 }
 
@@ -27,6 +28,21 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: { id: 
     const y = Math.round(worldY(tileY));
     visuals.push({ id, texture, x, y, depth: depth ?? y });
   };
+  const addPiles = () => {
+    for (const pile of state.stonePiles) {
+      if (pile.area !== state.area) continue;
+      add(pile.id, `looseStones:${pile.count === 1 ? 'one' : pile.count === 2 ? 'two' : 'many'}`, pile.x, pile.y);
+      if (pile.count < 2) continue;
+      const base = visuals[visuals.length - 1];
+      visuals.push({ id: `${pile.id}-count`, texture: `pileCount:${pile.count > 9 ? 'lots' : `n${pile.count}`}`, x: base.x, y: base.y - 14, depth: base.depth + 0.5 });
+    }
+  };
+  if (state.area === 'quarry') {
+    add('quarry', state.quarryReadyDay <= state.day ? 'quarry:ready' : 'quarry:spent', QUARRY_SITE.x, QUARRY_SITE.y);
+    add('rubble', state.rubbleReadyDay <= state.day ? 'rubble:ready' : 'rubble:gathered', RUBBLE_SITE.x, RUBBLE_SITE.y);
+    addPiles();
+    return visuals;
+  }
   for (const node of state.nodes) {
     if (node.kind === 'stone') {
       add(node.id, node.amount > 0 ? 'rock0:still' : 'pebbles0:still', node.x, node.y);
@@ -48,12 +64,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: { id: 
     }
     add(node.id, `${sprite}:${frame}`, node.x, node.y);
   }
-  for (const pile of state.stonePiles) {
-    add(pile.id, `looseStones:${pile.count === 1 ? 'one' : pile.count === 2 ? 'two' : 'many'}`, pile.x, pile.y);
-    if (pile.count < 2) continue;
-    const base = visuals[visuals.length - 1];
-    visuals.push({ id: `${pile.id}-count`, texture: `pileCount:${pile.count > 9 ? 'lots' : `n${pile.count}`}`, x: base.x, y: base.y - 14, depth: base.depth + 0.5 });
-  }
+  addPiles();
   for (const tree of state.trees) {
     const texture = tree.readyDay <= state.day ? `${tree.sprite}:still` : 'stump:still';
     add(tree.id, texture, tree.x, tree.y);
@@ -73,6 +84,8 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: { id: 
     state.structures.windbreak ? undefined : GROUND_DECAL_DEPTH);
   add('stonePile', state.structures.stonePile ? 'stonePile:built' : 'stonePileSite:still', x, y - 3,
     state.structures.stonePile ? undefined : GROUND_DECAL_DEPTH);
+  add('toolshed', state.structures.toolshed ? 'toolshed:built' : 'toolshedSite:still', x + 4, y,
+    state.structures.toolshed ? undefined : GROUND_DECAL_DEPTH);
   add('logSeat', 'logSeat:still', x - 1, y + 1);
   add('lookout', state.progress.lookoutRepaired ? 'lookout:restored' : 'lookout:damaged', LOOKOUT.x, LOOKOUT.y);
   add('site-basket', state.progress.discoveries.basket ? 'oldBasket:empty' : 'oldBasket:full', SITES.basket.x, SITES.basket.y);
