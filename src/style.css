@@ -50,7 +50,23 @@ button:focus-visible { outline: 3px solid #d69c5d; outline-offset: 3px; }
 .message::before { content: '✦'; color: #c99962; font-size: 15px; }
 .shortcuts { display: flex; gap: 17px; flex-wrap: wrap; padding: 8px 11px 10px; border-top: 1px solid #eceee4; color: #77897b; font-size: 11px; }
 kbd { display: inline-block; border: 1px solid #d4ddce; border-bottom-width: 2px; background: #f3f6ed; color: #4f7155; border-radius: 4px; padding: 2px 4px; font-family: inherit; font-weight: 700; margin-right: 2px; }
-.sidebar { display: flex; flex-direction: column; gap: 13px; }
+.sidebar, .sidebar-pages { display: flex; flex-direction: column; gap: 13px; }
+.bag-panel { order: -1; }
+.sidebar-tabs { display: flex; gap: 4px; padding: 4px; border: 1px solid #e3e5d9; border-radius: 13px; background: #f3f5ec; }
+.sidebar-tabs button { position: relative; flex: 1; min-height: 38px; border: 0; border-radius: 10px; background: transparent; color: #59735d; font-size: 12px; font-weight: 700; }
+.sidebar-tabs button:hover { background: #e9efe3; }
+.sidebar-tabs button.active { background: #fffdf7; color: #2e4a38; box-shadow: 0 1px 3px #38503c22; }
+.sidebar-tabs button.has-dot::after { content: ''; position: absolute; top: 8px; right: 12%; width: 8px; height: 8px; border-radius: 50%; background: #d69c5d; }
+@media not all and (max-width: 600px) and (orientation: portrait) {
+  .layout[data-sidebar-tab="bag"] .sidebar-pages > :not([data-tab="bag"]),
+  .layout[data-sidebar-tab="build"] .sidebar-pages > :not([data-tab="build"]),
+  .layout[data-sidebar-tab="camp"] .sidebar-pages > :not([data-tab="camp"]) { display: none; }
+}
+@media (min-width: 921px) {
+  /* The column stays as tall as the window; the open tab scrolls inside it. */
+  .sidebar { position: sticky; top: 14px; max-height: calc(100vh - 28px); }
+  .sidebar-pages { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: -6px -6px 0; padding: 6px 6px 14px; }
+}
 .panel { border-radius: 17px; padding: 18px; }
 .forecast-panel { background: linear-gradient(145deg, #e7f0ed, #fffdf7 70%); border-color: #c8d9d5; }
 .forecast-panel.active { background: linear-gradient(145deg, #cbdae4, #eef4f2 70%); border-color: #88a7b6; }
@@ -186,7 +202,7 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
 [hidden] { display: none; }
 @media (max-width: 920px) {
   .layout { grid-template-columns: 1fr; }
-  .sidebar { display: grid; grid-template-columns: repeat(2, 1fr); }
+  .sidebar-pages { display: grid; grid-template-columns: repeat(2, 1fr); }
   .build-panel { grid-column: 1 / -1; }
 }
 @media (max-width: 600px) {
@@ -197,7 +213,7 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
   .day-pill { font-size: 11px; padding: 8px 10px; gap: 7px; }
   .day-dial { width: 44px; }
   .day-countdown { display: none; }
-  .sidebar { display: flex; }
+  .sidebar-pages { display: flex; }
   .game-panel { padding: 7px; }
   .shortcuts { gap: 8px; }
   .prompt { left: 8px; bottom: 8px; font-size: 10px; }
@@ -242,11 +258,11 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
   .dock-tabs button.has-dot::after { content: ''; position: absolute; top: 9px; right: 14%; width: 8px; height: 8px; border-radius: 50%; background: #d69c5d; }
   .sidebar { position: absolute; z-index: 4; left: 0; right: 0; bottom: 0; display: none; flex-direction: column; gap: 10px; max-height: 60%; overflow-y: auto; overscroll-behavior: contain; padding: 10px; border-radius: 16px 16px 0 0; background: #eeefe4; box-shadow: 0 -8px 24px #18382b40; }
   .layout[data-open-tab] .sidebar { display: flex; }
-  .sidebar > section { display: none; }
-  .layout[data-open-tab="bag"] .sidebar > [data-tab="bag"],
-  .layout[data-open-tab="build"] .sidebar > [data-tab="build"],
-  .layout[data-open-tab="camp"] .sidebar > [data-tab="camp"] { display: block; }
-  .bag-panel { order: -1; }
+  .sidebar-pages { display: contents; }
+  .sidebar-tabs, .sidebar section { display: none; }
+  .layout[data-open-tab="bag"] .sidebar [data-tab="bag"],
+  .layout[data-open-tab="build"] .sidebar [data-tab="build"],
+  .layout[data-open-tab="camp"] .sidebar [data-tab="camp"] { display: block; }
   .survivor-panel h2, .survivor-panel .meter, .survivor-panel .quick-actions button:not(#eat-ration-button) { display: none; }
   .survivor-panel .quick-actions { grid-template-columns: 1fr; margin-top: 0; }
   .sidebar button { min-height: 44px; touch-action: manipulation; }
