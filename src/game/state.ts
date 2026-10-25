@@ -4,6 +4,7 @@ export const BUILDINGS = {
   shelter: { name: 'Shelter', description: 'A roof against the night cold', symbol: '⌂', cost: { wood: 6, fiber: 2 }, prerequisite: null },
   bed: { name: 'Bed', description: 'Rest more deeply at camp', symbol: '▣', cost: { wood: 4, fiber: 1 }, prerequisite: 'shelter' },
   crate: { name: 'Storage crate', description: 'Carry up to 16 supplies', symbol: '▤', cost: { wood: 4, fiber: 0 }, prerequisite: null },
+  toolshed: { name: 'Toolshed', description: 'Make tools here', symbol: '⚒', cost: { wood: 5, fiber: 2 }, prerequisite: 'shelter' },
   hearth: { name: 'Stone hearth', description: 'Each log keeps the fire longer', symbol: '♨', cost: { wood: 2, fiber: 0, stone: 3 }, prerequisite: 'coldNight' },
   dryingRack: { name: 'Drying rack', description: 'Prepare rations; improve cooked berries', symbol: '☼', cost: { wood: 4, fiber: 0 }, prerequisite: null },
   stonePile: { name: 'Stone pile', description: 'Keep up to 12 stone at camp', symbol: '◆', cost: { wood: 3, fiber: 0 }, prerequisite: null },
@@ -11,6 +12,8 @@ export const BUILDINGS = {
 } as const;
 
 export type StructureId = keyof typeof BUILDINGS;
+
+export const PICKAXE = { cost: { wood: 2, fiber: 1, stone: 2 } } as const;
 
 export const LOOKOUT = { x: 30, y: 8, cost: { wood: 4, fiber: 2, stone: 2 } } as const;
 
@@ -44,6 +47,7 @@ export interface StonePile {
   x: number;
   y: number;
   count: number;
+  area: AreaId;
 }
 
 export type AreaId = 'camp' | 'quarry';
@@ -57,12 +61,17 @@ export interface GameState {
   fireFuel: number;
   structures: Record<StructureId, boolean>;
   progress: { nextStormDay: number | null; hearthUnlocked: boolean; lookoutRepaired: boolean; axeCrafted: boolean;
+    quarryFound: boolean; pickaxeCrafted: boolean;
     discoveries: Record<SiteId, boolean> };
   nodes: ResourceNode[];
   trees: TreeNode[];
   stonePiles: StonePile[];
   /** Stone kept in the camp stone pile, outside the bag. */
   storedStone: number;
+  /** First day the quarry face can be dug again. */
+  quarryReadyDay: number;
+  /** First day the rubble pile gives stone again. */
+  rubbleReadyDay: number;
 }
 
 export const BALANCE = {
@@ -82,6 +91,9 @@ export const BALANCE = {
   chopEnergyCost: 8,
   chopSeconds: 10,
   treeRegrowDays: 3,
+  rubbleRegrowDays: 3,
+  digSeconds: 10,
+  digEnergyCost: 8,
   eatHungerGain: 25,
   trailFoodHungerGain: 45,
   trailFoodSeconds: 12,
@@ -151,12 +163,15 @@ export function createGame(): GameState {
     player: { x: BALANCE.campX + 1, y: BALANCE.campY + 1, energy: 100, hunger: 100, warmth: 100 },
     inventory: { wood: 0, food: 0, fiber: 0, stone: 0, trailFood: 0 },
     fireFuel: 0,
-    structures: { shelter: false, bed: false, crate: false, hearth: false, dryingRack: false, windbreak: false, stonePile: false },
+    structures: { shelter: false, bed: false, crate: false, hearth: false, dryingRack: false, windbreak: false, stonePile: false, toolshed: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
+      quarryFound: false, pickaxeCrafted: false,
       discoveries: { basket: false, spring: false, cairn: false } },
     nodes,
     trees,
     stonePiles: [],
-    storedStone: 0
+    storedStone: 0,
+    quarryReadyDay: 1,
+    rubbleReadyDay: 1
   };
 }

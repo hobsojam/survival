@@ -1,5 +1,5 @@
-import { CAMP_EXIT, QUARRY_EXIT, crossing, pathOpen } from './areas';
-import { BALANCE, BUILDINGS, LOOKOUT, SITES, type GameState, type SiteId, type StructureId } from './state';
+import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } from './areas';
+import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
   | { type: 'gather'; nodeId: string }
@@ -7,7 +7,7 @@ export type GameAction =
   | { type: 'visitSite'; siteId: SiteId }
   | { type: 'build'; structureId: StructureId }
   | { type: 'move'; dx: number; dy: number }
-  | { type: 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' }
+  | { type: 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' }
   | { type: 'pickUpStone'; pileId: string };
 
 /** Awake time tires the survivor; work already costs energy, and resting doesn't. */
@@ -115,6 +115,18 @@ export function stargazeBlocker(state: GameState): string | null {
   return null;
 }
 
+/** Why the pickaxe can't be crafted right now, or null if it can. */
+export function pickaxeBlocker(state: GameState): string | null {
+  if (state.progress.pickaxeCrafted) return 'You already have a pickaxe.';
+  if (!state.progress.quarryFound) return 'Find the quarry first.';
+  if (!state.structures.toolshed) return 'Build a toolshed first.';
+  if (!isAtCamp(state)) return 'Return to camp to craft the pickaxe.';
+  const { wood, fiber, stone } = PICKAXE.cost;
+  if (state.inventory.wood < wood || state.inventory.fiber < fiber || availableStone(state) < stone)
+    return `Need ${wood} wood, ${fiber} fiber, and ${stone} stone for the pickaxe.`;
+  return null;
+}
+
 export type BuildStatus = 'built' | 'locked' | 'needsShelter' | 'ready' | 'unavailable';
 
 /** How a structure's build button should look: built, locked, blocked by a missing shelter, ready to build here, or not yet. */
@@ -193,18 +205,19 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     const rawX = state.player.x + action.dx * factor;
     const rawY = state.player.y + action.dy * factor;
     const crossed = crossing(state, rawX, rawY);
-    return {
-      state: {
-        ...state,
-        ...(crossed ? { area: crossed.area } : {}),
-        player: {
-          ...state.player,
-          x: crossed ? crossed.x : Math.max(0, Math.min(BALANCE.mapWidth - 1, rawX)),
-          y: crossed ? crossed.y : Math.max(0, Math.min(BALANCE.mapHeight - 1, rawY))
-        }
-      },
-      message: ''
+    const moved: GameState = {
+      ...state,
+      ...(crossed ? { area: crossed.area } : {}),
+      player: {
+        ...state.player,
+        x: crossed ? crossed.x : Math.max(0, Math.min(BALANCE.mapWidth - 1, rawX)),
+        y: crossed ? crossed.y : Math.max(0, Math.min(BALANCE.mapHeight - 1, rawY))
+      }
     };
+    if (moved.area === 'quarry' && !moved.progress.quarryFound && near2(moved.player.x, moved.player.y, QUARRY_SITE.x, QUARRY_SITE.y, 2)) {
+      return { state: { ...moved, progress: { ...moved.progress, quarryFound: true } }, message: 'You found an old quarry. A pickaxe could work this stone.' };
+    }
+    return { state: moved, message: '' };
   }
   if (action.type === 'cross') {
     const exit = state.area === 'camp' ? CAMP_EXIT : QUARRY_EXIT;
@@ -219,7 +232,7 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
   if (action.type === 'gather') {
     const index = state.nodes.findIndex(node => node.id === action.nodeId);
     const node = state.nodes[index];
-    if (!node || !near(state.player.x, state.player.y, node.x, node.y)) {
+    if (!node || state.area !== 'camp' || !near(state.player.x, state.player.y, node.x, node.y)) {
       return { state, message: 'Move closer to gather.' };
     }
     if (node.amount <= 0) return { state, message: 'Nothing to gather yet.' };
@@ -244,6 +257,7 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
   if (action.type === 'craftAxe') {
     if (state.progress.axeCrafted) return { state, message: 'You already have a stone axe.' };
     if (!state.progress.hearthUnlocked) return { state, message: 'Weather the cold front before crafting an axe.' };
+    if (!state.structures.toolshed) return { state, message: 'Build a toolshed first.' };
     if (!isAtCamp(state)) return { state, message: 'Return to camp to craft the axe.' };
     if (state.inventory.wood < 1 || state.inventory.fiber < 1 || availableStone(state) < 1)
       return { state, message: 'Need 1 wood, 1 fiber, and 1 stone for the axe.' };
@@ -258,10 +272,54 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
       message: 'Crafted a stone axe. Mature trees can now provide wood.'
     };
   }
+  if (action.type === 'craftPickaxe') {
+    const blocker = pickaxeBlocker(state);
+    if (blocker) return { state, message: blocker };
+    const { wood, fiber, stone } = PICKAXE.cost;
+    const paid = spendStone(state, stone);
+    return {
+      state: advanceTime({
+        ...paid,
+        inventory: { ...paid.inventory, wood: state.inventory.wood - wood, fiber: state.inventory.fiber - fiber },
+        player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.buildEnergyCost) },
+        progress: { ...state.progress, pickaxeCrafted: true }
+      }, BALANCE.buildSeconds, 'working'),
+      message: 'Crafted a pickaxe. The quarry face can be worked now.'
+    };
+  }
+  if (action.type === 'gatherRubble') {
+    if (state.area !== 'quarry' || !near(state.player.x, state.player.y, RUBBLE_SITE.x, RUBBLE_SITE.y)) return { state, message: 'Move closer to the rubble.' };
+    if (state.rubbleReadyDay > state.day) return { state, message: 'The rubble is picked over. More will loosen in a few days.' };
+    if (freeSpaces(state) < spaceFor('stone')) return { state, message: FULL_BAG_MESSAGE };
+    return {
+      state: advanceTime({
+        ...state,
+        player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.gatherEnergyCost) },
+        inventory: { ...state.inventory, stone: state.inventory.stone + 1 },
+        rubbleReadyDay: state.day + BALANCE.rubbleRegrowDays
+      }, BALANCE.gatherSeconds, 'working'),
+      message: 'Pried a stone from the rubble.'
+    };
+  }
+  if (action.type === 'digQuarry') {
+    if (!state.progress.pickaxeCrafted) return { state, message: 'You need a pickaxe to work the quarry.' };
+    if (state.area !== 'quarry' || !near(state.player.x, state.player.y, QUARRY_SITE.x, QUARRY_SITE.y)) return { state, message: 'Move closer to the quarry face.' };
+    if (state.quarryReadyDay > state.day) return { state, message: 'The quarry face is worked out until morning.' };
+    if (freeSpaces(state) < spaceFor('stone')) return { state, message: FULL_BAG_MESSAGE };
+    return {
+      state: advanceTime({
+        ...state,
+        player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.digEnergyCost) },
+        inventory: { ...state.inventory, stone: state.inventory.stone + 1 },
+        quarryReadyDay: state.day + 1
+      }, BALANCE.digSeconds, 'working'),
+      message: 'Broke a good stone from the quarry face.'
+    };
+  }
   if (action.type === 'chopTree') {
     if (!state.progress.axeCrafted) return { state, message: 'Craft a stone axe before chopping trees.' };
     const tree = state.trees.find(item => item.id === action.treeId);
-    if (!tree || !near(state.player.x, state.player.y, tree.x, tree.y)) return { state, message: 'Move closer to a mature tree.' };
+    if (!tree || state.area !== 'camp' || !near(state.player.x, state.player.y, tree.x, tree.y)) return { state, message: 'Move closer to a mature tree.' };
     if (tree.readyDay > state.day) return { state, message: 'This stump needs more time to regrow.' };
     if (freeSpaces(state) < 2 * spaceFor('wood')) return { state, message: 'Your bag needs two free spaces for wood.' };
     return {
@@ -313,15 +371,16 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
   if (action.type === 'dropStone') {
     if (state.inventory.stone < 1) return { state, message: 'You have no stone to set down.' };
     const { x, y } = state.player;
-    const nearby = state.stonePiles.find(pile => Math.hypot(pile.x - x, pile.y - y) <= BALANCE.pileMergeRadius);
+    const nearby = state.stonePiles.find(pile => pile.area === state.area && Math.hypot(pile.x - x, pile.y - y) <= BALANCE.pileMergeRadius);
     const stonePiles = nearby
       ? state.stonePiles.map(pile => pile === nearby ? { ...pile, count: pile.count + 1 } : pile)
-      : [...state.stonePiles, { id: `pile-${state.day}-${Math.round(x * 10)}-${Math.round(y * 10)}`, x, y, count: 1 }];
+      : [...state.stonePiles, { id: `pile-${state.area}-${state.day}-${Math.round(x * 10)}-${Math.round(y * 10)}`, x, y, count: 1, area: state.area }];
     return { state: { ...state, inventory: { ...state.inventory, stone: state.inventory.stone - 1 }, stonePiles }, message: 'Set down one stone.' };
   }
   if (action.type === 'pickUpStone') {
-    const pile = state.stonePiles.find(item => item.id === action.pileId);
-    if (!pile || !near(state.player.x, state.player.y, pile.x, pile.y)) return { state, message: 'Move closer to the stones.' };
+    const pile = state.stonePiles.find(item => item.id === action.pileId && item.area === state.area);
+    if (!pile) return { state, message: 'There is no stone pile within reach.' };
+    if (!near(state.player.x, state.player.y, pile.x, pile.y)) return { state, message: 'Move closer to the stones.' };
     if (freeSpaces(state) < spaceFor('stone')) return { state, message: FULL_BAG_MESSAGE };
     const stonePiles = state.stonePiles
       .map(item => item === pile ? { ...item, count: item.count - 1 } : item)

@@ -111,7 +111,7 @@ describe('loose stone piles', () => {
     const state = createGame();
     state.nodes = [];
     state.trees = [];
-    state.stonePiles = [{ id: 'pile-a', x: 5, y: 5, count: 2 }];
+    state.stonePiles = [{ id: 'pile-a', x: 5, y: 5, count: 2, area: 'camp' }];
     expect(pickTapTarget(state, 5.6, 5)).toMatchObject({ kind: 'pile', id: 'pile-a' });
   });
 
@@ -124,7 +124,7 @@ describe('loose stone piles', () => {
     const node = state.nodes[0];
     state.nodes = [node];
     node.x = 5; node.y = 5;
-    state.stonePiles = [{ id: 'pile-a', x: 6.5, y: 5, count: 1 }];
+    state.stonePiles = [{ id: 'pile-a', x: 6.5, y: 5, count: 1, area: 'camp' }];
     state.player.x = 6; state.player.y = 5;
     expect(closestGatherable(state)).toMatchObject({ kind: 'pile', pile: { id: 'pile-a' } });
     state.player.x = 5.4;
