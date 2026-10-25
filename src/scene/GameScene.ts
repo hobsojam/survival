@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceNode, type SiteId, type TreeNode } from '../game/state';
+import { BALANCE, LOOKOUT, SITES, type GameState, type SiteId, type TreeNode } from '../game/state';
 import { advanceTime, applyAction, isAtCamp, isColdNight, sleepBlocker, type GameAction } from '../game/rules';
 import { TILE, worldX, worldY, drawTerrain } from './art';
 import { sceneVisuals, playerVisualDepth, WEATHER_DEPTH } from './visuals';
@@ -10,7 +10,7 @@ import { LOGICAL_WIDTH, LOGICAL_HEIGHT } from './pixelScale';
 import { facingFromInput, selectSurvivorVisual, type Facing, type SurvivorAction } from './survivorVisual';
 import { SceneEffects } from './SceneEffects';
 import { SceneLighting } from './SceneLighting';
-import { hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from './tapTarget';
+import { closestGatherable, hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from './tapTarget';
 import { palette } from '../art/palette';
 import { sitePrompt } from '../game/sitePrompt';
 
@@ -78,8 +78,9 @@ export class GameScene extends Phaser.Scene {
     }
     const tapWalking = this.walkTowardTarget(dt);
     if (Phaser.Input.Keyboard.JustDown(this.keys.E)) {
-      const node = this.closestNode();
-      if (node) this.perform({ type: 'gather', nodeId: node.id });
+      const found = closestGatherable(this.state);
+      if (found?.kind === 'node') this.perform({ type: 'gather', nodeId: found.node.id });
+      else if (found?.kind === 'pile') this.perform({ type: 'pickUpStone', pileId: found.pile.id });
       else if (isAtCamp(this.state)) this.perform({ type: 'rest' });
       else {
         this.cancelWalk();
@@ -139,12 +140,16 @@ export class GameScene extends Phaser.Scene {
         const tree = before.trees.find(item => item.id === action.treeId);
         if (tree) this.effects?.trigger('gather', this.time.now, tree.x, tree.y, 'branch');
       }
+      if (action.type === 'pickUpStone') {
+        const pile = before.stonePiles.find(item => item.id === action.pileId);
+        if (pile) this.effects?.trigger('gather', this.time.now, pile.x, pile.y, 'stone');
+      }
       if (action.type === 'cook' || action.type === 'stargaze')
         this.effects?.trigger(action.type, this.time.now, this.state.player.x, this.state.player.y);
     }
     if (result.state !== before && (action.type === 'gather' || action.type === 'rest' || action.type === 'cook' || action.type === 'stargaze'))
       this.visualAction = { kind: action.type, startedAtMs: this.time.now };
-    if (result.state !== before && action.type === 'chopTree') this.visualAction = { kind: 'gather', startedAtMs: this.time.now };
+    if (result.state !== before && (action.type === 'chopTree' || action.type === 'pickUpStone')) this.visualAction = { kind: 'gather', startedAtMs: this.time.now };
     if (action.type === 'gather') {
       const node = before.nodes.find(item => item.id === action.nodeId);
       const remaining = this.state.nodes.find(item => item.id === action.nodeId)?.amount;
@@ -161,7 +166,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   getPrompt(): string {
-    const node = this.closestNode();
+    const found = closestGatherable(this.state);
     const tree = this.closestTree();
     const site = this.closestSite();
     const canSleep = !sleepBlocker(this.state);
@@ -175,11 +180,12 @@ export class GameScene extends Phaser.Scene {
     else if (tree && this.state.progress.axeCrafted) treePrompt = 'X  Chop mature tree';
     else if (tree) treePrompt = 'Mature tree · craft an axe at camp';
     const nearbySitePrompt = site ? sitePrompt(this.state, site.id) : '';
-    if (node) {
+    if (found) {
       let gather = 'E  Pick up fallen branches';
-      if (node.kind === 'berry') gather = 'E  Pick berries';
-      else if (node.kind === 'fiber') gather = 'E  Gather fiber';
-      else if (node.kind === 'stone') gather = 'E  Collect stone';
+      if (found.kind === 'pile') gather = `E  Pick up stone (×${found.pile.count})`;
+      else if (found.node.kind === 'berry') gather = 'E  Pick berries';
+      else if (found.node.kind === 'fiber') gather = 'E  Gather fiber';
+      else if (found.node.kind === 'stone') gather = 'E  Collect stone';
       if (lookoutPrompt) return `${gather} · ${lookoutPrompt}`;
       if (nearbySitePrompt) return `${gather} · ${nearbySitePrompt}`;
       if (treePrompt) return `${gather} · ${treePrompt}`;
@@ -255,12 +261,6 @@ export class GameScene extends Phaser.Scene {
       .strokeCircle(0, 0, 5)
       .setDepth(WEATHER_DEPTH + 1);
     this.tweens.add({ targets: ring, alpha: 0, scale: 1.4, duration: 400, onComplete: () => ring.destroy() });
-  }
-
-  private closestNode(): ResourceNode | undefined {
-    return this.state.nodes
-      .filter(node => node.amount > 0 && Math.hypot(node.x - this.state.player.x, node.y - this.state.player.y) <= BALANCE.interactionRadius)
-      .sort((a, b) => Math.hypot(a.x - this.state.player.x, a.y - this.state.player.y) - Math.hypot(b.x - this.state.player.x, b.y - this.state.player.y))[0];
   }
 
   private closestTree(): TreeNode | undefined {

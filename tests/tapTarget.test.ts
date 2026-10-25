@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, LOOKOUT, SITES, createGame } from '../src/game/state';
-import { hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from '../src/scene/tapTarget';
+import { closestGatherable, hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from '../src/scene/tapTarget';
 
 describe('tap targets', () => {
   it('picks a node within one tile of the tap', () => {
@@ -103,6 +103,36 @@ describe('tap targets', () => {
     node.x = tree.x + 0.4; node.y = tree.y + 0.2;
     state.nodes = [node];
     expect(pickTapTarget(state, node.x, node.y)).toMatchObject({ kind: 'node', id: node.id });
+  });
+});
+
+describe('loose stone piles', () => {
+  it('picks a loose pile within one tile', () => {
+    const state = createGame();
+    state.nodes = [];
+    state.trees = [];
+    state.stonePiles = [{ id: 'pile-a', x: 5, y: 5, count: 2 }];
+    expect(pickTapTarget(state, 5.6, 5)).toMatchObject({ kind: 'pile', id: 'pile-a' });
+  });
+
+  it('maps a pile to pickUpStone', () => {
+    expect(targetAction({ kind: 'pile', id: 'pile-a', x: 0, y: 0 })).toEqual({ type: 'pickUpStone', pileId: 'pile-a' });
+  });
+
+  it('closestGatherable prefers the nearer of a pile and a node', () => {
+    const state = createGame();
+    const node = state.nodes[0];
+    state.nodes = [node];
+    node.x = 5; node.y = 5;
+    state.stonePiles = [{ id: 'pile-a', x: 6.5, y: 5, count: 1 }];
+    state.player.x = 6; state.player.y = 5;
+    expect(closestGatherable(state)).toMatchObject({ kind: 'pile', pile: { id: 'pile-a' } });
+    state.player.x = 5.4;
+    expect(closestGatherable(state)).toMatchObject({ kind: 'node', node: { id: node.id } });
+    node.amount = 0;
+    expect(closestGatherable(state)).toMatchObject({ kind: 'pile' });
+    state.player.x = 20;
+    expect(closestGatherable(state)).toBeUndefined();
   });
 });
 

@@ -198,6 +198,41 @@ function lookout(g: Grid, restored: boolean): void {
   }
 }
 
+function stoneLump(g: Grid, x: number, y: number, w: number, h: number): void {
+  box(g, x, y + 1, w, h - 1, 'n'); box(g, x + 1, y, w - 2, h, 'n');
+  box(g, x + 1, y + h - 1, w - 2, 1, 'm'); box(g, x + 1, y + 1, w - 2, h - 3, 'o');
+  box(g, x + 1, y, 2, 1, 'q'); dot(g, x + 1, y + 1, 'p');
+}
+/** Loose stone left on the ground: big, separate, highlighted stones, unlike the flat pebbles of a spent rock. */
+function looseStones(g: Grid, count: 1 | 2 | 3): void {
+  oval(g, 8, 13, count === 1 ? 4 : 6, 2, 's');
+  if (count === 1) { stoneLump(g, 5, 8, 6, 5); return; }
+  stoneLump(g, 2, 9, 6, 4); stoneLump(g, 8, 8, 6, 5);
+  if (count === 3) stoneLump(g, 5, 5, 6, 4);
+}
+function stonePileSite(g: Grid): void {
+  for (const [x, y] of [[1, 9], [13, 9], [1, 13], [13, 13]]) stake(g, x, y);
+  line(g, 3, 13, 12, 13, 'h'); dot(g, 7, 11, 'o'); dot(g, 8, 11, 'q');
+}
+function stonePile(g: Grid): void {
+  oval(g, 8, 14, 7, 2, 's');
+  box(g, 1, 10, 14, 4, 'a'); box(g, 2, 10, 12, 1, 'e'); line(g, 2, 12, 13, 12, 'c');
+  stoneLump(g, 2, 6, 6, 5); stoneLump(g, 8, 6, 6, 5); stoneLump(g, 5, 2, 6, 5);
+}
+const DIGITS: Record<string, string[]> = {
+  2: ['###', '..#', '###', '#..', '###'], 3: ['###', '..#', '.##', '..#', '###'], 4: ['#.#', '#.#', '###', '..#', '..#'],
+  5: ['###', '#..', '###', '..#', '###'], 6: ['###', '#..', '###', '#.#', '###'], 7: ['###', '..#', '.#.', '.#.', '.#.'],
+  8: ['###', '#.#', '###', '#.#', '###'], 9: ['###', '#.#', '###', '..#', '###'], '+': ['...', '.#.', '###', '.#.', '...']
+};
+/** A tiny ×N tag over loose piles: paper glyphs on an ink backing. */
+function pileCount(g: Grid, glyphs: string[]): void {
+  const left = glyphs.length === 1 ? 2 : 0;
+  box(g, left, 0, 9 + 4 * (glyphs.length - 1), 7, 'k');
+  for (const [x, y] of [[1, 2], [3, 2], [2, 3], [1, 4], [3, 4]]) dot(g, left + x, y, 'p');
+  glyphs.forEach((glyph, i) => DIGITS[glyph].forEach((row, y) => [...row].forEach((c, x) => { if (c === '#') dot(g, left + 5 + 4 * i + x, 1 + y, 'p'); })));
+}
+const countLegend = { k: 'ink', p: 'paper' } as const;
+
 const siteLegend = { ...campLegend, u: 'flower4', v: 'frost' } as const;
 function oldBasket(g: Grid, full: boolean): void {
   oval(g, 8, 14, 6, 2, 's');
@@ -241,5 +276,12 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   lookout: define(32, 32, campLegend, { damaged: g => lookout(g, false), restored: g => lookout(g, true) }, [16, 29]),
   oldBasket: define(16, 16, siteLegend, { full: g => oldBasket(g, true), empty: g => oldBasket(g, false) }),
   spring: define(24, 16, siteLegend, { still: spring }),
-  cairn: define(16, 16, siteLegend, { full: g => cairn(g, true), empty: g => cairn(g, false) })
+  cairn: define(16, 16, siteLegend, { full: g => cairn(g, true), empty: g => cairn(g, false) }),
+  looseStones: define(16, 16, campLegend, { one: g => looseStones(g, 1), two: g => looseStones(g, 2), many: g => looseStones(g, 3) }),
+  stonePileSite: define(16, 16, campLegend, { still: stonePileSite }),
+  stonePile: define(16, 16, campLegend, { built: stonePile }),
+  pileCount: define(13, 7, countLegend, {
+    ...Object.fromEntries([2, 3, 4, 5, 6, 7, 8, 9].map(n => [`n${n}`, (g: Grid) => pileCount(g, [String(n)])])),
+    lots: g => pileCount(g, ['9', '+'])
+  }, [6, 6])
 };

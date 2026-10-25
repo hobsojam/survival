@@ -20,7 +20,7 @@ describe('native-size scene art', () => {
     expect(keys).toContain('lookout:damaged');
     expect(keys).toContain('firePit:unlit');
     expect(keys).not.toContain('hearthSite:still');
-    const sites = new Set(['shelter', 'crate', 'dryingRack', 'windbreak']);
+    const sites = new Set(['shelter', 'crate', 'dryingRack', 'windbreak', 'stonePile']);
     for (const item of visuals) {
       const [name, frame] = item.texture.split(':');
       expect(sprites[name]?.frames[frame], item.texture).toBeDefined();
@@ -98,6 +98,42 @@ describe('native-size scene art', () => {
     expect(sceneVisuals(state, 180).map(item => item.texture)).toContain('hearth:lowWindy1');
     expect(sceneVisuals(state, 180).map(item => item.texture)).toContain('hearthFlame:lowWindy1');
     expect(sceneVisuals(state, 180).map(item => item.texture)).not.toContain('hearthSite:still');
+  });
+
+  it('draws loose piles by count', () => {
+    const state = createGame();
+    state.stonePiles = [{ id: 'p1', x: 5, y: 5, count: 1 }, { id: 'p2', x: 8, y: 5, count: 2 }, { id: 'p5', x: 11, y: 5, count: 5 }];
+    const visuals = sceneVisuals(state, 0);
+    expect(visuals.find(item => item.id === 'p1')?.texture).toBe('looseStones:one');
+    expect(visuals.find(item => item.id === 'p2')?.texture).toBe('looseStones:two');
+    expect(visuals.find(item => item.id === 'p5')?.texture).toBe('looseStones:many');
+    expect(() => validateSprite(sprites.looseStones)).not.toThrow();
+  });
+
+  it('labels loose piles of two or more with their count above the stones', () => {
+    const state = createGame();
+    state.stonePiles = [{ id: 'p1', x: 5, y: 5, count: 1 }, { id: 'p3', x: 8, y: 5, count: 3 }, { id: 'p12', x: 11, y: 5, count: 12 }];
+    const visuals = sceneVisuals(state, 0);
+    expect(visuals.find(item => item.id === 'p1-count')).toBeUndefined();
+    const label = visuals.find(item => item.id === 'p3-count')!;
+    const pile = visuals.find(item => item.id === 'p3')!;
+    expect(label.texture).toBe('pileCount:n3');
+    expect(label.y).toBeLessThan(pile.y);
+    expect(label.depth).toBeGreaterThan(pile.depth);
+    expect(visuals.find(item => item.id === 'p12-count')?.texture).toBe('pileCount:lots');
+    expect(() => validateSprite(sprites.pileCount)).not.toThrow();
+  });
+
+  it('draws the stone pile site, then the built pile', () => {
+    const state = createGame();
+    const site = sceneVisuals(state, 0).find(item => item.id === 'stonePile')!;
+    expect(site.texture).toBe('stonePileSite:still');
+    expect(site.depth).toBe(GROUND_DECAL_DEPTH);
+    state.structures.stonePile = true;
+    const built = sceneVisuals(state, 0).find(item => item.id === 'stonePile')!;
+    expect(built.texture).toBe('stonePile:built');
+    expect(built.depth).toBe(built.y);
+    for (const name of ['stonePile', 'stonePileSite']) expect(() => validateSprite(sprites[name])).not.toThrow();
   });
 
   it('keeps hearth construction marks below standing objects', () => {
