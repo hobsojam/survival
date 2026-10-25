@@ -90,6 +90,24 @@ function seated(kind: 'rest' | 'cook' | 'stargaze', phase: number): string[] {
   return g.map(row => row.join(''));
 }
 
+/** Slumped one pixel lower with closed, drooping eyes; the second frame yawns. */
+function tired(yawn: boolean): string[] {
+  return frame('down', 0, 0, 1, g => {
+    box(g, 6, 8, 2, 1, 'a'); box(g, 10, 8, 2, 1, 'a');
+    box(g, 7, 8, 1, 1, 'd'); box(g, 10, 8, 1, 1, 'd');
+    if (yawn) box(g, 8, 9, 2, 2, 'a');
+  });
+}
+
+/** The right hand brought across to rest on the stomach, rubbing up and down. */
+function hungry(phase: number): string[] {
+  return frame('down', 0, 0, 0, g => {
+    box(g, 13, 13, 2, 7, '.'); box(g, 12, 13, 1, 7, 'f');
+    box(g, 9, 15 + phase, 4, 2, 'g'); box(g, 7, 15 + phase, 2, 2, 'c');
+    box(g, 7, 9, 3, 1, 'c'); dot(g, 7, 9, 'a'); dot(g, 9, 9, 'a');
+  });
+}
+
 function reaching(): string[] {
   const g = blank();
   box(g, 5, 21, 7, 1, 's'); box(g, 3, 22, 11, 1, 's'); box(g, 5, 23, 7, 1, 's');
@@ -116,14 +134,16 @@ const frames: Record<string, string[]> = {
   cook0: seated('cook', 0), cook1: seated('cook', 1),
   stargaze0: seated('stargaze', 0), stargaze1: seated('stargaze', 1),
   shiver0: frame('down', -1, 0, 1, g => { dot(g, 2, 8, 't'); }),
-  shiver1: frame('down', 1, 0, 1, g => { dot(g, 14, 8, 't'); })
+  shiver1: frame('down', 1, 0, 1, g => { dot(g, 14, 8, 't'); }),
+  tired0: tired(false), tired1: tired(true),
+  hungry0: hungry(0), hungry1: hungry(1)
 };
 
 const animations: NonNullable<SpriteDef['animations']> = {};
-for (const [name, count] of Object.entries({ idleDown: 2, walkDown: 4, walkUp: 4, walkSide: 4, gather: 2, rest: 2, cook: 2, stargaze: 2, shiver: 2 })) {
+for (const [name, count] of Object.entries({ idleDown: 2, walkDown: 4, walkUp: 4, walkSide: 4, gather: 2, rest: 2, cook: 2, stargaze: 2, shiver: 2, tired: 2, hungry: 2 })) {
   let frameRate = 4;
   if (name.startsWith('walk')) frameRate = 8;
-  else if (name === 'idleDown' || name === 'shiver') frameRate = 2;
+  else if (['idleDown', 'shiver', 'tired', 'hungry'].includes(name)) frameRate = 2;
   animations[name] = { frames: Array.from({ length: count }, (_, index) => `${name}${index}`), frameRate, repeat: name === 'gather' ? 0 : -1 };
 }
 
