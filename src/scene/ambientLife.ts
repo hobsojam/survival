@@ -72,22 +72,25 @@ export class AmbientLife {
   }
 
   update(state: GameState, seconds: number, timeMs: number): void {
+    const dark = darkness(state.day, state.timeOfDay);
     // The birds, the fox and the fireflies live at camp; the eyes watch the quarry.
-    if (state.area === 'quarry') this.updateEyes(darkness(state.day, state.timeOfDay), state, timeMs);
+    if (state.area === 'quarry') this.updateEyes(dark, state, timeMs);
     else for (const image of this.eyes) image.setVisible(false);
     if (state.area !== 'camp') {
       for (const image of [...this.birds.map(bird => bird.image), this.fox, ...this.fireflies]) image.setVisible(false);
       return;
     }
-    const dark = darkness(state.day, state.timeOfDay);
-    if (!this.started) {
-      this.started = true;
-      for (const bird of this.birds) bird.nextForageAtMs = timeMs + bird.index * 2500;
-      if (dark > 0.3) for (const bird of this.birds) bird.away = { x: bird.home.x, y: bird.home.y - 9 };
-    }
+    if (!this.started) this.start(dark, timeMs);
     for (const bird of this.birds) this.updateBird(bird, state, dark, seconds, timeMs);
     this.updateFox(state, seconds, timeMs);
     this.updateFireflies(dark, timeMs);
+  }
+
+  /** Staggers the birds' first forage, and sends them away if camp opens after dark. */
+  private start(dark: number, timeMs: number): void {
+    this.started = true;
+    for (const bird of this.birds) bird.nextForageAtMs = timeMs + bird.index * 2500;
+    if (dark > 0.3) for (const bird of this.birds) bird.away = { x: bird.home.x, y: bird.home.y - 9 };
   }
 
   private show(image: Phaser.GameObjects.Image, x: number, y: number, frame: string, facing = 1, alpha = 1): void {

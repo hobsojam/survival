@@ -1,4 +1,4 @@
-import { BALANCE, LOOKOUT, SITES, type GameState } from '../game/state';
+import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceNode } from '../game/state';
 import { isColdNight } from '../game/rules';
 import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
@@ -21,90 +21,97 @@ export interface SceneVisual {
   depth: number;
 }
 
-export function sceneVisuals(state: GameState, timeMs: number, gathered?: { id: string; atMs: number }): SceneVisual[] {
+type AddVisual = (id: string, texture: string, tileX: number, tileY: number, depth?: number) => void;
+type Gathered = { id: string; atMs: number } | undefined;
+
+export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gathered): SceneVisual[] {
   const visuals: SceneVisual[] = [];
-  const add = (id: string, texture: string, tileX: number, tileY: number, depth?: number) => {
+  const add: AddVisual = (id, texture, tileX, tileY, depth) => {
     const x = Math.round(worldX(tileX));
     const y = Math.round(worldY(tileY));
     visuals.push({ id, texture, x, y, depth: depth ?? y });
   };
-  const addPiles = () => {
-    for (const pile of state.stonePiles) {
-      if (pile.area !== state.area) continue;
-      add(pile.id, `looseStones:${pile.count === 1 ? 'one' : pile.count === 2 ? 'two' : 'many'}`, pile.x, pile.y);
-      if (pile.count < 2) continue;
-      const base = visuals[visuals.length - 1];
-      visuals.push({ id: `${pile.id}-count`, texture: `pileCount:${pile.count > 9 ? 'lots' : `n${pile.count}`}`, x: base.x, y: base.y - 14, depth: base.depth + 0.5 });
-    }
-  };
   if (state.area === 'quarry') {
     add('quarry', state.quarryReadyDay <= state.day ? 'quarry:ready' : 'quarry:spent', QUARRY_SITE.x, QUARRY_SITE.y);
     add('rubble', state.rubbleReadyDay <= state.day ? 'rubble:ready' : 'rubble:gathered', RUBBLE_SITE.x, RUBBLE_SITE.y);
-    addPiles();
+    addPiles(state, visuals, add);
     return visuals;
   }
-  for (const node of state.nodes) {
-    if (node.kind === 'stone') {
-      add(node.id, node.amount > 0 ? 'rock0:still' : 'pebbles0:still', node.x, node.y);
-      continue;
-    }
-    let sprite = 'fiberReeds';
-    if (node.kind === 'branch') sprite = 'branchPile';
-    else if (node.kind === 'berry') sprite = 'berryBush';
-    const sinceGather = gathered?.id === node.id ? timeMs - gathered.atMs : -1;
-    let frame = 'ready';
-    if (node.kind === 'berry' && sinceGather >= 0 && sinceGather < 300) {
-      frame = `rustle${Math.floor(sinceGather / 150)}`;
-    } else if (node.amount <= 0) {
-      if (node.kind === 'berry') frame = 'picked';
-      else if (node.kind === 'fiber') frame = 'cut';
-      else frame = 'depleted';
-    } else if (node.kind === 'fiber') {
-      frame = ['ready', 'sway0', 'ready', 'sway1'][(Math.floor(timeMs / 500) + node.id.length + node.x) % 4];
-    }
-    add(node.id, `${sprite}:${frame}`, node.x, node.y);
+  for (const node of state.nodes) add(node.id, nodeTexture(node, timeMs, gathered), node.x, node.y);
+  addPiles(state, visuals, add);
+  for (const tree of state.trees) add(tree.id, tree.readyDay <= state.day ? `${tree.sprite}:still` : 'stump:still', tree.x, tree.y);
+  addCamp(state, add);
+  addFire(state, timeMs, visuals, add);
+  return visuals;
+}
+
+function addPiles(state: GameState, visuals: SceneVisual[], add: AddVisual): void {
+  for (const pile of state.stonePiles) {
+    if (pile.area !== state.area) continue;
+    add(pile.id, `looseStones:${pileSize(pile.count)}`, pile.x, pile.y);
+    if (pile.count < 2) continue;
+    const base = visuals[visuals.length - 1];
+    visuals.push({ id: `${pile.id}-count`, texture: `pileCount:${pile.count > 9 ? 'lots' : `n${pile.count}`}`, x: base.x, y: base.y - 14, depth: base.depth + 0.5 });
   }
-  addPiles();
-  for (const tree of state.trees) {
-    const texture = tree.readyDay <= state.day ? `${tree.sprite}:still` : 'stump:still';
-    add(tree.id, texture, tree.x, tree.y);
-  }
+}
+
+function pileSize(count: number): string {
+  if (count === 1) return 'one';
+  return count === 2 ? 'two' : 'many';
+}
+
+const NODE_SPRITES: Record<ResourceNode['kind'], string> = { branch: 'branchPile', berry: 'berryBush', fiber: 'fiberReeds', stone: 'rock0' };
+const EMPTY_FRAMES: Record<ResourceNode['kind'], string> = { branch: 'depleted', berry: 'picked', fiber: 'cut', stone: 'depleted' };
+
+function nodeTexture(node: ResourceNode, timeMs: number, gathered: Gathered): string {
+  if (node.kind === 'stone') return node.amount > 0 ? 'rock0:still' : 'pebbles0:still';
+  return `${NODE_SPRITES[node.kind]}:${nodeFrame(node, timeMs, gathered)}`;
+}
+
+function nodeFrame(node: ResourceNode, timeMs: number, gathered: Gathered): string {
+  const sinceGather = gathered?.id === node.id ? timeMs - gathered.atMs : -1;
+  if (node.kind === 'berry' && sinceGather >= 0 && sinceGather < 300) return `rustle${Math.floor(sinceGather / 150)}`;
+  if (node.amount <= 0) return EMPTY_FRAMES[node.kind];
+  if (node.kind === 'fiber') return ['ready', 'sway0', 'ready', 'sway1'][(Math.floor(timeMs / 500) + node.id.length + node.x) % 4];
+  return 'ready';
+}
+
+/** Small camp structures: where each stands from the fire, drawn as a flat site until built. */
+const CAMP_STRUCTURES = [['crate', 3, 1], ['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0]] as const;
+
+function addCamp(state: GameState, add: AddVisual): void {
   const { campX: x, campY: y } = BALANCE;
+  const { structures, progress } = state;
   let shelterTexture = 'shelterSite:still';
-  if (state.structures.shelter) {
-    const shelterFrame = state.structures.bed ? 'builtBed' : 'built';
-    shelterTexture = `shelter:${shelterFrame}`;
+  if (structures.shelter) shelterTexture = structures.bed ? 'shelter:builtBed' : 'shelter:built';
+  add('shelter', shelterTexture, x - 3, y - 2, structures.shelter ? undefined : GROUND_DECAL_DEPTH);
+  for (const [id, dx, dy] of CAMP_STRUCTURES) {
+    add(id, structures[id] ? `${id}:built` : `${id}Site:still`, x + dx, y + dy, structures[id] ? undefined : GROUND_DECAL_DEPTH);
   }
-  add('shelter', shelterTexture, x - 3, y - 2, state.structures.shelter ? undefined : GROUND_DECAL_DEPTH);
-  add('crate', state.structures.crate ? 'crate:built' : 'crateSite:still', x + 3, y + 1,
-    state.structures.crate ? undefined : GROUND_DECAL_DEPTH);
-  add('dryingRack', state.structures.dryingRack ? 'dryingRack:built' : 'dryingRackSite:still', x + 2, y - 2,
-    state.structures.dryingRack ? undefined : GROUND_DECAL_DEPTH);
-  add('windbreak', state.structures.windbreak ? 'windbreak:built' : 'windbreakSite:still', x - 2, y + 2,
-    state.structures.windbreak ? undefined : GROUND_DECAL_DEPTH);
-  add('stonePile', state.structures.stonePile ? 'stonePile:built' : 'stonePileSite:still', x, y - 3,
-    state.structures.stonePile ? undefined : GROUND_DECAL_DEPTH);
-  add('toolshed', state.structures.toolshed ? 'toolshed:built' : 'toolshedSite:still', x + 4, y,
-    state.structures.toolshed ? undefined : GROUND_DECAL_DEPTH);
   add('logSeat', 'logSeat:still', x - 1, y + 1);
-  add('lookout', state.progress.lookoutRepaired ? 'lookout:restored' : 'lookout:damaged', LOOKOUT.x, LOOKOUT.y);
-  add('site-basket', state.progress.discoveries.basket ? 'oldBasket:empty' : 'oldBasket:full', SITES.basket.x, SITES.basket.y);
+  add('lookout', progress.lookoutRepaired ? 'lookout:restored' : 'lookout:damaged', LOOKOUT.x, LOOKOUT.y);
+  add('site-basket', progress.discoveries.basket ? 'oldBasket:empty' : 'oldBasket:full', SITES.basket.x, SITES.basket.y);
   add('site-spring', 'spring:still', SITES.spring.x, SITES.spring.y);
-  add('site-cairn', state.progress.discoveries.cairn ? 'cairn:empty' : 'cairn:full', SITES.cairn.x, SITES.cairn.y);
-  if (state.progress.hearthUnlocked && !state.structures.hearth) add('hearthSite', 'hearthSite:still', x + 1, y + 2, GROUND_DECAL_DEPTH);
-  const fire = state.structures.hearth ? 'hearth' : 'firePit';
-  const phase = Math.floor(timeMs / 180) % 4;
+  add('site-cairn', progress.discoveries.cairn ? 'cairn:empty' : 'cairn:full', SITES.cairn.x, SITES.cairn.y);
+  if (progress.hearthUnlocked && !structures.hearth) add('hearthSite', 'hearthSite:still', x + 1, y + 2, GROUND_DECAL_DEPTH);
+}
+
+function fireMode(state: GameState): string {
+  if (state.fireFuel <= 0) return 'unlit';
   const storm = isColdNight(state);
   const low = state.fireFuel < 30;
-  let mode = 'burning';
-  if (state.fireFuel <= 0) mode = 'unlit';
-  else if (low && storm) mode = 'lowWindy';
-  else if (storm) mode = 'windy';
-  else if (low) mode = 'low';
+  if (storm) return low ? 'lowWindy' : 'windy';
+  return low ? 'low' : 'burning';
+}
+
+function addFire(state: GameState, timeMs: number, visuals: SceneVisual[], add: AddVisual): void {
+  const { campX: x, campY: y } = BALANCE;
+  const fire = state.structures.hearth ? 'hearth' : 'firePit';
+  const phase = Math.floor(timeMs / 180) % 4;
+  const mode = fireMode(state);
   add('fire', `${fire}:${mode === 'unlit' ? mode : `${mode}${phase}`}`, x, y);
   if (state.fireFuel > 0 && state.timeOfDay >= BALANCE.nightStart) visuals.push({
     id: 'flame', texture: `${state.structures.hearth ? 'hearthFlame' : 'flame'}:${mode}${phase}`,
     x: Math.round(worldX(x)), y: Math.round(worldY(y)), depth: LIGHT_DEPTH
   });
-  return visuals;
 }

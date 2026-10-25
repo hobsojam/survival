@@ -92,27 +92,36 @@ function pathTiles(destinations: readonly PathRoute[]): Map<string, string> {
   if (cached) return cached;
   const tiles = new Map<string, string>();
   for (let y = 0; y < BALANCE.mapHeight; y++) for (let x = 0; x < BALANCE.mapWidth; x++) {
-    if (pathDistance(x + .5, y + .5, destinations) > 1.25) continue;
-    const g = blank(16, 16);
-    let filled = 0;
-    for (let py = 0; py < 16; py++) for (let px = 0; px < 16; px++) {
-      const distance = pathDistance(x + (px + .5) / 16, y + (py + .5) / 16, destinations);
-      if (distance > .5) continue;
-      g[py][px] = distance >= .44 ? 'e' : 'g';
-      filled++;
-    }
-    if (filled === 0) continue;
-    const shape = g.map(row => row.join('')).join('/');
-    let name = pathSprites.get(shape);
-    if (!name) {
-      name = `pathTile${pathSprites.size}`;
-      terrainSprites[name] = sprite(g, groundLegend);
-      pathSprites.set(shape, name);
-    }
-    tiles.set(`${x},${y}`, name);
+    const g = pathTileGrid(x, y, destinations);
+    if (g) tiles.set(`${x},${y}`, pathSpriteFor(g));
   }
   pathTileSets.set(key, tiles);
   return tiles;
+}
+
+/** The path pixels on one tile, or null when no path crosses it. */
+function pathTileGrid(x: number, y: number, destinations: readonly PathRoute[]): Grid | null {
+  if (pathDistance(x + .5, y + .5, destinations) > 1.25) return null;
+  const g = blank(16, 16);
+  let filled = 0;
+  for (let py = 0; py < 16; py++) for (let px = 0; px < 16; px++) {
+    const distance = pathDistance(x + (px + .5) / 16, y + (py + .5) / 16, destinations);
+    if (distance > .5) continue;
+    g[py][px] = distance >= .44 ? 'e' : 'g';
+    filled++;
+  }
+  return filled ? g : null;
+}
+
+function pathSpriteFor(g: Grid): string {
+  const shape = g.map(row => row.join('')).join('/');
+  let name = pathSprites.get(shape);
+  if (!name) {
+    name = `pathTile${pathSprites.size}`;
+    terrainSprites[name] = sprite(g, groundLegend);
+    pathSprites.set(shape, name);
+  }
+  return name;
 }
 // Build every area's paths up front so their sprites are registered as textures with the rest.
 for (const routes of [CAMP_PATHS, CAMP_OPEN_PATHS, QUARRY_PATHS]) pathTiles(routes);
