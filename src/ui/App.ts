@@ -8,6 +8,7 @@ import { forecastFireCheck } from '../game/forecast';
 import { dayPhase, formatClock, nextChange } from '../game/clock';
 import { gateTap, nextOpenTab, type DockTab } from './dock';
 import { journalView } from './journal';
+import { Soundscape } from '../game/soundscape';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
 
@@ -17,6 +18,7 @@ export class App {
   private game?: Phaser.Game;
   private gameResize?: ResizeObserver;
   private readonly root: HTMLElement;
+  private readonly soundscape: Soundscape;
   private storage?: Storage;
   private previousSave: LoadResult = { kind: 'empty' };
   private lastSaveAt = 0;
@@ -33,6 +35,7 @@ export class App {
     } catch (error) {
       this.previousSave = { kind: 'invalid', reason: `Browser storage is unavailable: ${String(error)}` };
     }
+    this.soundscape = new Soundscape(this.storage);
     const buildMarkup = buildOptions.map(id => {
       const { name, description, symbol } = BUILDINGS[id];
       return `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>`
@@ -45,7 +48,7 @@ export class App {
       <div class="shell">
         <header class="topbar">
           <div class="brand"><span class="brand-icon">✦</span><div><strong>Hearthwild</strong><small>A little place to begin again</small></div></div>
-          <div class="top-actions"><span id="save-status" class="save-status">Local save</span><button id="restart-game" class="restart-button" hidden>New game</button><div class="day-pill" id="day-pill"><span id="day-label">Day 1 · Morning</span><span class="day-dial" aria-hidden="true"><span class="day-dial-night" style="left: ${BALANCE.nightStart / BALANCE.daySeconds * 100}%"></span><span id="day-dial-hand" class="day-dial-hand"></span></span><span id="day-countdown" class="day-countdown"></span></div></div>
+          <div class="top-actions"><button type="button" id="sound-toggle" class="sound-toggle" aria-pressed="true" aria-label="Mute game sounds" title="Mute game sounds"><span aria-hidden="true">♫</span><span class="sound-toggle-label">Sound on</span></button><span id="save-status" class="save-status">Local save</span><button id="restart-game" class="restart-button" hidden>New game</button><div class="day-pill" id="day-pill"><span id="day-label">Day 1 · Morning</span><span class="day-dial" aria-hidden="true"><span class="day-dial-night" style="left: ${BALANCE.nightStart / BALANCE.daySeconds * 100}%"></span><span id="day-dial-hand" class="day-dial-hand"></span></span><span id="day-countdown" class="day-countdown"></span></div></div>
         </header>
         <div class="layout">
           <main class="game-panel">
@@ -101,6 +104,12 @@ export class App {
     this.root.querySelector('#continue-game')!.addEventListener('click', () => this.continueGame());
     this.root.querySelector('#restart-game')!.addEventListener('click', () => this.beginNewGame());
     this.root.querySelector('#phone-new-game')!.addEventListener('click', () => this.beginNewGame());
+    this.root.querySelector('#sound-toggle')!.addEventListener('click', () => {
+      this.soundscape.toggle();
+      this.updateSoundToggle();
+    });
+    document.addEventListener('pointerdown', () => this.soundscape.resume(), { passive: true });
+    document.addEventListener('keydown', () => this.soundscape.resume());
     this.root.querySelectorAll<HTMLButtonElement>('[data-tab-button]').forEach(button => {
       button.addEventListener('click', () => this.setOpenTab(nextOpenTab(this.openTab, button.dataset.tabButton as DockTab)));
     });
@@ -111,6 +120,7 @@ export class App {
     window.addEventListener('pagehide', () => { if (this.scene) this.saveCurrent(); });
     document.addEventListener('visibilitychange', () => { if (document.hidden && this.scene) this.saveCurrent(); });
     this.showStartScreen();
+    this.updateSoundToggle();
     this.render();
   }
 
@@ -125,9 +135,12 @@ export class App {
     this.state = state;
     this.lastSaveAt = Date.now();
     this.saveFailures = 0;
+    this.soundscape.update(state);
+    this.soundscape.start();
     this.scene = new GameScene(state, (next, cause) => {
       const previous = this.state;
       this.state = next;
+      this.soundscape.update(next);
       this.render();
       if (cause === 'action' && !previous.progress.lookoutRepaired && next.progress.lookoutRepaired) {
         this.root.querySelector('#lookout-ending')?.classList.remove('hidden');
@@ -138,7 +151,7 @@ export class App {
       // After a failed save, wait for the backoff instead of retrying on every action.
       const due = Date.now() - this.lastSaveAt >= autosaveDelayMs(this.saveFailures);
       if ((cause === 'action' && next !== previous && !this.saveFailures) || due) this.saveCurrent();
-    }, message => this.setMessage(message));
+    }, message => this.setMessage(message), cue => this.soundscape.playCue(cue));
     // A tap on the game while a phone sheet is open only closes the sheet.
     this.scene.setTapGate(() => {
       const dock = this.root.querySelector<HTMLElement>('.phone-dock');
@@ -431,5 +444,17 @@ export class App {
   private setText(id: string, text: string): void {
     const element = this.root.querySelector<HTMLElement>(`#${id}`);
     if (element) element.textContent = text;
+  }
+
+  private updateSoundToggle(): void {
+    const button = this.root.querySelector<HTMLButtonElement>('#sound-toggle');
+    if (!button) return;
+    const soundOn = !this.soundscape.isMuted;
+    const label = soundOn ? 'Sound on' : 'Sound off';
+    const action = soundOn ? 'Mute game sounds' : 'Turn on game sounds';
+    button.querySelector('.sound-toggle-label')!.textContent = label;
+    button.setAttribute('aria-pressed', String(soundOn));
+    button.setAttribute('aria-label', action);
+    button.title = action;
   }
 }

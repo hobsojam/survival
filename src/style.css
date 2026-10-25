@@ -27,6 +27,8 @@ button:focus-visible { outline: 3px solid #d69c5d; outline-offset: 3px; }
 .brand strong { display: block; font: 700 27px/1.05 'Fraunces', serif; letter-spacing: -.035em; }
 .brand small { display: block; margin-top: 4px; color: #788678; font-size: 10px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
 .top-actions { display: flex; align-items: center; gap: 13px; }
+.sound-toggle { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #cbd8c8; border-radius: 999px; background: #f6f7ee; color: #4b6b50; padding: 7px 10px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.sound-toggle[aria-pressed="false"] { color: #7d8377; background: #f0f0e9; }
 .save-status { color: #5f6e63; font-size: 11px; white-space: nowrap; }
 .restart-button { border: 0; background: transparent; color: #58715c; font-size: 11px; font-weight: 700; text-decoration: underline; }
 .day-pill { display: flex; align-items: center; gap: 10px; background: #dce8d6; color: #3f684b; border: 1px solid #cbdcc7; border-radius: 100px; padding: 10px 17px; font-weight: 700; font-size: 12px; white-space: nowrap; box-shadow: inset 0 1px #fff9; transition: background .6s, color .6s, border-color .6s; }
@@ -205,6 +207,7 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
   .brand { gap: 8px; }
   .brand-icon { width: 28px; height: 28px; border-radius: 9px; font-size: 16px; }
   .top-actions { gap: 8px; }
+  .sound-toggle { gap: 4px; padding: 6px 8px; font-size: 10px; }
   .save-status { display: inline; font-size: 10px; }
   .brand strong { font-size: 17px; }
   .day-pill { padding: 6px 8px; gap: 5px; font-size: 10px; }
