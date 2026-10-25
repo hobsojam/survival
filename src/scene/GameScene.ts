@@ -148,6 +148,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   perform(action: GameAction, announce = true): void {
+    // The sidebar's buttons still click while the game is paused; nothing should happen.
+    if (this.scene.isPaused()) return;
     if (action.type !== 'move') this.walkTarget = nextWalk(this.walkTarget, { kind: 'action' });
     const before = this.state;
     const result = applyAction(before, action);

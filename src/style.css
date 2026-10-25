@@ -29,6 +29,16 @@ button:focus-visible { outline: 3px solid #d69c5d; outline-offset: 3px; }
 .top-actions { display: flex; align-items: center; gap: 13px; }
 .sound-toggle { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #cbd8c8; border-radius: 999px; background: #f6f7ee; color: #4b6b50; padding: 7px 10px; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .sound-toggle[aria-pressed="false"] { color: #5f665b; background: #f0f0e9; }
+.pause-toggle[aria-pressed="false"] { color: #4b6b50; background: #f6f7ee; }
+.pause-toggle[aria-pressed="true"] { color: #f1f4fa; background: #3d5875; border-color: #2f4459; }
+.pause-icon { font-size: 9px; letter-spacing: -1px; }
+.pause-overlay { position: absolute; inset: 0; z-index: 7; display: grid; place-items: center; padding: 16px; background: #18382b9e; backdrop-filter: blur(2px); }
+.pause-overlay[hidden] { display: none; }
+.pause-card { max-width: 320px; padding: 22px 24px; border-radius: 16px; background: #fffdf7; text-align: center; box-shadow: 0 12px 32px #17302466; }
+.pause-card h2 { margin: 4px 0 8px; }
+.pause-card p:not(.eyebrow) { margin: 0 0 16px; color: #536d55; font-size: 13px; line-height: 1.45; }
+.pause-card .primary-button { width: 100%; }
+.pause-key { display: block; margin-top: 8px; color: #77897b; font-size: 11px; }
 .save-status { color: #5f6e63; font-size: 11px; white-space: nowrap; }
 .restart-button { border: 0; background: transparent; color: #58715c; font-size: 11px; font-weight: 700; text-decoration: underline; }
 .day-pill { display: flex; align-items: center; gap: 10px; background: #dce8d6; color: #3f684b; border: 1px solid #cbdcc7; border-radius: 100px; padding: 10px 17px; font-weight: 700; font-size: 12px; white-space: nowrap; box-shadow: inset 0 1px #fff9; transition: background .6s, color .6s, border-color .6s; }
@@ -195,7 +205,7 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
 .start-copy { color: #64766a; line-height: 1.55; font-size: 14px; }
 .start-note { min-height: 35px; color: #926e50; font-size: 12px; line-height: 1.4; }
 .start-buttons { display: grid; gap: 9px; margin: 20px 0 18px; }
-.start-buttons button { border-radius: 9px; padding: 12px; border: 1px solid #9bb398; font-weight: 700; }
+.start-buttons button, .pause-card button { border-radius: 9px; padding: 12px; border: 1px solid #9bb398; font-weight: 700; }
 .primary-button { background: #4d7559; color: #fff; }.primary-button:hover { background: #3e664b; }
 .secondary-button { background: #f4f7ee; color: #46674d; }.secondary-button:hover { background: #e7efe1; }
 .start-card > small { color: #9ca99c; font-size: 10px; letter-spacing: .05em; }
@@ -231,6 +241,7 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
   .brand-icon { width: 28px; height: 28px; border-radius: 9px; font-size: 16px; }
   .top-actions { gap: 8px; }
   .sound-toggle { gap: 4px; padding: 6px 8px; font-size: 10px; }
+  .pause-label, .pause-key, .sound-toggle-label { display: none; }
   .save-status { display: inline; font-size: 10px; }
   .brand strong { font-size: 17px; }
   .day-pill { padding: 6px 8px; gap: 5px; font-size: 10px; }

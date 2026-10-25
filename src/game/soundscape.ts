@@ -17,6 +17,7 @@ export class Soundscape {
   private muted: boolean;
   private readonly gainTargets = new WeakMap<GainNode, number>();
   private started = false;
+  private paused = false;
   private birdTimer?: number;
   private cricketTimer?: number;
   private fireTimer?: number;
@@ -45,8 +46,16 @@ export class Soundscape {
   }
 
   resume(): void {
+    if (this.paused) return;
     if (!this.context || this.muted || this.context.state === 'running') return;
     void this.context.resume().catch(() => undefined);
+  }
+
+  /** Silences everything while the game is paused, and picks up where it left off after. */
+  setPaused(paused: boolean): void {
+    this.paused = paused;
+    if (paused) void this.context?.suspend().catch(() => undefined);
+    else this.resume();
   }
 
   update(state: GameState & { area?: string }): void {
