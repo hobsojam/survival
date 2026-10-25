@@ -7,6 +7,7 @@ import { cookBlocker, isAtCamp, sleepBlocker, stargazeBlocker } from '../game/ru
 import { dayPhase, formatClock, nextChange } from '../game/clock';
 import { isLowMeter } from '../game/needs';
 import { gateTap, nextOpenTab, wireSidebarTabs, type DockTab } from './dock';
+import { createPause, wirePause, type PauseControl } from './pause';
 import { journalView, QUARRY_MARKER } from './journal';
 import { axeView, bagView, buildButtonView, forecastView, lookoutView, nightHint, pickaxeView, sitesFound, startNote, type ActionPanelView } from './panels';
 import { Soundscape } from '../game/soundscape';
@@ -25,6 +26,7 @@ export class App {
   private lastSaveAt = 0;
   private saveFailures = 0;
   private openTab: DockTab | null = null;
+  private readonly pause: PauseControl;
   private toastTimer?: number;
 
   constructor(root: HTMLElement) {
@@ -37,6 +39,7 @@ export class App {
       this.previousSave = { kind: 'invalid', reason: `Browser storage is unavailable: ${String(error)}` };
     }
     this.soundscape = new Soundscape(this.storage);
+    this.pause = createPause(this.root, { scenes: () => this.game?.scene, sound: this.soundscape, save: () => { if (this.storage) this.saveCurrent(); }, started: () => Boolean(this.scene) });
     const buildMarkup = buildOptions.map(id => {
       const { name, description, symbol } = BUILDINGS[id];
       return `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>`
@@ -51,11 +54,11 @@ export class App {
       <div class="shell">
         <header class="topbar">
           <div class="brand"><span class="brand-icon">✦</span><div><strong>Hearthwild</strong><small>A little place to begin again</small></div></div>
-          <div class="top-actions"><button type="button" id="sound-toggle" class="sound-toggle" aria-pressed="true" aria-label="Mute game sounds" title="Mute game sounds"><span aria-hidden="true">♫</span><span class="sound-toggle-label">Sound on</span></button><span id="save-status" class="save-status">Local save</span><button id="restart-game" class="restart-button" hidden>New game</button><div class="day-pill" id="day-pill"><span id="day-label">Day 1 · Morning</span><span class="day-dial" aria-hidden="true"><span class="day-dial-night" style="left: ${BALANCE.nightStart / BALANCE.daySeconds * 100}%"></span><span id="day-dial-hand" class="day-dial-hand"></span></span><span id="day-countdown" class="day-countdown"></span></div></div>
+          <div class="top-actions"><button type="button" id="sound-toggle" class="sound-toggle" aria-pressed="true" aria-label="Mute game sounds" title="Mute game sounds"><span aria-hidden="true">♫</span><span class="sound-toggle-label">Sound on</span></button><button type="button" id="pause-toggle" class="sound-toggle pause-toggle" aria-pressed="false" title="Pause the game (Esc)"><span class="pause-icon" aria-hidden="true">❚❚</span><span class="pause-label">Pause</span></button><span id="save-status" class="save-status">Local save</span><button id="restart-game" class="restart-button" hidden>New game</button><div class="day-pill" id="day-pill"><span id="day-label">Day 1 · Morning</span><span class="day-dial" aria-hidden="true"><span class="day-dial-night" style="left: ${BALANCE.nightStart / BALANCE.daySeconds * 100}%"></span><span id="day-dial-hand" class="day-dial-hand"></span></span><span id="day-countdown" class="day-countdown"></span></div></div>
         </header>
         <div class="layout">
           <main class="game-panel">
-            <div class="game-frame"><div id="game-canvas"></div><div class="phone-meters" aria-hidden="true"><span class="track"><span id="mini-energy" class="fill energy"></span></span><span class="track"><span id="mini-hunger" class="fill hunger"></span></span><span class="track"><span id="mini-warmth" class="fill warmth"></span></span></div><div class="prompt" id="prompt">WASD / arrows  Move</div></div>
+            <div class="game-frame"><div id="game-canvas"></div><div class="phone-meters" aria-hidden="true"><span class="track"><span id="mini-energy" class="fill energy"></span></span><span class="track"><span id="mini-hunger" class="fill hunger"></span></span><span class="track"><span id="mini-warmth" class="fill warmth"></span></span></div><div id="pause-overlay" class="pause-overlay" hidden><div class="pause-card" role="dialog" aria-labelledby="pause-title"><p class="eyebrow">TAKING A BREATH</p><h2 id="pause-title">Paused</h2><p>The clock, the fire, and your survivor will wait for you.</p><button type="button" id="pause-resume" class="primary-button">Resume</button><small class="pause-key">or press Esc</small></div></div><div class="prompt" id="prompt">WASD / arrows  Move</div></div>
             <div class="message" id="message">Gather a few branches. Your camp is waiting.</div>
             <div class="shortcuts"><span><kbd>WASD</kbd> Move</span><span><kbd>E</kbd> Gather</span><span><kbd>V</kbd> Explore</span><span><kbd>F</kbd> Fire</span><span><kbd>R</kbd> Rest</span><span><kbd>Q</kbd> Berries</span><span><kbd>T</kbd> Ration</span><span><kbd>P</kbd> Prepare</span><span><kbd>C</kbd> Cook</span><span><kbd>G</kbd> Stargaze</span><span><kbd>Z</kbd> Sleep</span><span><kbd>L</kbd> Lookout</span><span><kbd>X</kbd> Chop</span></div>
           </main>
@@ -98,14 +101,14 @@ export class App {
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
         const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone';
-        this.scene?.perform({ type });
+        if (!this.pause.paused) this.scene?.perform({ type });
       });
     });
     this.root.querySelector('#build-list')!.addEventListener('click', event => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-build]');
-      if (button) this.scene?.perform({ type: 'build', structureId: button.dataset.build as StructureId });
+      if (button && !this.pause.paused) this.scene?.perform({ type: 'build', structureId: button.dataset.build as StructureId });
     });
-    this.root.querySelector('#site-button')!.addEventListener('click', () => this.scene?.visitNearestSite());
+    this.root.querySelector('#site-button')!.addEventListener('click', () => { if (!this.pause.paused) this.scene?.visitNearestSite(); });
     this.root.querySelector('#new-game')!.addEventListener('click', () => this.beginNewGame());
     this.root.querySelector('#continue-game')!.addEventListener('click', () => this.continueGame());
     this.root.querySelector('#restart-game')!.addEventListener('click', () => this.beginNewGame());
@@ -120,6 +123,7 @@ export class App {
       button.addEventListener('click', () => this.setOpenTab(nextOpenTab(this.openTab, button.dataset.tabButton as DockTab)));
     });
     wireSidebarTabs(this.root, this.storage);
+    wirePause(this.root, document, this.pause);
     this.root.querySelector('#continue-exploring')!.addEventListener('click', () => {
       this.root.querySelector('#lookout-ending')?.classList.add('hidden');
       this.game?.scene.resume('GameScene');
@@ -139,6 +143,7 @@ export class App {
     const restart = this.root.querySelector<HTMLButtonElement>('#restart-game');
     if (restart) restart.hidden = false;
     this.setOpenTab(null);
+    this.pause.set(false);
     this.state = state;
     this.lastSaveAt = Date.now();
     this.saveFailures = 0;
