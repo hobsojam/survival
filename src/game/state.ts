@@ -46,7 +46,10 @@ export interface StonePile {
   count: number;
 }
 
+export type AreaId = 'camp' | 'quarry';
+
 export interface GameState {
+  area: AreaId;
   day: number;
   timeOfDay: number;
   player: { x: number; y: number; energy: number; hunger: number; warmth: number };
@@ -127,7 +130,7 @@ const fiberPositions = [
   [21, 14], [17, 19], [24, 18], [14, 16],
   [27, 12], [10, 14], [30, 18], [8, 21]
 ];
-const stonePositions = [[8, 12], [31, 10], [11, 22], [29, 21], [6, 18], [33, 23]];
+const stonePositions = [[31, 10], [11, 22], [29, 21]];
 const treePositions = [
   [20, 7, 'treeBroadleaf'], [17, 9, 'treeBroadleaf'], [27, 5, 'treeBroadleaf'],
   [22, 23, 'treePine'], [32, 14, 'treePine'], [15, 24, 'treePine']
@@ -142,6 +145,7 @@ export function createGame(): GameState {
   ];
   const trees: TreeNode[] = treePositions.map(([x, y, sprite], index) => ({ id: `tree-${index}`, x, y, sprite, readyDay: 1 }));
   return {
+    area: 'camp',
     day: 1,
     timeOfDay: 0,
     player: { x: BALANCE.campX + 1, y: BALANCE.campY + 1, energy: 100, hunger: 100, warmth: 100 },

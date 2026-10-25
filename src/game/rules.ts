@@ -1,3 +1,4 @@
+import { CAMP_EXIT, QUARRY_EXIT, crossing, pathOpen } from './areas';
 import { BALANCE, BUILDINGS, LOOKOUT, SITES, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
@@ -6,7 +7,7 @@ export type GameAction =
   | { type: 'visitSite'; siteId: SiteId }
   | { type: 'build'; structureId: StructureId }
   | { type: 'move'; dx: number; dy: number }
-  | { type: 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' }
+  | { type: 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' }
   | { type: 'pickUpStone'; pileId: string };
 
 /** Awake time tires the survivor; work already costs energy, and resting doesn't. */
@@ -21,8 +22,12 @@ function near(x1: number, y1: number, x2: number, y2: number): boolean {
   return Math.hypot(x1 - x2, y1 - y2) <= BALANCE.interactionRadius;
 }
 
+function near2(x1: number, y1: number, x2: number, y2: number, radius: number): boolean {
+  return Math.hypot(x1 - x2, y1 - y2) <= radius;
+}
+
 export function isAtCamp(state: GameState): boolean {
-  return Math.hypot(state.player.x - BALANCE.campX, state.player.y - BALANCE.campY) <= BALANCE.campRadius;
+  return state.area === 'camp' && Math.hypot(state.player.x - BALANCE.campX, state.player.y - BALANCE.campY) <= BALANCE.campRadius;
 }
 
 export const FULL_BAG_MESSAGE = 'Your bag is full. Eat, burn, or set something down at camp to make room.';
@@ -185,15 +190,29 @@ function dawn(next: GameState, camp: boolean): void {
 export function applyAction(state: GameState, action: GameAction): ActionResult {
   if (action.type === 'move') {
     const factor = movementFactor(state);
+    const rawX = state.player.x + action.dx * factor;
+    const rawY = state.player.y + action.dy * factor;
+    const crossed = crossing(state, rawX, rawY);
     return {
       state: {
         ...state,
+        ...(crossed ? { area: crossed.area } : {}),
         player: {
           ...state.player,
-          x: Math.max(0, Math.min(BALANCE.mapWidth - 1, state.player.x + action.dx * factor)),
-          y: Math.max(0, Math.min(BALANCE.mapHeight - 1, state.player.y + action.dy * factor))
+          x: crossed ? crossed.x : Math.max(0, Math.min(BALANCE.mapWidth - 1, rawX)),
+          y: crossed ? crossed.y : Math.max(0, Math.min(BALANCE.mapHeight - 1, rawY))
         }
       },
+      message: ''
+    };
+  }
+  if (action.type === 'cross') {
+    const exit = state.area === 'camp' ? CAMP_EXIT : QUARRY_EXIT;
+    if (!near2(state.player.x, state.player.y, exit.x, exit.y, 0.5)) return { state, message: 'Walk to the end of the west path to cross.' };
+    if (!pathOpen(state)) return { state, message: 'Build a shelter to open the west path.' };
+    const toQuarry = state.area === 'camp';
+    return {
+      state: { ...state, area: toQuarry ? 'quarry' : 'camp', player: { ...state.player, x: toQuarry ? BALANCE.mapWidth - 1.5 : 0.5, y: exit.y } },
       message: ''
     };
   }
@@ -256,6 +275,7 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     };
   }
   if (action.type === 'visitSite') {
+    if (state.area !== 'camp') return { state, message: 'There is nothing like that here.' };
     const site = SITES[action.siteId];
     if (!site || !near(state.player.x, state.player.y, site.x, site.y)) return { state, message: 'Move closer to a place along the path.' };
     if (action.siteId === 'spring') {
@@ -387,6 +407,7 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     };
   }
   if (action.type === 'repairLookout') {
+    if (state.area !== 'camp') return { state, message: 'There is nothing like that here.' };
     const blocker = lookoutRepairBlocker(state);
     if (blocker) return { state, message: blocker };
     const { wood, fiber, stone } = LOOKOUT.cost;

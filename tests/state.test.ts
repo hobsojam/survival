@@ -4,6 +4,7 @@ import { BALANCE, BUILDINGS, createGame } from '../src/game/state';
 describe('new game', () => {
   it('starts one survivor at a valid camp with renewable supplies', () => {
     const game = createGame();
+    expect(game.area).toBe('camp');
     expect(game.day).toBe(1);
     expect(game.timeOfDay).toBe(0);
     expect(game.player.x).toBeGreaterThanOrEqual(0);
@@ -21,8 +22,8 @@ describe('new game', () => {
     expect(game.nodes.filter(node => node.kind === 'branch')).toHaveLength(12);
     expect(game.nodes.filter(node => node.kind === 'berry')).toHaveLength(8);
     expect(game.nodes.filter(node => node.kind === 'fiber')).toHaveLength(8);
-    expect(game.nodes.filter(node => node.kind === 'stone')).toHaveLength(6);
-    expect(new Set(game.nodes.map(node => node.id)).size).toBe(34);
+    expect(game.nodes.filter(node => node.kind === 'stone')).toHaveLength(3);
+    expect(new Set(game.nodes.map(node => node.id)).size).toBe(31);
   });
 });
 

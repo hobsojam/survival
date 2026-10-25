@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, LOOKOUT, SITES, createGame } from '../src/game/state';
-import { FULL_BAG_MESSAGE, advanceTime, applyAction, buildStatus, carriedCount, freeSpaces, lookoutRepairBlocker } from '../src/game/rules';
+import { FULL_BAG_MESSAGE, advanceTime, isAtCamp, applyAction, buildStatus, carriedCount, freeSpaces, lookoutRepairBlocker } from '../src/game/rules';
 
 describe('gathering and inventory', () => {
   it('prepares a trail ration only at a built rack in camp, including with a full bag', () => {
@@ -978,5 +978,83 @@ describe('the stone pile at camp', () => {
     const repaired = applyAction(state, { type: 'repairLookout' }).state;
     expect(repaired.progress.lookoutRepaired).toBe(true);
     expect(repaired.storedStone).toBe(1);
+  });
+});
+
+describe('the second area', () => {
+  function sheltered() {
+    const state = createGame();
+    state.structures.shelter = true;
+    return state;
+  }
+
+  it('walking off the west edge at the path crosses into the quarry', () => {
+    const state = sheltered();
+    state.player.x = 0.05;
+    state.player.y = 15;
+    expect(applyAction(state, { type: 'move', dx: -1, dy: 0 }).state.area).toBe('quarry');
+  });
+
+  it('the west edge still blocks away from the path', () => {
+    const state = sheltered();
+    state.player.x = 0.05;
+    state.player.y = 10;
+    const moved = applyAction(state, { type: 'move', dx: -1, dy: 0 }).state;
+    expect(moved.area).toBe('camp');
+    expect(moved.player.x).toBe(0);
+  });
+
+  it('cross needs to stand at the path end', () => {
+    const state = sheltered();
+    state.player.x = 5;
+    state.player.y = 15;
+    const refused = applyAction(state, { type: 'cross' });
+    expect(refused.state).toBe(state);
+    expect(refused.message).toBe('Walk to the end of the west path to cross.');
+    state.player.x = 0.4;
+    expect(applyAction(state, { type: 'cross' }).state.area).toBe('quarry');
+  });
+
+  it('camp actions need the camp area', () => {
+    const state = sheltered();
+    state.area = 'quarry';
+    state.timeOfDay = BALANCE.nightStart;
+    state.player.x = 20;
+    state.player.y = 15;
+    state.inventory.wood = 20;
+    state.inventory.fiber = 20;
+    expect(isAtCamp(state)).toBe(false);
+    for (const action of [{ type: 'stokeFire' }, { type: 'sleep' }, { type: 'build', structureId: 'bed' }] as const) {
+      const result = applyAction(state, action);
+      expect(result.state).toBe(state);
+      expect(result.message).toMatch(/^Return to/);
+    }
+  });
+
+  it('sites and the lookout only answer in the camp area', () => {
+    const state = createGame();
+    state.area = 'quarry';
+    state.player.x = SITES.spring.x;
+    state.player.y = SITES.spring.y;
+    expect(applyAction(state, { type: 'visitSite', siteId: 'spring' }).message).toBe('There is nothing like that here.');
+    expect(applyAction(state, { type: 'repairLookout' }).message).toBe('There is nothing like that here.');
+  });
+
+  it('the cold front counts the quarry as away from camp', () => {
+    const make = (area: 'camp' | 'quarry') => {
+      const state = createGame();
+      state.area = area;
+      state.day = 3;
+      state.timeOfDay = 170;
+      state.player.warmth = 80;
+      state.player.x = 20;
+      state.player.y = 15;
+      state.structures.shelter = true;
+      state.structures.windbreak = true;
+      return state;
+    };
+    const atCamp = advanceTime(make('camp'), 4).player.warmth;
+    const away = advanceTime(make('quarry'), 4).player.warmth;
+    expect(away).toBeLessThan(atCamp);
   });
 });
