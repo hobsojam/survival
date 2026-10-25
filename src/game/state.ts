@@ -108,6 +108,17 @@ export const BALANCE = {
   bedRestEnergyGain: 50,
   sleepEnergyGain: 60,
   energyDrainPerSecond: 1 / 6,
+  /** At or below this, energy and hunger read as low: tired or hungry. */
+  lowNeed: 20,
+  /** Below this energy, heavy work is refused. */
+  exhaustedEnergy: 10,
+  tiredWorkFactor: 1.5,
+  /** A hungry survivor regains this share of the energy rest would give. */
+  hungryRecoveryFactor: 0.5,
+  /** Sleeping hungry can't lift energy past this. */
+  hungrySleepCap: 50,
+  /** Extra energy lost each second at zero hunger, whatever the survivor is doing. */
+  starvingEnergyDrainPerSecond: 0.25,
   fireSecondsPerWood: 90,
   /** Kindling: the same with or without the hearth. */
   fiberFireSeconds: 30,

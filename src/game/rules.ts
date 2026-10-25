@@ -1,4 +1,5 @@
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } from './areas';
+import { TOO_TIRED_MESSAGE, isExhausted, isHungry, recovery, workSeconds } from './needs';
 import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
@@ -74,6 +75,7 @@ export function lookoutRepairBlocker(state: GameState): string | null {
   if (state.progress.lookoutRepaired) return 'The lookout is already restored.';
   if (!state.progress.hearthUnlocked) return 'Weather the cold front before repairing the lookout.';
   if (!near(state.player.x, state.player.y, LOOKOUT.x, LOOKOUT.y)) return 'Stand beside the lookout to repair it.';
+  if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   const { wood, fiber, stone } = LOOKOUT.cost;
   if (state.inventory.wood < wood || state.inventory.fiber < fiber || availableStone(state) < stone) {
     const needed = [state.inventory.wood < wood ? `${wood} wood` : null,
@@ -122,6 +124,7 @@ export function pickaxeBlocker(state: GameState): string | null {
   if (!state.progress.quarryFound) return 'Find the quarry first.';
   if (!state.structures.toolshed) return 'Build a toolshed first.';
   if (!isAtCamp(state)) return 'Return to camp to craft the pickaxe.';
+  if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   const { wood, fiber, stone } = PICKAXE.cost;
   if (state.inventory.wood < wood || state.inventory.fiber < fiber || availableStone(state) < stone)
     return `Need ${wood} wood, ${fiber} fiber, and ${stone} stone for the pickaxe.`;
@@ -139,7 +142,7 @@ export function buildStatus(state: GameState, id: StructureId): BuildStatus {
   const cost = definition.cost;
   const stoneCost = 'stone' in cost ? cost.stone : 0;
   const affordable = state.inventory.wood >= cost.wood && state.inventory.fiber >= cost.fiber && availableStone(state) >= stoneCost;
-  return affordable && isAtCamp(state) ? 'ready' : 'unavailable';
+  return affordable && isAtCamp(state) && !isExhausted(state) ? 'ready' : 'unavailable';
 }
 
 export function advanceTime(state: GameState, seconds: number, activity: Activity = 'awake'): GameState {
@@ -155,8 +158,9 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
     const step = Math.min(remaining, 1, BALANCE.daySeconds - next.timeOfDay);
     const camp = isAtCamp(next);
     const coldNight = isColdNight(next);
+    const drain = (activity === 'awake' ? BALANCE.energyDrainPerSecond : 0) + (next.player.hunger <= 0 ? BALANCE.starvingEnergyDrainPerSecond : 0);
     next.player.hunger = Math.max(0, next.player.hunger - step / 8);
-    if (activity === 'awake') next.player.energy = Math.max(0, next.player.energy - step * BALANCE.energyDrainPerSecond);
+    next.player.energy = Math.max(0, next.player.energy - step * drain);
     next.player.warmth = Math.max(0, Math.min(100, next.player.warmth + warmthChange(next, step, camp, coldNight)));
     next.fireFuel = Math.max(0, next.fireFuel - step * (coldNight ? BALANCE.coldNightFireBurn : 1));
     next.timeOfDay += step;
@@ -219,7 +223,7 @@ function payAndBuild(state: GameState, cost: { wood: number; fiber: number; ston
     inventory: { ...paid.inventory, wood: state.inventory.wood - cost.wood, fiber: state.inventory.fiber - cost.fiber },
     player: tire(state, BALANCE.buildEnergyCost),
     ...changes
-  }, BALANCE.buildSeconds, 'working');
+  }, workSeconds(state, BALANCE.buildSeconds), 'working');
 }
 
 function quarryFoundOnArrival(moved: GameState): ActionResult {
@@ -269,7 +273,7 @@ const gather: ActionHandler<'gather'> = (state, action) => {
       player: tire(state, BALANCE.gatherEnergyCost),
       inventory: { ...state.inventory, [resource]: state.inventory[resource] + 1 },
       nodes
-    }, BALANCE.gatherSeconds, 'working'),
+    }, workSeconds(state, BALANCE.gatherSeconds), 'working'),
     message: GATHER_MESSAGE[resource] ?? ''
   };
 };
@@ -279,6 +283,7 @@ export function axeBlocker(state: GameState): string | null {
   if (!state.progress.hearthUnlocked) return 'Weather the cold front before crafting an axe.';
   if (!state.structures.toolshed) return 'Build a toolshed first.';
   if (!isAtCamp(state)) return 'Return to camp to craft the axe.';
+  if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   if (state.inventory.wood < 1 || state.inventory.fiber < 1 || availableStone(state) < 1) return 'Need 1 wood, 1 fiber, and 1 stone for the axe.';
   return null;
 }
@@ -311,7 +316,7 @@ const gatherRubble: ActionHandler<'gatherRubble'> = state => {
       player: tire(state, BALANCE.gatherEnergyCost),
       inventory: { ...state.inventory, stone: state.inventory.stone + 1 },
       rubbleReadyDay: state.day + BALANCE.rubbleRegrowDays
-    }, BALANCE.gatherSeconds, 'working'),
+    }, workSeconds(state, BALANCE.gatherSeconds), 'working'),
     message: 'Pried a stone from the rubble.'
   };
 };
@@ -320,6 +325,7 @@ const digQuarry: ActionHandler<'digQuarry'> = state => {
   if (!state.progress.pickaxeCrafted) return refuse(state, 'You need a pickaxe to work the quarry.');
   if (state.area !== 'quarry' || !near(state.player.x, state.player.y, QUARRY_SITE.x, QUARRY_SITE.y)) return refuse(state, 'Move closer to the quarry face.');
   if (state.quarryReadyDay > state.day) return refuse(state, 'The quarry face is worked out until morning.');
+  if (isExhausted(state)) return refuse(state, TOO_TIRED_MESSAGE);
   if (freeSpaces(state) < spaceFor('stone')) return refuse(state, FULL_BAG_MESSAGE);
   return {
     state: advanceTime({
@@ -327,7 +333,7 @@ const digQuarry: ActionHandler<'digQuarry'> = state => {
       player: tire(state, BALANCE.digEnergyCost),
       inventory: { ...state.inventory, stone: state.inventory.stone + 1 },
       quarryReadyDay: state.day + 1
-    }, BALANCE.digSeconds, 'working'),
+    }, workSeconds(state, BALANCE.digSeconds), 'working'),
     message: 'Broke a good stone from the quarry face.'
   };
 };
@@ -337,6 +343,7 @@ const chopTree: ActionHandler<'chopTree'> = (state, action) => {
   const tree = state.trees.find(item => item.id === action.treeId);
   if (!tree || state.area !== 'camp' || !near(state.player.x, state.player.y, tree.x, tree.y)) return refuse(state, 'Move closer to a mature tree.');
   if (tree.readyDay > state.day) return refuse(state, 'This stump needs more time to regrow.');
+  if (isExhausted(state)) return refuse(state, TOO_TIRED_MESSAGE);
   if (freeSpaces(state) < 2 * spaceFor('wood')) return refuse(state, 'Your bag needs two free spaces for wood.');
   return {
     state: advanceTime({
@@ -344,7 +351,7 @@ const chopTree: ActionHandler<'chopTree'> = (state, action) => {
       player: tire(state, BALANCE.chopEnergyCost),
       inventory: { ...state.inventory, wood: state.inventory.wood + 2 },
       trees: state.trees.map(item => item.id === tree.id ? { ...item, readyDay: state.day + BALANCE.treeRegrowDays } : item)
-    }, BALANCE.chopSeconds, 'working'),
+    }, workSeconds(state, BALANCE.chopSeconds), 'working'),
     message: 'Chopped the tree and collected two wood. A stump remains.'
   };
 };
@@ -353,7 +360,7 @@ function restAtSpring(state: GameState): ActionResult {
   const rested = advanceTime({ ...state, progress: { ...state.progress,
     discoveries: { ...state.progress.discoveries, spring: true } } }, BALANCE.restSeconds, 'resting');
   return {
-    state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + 20) } },
+    state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + recovery(state, 20)) } },
     message: 'You pause beside the quiet spring and feel rested.'
   };
 }
@@ -372,7 +379,7 @@ const visitSite: ActionHandler<'visitSite'> = (state, action) => {
     player: tire(state, BALANCE.gatherEnergyCost),
     inventory: { ...state.inventory, [resource]: state.inventory[resource] + 2 },
     progress: { ...state.progress, discoveries: { ...state.progress.discoveries, [action.siteId]: true } }
-  }, BALANCE.gatherSeconds, 'working');
+  }, workSeconds(state, BALANCE.gatherSeconds), 'working');
   return { state: found, message: action.siteId === 'basket' ? 'An old basket holds two berries.' : 'You find two useful stones tucked in the cairn.' };
 };
 
@@ -461,7 +468,7 @@ const prepareTrailFood: ActionHandler<'prepareTrailFood'> = state => {
     state: advanceTime({ ...state,
       inventory: { ...state.inventory, food: state.inventory.food - 1, trailFood: state.inventory.trailFood + 1 },
       player: tire(state, BALANCE.gatherEnergyCost)
-    }, BALANCE.trailFoodSeconds, 'working'),
+    }, workSeconds(state, BALANCE.trailFoodSeconds), 'working'),
     message: 'Dried a berry into one trail ration.'
   };
 };
@@ -488,7 +495,7 @@ const STARGAZE_THOUGHTS = [
 const stargaze: ActionHandler<'stargaze'> = state => {
   const blocker = stargazeBlocker(state);
   if (blocker) return refuse(state, blocker);
-  const restored = { ...state, player: { ...state.player, energy: Math.min(100, state.player.energy + BALANCE.stargazeEnergyGain) } };
+  const restored = { ...state, player: { ...state.player, energy: Math.min(100, state.player.energy + recovery(state, BALANCE.stargazeEnergyGain)) } };
   return {
     state: advanceTime(restored, BALANCE.stargazeSeconds, 'resting'),
     message: `${STARGAZE_THOUGHTS[(state.day - 1) % STARGAZE_THOUGHTS.length]} You feel a little rested.`
@@ -530,6 +537,7 @@ function buildBlocker(state: GameState, structureId: StructureId): string | null
   if (definition.prerequisite === 'coldNight' && !state.progress.hearthUnlocked) return 'Weather the cold night to unlock the hearth.';
   if (state.structures[structureId]) return 'Already built.';
   if (definition.prerequisite === 'shelter' && !state.structures.shelter) return 'Build a shelter first.';
+  if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   return missingCost(state, buildingCost(structureId));
 }
 
@@ -550,18 +558,25 @@ const build: ActionHandler<'build'> = (state, action) => {
 const rest: ActionHandler<'rest'> = state => {
   if (!isAtCamp(state)) return refuse(state, 'Return to the marked camp area to rest.');
   const rested = advanceTime(state, BALANCE.restSeconds, 'resting');
-  const gain = rested.structures.bed ? BALANCE.bedRestEnergyGain : BALANCE.restEnergyGain;
+  const gain = recovery(state, rested.structures.bed ? BALANCE.bedRestEnergyGain : BALANCE.restEnergyGain);
   return {
     state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + gain) } },
     message: 'You take a short rest.'
   };
 };
 
+/** Energy after a night's sleep: full in a bed, otherwise a good boost; hungry, half the boost and no more than the cap. */
+function sleptEnergy(state: GameState): number {
+  const { energy } = state.player;
+  const rested = state.structures.bed ? 100 : Math.min(100, energy + BALANCE.sleepEnergyGain);
+  if (!isHungry(state)) return rested;
+  return Math.max(energy, Math.min(BALANCE.hungrySleepCap, energy + (rested - energy) * BALANCE.hungryRecoveryFactor));
+}
+
 const sleep: ActionHandler<'sleep'> = state => {
   const blocked = sleepBlocker(state);
   if (blocked) return refuse(state, blocked);
-  const energy = state.structures.bed ? 100 : Math.min(100, state.player.energy + BALANCE.sleepEnergyGain);
-  const slept = advanceTime({ ...state, player: { ...state.player, energy } }, BALANCE.daySeconds - state.timeOfDay, 'resting');
+  const slept = advanceTime({ ...state, player: { ...state.player, energy: sleptEnergy(state) } }, BALANCE.daySeconds - state.timeOfDay, 'resting');
   const fireDied = state.fireFuel > 0 && slept.fireFuel <= 0;
   return {
     state: slept,
