@@ -82,6 +82,10 @@ export const BALANCE = {
   sleepEnergyGain: 60,
   energyDrainPerSecond: 1 / 6,
   fireSecondsPerWood: 90,
+  /** Kindling: the same with or without the hearth. */
+  fiberFireSeconds: 30,
+  /** Stone is heavy: each one takes this many bag spaces. */
+  stoneSpaces: 2,
   hearthFireSecondsPerWood: 150,
   coldNightStartDay: 3,
   coldNightRetryDays: 3,

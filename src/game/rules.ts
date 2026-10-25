@@ -4,10 +4,9 @@ export type GameAction =
   | { type: 'gather'; nodeId: string }
   | { type: 'chopTree'; treeId: string }
   | { type: 'visitSite'; siteId: SiteId }
-  | { type: 'drop'; resource: keyof GameState['inventory'] }
   | { type: 'build'; structureId: StructureId }
   | { type: 'move'; dx: number; dy: number }
-  | { type: 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' };
+  | { type: 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'burnFiber' };
 
 /** Awake time tires the survivor; work already costs energy, and resting doesn't. */
 export type Activity = 'awake' | 'working' | 'resting';
@@ -25,9 +24,25 @@ export function isAtCamp(state: GameState): boolean {
   return Math.hypot(state.player.x - BALANCE.campX, state.player.y - BALANCE.campY) <= BALANCE.campRadius;
 }
 
+export const FULL_BAG_MESSAGE = 'Your bag is full. Eat, burn, or set something down at camp to make room.';
+
+/** Bag spaces one of this supply takes; stone is heavy. */
+export function spaceFor(resource: keyof GameState['inventory']): number {
+  return resource === 'stone' ? BALANCE.stoneSpaces : 1;
+}
+
+/** Bag spaces in use, counting stone at its weight. */
 export function carriedCount(state: GameState): number {
-  const { wood, food, fiber, stone, trailFood } = state.inventory;
-  return wood + food + fiber + stone + trailFood;
+  return (Object.keys(state.inventory) as (keyof GameState['inventory'])[])
+    .reduce((total, resource) => total + state.inventory[resource] * spaceFor(resource), 0);
+}
+
+export function bagCapacity(state: GameState): number {
+  return state.structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity;
+}
+
+export function freeSpaces(state: GameState): number {
+  return bagCapacity(state) - carriedCount(state);
 }
 
 export function trailFoodBlocker(state: GameState): string | null {
@@ -137,7 +152,8 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
       const weathered = stormEnded && camp && next.structures.shelter && next.fireFuel > 0 && next.player.warmth > 20;
       next.day += 1;
       next.timeOfDay = 0;
-      next.nodes = next.nodes.map(node => node.readyDay <= next.day ? { ...node, amount: 1 } : node);
+      // Rocks give their stone once; everything else grows back at dawn.
+      next.nodes = next.nodes.map(node => node.kind !== 'stone' && node.readyDay <= next.day ? { ...node, amount: 1 } : node);
       if (stormEnded) {
         next.progress = weathered
           ? { ...next.progress, nextStormDay: null, hearthUnlocked: true }
@@ -174,14 +190,11 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
       return { state, message: 'Move closer to gather.' };
     }
     if (node.amount <= 0) return { state, message: 'Nothing to gather yet.' };
-    const capacity = state.structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity;
-    if (carriedCount(state) >= capacity) {
-      return { state, message: 'Your bag is full. Drop an item to make room.' };
-    }
     let resource: keyof GameState['inventory'] = 'wood';
     if (node.kind === 'berry') resource = 'food';
     else if (node.kind === 'fiber') resource = 'fiber';
     else if (node.kind === 'stone') resource = 'stone';
+    if (freeSpaces(state) < spaceFor(resource)) return { state, message: FULL_BAG_MESSAGE };
     const nodes = state.nodes.map((item, itemIndex) => itemIndex === index
       ? { ...item, amount: item.amount - 1, readyDay: state.day + 1 }
       : item);
@@ -216,9 +229,7 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     const tree = state.trees.find(item => item.id === action.treeId);
     if (!tree || !near(state.player.x, state.player.y, tree.x, tree.y)) return { state, message: 'Move closer to a mature tree.' };
     if (tree.readyDay > state.day) return { state, message: 'This stump needs more time to regrow.' };
-    const capacity = state.structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity;
-    const carried = carriedCount(state);
-    if (carried + 2 > capacity) return { state, message: 'Your bag needs two free spaces for wood.' };
+    if (freeSpaces(state) < 2 * spaceFor('wood')) return { state, message: 'Your bag needs two free spaces for wood.' };
     return {
       state: advanceTime({
         ...state,
@@ -241,10 +252,9 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
       };
     }
     if (state.progress.discoveries[action.siteId]) return { state, message: `You have already searched the ${site.name.toLowerCase()}.` };
-    const capacity = state.structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity;
-    const carried = carriedCount(state);
-    if (carried + 2 > capacity) return { state, message: 'Your bag needs two free spaces for this find.' };
     const resource = action.siteId === 'basket' ? 'food' : 'stone';
+    const needed = 2 * spaceFor(resource);
+    if (freeSpaces(state) < needed) return { state, message: `Your bag needs ${needed} free spaces for this find.` };
     const found = advanceTime({
       ...state,
       player: { ...state.player, energy: Math.max(0, state.player.energy - BALANCE.gatherEnergyCost) },
@@ -253,15 +263,12 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     }, BALANCE.gatherSeconds, 'working');
     return { state: found, message: action.siteId === 'basket' ? 'An old basket holds two berries.' : 'You find two useful stones tucked in the cairn.' };
   }
-  if (action.type === 'drop') {
-    const amount = state.inventory[action.resource];
-    if (!amount) return { state, message: `No ${action.resource} to drop.` };
-    let item: string = action.resource;
-    if (action.resource === 'food') item = 'berry';
-    if (action.resource === 'trailFood') item = 'trail ration';
+  if (action.type === 'burnFiber') {
+    if (!isAtCamp(state)) return { state, message: 'Return to the marked camp area to tend the fire.' };
+    if (state.inventory.fiber < 1) return { state, message: 'You have no fiber to burn.' };
     return {
-      state: { ...state, inventory: { ...state.inventory, [action.resource]: amount - 1 } },
-      message: `Dropped one ${item}.`
+      state: { ...state, inventory: { ...state.inventory, fiber: state.inventory.fiber - 1 }, fireFuel: state.fireFuel + BALANCE.fiberFireSeconds },
+      message: 'The kindling flares up.'
     };
   }
   if (action.type === 'eat') {

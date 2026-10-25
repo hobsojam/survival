@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE, createGame } from '../src/game/state';
-import { advanceTime, applyAction } from '../src/game/rules';
+import { BALANCE, SITES, createGame } from '../src/game/state';
+import { FULL_BAG_MESSAGE, advanceTime, applyAction, carriedCount, freeSpaces } from '../src/game/rules';
 
 describe('gathering and inventory', () => {
   it('prepares a trail ration only at a built rack in camp, including with a full bag', () => {
@@ -30,18 +30,18 @@ describe('gathering and inventory', () => {
     expect(applyAction({ ...eaten, player: { ...eaten.player, hunger: 90 } }, { type: 'eatTrailFood' }).state.player.hunger).toBe(100);
   });
 
-  it('counts rations for discovery rewards and drops one ration at a time', () => {
+  it('counts rations for discovery rewards, and eating one makes room', () => {
     const state = createGame();
     state.inventory.trailFood = 7;
     state.player.x = 8;
     state.player.y = 8;
+    state.player.hunger = 50;
     const blocked = applyAction(state, { type: 'visitSite', siteId: 'basket' });
     expect(blocked.state).toBe(state);
     expect(state.progress.discoveries.basket).toBe(false);
-    const dropped = applyAction(state, { type: 'drop', resource: 'trailFood' });
-    expect(dropped.state.inventory.trailFood).toBe(6);
-    expect(dropped.message).toContain('trail ration');
-    expect(applyAction(dropped.state, { type: 'visitSite', siteId: 'basket' }).state.progress.discoveries.basket).toBe(true);
+    const eaten = applyAction(state, { type: 'eatTrailFood' });
+    expect(eaten.state.inventory.trailFood).toBe(6);
+    expect(applyAction(eaten.state, { type: 'visitSite', siteId: 'basket' }).state.progress.discoveries.basket).toBe(true);
   });
   it('gathers nearby wood and spends energy without mutating the old state', () => {
     const before = createGame();
@@ -63,7 +63,7 @@ describe('gathering and inventory', () => {
     expect(advanceTime(gathered.state, 240).nodes.find(node => node.id === 'fiber-0')?.amount).toBe(1);
   });
 
-  it('collects stone from a rock, refills it at dawn, and counts it toward bag capacity', () => {
+  it('collects stone from a rock once, and counts it as two bag spaces', () => {
     const state = createGame();
     const stone = state.nodes.find(node => node.kind === 'stone')!;
     state.player.x = stone.x;
@@ -71,34 +71,15 @@ describe('gathering and inventory', () => {
     const gathered = applyAction(state, { type: 'gather', nodeId: stone.id });
     expect(gathered.state.inventory.stone).toBe(1);
     expect(gathered.state.nodes.find(node => node.id === stone.id)?.amount).toBe(0);
-    expect(advanceTime(gathered.state, 240).nodes.find(node => node.id === stone.id)?.amount).toBe(1);
+    expect(advanceTime(gathered.state, 240).nodes.find(node => node.id === stone.id)?.amount).toBe(0);
     const fullBag = gathered.state;
-    fullBag.inventory.wood = 7;
+    fullBag.inventory.wood = 5;
     const secondStone = fullBag.nodes.find(node => node.kind === 'stone' && node.amount > 0)!;
     fullBag.player.x = secondStone.x;
     fullBag.player.y = secondStone.y;
     expect(applyAction(fullBag, { type: 'gather', nodeId: secondStone.id }).message).toMatch(/full/i);
   });
 
-  it('can clear a stone-filled bag and still build the shelter', () => {
-    let state = createGame();
-    state.inventory.stone = 6;
-    state.inventory.fiber = 2;
-    for (let i = 0; i < 6; i++) {
-      const dropped = applyAction(state, { type: 'drop', resource: 'stone' });
-      expect(dropped.state.inventory.stone).toBe(5 - i);
-      state = dropped.state;
-    }
-    expect(applyAction(state, { type: 'drop', resource: 'stone' }).state).toBe(state);
-    for (const node of state.nodes.filter(node => node.kind === 'branch').slice(0, 6)) {
-      state.player.x = node.x;
-      state.player.y = node.y;
-      state = applyAction(state, { type: 'gather', nodeId: node.id }).state;
-    }
-    state.player.x = BALANCE.campX;
-    state.player.y = BALANCE.campY;
-    expect(applyAction(state, { type: 'build', structureId: 'shelter' }).state.structures.shelter).toBe(true);
-  });
 
   it('counts fiber toward carrying capacity', () => {
     const state = createGame();
@@ -758,5 +739,81 @@ describe('forecast cold night', () => {
     expect(built.inventory.stone).toBe(0);
     built.inventory.wood = 1;
     expect(applyAction(built, { type: 'stokeFire' }).state.fireFuel).toBe(150);
+  });
+});
+
+describe('heavy stone and fiber fuel', () => {
+  const atCamp = () => {
+    const state = createGame();
+    state.player.x = BALANCE.campX;
+    state.player.y = BALANCE.campY;
+    return state;
+  };
+
+  it('counts stone as two spaces', () => {
+    const state = createGame();
+    state.inventory = { wood: 2, food: 0, fiber: 0, stone: 1, trailFood: 0 };
+    expect(carriedCount(state)).toBe(4);
+    expect(freeSpaces(state)).toBe(4);
+  });
+
+  it('refuses a rock when only one space is free', () => {
+    const state = createGame();
+    const rock = state.nodes.find(node => node.id === 'stone-0')!;
+    state.player.x = rock.x;
+    state.player.y = rock.y;
+    state.inventory.wood = 7;
+    const refused = applyAction(state, { type: 'gather', nodeId: rock.id });
+    expect(refused.state).toBe(state);
+    expect(refused.message).toBe(FULL_BAG_MESSAGE);
+    state.inventory.wood = 6;
+    expect(applyAction(state, { type: 'gather', nodeId: rock.id }).state.inventory.stone).toBe(1);
+  });
+
+  it("needs four free spaces for the cairn's two stones", () => {
+    const state = createGame();
+    state.player.x = SITES.cairn.x;
+    state.player.y = SITES.cairn.y;
+    state.inventory.wood = 5;
+    expect(applyAction(state, { type: 'visitSite', siteId: 'cairn' }).state).toBe(state);
+    state.inventory.wood = 4;
+    expect(applyAction(state, { type: 'visitSite', siteId: 'cairn' }).state.inventory.stone).toBe(2);
+  });
+
+  it('burns fiber for thirty seconds at camp only', () => {
+    const state = atCamp();
+    state.inventory.fiber = 1;
+    const burned = applyAction(state, { type: 'burnFiber' }).state;
+    expect(burned.fireFuel).toBe(30);
+    expect(burned.inventory.fiber).toBe(0);
+    state.structures.hearth = true;
+    expect(applyAction(state, { type: 'burnFiber' }).state.fireFuel).toBe(30);
+    const away = createGame();
+    away.player.x = 0;
+    away.inventory.fiber = 1;
+    expect(applyAction(away, { type: 'burnFiber' }).state).toBe(away);
+    const none = atCamp();
+    expect(applyAction(none, { type: 'burnFiber' }).state).toBe(none);
+  });
+
+  it('never burns fiber when stoking the fire', () => {
+    const state = atCamp();
+    state.inventory.fiber = 2;
+    const result = applyAction(state, { type: 'stokeFire' });
+    expect(result.state).toBe(state);
+    expect(state.inventory.fiber).toBe(2);
+  });
+
+  it('does not refill rocks at dawn, but still refills branches', () => {
+    let state = createGame();
+    for (const id of ['stone-0', 'branch-0']) {
+      const node = state.nodes.find(item => item.id === id)!;
+      state.player.x = node.x;
+      state.player.y = node.y;
+      state = applyAction(state, { type: 'gather', nodeId: id }).state;
+    }
+    const morning = advanceTime(state, BALANCE.daySeconds);
+    expect(morning.nodes.find(node => node.id === 'stone-0')!.amount).toBe(0);
+    expect(morning.nodes.find(node => node.id === 'branch-0')!.amount).toBe(1);
   });
 });

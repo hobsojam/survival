@@ -91,10 +91,6 @@ export class App {
         this.scene?.perform({ type });
       });
     });
-    this.root.querySelector('.supplies')!.addEventListener('click', event => {
-      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-drop]');
-      if (button) this.scene?.perform({ type: 'drop', resource: button.dataset.drop as keyof GameState['inventory'] });
-    });
     this.root.querySelector('#build-list')!.addEventListener('click', event => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-build]');
       if (button) this.scene?.perform({ type: 'build', structureId: button.dataset.build as StructureId });
