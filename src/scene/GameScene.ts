@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { BALANCE, LOOKOUT, SITES, type GameState, type SiteId, type TreeNode } from '../game/state';
 import { advanceTime, applyAction, isAtCamp, isColdNight, sleepBlocker, type GameAction } from '../game/rules';
 import { TILE, worldX, worldY, drawTerrain } from './art';
+import { terrainKey } from './map';
 import { sceneVisuals, playerVisualDepth, WEATHER_DEPTH } from './visuals';
 import { sprites } from '../art/sprites';
 import { AmbientLife } from './ambientLife';
@@ -32,6 +33,8 @@ export class GameScene extends Phaser.Scene {
   private visualAction?: { kind: SurvivorAction; startedAtMs: number };
   private walkTarget?: TapTarget;
   private tapGate: () => boolean = () => true;
+  private terrain: Phaser.GameObjects.GameObject[] = [];
+  private terrainShown = '';
 
   constructor(state: GameState, onStateChange: (state: GameState, cause: 'action' | 'tick') => void, onFeedback: (message: string) => void, onSound: (cue: SoundCue) => void = () => undefined) {
     super({ key: 'GameScene' });
@@ -43,14 +46,13 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     registerSpriteTextures(this);
-    drawTerrain(this, this.state.nodes, this.state.trees);
+    this.redrawTerrain();
     this.ambient = new AmbientLife(this);
     this.effects = new SceneEffects(this);
     const playerArt = sprites.survivor;
     this.playerSprite = this.add.image(Math.round(worldX(this.state.player.x)), Math.round(worldY(this.state.player.y)), 'survivor:idleDown0')
       .setOrigin(playerArt.anchor[0] / playerArt.size[0], playerArt.anchor[1] / playerArt.size[1]);
     this.playerSprite.setDepth(playerVisualDepth(this.state));
-    this.cameras.main.setBounds(0, 0, BALANCE.mapWidth * TILE, BALANCE.mapHeight * TILE);
     this.cameras.main.startFollow(this.playerSprite, true, 0.09, 0.09);
     this.cameras.main.setZoom(1);
     this.cameras.main.roundPixels = true;
@@ -66,6 +68,7 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (document.hidden || !this.keys) return;
+    if (terrainKey(this.state) !== this.terrainShown) this.redrawTerrain();
     const dt = Math.min(delta / 1000, 0.05);
     const horizontal = Number(this.keys.D.isDown || this.keys.RIGHT.isDown) - Number(this.keys.A.isDown || this.keys.LEFT.isDown);
     const vertical = Number(this.keys.S.isDown || this.keys.DOWN.isDown) - Number(this.keys.W.isDown || this.keys.UP.isDown);
@@ -229,6 +232,15 @@ export class GameScene extends Phaser.Scene {
 
   resizeViewport(width: number, height: number): void {
     if (this.lighting) this.lighting.resize(width, height);
+  }
+
+  /** Swaps the terrain when the area changes or the west path opens. */
+  private redrawTerrain(): void {
+    for (const object of this.terrain) object.destroy();
+    if (this.terrainShown) this.textures.remove(`terrain-${this.terrainShown}`);
+    this.terrainShown = terrainKey(this.state);
+    this.terrain = drawTerrain(this, this.state);
+    this.cameras.main.setBounds(0, 0, BALANCE.mapWidth * TILE, BALANCE.mapHeight * TILE);
   }
 
   private handleTap(pixelX: number, pixelY: number): void {
