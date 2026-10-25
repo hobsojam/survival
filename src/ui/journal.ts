@@ -48,9 +48,9 @@ export function journalView(state: GameState): {
     ? 'Follow the northeast path and restore the old lookout.'
     : 'Build a toolshed at camp to make tools.';
   if (state.progress.lookoutRepaired && state.structures.toolshed) {
-    if (!sitesFound) nextHint = 'Follow an unexplored path to find another quiet place.';
-    else if (!state.progress.quarryFound) nextHint = 'Follow the west path out of camp to see what lies beyond.';
-    else nextHint = 'You have followed all five paths. Your camp is home, and the woods are yours to wander.';
+    if (sitesFound && state.progress.quarryFound) nextHint = 'You have followed all five paths. Your camp is home, and the woods are yours to wander.';
+    else if (sitesFound) nextHint = 'Follow the west path out of camp to see what lies beyond.';
+    else nextHint = 'Follow an unexplored path to find another quiet place.';
   }
   return { locations, milestones, nextHint };
 }

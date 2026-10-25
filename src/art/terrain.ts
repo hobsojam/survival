@@ -55,7 +55,8 @@ for (let mask = 0; mask < 16; mask++) {
   terrainSprites[`transition${mask}`] = sprite(g, groundLegend);
 }
 
-const campCircleTiles = new Map<string, 'full' | string>();
+/** Camp circle tiles by offset: 'full' for solid earth, otherwise the edge sprite's name. */
+const campCircleTiles = new Map<string, string>();
 const circleRadius = BALANCE.campRadius * 16;
 for (let dy = -BALANCE.campRadius; dy <= BALANCE.campRadius; dy++) {
   for (let dx = -BALANCE.campRadius; dx <= BALANCE.campRadius; dx++) {
@@ -79,7 +80,7 @@ for (let dy = -BALANCE.campRadius; dy <= BALANCE.campRadius; dy++) {
   }
 }
 
-export function campCircleTile(dx: number, dy: number): 'full' | string | undefined {
+export function campCircleTile(dx: number, dy: number): string | undefined {
   return campCircleTiles.get(`${dx},${dy}`);
 }
 

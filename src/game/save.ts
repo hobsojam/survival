@@ -40,7 +40,8 @@ function validProgress({ structures, progress, area }: SaveShape): boolean {
   if ((area === 'quarry' || progress.quarryFound) && !structures.shelter) return false;
   if (progress.pickaxeCrafted && !(progress.quarryFound && structures.toolshed)) return false;
   if (progress.axeCrafted && !structures.toolshed) return false;
-  return !((structures.hearth || progress.lookoutRepaired || progress.axeCrafted) && !progress.hearthUnlocked);
+  const needsColdNight = [structures.hearth, progress.lookoutRepaired, progress.axeCrafted].includes(true);
+  return progress.hearthUnlocked === true || !needsColdNight;
 }
 
 function validStorm({ progress, day }: SaveShape): boolean {
@@ -57,7 +58,7 @@ const readyBy = (value: unknown, latest: number): boolean => whole(value) && val
 
 function validStone({ structures, storedStone, quarryReadyDay, rubbleReadyDay, day }: SaveShape): boolean {
   const today = day as number;
-  return count(storedStone) && storedStone <= BALANCE.stonePileCapacity && (structures.stonePile || storedStone === 0)
+  return count(storedStone) && storedStone <= BALANCE.stonePileCapacity && (structures.stonePile === true || storedStone === 0)
     && readyBy(quarryReadyDay, today + 1) && readyBy(rubbleReadyDay, today + BALANCE.rubbleRegrowDays);
 }
 

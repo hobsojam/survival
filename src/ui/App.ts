@@ -355,11 +355,11 @@ export class App {
 
   private renderMap(locations: ReturnType<typeof journalView>['locations']): void {
     const { player } = this.state;
-    const quarryPlace = locations.find(place => place.id === 'quarry');
+    const quarryKnown = locations.some(place => place.id === 'quarry');
     const quarryMarker = this.root.querySelector<HTMLElement>('#map-quarry');
-    if (quarryMarker) quarryMarker.hidden = !quarryPlace;
+    if (quarryMarker) quarryMarker.hidden = !quarryKnown;
     const westPath = this.root.querySelector<SVGPathElement>('#map-west-path');
-    if (westPath) westPath.style.display = quarryPlace ? '' : 'none';
+    if (westPath) westPath.style.display = quarryKnown ? '' : 'none';
     for (const place of locations) {
       const marker = this.root.querySelector(`#map-${place.id}`);
       if (marker) {

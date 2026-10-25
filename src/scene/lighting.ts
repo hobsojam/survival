@@ -7,7 +7,7 @@ import { darkness } from './ambient';
 export interface LightingTint { color: number; alpha: number }
 export interface LightRadii { inner: number; middle: number; outer: number }
 
-const color = (hex: string): number => parseInt(hex.slice(1), 16);
+const color = (hex: string): number => Number.parseInt(hex.slice(1), 16);
 const mixColor = (from: number, to: number, amount: number): number => {
   const channel = (shift: number) => Math.round(((from >> shift) & 255) * (1 - amount) + ((to >> shift) & 255) * amount);
   return (channel(16) << 16) | (channel(8) << 8) | channel(0);

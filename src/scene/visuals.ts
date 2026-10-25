@@ -50,9 +50,13 @@ function addPiles(state: GameState, visuals: SceneVisual[], add: AddVisual): voi
     if (pile.area !== state.area) continue;
     add(pile.id, `looseStones:${pileSize(pile.count)}`, pile.x, pile.y);
     if (pile.count < 2) continue;
-    const base = visuals[visuals.length - 1];
-    visuals.push({ id: `${pile.id}-count`, texture: `pileCount:${pile.count > 9 ? 'lots' : `n${pile.count}`}`, x: base.x, y: base.y - 14, depth: base.depth + 0.5 });
+    const base = visuals.at(-1)!;
+    visuals.push({ id: `${pile.id}-count`, texture: `pileCount:${pileCountFrame(pile.count)}`, x: base.x, y: base.y - 14, depth: base.depth + 0.5 });
   }
+}
+
+function pileCountFrame(count: number): string {
+  return count > 9 ? 'lots' : 'n' + count;
 }
 
 function pileSize(count: number): string {
@@ -109,7 +113,8 @@ function addFire(state: GameState, timeMs: number, visuals: SceneVisual[], add: 
   const fire = state.structures.hearth ? 'hearth' : 'firePit';
   const phase = Math.floor(timeMs / 180) % 4;
   const mode = fireMode(state);
-  add('fire', `${fire}:${mode === 'unlit' ? mode : `${mode}${phase}`}`, x, y);
+  const frame = mode === 'unlit' ? mode : mode + phase;
+  add('fire', `${fire}:${frame}`, x, y);
   if (state.fireFuel > 0 && state.timeOfDay >= BALANCE.nightStart) visuals.push({
     id: 'flame', texture: `${state.structures.hearth ? 'hearthFlame' : 'flame'}:${mode}${phase}`,
     x: Math.round(worldX(x)), y: Math.round(worldY(y)), depth: LIGHT_DEPTH
