@@ -1,7 +1,7 @@
 import { BALANCE, type GameState, type ResourceNode } from '../game/state';
 import { QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 import { campCircleTile, pathTile, terrainSprites } from '../art/terrain';
-import { CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_OPEN_PATHS, CAMP_PATHS, QUARRY_PATHS, pathDistance, type PathRoute } from './mapGeometry';
+import { CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_OPEN_PATHS, CAMP_PATHS, pathDistance, type PathRoute } from './mapGeometry';
 
 export interface MapItem { x: number; y: number; sprite: string }
 export interface TerrainMap { ground: string[][]; pathTiles: MapItem[]; campEdges: MapItem[]; decorations: MapItem[]; rimStones: MapItem[]; trees: MapItem[]; groves: MapItem[][] }
@@ -14,7 +14,7 @@ export function terrainKey(state: GameState): TerrainKey {
   return pathOpen(state) ? 'camp-open' : 'camp';
 }
 
-const ROUTES: Record<TerrainKey, readonly PathRoute[]> = { camp: CAMP_PATHS, 'camp-open': CAMP_OPEN_PATHS, quarry: QUARRY_PATHS };
+const ROUTES: Record<Exclude<TerrainKey, 'quarry'>, readonly PathRoute[]> = { camp: CAMP_PATHS, 'camp-open': CAMP_OPEN_PATHS };
 
 function hash(x: number, y: number, salt = 0): number {
   let n = Math.imul(x + salt * 31, 374761393) + Math.imul(y - salt * 17, 668265263);
@@ -69,14 +69,11 @@ function buildQuarryMap(): TerrainMap {
 
 /** Adds one quarry tile's path, tree or decoration to the map and returns its ground sprite. */
 function layQuarryTile(x: number, y: number, map: TerrainMap): string {
-  const routes = QUARRY_PATHS;
-  const path = pathTile(x, y, routes);
-  if (path) map.pathTiles.push({ x, y, sprite: path });
   const edge = edgeDistance(x, y);
   const nearSite = [QUARRY_SITE, RUBBLE_SITE].some(site => Math.hypot(x - site.x, y - site.y) < 1.5);
-  if (edge <= 1 && x < 24 && hash(x, y, 2) % 3 !== 0 && clearForTree(x, y, [], routes)) {
+  if (edge <= 1 && x < 24 && hash(x, y, 2) % 3 !== 0 && clearForTree(x, y, [], [])) {
     map.trees.push({ x, y, sprite: TREE_SPRITES[hash(x, y, 3) % 3] });
-  } else if (edge > 0 && pathDistance(x + .5, y + .5, routes) > .5 && !nearSite && hash(x, y, 4) % 4 === 0) {
+  } else if (edge > 0 && !nearSite && hash(x, y, 4) % 4 === 0) {
     const detail = hash(x, y, 5) % 4;
     map.decorations.push({ x, y, sprite: detail === 3 ? 'tuft0' : `pebbles${detail % 2}` });
   }

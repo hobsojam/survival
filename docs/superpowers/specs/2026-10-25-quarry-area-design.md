@@ -40,7 +40,7 @@ This builds on the supplies rework (PR #63, merged) and assumes its rules: stone
 - **The second area itself:**
   - The same tile size and map size as camp (40×30).
   - **Rockier and more open:** more bare ground and stone decals, and few trees.
-  - Its path leads from the crossing to the quarry.
+  - No path is drawn in this area: the open ground leads from the crossing to the quarry. (Changed after play-testing; the drawn path looked wrong here.)
 - **Everything else keeps running there:** the clock, hunger, warmth, energy, night, weather, and the cold-front schedule. The fire stays at camp, so being away costs warmth just as any trip away from camp does today. Camp actions such as feeding the fire, sleeping, building, and the stone pile only work in the camp area.
 - **Dropped stone stays in the area where it was dropped.** Loose piles belong to an area.
 

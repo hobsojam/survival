@@ -1,5 +1,5 @@
 import { BALANCE } from '../game/state';
-import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE } from '../game/areas';
+import { CAMP_EXIT } from '../game/areas';
 
 /** A path runs between two tile centres: [fromX, fromY, toX, toY]. */
 export type PathRoute = readonly [number, number, number, number];
@@ -12,8 +12,6 @@ const fromCamp = ([x, y]: readonly [number, number]): PathRoute => [BALANCE.camp
 export const CAMP_PATHS: readonly PathRoute[] = PATH_DESTINATIONS.map(fromCamp);
 /** Once the shelter stands, a fifth path leads west to the crossing. */
 export const CAMP_OPEN_PATHS: readonly PathRoute[] = [...CAMP_PATHS, fromCamp([CAMP_EXIT.x, CAMP_EXIT.y])];
-/** The quarry's own path, from its east exit to the edge of the quarry. */
-export const QUARRY_PATHS: readonly PathRoute[] = [[QUARRY_EXIT.x, QUARRY_EXIT.y, QUARRY_SITE.x + 1, QUARRY_SITE.y + 1]];
 
 export function segmentDistance(x: number, y: number, [fromX, fromY, toX, toY]: PathRoute): number {
   const startX = fromX + .5, startY = fromY + .5;

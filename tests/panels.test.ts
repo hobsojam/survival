@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
-import { axeView, bagView, buildButtonView, forecastView, lookoutView, nightHint, pickaxeView, startNote } from '../src/ui/panels';
+import { axeView, bagView, buildButtonView, forecastView, lookoutView, nightHint, pickaxeView, sitesFound, startNote } from '../src/ui/panels';
 
 type Changes = { structures?: Partial<GameState['structures']>; progress?: Partial<GameState['progress']>; inventory?: Partial<GameState['inventory']> };
 
@@ -151,5 +151,13 @@ describe('build buttons', () => {
 
   it('shows built structures as complete', () => {
     expect(buildButtonView(game({ structures: { crate: true } }), 'crate')).toMatchObject({ disabled: true, built: true, locked: false, verb: 'Built', price: 'Complete' });
+  });
+});
+
+describe('places found', () => {
+  it('lists the places found along the paths, in path order', () => {
+    expect(sitesFound(game())).toBe('Places found: none yet');
+    expect(sitesFound(game({ progress: { discoveries: { basket: false, spring: true, cairn: false } } }))).toBe('Places found: Quiet spring');
+    expect(sitesFound(game({ progress: { discoveries: { basket: true, spring: false, cairn: true } } }))).toBe('Places found: Old basket, Stone cairn');
   });
 });

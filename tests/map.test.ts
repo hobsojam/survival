@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BALANCE, SITES, createGame } from '../src/game/state';
 import { terrainSprites } from '../src/art/terrain';
 import { buildMap, terrainKey, type TerrainMap } from '../src/scene/map';
-import { CAMP_EXIT, QUARRY_SITE } from '../src/game/areas';
+import { CAMP_EXIT } from '../src/game/areas';
 
 function visibleGround(map: TerrainMap, x: number, y: number, pixelX = 8, pixelY = 8): string | undefined {
   const base = terrainSprites[map.ground[y][x]];
@@ -210,8 +210,8 @@ describe('terrain composition', () => {
     const camp = buildMap(nodes, 'camp');
     const quarry = buildMap([], 'quarry');
     expect(quarry.campEdges).toEqual([]);
-    expect(quarry.pathTiles.some(item => item.x === 38 && item.y === 15)).toBe(true);
-    expect(quarry.pathTiles.some(item => Math.hypot(item.x - QUARRY_SITE.x, item.y - QUARRY_SITE.y) <= 2)).toBe(true);
+    // No path is drawn in the quarry; the open ground leads straight to the quarry face.
+    expect(quarry.pathTiles).toEqual([]);
     expect(quarry.trees.length).toBeLessThan(camp.trees.length / 2);
     const stones = (map: TerrainMap) => map.decorations.filter(item => item.sprite.startsWith('pebbles')).length;
     expect(stones(quarry)).toBeGreaterThanOrEqual(2 * stones(camp));
