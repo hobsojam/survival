@@ -3,11 +3,11 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type SiteId, typ
 import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
-import { availableStone, bagCapacity, buildStatus, carriedCount, cookBlocker, isAtCamp, isColdNight, lookoutRepairBlocker, sleepBlocker, stargazeBlocker, trailFoodBlocker } from '../game/rules';
+import { availableStone, bagCapacity, buildStatus, carriedCount, cookBlocker, isAtCamp, isColdNight, lookoutRepairBlocker, pickaxeBlocker, sleepBlocker, stargazeBlocker, trailFoodBlocker } from '../game/rules';
 import { forecastFireCheck } from '../game/forecast';
 import { dayPhase, formatClock, nextChange } from '../game/clock';
 import { gateTap, nextOpenTab, type DockTab } from './dock';
-import { journalView } from './journal';
+import { journalView, QUARRY_MARKER } from './journal';
 import { Soundscape } from '../game/soundscape';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
@@ -41,8 +41,10 @@ export class App {
       return `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>`
         + (id === 'stonePile' ? `<div id="stone-pile-controls" class="stone-pile-controls" hidden><span id="stone-pile-stored">Stored stone 0/${BALANCE.stonePileCapacity}</span><button type="button" data-action="storeStone">Store 1</button><button type="button" data-action="takeStone">Take 1</button></div>` : '');
     }).join('');
-    const mapMarkers = journalView(this.state).locations.map(place =>
-      `<span id="map-${place.id}" class="map-point" style="left:${place.x / BALANCE.mapWidth * 100}%;top:${place.y / BALANCE.mapHeight * 100}%">?</span>`
+    // The quarry marker is always in the markup and shown only once the west path opens.
+    const markerPlaces = [...journalView(this.state).locations.filter(place => place.id !== 'quarry'), { id: 'quarry', ...QUARRY_MARKER }];
+    const mapMarkers = markerPlaces.map(place =>
+      `<span id="map-${place.id}" class="map-point" style="left:${place.x / BALANCE.mapWidth * 100}%;top:${place.y / BALANCE.mapHeight * 100}%"${place.id === 'quarry' ? ' hidden' : ''}>?</span>`
     ).join('');
     this.root.innerHTML = `
       <div class="shell">
@@ -59,10 +61,10 @@ export class App {
           <aside class="sidebar">
             <section class="panel forecast-panel" id="forecast-panel" data-tab="camp"><p class="eyebrow">THE FORECAST</p><h2 id="forecast-title">A cold front is coming</h2><p id="forecast-copy" class="forecast-copy"></p><div class="forecast-checks"><span id="forecast-shelter"></span><span id="forecast-fire"></span></div></section>
             <section class="panel lookout-panel" id="lookout-panel" data-tab="build"><p class="eyebrow">A PLACE BEYOND CAMP</p><h2 id="lookout-title">The old lookout</h2><p id="lookout-copy" class="lookout-copy"></p><button type="button" id="lookout-button" data-action="repairLookout">Repair lookout</button><small id="lookout-cost">4 wood · 2 fiber · 2 stone</small></section>
-            <section class="panel axe-panel" data-tab="build"><p class="eyebrow">FOREST TOOLS</p><h2 id="axe-title">Stone axe</h2><p id="axe-copy" class="lookout-copy"></p><button type="button" id="axe-button" data-action="craftAxe">Craft stone axe</button><small id="axe-cost">1 wood · 1 fiber · 1 stone</small></section>
+            <section class="panel axe-panel" data-tab="build"><p class="eyebrow">FOREST TOOLS</p><div class="tool-row"><h2 id="axe-title">Stone axe</h2><p id="axe-copy" class="lookout-copy"></p><button type="button" id="axe-button" data-action="craftAxe">Craft stone axe</button><small id="axe-cost">1 wood · 1 fiber · 1 stone</small></div><div id="pickaxe-row" class="tool-row" hidden><h2 id="pickaxe-title">Pickaxe</h2><p id="pickaxe-copy" class="lookout-copy"></p><button type="button" id="pickaxe-button" data-action="craftPickaxe">Craft pickaxe</button><small id="pickaxe-cost">2 wood · 1 fiber · 2 stone</small></div></section>
             <section class="panel ration-panel" data-tab="bag"><p class="eyebrow">TRAIL FOOD</p><h2>Drying rack</h2><p class="lookout-copy">Dry a berry at camp for a ration you can eat anywhere. Each restores 45 hunger.</p><button type="button" id="prepare-button" data-action="prepareTrailFood">Prepare trail ration</button><small id="prepare-hint">Build a drying rack first.</small></section>
             <section class="panel sites-panel" data-tab="camp"><p class="eyebrow">BEYOND CAMP</p><h2>Follow the paths</h2><p class="lookout-copy">An old basket, a quiet spring, and a stone cairn wait beyond the clearing.</p><p id="sites-seen" class="sites-seen">Places found: none yet</p><button type="button" id="site-button">Explore nearby place</button><small>Stand beside a place and press V</small></section>
-            <section class="panel journal-panel" data-tab="camp"><p class="eyebrow">YOUR FIELD JOURNAL</p><h2>Paths from camp</h2><p id="journal-hint" class="journal-hint"></p><details open><summary>Map and milestones</summary><div class="journal-map" aria-hidden="true"><svg viewBox="0 0 40 30" preserveAspectRatio="none"><path d="M20 15 L8 8 M20 15 L30 8 M20 15 L10 20 M20 15 L31 21" /></svg><span class="map-point camp" style="left:50%;top:50%">✦</span>${mapMarkers}<span id="map-player" class="map-player"></span></div><p class="map-key">✦ Camp &nbsp; ● You &nbsp; ? Unexplored</p><ul id="journal-places" class="journal-list"></ul><p class="journal-subhead">Camp milestones</p><ul id="journal-milestones" class="journal-list"></ul></details></section>
+            <section class="panel journal-panel" data-tab="camp"><p class="eyebrow">YOUR FIELD JOURNAL</p><h2>Paths from camp</h2><p id="journal-hint" class="journal-hint"></p><details open><summary>Map and milestones</summary><div class="journal-map" aria-hidden="true"><svg viewBox="0 0 40 30" preserveAspectRatio="none"><path d="M20 15 L8 8 M20 15 L30 8 M20 15 L10 20 M20 15 L31 21" /><path id="map-west-path" d="M20 15 L1 15" style="display:none" /></svg><span class="map-point camp" style="left:50%;top:50%">✦</span>${mapMarkers}<span id="map-player" class="map-player"></span></div><p class="map-key">✦ Camp &nbsp; ● You &nbsp; ? Unexplored</p><ul id="journal-places" class="journal-list"></ul><p class="journal-subhead">Camp milestones</p><ul id="journal-milestones" class="journal-list"></ul></details></section>
             <section class="panel survivor-panel" data-tab="bag"><p class="eyebrow">YOUR SURVIVOR</p><h2>Take it one day at a time</h2>
               <div class="meter"><div class="meter-title"><span>Energy</span><b id="energy-value">100</b></div><div class="track"><div id="energy-bar" class="fill energy"></div></div></div>
               <div class="meter"><div class="meter-title"><span>Hunger</span><b id="hunger-value">100</b></div><div class="track"><div id="hunger-bar" class="fill hunger"></div></div></div>
@@ -91,7 +93,7 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone';
+        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone';
         this.scene?.perform({ type });
       });
     });
@@ -216,7 +218,7 @@ export class App {
   private continueGame(): void {
     if (this.previousSave.kind !== 'loaded') return;
     this.startGame(this.previousSave.state);
-    this.setMessage('Welcome back to your camp.');
+    this.setMessage(this.previousSave.state.area === 'quarry' ? 'Welcome back. You are out by the old quarry.' : 'Welcome back to your camp.');
     this.setText('save-status', 'Loaded locally');
   }
 
@@ -311,6 +313,11 @@ export class App {
         return item;
       }));
     }
+    const quarryPlace = journal.locations.find(place => place.id === 'quarry');
+    const quarryMarker = this.root.querySelector<HTMLElement>('#map-quarry');
+    if (quarryMarker) quarryMarker.hidden = !quarryPlace;
+    const westPath = this.root.querySelector<SVGPathElement>('#map-west-path');
+    if (westPath) westPath.style.display = quarryPlace ? '' : 'none';
     for (const place of journal.locations) {
       const marker = this.root.querySelector(`#map-${place.id}`);
       if (marker) {
@@ -323,8 +330,10 @@ export class App {
     }
     const playerMarker = this.root.querySelector<HTMLElement>('#map-player');
     if (playerMarker) {
-      playerMarker.style.left = `${player.x / BALANCE.mapWidth * 100}%`;
-      playerMarker.style.top = `${player.y / BALANCE.mapHeight * 100}%`;
+      // The camp map can't show the quarry area, so away there the survivor sits at the west path's end.
+      const mapPosition = this.state.area === 'camp' ? player : QUARRY_MARKER;
+      playerMarker.style.left = `${mapPosition.x / BALANCE.mapWidth * 100}%`;
+      playerMarker.style.top = `${mapPosition.y / BALANCE.mapHeight * 100}%`;
     }
     const nearSite = (Object.keys(SITES) as SiteId[]).some(id => Math.hypot(player.x - SITES[id].x, player.y - SITES[id].y) <= BALANCE.interactionRadius);
     this.root.querySelector('#site-button')?.classList.toggle('ready', nearSite);
@@ -361,7 +370,7 @@ export class App {
     const axeButton = this.root.querySelector<HTMLButtonElement>('#axe-button');
     if (axeButton) {
       axeButton.disabled = !this.state.progress.hearthUnlocked || this.state.progress.axeCrafted;
-      const canCraft = this.state.progress.hearthUnlocked && isAtCamp(this.state)
+      const canCraft = this.state.progress.hearthUnlocked && structures.toolshed && isAtCamp(this.state)
         && inventory.wood >= 1 && inventory.fiber >= 1 && availableStone(this.state) >= 1 && !this.state.progress.axeCrafted;
       axeButton.classList.toggle('ready', canCraft);
     }
@@ -371,12 +380,31 @@ export class App {
       this.setText('axe-cost', 'Crafted');
     } else if (this.state.progress.hearthUnlocked) {
       this.setText('axe-title', 'Craft a stone axe');
-      this.setText('axe-copy', 'Use stone, fiber, and wood at camp to work with the mature trees. Fallen branches remain easy to gather.');
+      this.setText('axe-copy', structures.toolshed
+        ? 'Use stone, fiber, and wood at camp to work with the mature trees. Fallen branches remain easy to gather.'
+        : 'Build a toolshed first.');
       this.setText('axe-cost', '1 wood · 1 fiber · 1 stone');
     } else {
       this.setText('axe-title', 'Stone axe');
       this.setText('axe-copy', 'Weather the cold front to learn how to make a useful forest tool.');
       this.setText('axe-cost', 'Unlocks after the cold front');
+    }
+    const pickaxeRow = this.root.querySelector<HTMLElement>('#pickaxe-row');
+    if (pickaxeRow) pickaxeRow.hidden = !this.state.progress.quarryFound;
+    const pickaxeButton = this.root.querySelector<HTMLButtonElement>('#pickaxe-button');
+    const pickaxeBlock = pickaxeBlocker(this.state);
+    if (pickaxeButton) {
+      pickaxeButton.disabled = !this.state.progress.quarryFound || this.state.progress.pickaxeCrafted;
+      pickaxeButton.classList.toggle('ready', this.state.progress.quarryFound && !pickaxeBlock);
+    }
+    if (this.state.progress.pickaxeCrafted) {
+      this.setText('pickaxe-title', 'Pickaxe ready');
+      this.setText('pickaxe-copy', 'Stand at the quarry face and press E, or tap it, to dig a stone. It is ready again each dawn.');
+      this.setText('pickaxe-cost', 'Crafted');
+    } else {
+      this.setText('pickaxe-title', 'Craft a pickaxe');
+      this.setText('pickaxe-copy', pickaxeBlock ?? 'Your toolshed is ready. Craft a pickaxe to work the quarry face.');
+      this.setText('pickaxe-cost', '2 wood · 1 fiber · 2 stone');
     }
     const atCamp = isAtCamp(this.state);
     const afterDark = timeOfDay >= BALANCE.nightStart;

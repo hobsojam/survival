@@ -72,7 +72,9 @@ kbd { display: inline-block; border: 1px solid #d4ddce; border-bottom-width: 2px
 .axe-panel button { width: 100%; border: 1px solid #bbd0b6; border-bottom-width: 2px; border-radius: 9px; background: #e7f0e2; color: #426447; padding: 10px; font-size: 12px; font-weight: 700; }
 .axe-panel button.ready { background: #517d5b; border-color: #42724d; color: #fffdf7; }
 .axe-panel button:disabled { opacity: .55; cursor: default; }
-.axe-panel small { display: block; margin-top: 7px; color: #6f836c; text-align: center; font-size: 11px; }
+.axe-panel small { display: block; margin-top: 7px; color: #4f6655; text-align: center; font-size: 11px; }
+.axe-panel .lookout-copy { color: #5b604e; }
+.tool-row + .tool-row { margin-top: 14px; padding-top: 12px; border-top: 1px solid #d2dfc5; }
 .journal-panel { background: linear-gradient(145deg, #e9f0ec, #fffdf7 72%); border-color: #ccded6; }
 .journal-panel h2 { margin-bottom: 7px; }
 .journal-hint { color: #526e5d; font-size: 12px; line-height: 1.45; margin: 0 0 12px; }
