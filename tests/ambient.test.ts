@@ -3,7 +3,7 @@ import { nightStart } from '../src/game/calendar';
 import { QUARRY_SITE } from '../src/game/areas';
 import { BALANCE, createGame } from '../src/game/state';
 import {
-  BIRD_FLEE_RADIUS, BIRD_FORAGE_RADIUS, BIRD_HOMES, FIREFLY_HOMES, FOX, birdForageTarget, birdMayReturn, birdShouldLeave, EYE_SPOTS, darkness, eyesAt, fireflyGlow, foxAt, foxVisits, foxWindow
+  BIRD_FLEE_RADIUS, BIRD_FORAGE_RADIUS, BIRD_HOMES, FIREFLY_HOMES, FOX, birdForageTarget, birdMayReturn, birdShouldLeave, EYE_SPOTS, LEAF_HOMES, darkness, eyesAt, fireflyGlow, foxAt, foxVisits, foxWindow, leafAt
 } from '../src/scene/ambient';
 
 const visitDay = Array.from({ length: 20 }, (_, i) => i + 1).find(foxVisits)!;
@@ -168,5 +168,34 @@ describe('evening life through the year', () => {
     const { arrive, leave } = foxWindow(winterVisit);
     expect(foxAt(winterVisit, arrive + 5)).not.toBeNull();
     expect(foxAt(winterVisit, leave + 1)).toBeNull();
+  });
+});
+
+describe('falling leaves', () => {
+  it('fall for four seconds in every nine, then rest', () => {
+    const leaf = leafAt(0, 1000);
+    expect(leaf).not.toBeNull();
+    expect(leaf!.alpha).toBeGreaterThan(0);
+    expect(leafAt(0, 6000)).toBeNull();
+  });
+
+  it('only ever drift downward, about two tiles below their tree', () => {
+    let last = -Infinity;
+    for (let ms = 0; ms < 4000; ms += 100) {
+      const leaf = leafAt(0, ms);
+      if (!leaf) continue;
+      expect(leaf.y).toBeGreaterThanOrEqual(last);
+      last = leaf.y;
+    }
+    expect(last - LEAF_HOMES[0].y).toBeLessThanOrEqual(2);
+  });
+
+  it('start beside the broadleaf trees at camp', () => {
+    const game = createGame();
+    for (const home of LEAF_HOMES) {
+      const tree = game.trees.find(each => each.id === home.treeId)!;
+      expect(tree.sprite).toBe('treeBroadleaf');
+      expect(Math.hypot(home.x - tree.x, home.y - tree.y)).toBeLessThanOrEqual(2);
+    }
   });
 });

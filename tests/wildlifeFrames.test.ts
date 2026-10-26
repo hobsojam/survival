@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { validateSprite } from '../src/art/textures';
+import { wildlifeSprites } from '../src/art/wildlifeSprites';
 import { birdGroundFrame, birdFlightFrame, foxFrame, fireflyFrame } from '../src/scene/ambient';
 
 describe('wildlife frame selection', () => {
@@ -21,5 +23,12 @@ describe('wildlife frame selection', () => {
     expect(fireflyFrame(0, 0)).toBe('firefly:glow0');
     expect(fireflyFrame(0, 500)).toBe('firefly:glow1');
     expect(fireflyFrame(0, 1000)).toBe('firefly:glow0');
+  });
+});
+
+describe('the falling leaf', () => {
+  it('is a valid sprite with two tumbling frames', () => {
+    expect(() => validateSprite(wildlifeSprites.leaf)).not.toThrow();
+    expect(Object.keys(wildlifeSprites.leaf.frames)).toEqual(['fall0', 'fall1']);
   });
 });

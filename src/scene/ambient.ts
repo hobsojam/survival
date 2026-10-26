@@ -101,6 +101,30 @@ export function fireflyGlow(index: number, timeMs: number, dark: number): number
   return dark * pulse * pulse;
 }
 
+/** Where autumn leaves start: two under the crown of each broadleaf tree at camp. */
+export const LEAF_HOMES: (Point & { treeId: string })[] = [
+  { x: 19.6, y: 5.6, treeId: 'tree-0' }, { x: 20.8, y: 6.2, treeId: 'tree-0' },
+  { x: 16.6, y: 7.6, treeId: 'tree-1' }, { x: 17.8, y: 8.2, treeId: 'tree-1' },
+  { x: 26.6, y: 3.6, treeId: 'tree-2' }, { x: 27.6, y: 4.2, treeId: 'tree-2' }
+];
+const LEAF_CYCLE = 9;
+const LEAF_FALL = 4;
+const LEAF_FADE = 0.5;
+
+/** One leaf: it tumbles two tiles down for 4 s of every 9 s, swaying side to side, and fades in and out at the ends. */
+export function leafAt(index: number, timeMs: number): { x: number; y: number; alpha: number; frame: 'leaf:fall0' | 'leaf:fall1' } | null {
+  const phase = (timeMs / 1000 + index * 1.5) % LEAF_CYCLE;
+  if (phase >= LEAF_FALL) return null;
+  const home = LEAF_HOMES[index];
+  const progress = phase / LEAF_FALL;
+  return {
+    x: home.x + Math.sin(phase * 2.4 + index) * 0.6,
+    y: home.y + progress * 2,
+    alpha: Math.min(1, phase / LEAF_FADE, (LEAF_FALL - phase) / LEAF_FADE),
+    frame: Math.floor(phase * 3) % 2 ? 'leaf:fall1' : 'leaf:fall0'
+  };
+}
+
 /** Pairs of eyes that watch from the dark edges of the quarry. They are only a look; nothing follows the survivor. */
 export const EYE_SPOTS: Point[] = [
   { x: 4, y: 5 }, { x: 9, y: 22 }, { x: 19, y: 6 }, { x: 22, y: 21 }, { x: 28, y: 11 }, { x: 33, y: 25 }
