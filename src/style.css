@@ -221,15 +221,23 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
   .layout { grid-template-columns: 1fr; }
   .sidebar-pages { display: grid; grid-template-columns: repeat(2, 1fr); }
   .build-panel { grid-column: 1 / -1; }
+  /* Keep the top bar on one screen width: the sound and pause buttons show only their icons. */
+  .sound-toggle-label, .pause-label { display: none; }
+  .brand small, .save-status, .day-phase-part { display: none; }
+}
+@media (max-width: 980px) {
+  .day-phase-part { display: none; }
+}
+@media (max-width: 720px) {
+  .day-countdown { display: none; }
+  .day-pill { font-size: 11px; padding: 8px 10px; gap: 7px; }
+  .day-dial { width: 44px; }
 }
 @media (max-width: 600px) {
   .shell { padding: 9px; }
   .topbar { height: 62px; }
   .brand strong { font-size: 20px; }
   .brand small { font-size: 9px; }
-  .day-pill { font-size: 11px; padding: 8px 10px; gap: 7px; }
-  .day-dial { width: 44px; }
-  .day-countdown { display: none; }
   .sidebar-pages { display: flex; }
   .game-panel { padding: 7px; }
   .shortcuts { gap: 8px; }
@@ -288,7 +296,6 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
 }
 /* Narrow phones: the day pill needs the room more than the title does. */
 @media (max-width: 439px) and (orientation: portrait) {
-  .day-phase-part { display: none; }
   .brand strong { display: none; }
 }
 @media (max-width: 359px) and (orientation: portrait) {
