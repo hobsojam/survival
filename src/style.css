@@ -279,6 +279,10 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
   .sidebar button { min-height: 44px; touch-action: manipulation; }
   .phone-only button { width: 100%; border-radius: 9px; padding: 12px; border: 1px solid #9bb398; font-weight: 700; }
 }
-@media (max-width: 359px) and (orientation: portrait) {
+/* Narrow phones: the day pill needs the room more than the title does. */
+@media (max-width: 439px) and (orientation: portrait) {
   .brand strong { display: none; }
+}
+@media (max-width: 359px) and (orientation: portrait) {
+  .save-status { display: none; }
 }
