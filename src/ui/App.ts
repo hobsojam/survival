@@ -4,8 +4,7 @@ import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
 import { cookBlocker, isAtCamp, sleepBlocker, stargazeBlocker } from '../game/rules';
-import { dayPhase, formatClock, nextChange } from '../game/clock';
-import { nightStart } from '../game/calendar';
+import { dayPillView, renderDayPill, renderYearWheel, yearWheelView, type CalendarRoot } from './calendarView';
 import { isLowMeter } from '../game/needs';
 import { gateTap, nextOpenTab, wireSidebarTabs, type DockTab } from './dock';
 import { createPause, wirePause, type PauseControl } from './pause';
@@ -21,6 +20,8 @@ export class App {
   private game?: Phaser.Game;
   private gameResize?: ResizeObserver;
   private readonly root: HTMLElement;
+  /** The page as the calendar sees it: elements it can fill and move. */
+  private readonly calendarRoot: CalendarRoot = { querySelector: selector => this.root.querySelector<HTMLElement>(selector) };
   private readonly soundscape: Soundscape;
   private readonly storage?: Storage;
   private previousSave: LoadResult = { kind: 'empty' };
@@ -55,7 +56,7 @@ export class App {
       <div class="shell">
         <header class="topbar">
           <div class="brand"><span class="brand-icon">✦</span><div><strong>Hearthwild</strong><small>A little place to begin again</small></div></div>
-          <div class="top-actions"><button type="button" id="sound-toggle" class="sound-toggle" aria-pressed="true" aria-label="Mute game sounds" title="Mute game sounds"><span aria-hidden="true">♫</span><span class="sound-toggle-label">Sound on</span></button><button type="button" id="pause-toggle" class="sound-toggle pause-toggle" aria-pressed="false" title="Pause the game (Esc)"><span class="pause-icon" aria-hidden="true">❚❚</span><span class="pause-label">Pause</span></button><span id="save-status" class="save-status">Local save</span><button id="restart-game" class="restart-button" hidden>New game</button><div class="day-pill" id="day-pill"><span id="day-label">Day 1 · Morning</span><span class="day-dial" aria-hidden="true"><span id="day-dial-night" class="day-dial-night"></span><span id="day-dial-hand" class="day-dial-hand"></span></span><span id="day-countdown" class="day-countdown"></span></div></div>
+          <div class="top-actions"><button type="button" id="sound-toggle" class="sound-toggle" aria-pressed="true" aria-label="Mute game sounds" title="Mute game sounds"><span aria-hidden="true">♫</span><span class="sound-toggle-label">Sound on</span></button><button type="button" id="pause-toggle" class="sound-toggle pause-toggle" aria-pressed="false" title="Pause the game (Esc)"><span class="pause-icon" aria-hidden="true">❚❚</span><span class="pause-label">Pause</span></button><span id="save-status" class="save-status">Local save</span><button id="restart-game" class="restart-button" hidden>New game</button><div class="day-pill" id="day-pill"><span id="day-label"><span id="day-season">Autumn</span> · <span id="day-number">Day 1</span><span class="day-phase-part"> · <span id="day-phase">Morning</span></span></span><span class="day-dial" aria-hidden="true"><span id="day-dial-night" class="day-dial-night"></span><span id="day-dial-hand" class="day-dial-hand"></span></span><span id="day-countdown" class="day-countdown"></span></div></div>
         </header>
         <div class="layout">
           <main class="game-panel">
@@ -77,7 +78,7 @@ export class App {
               <section class="panel axe-panel" data-tab="build"><p class="eyebrow">FOREST TOOLS</p><div class="tool-row"><h2 id="axe-title">Stone axe</h2><p id="axe-copy" class="lookout-copy"></p><button type="button" id="axe-button" data-action="craftAxe">Craft stone axe</button><small id="axe-cost">1 wood · 1 fiber · 1 stone</small></div><div id="pickaxe-row" class="tool-row" hidden><h2 id="pickaxe-title">Pickaxe</h2><p id="pickaxe-copy" class="lookout-copy"></p><button type="button" id="pickaxe-button" data-action="craftPickaxe">Craft pickaxe</button><small id="pickaxe-cost">2 wood · 1 fiber · 2 stone</small></div></section>
               <section class="panel ration-panel" data-tab="bag"><p class="eyebrow">TRAIL FOOD</p><h2>Drying rack</h2><p class="lookout-copy">Dry a berry at camp for a ration you can eat anywhere. Each restores 45 hunger.</p><button type="button" id="prepare-button" data-action="prepareTrailFood">Prepare trail ration</button><small id="prepare-hint">Build a drying rack first.</small></section>
               <section class="panel sites-panel" data-tab="camp"><p class="eyebrow">BEYOND CAMP</p><h2>Follow the paths</h2><p class="lookout-copy">An old basket, a quiet spring, and a stone cairn wait beyond the clearing.</p><p id="sites-seen" class="sites-seen">Places found: none yet</p><button type="button" id="site-button">Explore nearby place</button><small>Stand beside a place and press V</small></section>
-              <section class="panel journal-panel" data-tab="camp"><p class="eyebrow">YOUR FIELD JOURNAL</p><h2>Paths from camp</h2><p id="journal-hint" class="journal-hint"></p><details open><summary>Map and milestones</summary><div class="journal-map" aria-hidden="true"><svg viewBox="0 0 40 30" preserveAspectRatio="none"><path d="M20 15 L8 8 M20 15 L30 8 M20 15 L10 20 M20 15 L31 21" /><path id="map-west-path" d="M20 15 L1 15" style="display:none" /></svg><span class="map-point camp" style="left:50%;top:50%">✦</span>${mapMarkers}<span id="map-player" class="map-player"></span></div><p class="map-key">✦ Camp &nbsp; ● You &nbsp; ? Unexplored</p><ul id="journal-places" class="journal-list"></ul><p class="journal-subhead">Camp milestones</p><ul id="journal-milestones" class="journal-list"></ul></details></section>
+              <section class="panel journal-panel" data-tab="camp"><p class="eyebrow">YOUR FIELD JOURNAL</p><h2>Paths from camp</h2><p id="journal-hint" class="journal-hint"></p><div class="year-wheel"><span class="year-dial" aria-hidden="true"><span id="year-hand" class="year-hand"></span></span><p id="year-label" class="year-label"></p><ul class="visually-hidden" aria-label="Seasons"><li id="year-season-0">Autumn</li><li id="year-season-1">Winter</li><li id="year-season-2">Spring</li><li id="year-season-3">Summer</li></ul></div><details open><summary>Map and milestones</summary><div class="journal-map" aria-hidden="true"><svg viewBox="0 0 40 30" preserveAspectRatio="none"><path d="M20 15 L8 8 M20 15 L30 8 M20 15 L10 20 M20 15 L31 21" /><path id="map-west-path" d="M20 15 L1 15" style="display:none" /></svg><span class="map-point camp" style="left:50%;top:50%">✦</span>${mapMarkers}<span id="map-player" class="map-player"></span></div><p class="map-key">✦ Camp &nbsp; ● You &nbsp; ? Unexplored</p><ul id="journal-places" class="journal-list"></ul><p class="journal-subhead">Camp milestones</p><ul id="journal-milestones" class="journal-list"></ul></details></section>
               <section class="panel bag-panel" data-tab="bag"><p class="eyebrow">IN YOUR BAG</p><div class="supplies">
                 <div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small><button type="button" class="supply-action" data-action="stokeFire" data-supply="wood" aria-label="Burn one wood">Burn</button></div>
                 <div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small><button type="button" class="supply-action" data-action="eat" data-supply="food" aria-label="Eat one berry">Eat</button></div>
@@ -286,16 +287,7 @@ export class App {
   }
 
   private renderClock(): void {
-    const { timeOfDay } = this.state;
-    const phase = dayPhase(timeOfDay, this.state.day);
-    const change = nextChange(timeOfDay, this.state.day);
-    this.setText('day-label', `Day ${this.state.day} · ${phase}`);
-    this.setText('day-countdown', `${change.event} in ${formatClock(change.seconds)}`);
-    this.root.querySelector('#day-pill')?.classList.toggle('night', phase === 'Night');
-    const hand = this.root.querySelector<HTMLElement>('#day-dial-hand');
-    if (hand) hand.style.left = `${timeOfDay / BALANCE.daySeconds * 100}%`;
-    const night = this.root.querySelector<HTMLElement>('#day-dial-night');
-    if (night) night.style.left = `${nightStart(this.state.day) / BALANCE.daySeconds * 100}%`;
+    renderDayPill(this.calendarRoot, dayPillView(this.state));
     this.root.querySelector('#sleep-button')?.classList.toggle('ready', !sleepBlocker(this.state));
     this.root.querySelector('#dock-sleep')?.classList.toggle('ready', !sleepBlocker(this.state));
   }
@@ -344,6 +336,7 @@ export class App {
   private renderJournal(): void {
     const journal = journalView(this.state);
     this.setText('journal-hint', journal.nextHint);
+    renderYearWheel(this.calendarRoot, yearWheelView(this.state.day, this.state.timeOfDay));
     const placeList = this.root.querySelector('#journal-places');
     if (placeList) {
       placeList.replaceChildren(...journal.locations.map(place => {
