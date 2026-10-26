@@ -48,3 +48,11 @@ describe('rain art', () => {
     expect(wildlifeSprites.puddle.size).toEqual([16, 6]);
   });
 });
+
+describe('the rabbit', () => {
+  it('is a valid sprite that sits, nibbles and hops', () => {
+    expect(() => validateSprite(wildlifeSprites.rabbit)).not.toThrow();
+    expect(wildlifeSprites.rabbit.size).toEqual([10, 8]);
+    expect(Object.keys(wildlifeSprites.rabbit.frames)).toEqual(['sit', 'nibble0', 'nibble1', 'hop0', 'hop1']);
+  });
+});

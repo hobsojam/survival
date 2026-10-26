@@ -3,11 +3,11 @@ import type { GameState } from '../game/state';
 import { worldX, worldY } from './art';
 import { LIGHT_DEPTH } from './visuals';
 import { sprites } from '../art/sprites';
-import { firefliesOut, isWinter, leavesFalling } from '../game/calendar';
+import { firefliesOut, isSpring, isWinter, leavesFalling } from '../game/calendar';
 import { wolvesClose } from '../game/wolves';
 import {
   BIRD_HOMES, EYE_SPOTS, FIREFLY_HOMES, FOX, birdForageTarget, birdMayReturn, birdShouldLeave, birdGroundFrame, birdFlightFrame,
-  LEAF_HOMES, WOLF_SPOTS, darkness, eyesAt, fireflyFrame, fireflyGlow, fireflyOffset, foxAt, foxFrame, leafAt, wolfCount, wolfWatch, type Point
+  LEAF_HOMES, RABBIT_FLEE_RADIUS, RABBIT_HOMES, WOLF_SPOTS, darkness, eyesAt, fireflyFrame, fireflyGlow, fireflyOffset, foxAt, foxFrame, leafAt, rabbitAt, rabbitCount, wolfCount, wolfWatch, type Point
 } from './ambient';
 
 type BirdFlightKind = 'flee' | 'return' | 'forage' | 'home';
@@ -18,6 +18,12 @@ interface Bird {
   nextForageAtMs: number; forageUntilMs: number; forageNodeId: string | null;
   index: number; image: Phaser.GameObjects.Image;
 }
+
+/** A rabbit that has run off hides for a while, and only comes home once the survivor has moved away. */
+interface Rabbit { index: number; image: Phaser.GameObjects.Image; run: Motion | null; hiddenSeconds: number; away: boolean }
+const RABBIT_RUN_SECONDS = 0.8;
+const RABBIT_HIDE_SECONDS = 8;
+const RABBIT_RETURN_DISTANCE = 4.5;
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const FLIGHT_SECONDS = 1.6;
@@ -60,6 +66,7 @@ export class AmbientLife {
   private readonly leaves: Phaser.GameObjects.Image[];
   private readonly eyes: Phaser.GameObjects.Image[];
   private readonly wolfEyes: Phaser.GameObjects.Image[];
+  private readonly rabbits: Rabbit[];
   /** Eases toward how strongly the wolves press in, so their eyes fade rather than blink out. */
   private wolfPresence = 0;
   private foxRun: Motion | null = null;
@@ -77,6 +84,7 @@ export class AmbientLife {
     this.leaves = LEAF_HOMES.map(() => sprite(scene, 'leaf', 'fall0'));
     this.eyes = EYE_SPOTS.map(() => sprite(scene, 'eyes', 'open', LIGHT_DEPTH));
     this.wolfEyes = WOLF_SPOTS.map(() => sprite(scene, 'eyes', 'open', LIGHT_DEPTH));
+    this.rabbits = RABBIT_HOMES.map((_, index) => ({ index, image: sprite(scene, 'rabbit', 'sit'), run: null, hiddenSeconds: 0, away: false }));
   }
 
   update(state: GameState, seconds: number, timeMs: number): void {
@@ -86,9 +94,12 @@ export class AmbientLife {
     else for (const image of this.eyes) image.setVisible(false);
     this.updateWolves(state, dark, seconds, timeMs);
     if (state.area !== 'camp') {
-      for (const image of [...this.birds.map(bird => bird.image), this.fox, ...this.fireflies, ...this.leaves]) image.setVisible(false);
+      for (const image of [...this.birds.map(bird => bird.image), this.fox, ...this.fireflies, ...this.leaves, ...this.rabbits.map(rabbit => rabbit.image)]) image.setVisible(false);
       return;
     }
+    // Rabbits are out on spring days.
+    const rabbitsOut = isSpring(state.day) && dark < 0.3;
+    for (const rabbit of this.rabbits) this.updateRabbit(rabbit, state, rabbitsOut && rabbit.index < rabbitCount(state.day), seconds, timeMs);
     if (!this.started) this.start(dark, timeMs);
     // The birds leave for the winter.
     if (isWinter(state.day)) for (const bird of this.birds) bird.image.setVisible(false);
@@ -213,6 +224,37 @@ export class AmbientLife {
       image.setTexture(`eyes:${eyes.frame}`).setPosition(Math.round(worldX(eyes.x)), Math.round(worldY(eyes.y)))
         .setAlpha(eyes.alpha).setVisible(true);
     });
+  }
+
+  /** A rabbit hops about near home, bolts from the survivor, hides, and comes back once they have gone. */
+  private updateRabbit(rabbit: Rabbit, state: GameState, out: boolean, seconds: number, timeMs: number): void {
+    const { image } = rabbit;
+    if (!out) { image.setVisible(false); return; }
+    const player = state.player;
+    if (rabbit.run) {
+      const run = rabbit.run;
+      run.elapsed += seconds;
+      const progress = Math.min(1, run.elapsed / run.duration);
+      this.show(image, lerp(run.from.x, run.to.x, progress), lerp(run.from.y, run.to.y, progress),
+        `rabbit:hop${Math.floor(run.elapsed / 0.1) % 2}`, Math.sign(run.to.x - run.from.x) || 1, Math.min(1, (1 - progress) / 0.3));
+      if (progress >= 1) { rabbit.run = null; rabbit.away = true; rabbit.hiddenSeconds = RABBIT_HIDE_SECONDS; image.setVisible(false); }
+      return;
+    }
+    if (rabbit.away) {
+      rabbit.hiddenSeconds = Math.max(0, rabbit.hiddenSeconds - seconds);
+      const home = RABBIT_HOMES[rabbit.index];
+      if (rabbit.hiddenSeconds > 0 || Math.hypot(home.x - player.x, home.y - player.y) <= RABBIT_RETURN_DISTANCE) { image.setVisible(false); return; }
+      rabbit.away = false;
+    }
+    const pose = rabbitAt(rabbit.index, timeMs);
+    const away = Math.hypot(pose.x - player.x, pose.y - player.y);
+    if (away < RABBIT_FLEE_RADIUS) {
+      const dx = away > 0 ? (pose.x - player.x) / away : 1;
+      const dy = away > 0 ? (pose.y - player.y) / away : 0;
+      rabbit.run = { from: pose, to: { x: pose.x + dx * 5, y: pose.y + dy * 5 }, elapsed: 0, duration: RABBIT_RUN_SECONDS };
+      return;
+    }
+    this.show(image, pose.x, pose.y, pose.frame, pose.facing);
   }
 
   /** Wolf eyes at the camp edge on winter nights while the fire burns low, fading as it is fed. */
