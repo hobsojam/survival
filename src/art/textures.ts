@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { palette } from './palette';
+import { palette, type PaletteKey } from './palette';
 import { sprites, type SpriteDef } from './sprites';
 
 export function validateSprite(def: SpriteDef): void {
@@ -36,7 +36,7 @@ function validateAnimation(def: SpriteDef, name: string, animation: NonNullable<
   for (const frame of animation.frames) if (!(frame in def.frames)) throw new Error(`Animation ${name} uses missing frame ${frame}.`);
 }
 
-export function rasterizeFrame(def: SpriteDef, frame: string): Uint8ClampedArray {
+export function rasterizeFrame(def: SpriteDef, frame: string, colors: Record<PaletteKey, string> = palette): Uint8ClampedArray {
   validateSprite(def);
   const rows = def.frames[frame];
   if (!rows) throw new Error(`Unknown frame ${frame}.`);
@@ -46,7 +46,7 @@ export function rasterizeFrame(def: SpriteDef, frame: string): Uint8ClampedArray
     const symbol = rows[y][x];
     if (symbol === '.') continue;
     const key = def.legend[symbol];
-    const hex = palette[key].slice(1);
+    const hex = colors[key].slice(1);
     const offset = (y * width + x) * 4;
     bytes[offset] = Number.parseInt(hex.slice(0, 2), 16);
     bytes[offset + 1] = Number.parseInt(hex.slice(2, 4), 16);
@@ -65,14 +65,16 @@ export function animationConfigs(all: Record<string, SpriteDef>): Phaser.Types.A
   })));
 }
 
-export function registerSpriteTextures(scene: Phaser.Scene): void {
+/** Paints every sprite frame in the given colours: new textures are created, existing ones repainted in place. */
+export function registerSpriteTextures(scene: Phaser.Scene, colors: Record<PaletteKey, string> = palette): void {
   for (const [name, def] of Object.entries(sprites)) for (const frame of Object.keys(def.frames)) {
     const key = `${name}:${frame}`;
-    if (scene.textures.exists(key)) continue;
-    const texture = scene.textures.createCanvas(key, ...def.size);
+    const texture = scene.textures.exists(key)
+      ? scene.textures.get(key) as Phaser.Textures.CanvasTexture
+      : scene.textures.createCanvas(key, ...def.size);
     if (!texture) throw new Error(`Could not create texture ${key}.`);
     const image = texture.context.createImageData(...def.size);
-    image.data.set(rasterizeFrame(def, frame));
+    image.data.set(rasterizeFrame(def, frame, colors));
     texture.context.putImageData(image, 0, 0);
     texture.refresh();
   }

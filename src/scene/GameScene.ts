@@ -2,12 +2,13 @@ import Phaser from 'phaser';
 import { BALANCE, type GameState } from '../game/state';
 import { advanceTime, applyAction, isColdNight, type GameAction } from '../game/rules';
 import { TILE, worldX, worldY, drawTerrain } from './art';
-import { terrainKey } from './map';
+import { shownTerrainKey } from './map';
 import { sceneVisuals, playerVisualDepth, WEATHER_DEPTH } from './visuals';
 import { sprites } from '../art/sprites';
 import { AmbientLife } from './ambientLife';
 import { registerSpriteTextures } from '../art/textures';
-import { seasonMessage } from '../game/calendar';
+import { season, seasonMessage, type Season } from '../game/calendar';
+import { seasonPalette } from '../art/seasonPalette';
 import { LOGICAL_WIDTH, LOGICAL_HEIGHT } from './pixelScale';
 import { facingFromInput, selectSurvivorVisual, type Facing, type SurvivorAction } from './survivorVisual';
 import { SceneEffects } from './SceneEffects';
@@ -37,6 +38,7 @@ export class GameScene extends Phaser.Scene {
   private tapGate: () => boolean = () => true;
   private terrain: Phaser.GameObjects.GameObject[] = [];
   private terrainShown = '';
+  private seasonPainted: Season | null = null;
   private areaShown = '';
   private needsArmed: ReadonlySet<NeedAlert> = new Set(ALL_NEED_ALERTS);
 
@@ -49,7 +51,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
-    registerSpriteTextures(this);
     this.redrawTerrain();
     this.ambient = new AmbientLife(this);
     this.effects = new SceneEffects(this);
@@ -73,7 +74,7 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (document.hidden || !this.keys) return;
-    if (terrainKey(this.state) !== this.terrainShown) this.redrawTerrain();
+    if (shownTerrainKey(this.state) !== this.terrainShown) this.redrawTerrain();
     const dt = Math.min(delta / 1000, 0.05);
     const walking = this.walkFromKeys(dt);
     const tapWalking = this.walkTowardTarget(dt);
@@ -159,7 +160,7 @@ export class GameScene extends Phaser.Scene {
     if (result.state !== before) this.showActionDone(action, before);
     if (action.type === 'gather') this.noteBerryPicked(action.nodeId, before);
     const message = this.weatherMessage(before, this.state) ?? (announce ? result.message : '');
-    this.say(message, this.needsAlert());
+    this.say(message, seasonMessage(before.day, this.state.day), this.needsAlert());
     if (announce) {
       this.onStateChange(this.state, 'action');
       if (this.playerSprite) this.paintObjects();
@@ -213,11 +214,16 @@ export class GameScene extends Phaser.Scene {
     if (this.lighting) this.lighting.resize(width, height);
   }
 
-  /** Swaps the terrain when the area changes or the west path opens. */
+  /** Swaps the terrain when the area, the west path or the season changes; a new season repaints every sprite first. */
   private redrawTerrain(): void {
+    const now = season(this.state.day);
+    if (now !== this.seasonPainted) {
+      registerSpriteTextures(this, seasonPalette(now));
+      this.seasonPainted = now;
+    }
     for (const object of this.terrain) object.destroy();
     if (this.terrainShown) this.textures.remove(`terrain-${this.terrainShown}`);
-    this.terrainShown = terrainKey(this.state);
+    this.terrainShown = shownTerrainKey(this.state);
     this.terrain = drawTerrain(this, this.state);
     this.cameras.main.setBounds(0, 0, BALANCE.mapWidth * TILE, BALANCE.mapHeight * TILE);
   }

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { BALANCE, type GameState } from '../game/state';
-import { buildMap, terrainKey, type MapItem } from './map';
+import { buildMap, shownTerrainKey, terrainKey, type MapItem } from './map';
 import { sprites } from '../art/sprites';
 
 export const TILE = 16;
@@ -35,8 +35,9 @@ export function drawTerrain(scene: Phaser.Scene, state: GameState): Phaser.GameO
     const def = sprites[item.sprite];
     stamp(item.sprite, Math.round(item.x * TILE - def.anchor[0]), Math.round(item.y * TILE - def.anchor[1]));
   }
-  scene.textures.addCanvas(`terrain-${key}`, canvas);
-  const objects: Phaser.GameObjects.GameObject[] = [scene.add.image(0, 0, `terrain-${key}`).setOrigin(0).setDepth(-100)];
+  const name = `terrain-${shownTerrainKey(state)}`;
+  scene.textures.addCanvas(name, canvas);
+  const objects: Phaser.GameObjects.GameObject[] = [scene.add.image(0, 0, name).setOrigin(0).setDepth(-100)];
   const standing = (item: MapItem) => {
     const def = sprites[item.sprite];
     return scene.add.image(Math.round(worldX(item.x)), Math.round(worldY(item.y)), `${item.sprite}:still`)

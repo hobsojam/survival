@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, SITES, createGame } from '../src/game/state';
 import { terrainSprites } from '../src/art/terrain';
-import { buildMap, terrainKey, type TerrainMap } from '../src/scene/map';
+import { buildMap, shownTerrainKey, terrainKey, type TerrainMap } from '../src/scene/map';
 import { CAMP_EXIT } from '../src/game/areas';
 
 function visibleGround(map: TerrainMap, x: number, y: number, pixelX = 8, pixelY = 8): string | undefined {
@@ -215,5 +215,12 @@ describe('terrain composition', () => {
     expect(quarry.trees.length).toBeLessThan(camp.trees.length / 2);
     const stones = (map: TerrainMap) => map.decorations.filter(item => item.sprite.startsWith('pebbles')).length;
     expect(stones(quarry)).toBeGreaterThanOrEqual(2 * stones(camp));
+  });
+});
+
+describe('the shown terrain through the year', () => {
+  it('is redrawn for each season as well as each area', () => {
+    expect(shownTerrainKey(createGame())).toBe('camp-autumn');
+    expect(shownTerrainKey({ ...createGame(), day: 11, area: 'quarry' })).toBe('quarry-winter');
   });
 });
