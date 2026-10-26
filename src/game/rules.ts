@@ -1,4 +1,4 @@
-import { isWinter, nightStart } from './calendar';
+import { isSpring, isWinter, nightStart } from './calendar';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } from './areas';
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { isRaining } from './rain';
@@ -352,6 +352,11 @@ const digQuarry: ActionHandler<'digQuarry'> = state => {
   };
 };
 
+/** Days a chopped tree takes to regrow: quicker in spring. */
+export function treeRegrowDays(day: number): number {
+  return isSpring(day) ? BALANCE.springTreeRegrowDays : BALANCE.treeRegrowDays;
+}
+
 const chopTree: ActionHandler<'chopTree'> = (state, action) => {
   if (!state.progress.axeCrafted) return refuse(state, 'Craft a stone axe before chopping trees.');
   const tree = state.trees.find(item => item.id === action.treeId);
@@ -364,7 +369,7 @@ const chopTree: ActionHandler<'chopTree'> = (state, action) => {
       ...state,
       player: tire(state, BALANCE.chopEnergyCost),
       inventory: { ...state.inventory, wood: state.inventory.wood + 2 },
-      trees: state.trees.map(item => item.id === tree.id ? { ...item, readyDay: state.day + BALANCE.treeRegrowDays } : item)
+      trees: state.trees.map(item => item.id === tree.id ? { ...item, readyDay: state.day + treeRegrowDays(state.day) } : item)
     }, workSeconds(state, BALANCE.chopSeconds), 'working'),
     message: 'Chopped the tree and collected two wood. A stump remains.'
   };

@@ -1,7 +1,7 @@
 import { isWinter, nightStart } from '../game/calendar';
 import { BALANCE, BUILDINGS, SITES, type GameState, type SiteId, type StructureId } from '../game/state';
 import { workSeconds } from '../game/needs';
-import { axeBlocker, bagCapacity, buildStatus, carriedCount, isAtCamp, isColdNight, isFreezingNight, lookoutRepairBlocker, pickaxeBlocker, trailFoodBlocker } from '../game/rules';
+import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, isAtCamp, isColdNight, isFreezingNight, lookoutRepairBlocker, pickaxeBlocker, trailFoodBlocker } from '../game/rules';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
 
@@ -24,7 +24,7 @@ export function axeView(state: GameState): ActionPanelView {
   const { hearthUnlocked, axeCrafted } = state.progress;
   const button = { disabled: !hearthUnlocked || axeCrafted, ready: !axeBlocker(state) };
   if (axeCrafted) {
-    return { ...button, title: 'Stone axe ready', copy: 'Tap a mature tree, or stand by one and press X, to gather two wood. Stumps regrow after three dawns.', cost: 'Crafted' };
+    return { ...button, title: 'Stone axe ready', copy: `Tap a mature tree, or stand by one and press X, to gather two wood. Stumps regrow after ${treeRegrowDays(state.day) === 2 ? 'two' : 'three'} dawns.`, cost: 'Crafted' };
   }
   if (hearthUnlocked) {
     const copy = state.structures.toolshed

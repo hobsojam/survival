@@ -1351,3 +1351,15 @@ describe('winter larder', () => {
     expect(result.state.progress.discoveries.spring).toBe(true);
   });
 });
+
+describe('spring growth', () => {
+  it('regrows trees in two days when chopped in spring', () => {
+    const base = createGame();
+    const tree = base.trees[0];
+    const ready = { ...base, progress: { ...base.progress, hearthUnlocked: true, nextStormDay: null, axeCrafted: true },
+      player: { ...base.player, x: tree.x, y: tree.y } };
+    expect(applyAction({ ...ready, day: 30 }, { type: 'chopTree', treeId: tree.id }).state.trees[0].readyDay).toBe(32);
+    expect(applyAction({ ...ready, day: 8 }, { type: 'chopTree', treeId: tree.id }).state.trees[0].readyDay).toBe(11);
+    expect(BALANCE.springTreeRegrowDays).toBe(2);
+  });
+});

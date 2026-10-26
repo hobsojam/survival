@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BALANCE, type GameState } from '../game/state';
 import { buildMap, shownTerrainKey, terrainKey, type MapItem } from './map';
+import { season } from '../game/calendar';
 import { sprites } from '../art/sprites';
 
 export const TILE = 16;
@@ -11,7 +12,7 @@ export const worldY = (y: number) => (y + 0.5) * TILE;
 export function drawTerrain(scene: Phaser.Scene, state: GameState): Phaser.GameObjects.GameObject[] {
   const key = terrainKey(state);
   const camp = key !== 'quarry';
-  const map = buildMap(camp ? state.nodes : [], key);
+  const map = buildMap(camp ? state.nodes : [], key, season(state.day));
   const canvas = document.createElement('canvas');
   canvas.width = BALANCE.mapWidth * TILE;
   canvas.height = BALANCE.mapHeight * TILE;

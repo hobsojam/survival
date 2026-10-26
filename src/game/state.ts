@@ -94,6 +94,8 @@ export const BALANCE = {
   chopEnergyCost: 8,
   chopSeconds: 10,
   treeRegrowDays: 3,
+  /** Trees chopped in spring grow back faster. */
+  springTreeRegrowDays: 2,
   rubbleRegrowDays: 3,
   digSeconds: 10,
   digEnergyCost: 8,
