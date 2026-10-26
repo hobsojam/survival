@@ -94,6 +94,13 @@ describe('forecast panel', () => {
     expect(forecastView(game({ structures: { shelter: true } })).shelter).toBe('✓ Shelter ready');
   });
 
+  it('asks for enough logs for a longer retry night', () => {
+    // The day-9 night lasts 94 s, which burns 188 s of fuel at double rate: two logs (180 s) are not enough.
+    const retry = game({}, { day: 7 });
+    retry.progress.nextStormDay = 9;
+    expect(forecastView(retry).copy).toBe('Build a shelter and bring three logs to camp before nightfall on day 9.');
+  });
+
   it('calls the survivor home while the front is here', () => {
     const day = createGame().progress.nextStormDay!;
     expect(forecastView(game({}, { day, timeOfDay: nightStart(day) + 1 })))

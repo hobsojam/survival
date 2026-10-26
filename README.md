@@ -60,7 +60,7 @@ The year has four seasons of ten days each, so a year is forty days. A new game 
 
 ### The cold night
 
-The forecast card warns you about a cold front on **day 3 night**. Build a shelter and keep the fire burning through dawn while you stay at camp. The front burns fire fuel twice as fast, so two fresh logs at nightfall will last the full night. The card shows your shelter status and how much fuel is needed. Sleeping passes the night, but the fire still burns and the cold-night outcome still applies.
+The forecast card warns you about a cold front on **day 3 night**. Build a shelter and keep the fire burning through dawn while you stay at camp. The front burns fire fuel twice as fast. On day 3 two fresh logs at nightfall last the full night, but nights grow longer toward winter, so a later front can need three; the card says how many to bring. The card shows your shelter status and how much fuel is needed. Sleeping passes the night, but the fire still burns and the cold-night outcome still applies.
 
 If you weather it with warmth above 20, you unlock the **stone hearth**. Build it for two wood and three stone to make each future log burn for 150 seconds instead of 90. If the camp is unprepared, you wake tired and lose 30 seconds of the morning; another cold front arrives three days later. You can always recover, gather more wood, and try again.
 

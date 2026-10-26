@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
-import { forecastFireCheck, stormReadiness } from '../src/game/forecast';
+import { forecastFireCheck, logsForColdNight, stormReadiness } from '../src/game/forecast';
 
 const NIGHT_NEED = (BALANCE.daySeconds - nightStart(3)) * BALANCE.coldNightFireBurn;
 
@@ -66,5 +66,13 @@ describe('stormReadiness', () => {
 describe('the forecast with the autumn day length', () => {
   it('needs enough fire for day three’s night, which starts at 174', () => {
     expect(stormReadiness(stormDay(100)).needed).toBe((240 - 174) * 2);
+  });
+});
+
+describe('logs for a cold night', () => {
+  it('asks for two logs on day three and three once nights lengthen', () => {
+    expect(logsForColdNight(3)).toBe(2);
+    expect(logsForColdNight(9)).toBe(3);
+    for (let day = 1; day <= 40; day++) expect([2, 3]).toContain(logsForColdNight(day));
   });
 });

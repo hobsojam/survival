@@ -13,6 +13,11 @@ export interface StormReadiness {
   storm: boolean;
 }
 
+/** Plain logs that last the cold front's whole night on that day at double burn. Nights lengthen toward winter. */
+export function logsForColdNight(day: number): number {
+  return Math.ceil((BALANCE.daySeconds - nightStart(day)) * BALANCE.coldNightFireBurn / BALANCE.fireSecondsPerWood);
+}
+
 export const secondsPerLog = (state: GameState) =>
   state.structures.hearth ? BALANCE.hearthFireSecondsPerWood : BALANCE.fireSecondsPerWood;
 
