@@ -32,3 +32,11 @@ describe('the falling leaf', () => {
     expect(Object.keys(wildlifeSprites.leaf.frames)).toEqual(['fall0', 'fall1']);
   });
 });
+
+describe('wolf tracks', () => {
+  it('is a valid ring of prints', () => {
+    expect(() => validateSprite(wildlifeSprites.wolfTracks)).not.toThrow();
+    expect(wildlifeSprites.wolfTracks.size).toEqual([40, 24]);
+    expect(Object.keys(wildlifeSprites.wolfTracks.frames)).toEqual(['still']);
+  });
+});

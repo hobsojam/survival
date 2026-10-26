@@ -52,9 +52,9 @@ function memoryStorage(initial: Record<string, string> = {}): Storage {
 function setup(storage = memoryStorage()) {
   const context = new FakeAudioContext();
   const sound = new Soundscape(storage, () => context as unknown as AudioContext);
-  // The layers are created in order: master, birds, crickets, fire, quarry.
+  // The layers are created in order: master, birds, crickets, fire, quarry, wolves.
   const layer = (index: number) => context.gains[index].gain.value;
-  return { context, sound, storage, master: () => layer(0), birds: () => layer(1), crickets: () => layer(2), fire: () => layer(3), quarry: () => layer(4) };
+  return { context, sound, storage, master: () => layer(0), birds: () => layer(1), crickets: () => layer(2), fire: () => layer(3), quarry: () => layer(4), wolves: () => layer(5) };
 }
 
 function world(changes: Partial<GameState> = {}): GameState {
@@ -92,6 +92,23 @@ describe('the soundscape', () => {
     expect([birds(), fire(), quarry()]).toEqual([0.16, 0, 0.48]);
     sound.update(world({ area: 'quarry', timeOfDay: night }));
     expect([birds(), crickets(), quarry()]).toEqual([0, 0.22, 0.72]);
+  });
+
+  it('lets the wolves howl near a dying fire on winter nights, and silences winter birds', () => {
+    const { sound, birds, wolves } = setup();
+    sound.start();
+    const weathered = { ...createGame().progress, hearthUnlocked: true, nextStormDay: null };
+    const winterNight = world({ day: 12, timeOfDay: nightStart(12) + 10, fireFuel: 0, progress: weathered });
+    sound.update(winterNight);
+    expect(wolves()).toBeCloseTo(0.5);
+    sound.update({ ...winterNight, fireFuel: 30 });
+    expect(wolves()).toBe(0);
+    sound.update({ ...winterNight, area: 'quarry' });
+    expect(wolves()).toBe(0);
+    sound.update(world({ day: 8, timeOfDay: nightStart(8) + 10, fireFuel: 0, progress: weathered }));
+    expect(wolves()).toBe(0);
+    sound.update(world({ day: 12, timeOfDay: 30, progress: weathered }));
+    expect(birds()).toBe(0);
   });
 
   it('mutes and unmutes, and remembers the choice', () => {

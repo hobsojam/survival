@@ -3,6 +3,7 @@ import { BALANCE, createGame } from '../src/game/state';
 import { nightStart } from '../src/game/calendar';
 import { sceneVisuals, playerVisualDepth, GROUND_DECAL_DEPTH, NIGHT_DEPTH, LIGHT_DEPTH, WEATHER_DEPTH } from '../src/scene/visuals';
 import { sprites } from '../src/art/sprites';
+import { worldX, worldY } from '../src/scene/art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { validateSprite } from '../src/art/textures';
 
@@ -123,6 +124,14 @@ describe('native-size scene art', () => {
     expect(bushes(2).every(texture => texture === 'berryBush:ready')).toBe(true);
     expect(textures(2)).toContain('spring:still');
     expect(sprites.spring.frames.frozen).toBeDefined();
+  });
+
+  it('circles the fire pit with wolf tracks until the next nightfall', () => {
+    const state = { ...createGame(), day: 13, timeOfDay: 30, lastWolf: { day: 12, took: 'ration' as const } };
+    const tracks = sceneVisuals(state, 0).find(item => item.texture === 'wolfTracks:still');
+    expect(tracks).toMatchObject({ x: Math.round(worldX(BALANCE.campX)), y: Math.round(worldY(BALANCE.campY)), depth: GROUND_DECAL_DEPTH });
+    expect(sceneVisuals({ ...state, timeOfDay: nightStart(13) }, 0).some(item => item.texture === 'wolfTracks:still')).toBe(false);
+    expect(sceneVisuals({ ...state, area: 'quarry' }, 0).some(item => item.texture === 'wolfTracks:still')).toBe(false);
   });
 
   it('draws loose piles by count', () => {

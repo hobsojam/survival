@@ -1,6 +1,7 @@
 import { isWinter, nightStart } from '../game/calendar';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceNode } from '../game/state';
 import { isFreezingNight } from '../game/rules';
+import { wolfTracksShown } from '../game/wolves';
 import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 
@@ -116,6 +117,7 @@ function addFire(state: GameState, timeMs: number, visuals: SceneVisual[], add: 
   const fire = state.structures.hearth ? 'hearth' : 'firePit';
   const phase = Math.floor(timeMs / 180) % 4;
   const mode = fireMode(state);
+  if (wolfTracksShown(state)) add('wolfTracks', 'wolfTracks:still', x, y, GROUND_DECAL_DEPTH);
   const frame = mode === 'unlit' ? mode : mode + phase;
   add('fire', `${fire}:${frame}`, x, y);
   if (state.fireFuel > 0 && state.timeOfDay >= nightStart(state.day)) visuals.push({

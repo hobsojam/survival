@@ -1,24 +1,25 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createGame } from '../src/game/state';
 import { worldX } from '../src/scene/art';
-import { BIRD_HOMES, EYE_SPOTS } from '../src/scene/ambient';
+import { BIRD_HOMES, EYE_SPOTS, WOLF_SPOTS, wolfCount } from '../src/scene/ambient';
+import { nightStart } from '../src/game/calendar';
 import { AmbientLife } from '../src/scene/ambientLife';
 
 function sceneWithImages() {
-  const images: Array<{ kind: string; texture: string; x: number; visible: boolean }> = [];
+  const images: Array<{ kind: string; texture: string; x: number; visible: boolean; alpha: number }> = [];
   const scene = {
     add: {
       image: (_x: number, _y: number, key: string) => {
         const image = {
           // What the image was made as (bird, fox, eyes...), so tests don't depend on creation order.
-          kind: key.split(':')[0], texture: key, x: 0, visible: false,
+          kind: key.split(':')[0], texture: key, x: 0, visible: false, alpha: 1,
           setOrigin() { return this; },
           setDepth() { return this; },
           setVisible(value: boolean) { this.visible = value; return this; },
           setTexture(value: string) { this.texture = value; return this; },
           setPosition(x: number) { this.x = x; return this; },
           setFlipX() { return this; },
-          setAlpha() { return this; }
+          setAlpha(value: number) { this.alpha = value; return this; }
         };
         images.push(image);
         return image;
@@ -118,11 +119,12 @@ describe('seasonal life at camp', () => {
 });
 
 describe('ambient quarry eyes', () => {
-  it('shows no eyes at camp, by day or by night', () => {
+  it('shows no eyes at camp on an autumn day or night', () => {
     const { scene, of } = sceneWithImages();
     const life = new AmbientLife(scene as never);
     const eyes = of('eyes');
-    expect(eyes).toHaveLength(EYE_SPOTS.length);
+    // The quarry's watchers, then the winter wolves.
+    expect(eyes).toHaveLength(EYE_SPOTS.length + WOLF_SPOTS.length);
     const state = createGame();
     state.timeOfDay = 200;
     for (let t = 0; t < 12000; t += 500) life.update(state, 0.5, t);
@@ -142,5 +144,53 @@ describe('ambient quarry eyes', () => {
     state.timeOfDay = 200;
     life.update(state, 0.5, 3000);
     expect(eyes.some(image => image.visible)).toBe(true);
+  });
+});
+
+describe('winter at camp', () => {
+  const base = createGame();
+  const winterNight = { ...base, day: 12, timeOfDay: nightStart(12) + 40, fireFuel: 0,
+    player: { ...base.player, x: 20, y: 15 }, progress: { ...base.progress, hearthUnlocked: true, nextStormDay: null } };
+
+  /** Runs a few one-second updates so the wolves' presence settles, ending at a moment every spot is watching. */
+  function settle(life: AmbientLife, state: typeof winterNight) {
+    for (let i = 0; i < 3; i++) life.update(state, 1, 12000 * (i + 1) + 1000);
+  }
+
+  it('shows the day\'s wolves at the camp edge while the fire is out, and none in autumn', () => {
+    const { scene, of } = sceneWithImages();
+    const life = new AmbientLife(scene as never);
+    settle(life, winterNight);
+    expect(of('eyes').filter(image => image.visible)).toHaveLength(wolfCount(12));
+    const autumn = sceneWithImages();
+    const autumnLife = new AmbientLife(autumn.scene as never);
+    settle(autumnLife, { ...winterNight, day: 8, timeOfDay: nightStart(8) + 40 });
+    expect(autumn.of('eyes').filter(image => image.visible)).toHaveLength(0);
+  });
+
+  it('lets the wolf eyes fade, not vanish, when the fire is fed', () => {
+    const { scene, of } = sceneWithImages();
+    const life = new AmbientLife(scene as never);
+    settle(life, winterNight);
+    life.update({ ...winterNight, fireFuel: 100 }, 0.5, 37200);
+    const shown = of('eyes').filter(image => image.visible);
+    expect(shown.length).toBeGreaterThan(0);
+    expect(shown.every(image => image.alpha > 0.3 && image.alpha < 0.7)).toBe(true);
+    life.update({ ...winterNight, fireFuel: 100 }, 1, 37400);
+    expect(of('eyes').filter(image => image.visible)).toHaveLength(0);
+  });
+
+  it('sends the birds away for the winter', () => {
+    const { scene, of } = sceneWithImages();
+    const life = new AmbientLife(scene as never);
+    const day = { ...base, day: 12, timeOfDay: 30, player: { ...base.player, x: 2, y: 2 } };
+    life.update(day, 0.1, 100);
+    life.update(day, 0.1, 200);
+    expect(of('bird').some(image => image.visible)).toBe(false);
+    const autumn = sceneWithImages();
+    const autumnLife = new AmbientLife(autumn.scene as never);
+    autumnLife.update({ ...day, day: 8 }, 0.1, 100);
+    autumnLife.update({ ...day, day: 8 }, 0.1, 200);
+    expect(autumn.of('bird').some(image => image.visible)).toBe(true);
   });
 });

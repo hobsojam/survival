@@ -3,10 +3,11 @@ import type { GameState } from '../game/state';
 import { worldX, worldY } from './art';
 import { LIGHT_DEPTH } from './visuals';
 import { sprites } from '../art/sprites';
-import { firefliesOut, leavesFalling } from '../game/calendar';
+import { firefliesOut, isWinter, leavesFalling } from '../game/calendar';
+import { wolvesClose } from '../game/wolves';
 import {
   BIRD_HOMES, EYE_SPOTS, FIREFLY_HOMES, FOX, birdForageTarget, birdMayReturn, birdShouldLeave, birdGroundFrame, birdFlightFrame,
-  LEAF_HOMES, darkness, eyesAt, fireflyFrame, fireflyGlow, fireflyOffset, foxAt, foxFrame, leafAt, type Point
+  LEAF_HOMES, WOLF_SPOTS, darkness, eyesAt, fireflyFrame, fireflyGlow, fireflyOffset, foxAt, foxFrame, leafAt, wolfCount, wolfWatch, type Point
 } from './ambient';
 
 type BirdFlightKind = 'flee' | 'return' | 'forage' | 'home';
@@ -58,6 +59,9 @@ export class AmbientLife {
   private readonly fireflies: Phaser.GameObjects.Image[];
   private readonly leaves: Phaser.GameObjects.Image[];
   private readonly eyes: Phaser.GameObjects.Image[];
+  private readonly wolfEyes: Phaser.GameObjects.Image[];
+  /** Eases toward how strongly the wolves press in, so their eyes fade rather than blink out. */
+  private wolfPresence = 0;
   private foxRun: Motion | null = null;
   private foxFledDay = 0;
   private started = false;
@@ -72,6 +76,7 @@ export class AmbientLife {
     this.fireflies = FIREFLY_HOMES.map(() => sprite(scene, 'firefly', 'glow0', LIGHT_DEPTH));
     this.leaves = LEAF_HOMES.map(() => sprite(scene, 'leaf', 'fall0'));
     this.eyes = EYE_SPOTS.map(() => sprite(scene, 'eyes', 'open', LIGHT_DEPTH));
+    this.wolfEyes = WOLF_SPOTS.map(() => sprite(scene, 'eyes', 'open', LIGHT_DEPTH));
   }
 
   update(state: GameState, seconds: number, timeMs: number): void {
@@ -79,12 +84,15 @@ export class AmbientLife {
     // The birds, the fox and the fireflies live at camp; the eyes watch the quarry.
     if (state.area === 'quarry') this.updateEyes(dark, state, timeMs);
     else for (const image of this.eyes) image.setVisible(false);
+    this.updateWolves(state, dark, seconds, timeMs);
     if (state.area !== 'camp') {
       for (const image of [...this.birds.map(bird => bird.image), this.fox, ...this.fireflies, ...this.leaves]) image.setVisible(false);
       return;
     }
     if (!this.started) this.start(dark, timeMs);
-    for (const bird of this.birds) this.updateBird(bird, state, dark, seconds, timeMs);
+    // The birds leave for the winter.
+    if (isWinter(state.day)) for (const bird of this.birds) bird.image.setVisible(false);
+    else for (const bird of this.birds) this.updateBird(bird, state, dark, seconds, timeMs);
     this.updateFox(state, seconds, timeMs);
     // Fireflies are a summer-night sight, and leaves fall on autumn days.
     this.updateFireflies(firefliesOut(state.day) ? dark : 0, timeMs);
@@ -204,6 +212,20 @@ export class AmbientLife {
       if (!eyes) { image.setVisible(false); return; }
       image.setTexture(`eyes:${eyes.frame}`).setPosition(Math.round(worldX(eyes.x)), Math.round(worldY(eyes.y)))
         .setAlpha(eyes.alpha).setVisible(true);
+    });
+  }
+
+  /** Wolf eyes at the camp edge on winter nights while the fire burns low, fading as it is fed. */
+  private updateWolves(state: GameState, dark: number, seconds: number, timeMs: number): void {
+    const target = state.area === 'camp' && wolvesClose(state) ? wolfWatch(state.fireFuel) : 0;
+    this.wolfPresence += Math.max(-seconds, Math.min(seconds, target - this.wolfPresence));
+    const count = wolfCount(state.day);
+    this.wolfEyes.forEach((image, index) => {
+      const eyes = index < count && state.area === 'camp' ? eyesAt(index, timeMs, dark, state.player, WOLF_SPOTS) : null;
+      const alpha = (eyes?.alpha ?? 0) * this.wolfPresence;
+      if (!eyes || alpha < 0.02) { image.setVisible(false); return; }
+      image.setTexture(`eyes:${eyes.frame}`).setPosition(Math.round(worldX(eyes.x)), Math.round(worldY(eyes.y)))
+        .setAlpha(alpha).setVisible(true);
     });
   }
 

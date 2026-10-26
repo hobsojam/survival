@@ -109,7 +109,7 @@ describe('terrain composition', () => {
           const worldX = x + (px + .5) / 16;
           const worldY = y + (py + .5) / 16;
           if (Math.hypot(worldX - BALANCE.campX - .5, worldY - BALANCE.campY - .5) <= BALANCE.campRadius + .1) continue;
-          if (visibleGround(map, x, y, px, py)?.startsWith('earth')) {
+          if (/^(earth|path)/.test(visibleGround(map, x, y, px, py) ?? '')) {
             expect(pathDistance(worldX, worldY), `path too wide at ${worldX},${worldY}`).toBeLessThanOrEqual(.65);
           }
         }
@@ -126,7 +126,7 @@ describe('terrain composition', () => {
         const tileY = Math.floor(worldY);
         const pixelX = Math.floor((worldX - tileX) * 16);
         const pixelY = Math.floor((worldY - tileY) * 16);
-        expect(visibleGround(map, tileX, tileY, pixelX, pixelY), `path gap at ${worldX},${worldY}`).toMatch(/^earth/);
+        expect(visibleGround(map, tileX, tileY, pixelX, pixelY), `path gap at ${worldX},${worldY}`).toMatch(/^(earth|path)/);
       }
     }
   });

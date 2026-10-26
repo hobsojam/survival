@@ -1,4 +1,5 @@
-import { nightStart } from './calendar';
+import { isWinter, nightStart } from './calendar';
+import { wolvesClose } from './wolves';
 import { BALANCE, type GameState } from './state';
 
 const MUTE_KEY = 'hearthwild.sound-muted';
@@ -18,6 +19,7 @@ export class Soundscape {
   private crickets?: GainNode;
   private fire?: GainNode;
   private quarry?: GainNode;
+  private wolves?: GainNode;
   private noise?: AudioBuffer;
   private state?: GameState & { area?: string };
   private muted: boolean;
@@ -28,6 +30,7 @@ export class Soundscape {
   private cricketTimer?: number;
   private fireTimer?: number;
   private quarryTimer?: number;
+  private howlTimer?: number;
 
   constructor(private readonly storage?: Storage, private readonly createContext: () => AudioContext | undefined = browserAudioContext) {
     this.muted = this.readMuted();
@@ -44,6 +47,7 @@ export class Soundscape {
         this.scheduleCrickets();
         this.scheduleFire();
         this.scheduleQuarry();
+        this.scheduleHowl();
       }
       this.syncAmbience();
     } catch {
@@ -125,6 +129,7 @@ export class Soundscape {
     this.crickets = this.makeLayer(context, master, 0);
     this.fire = this.makeLayer(context, master, 0);
     this.quarry = this.makeLayer(context, master, 0);
+    this.wolves = this.makeLayer(context, master, 0);
     this.makeQuarryDrone(context, this.quarry);
     this.noise = this.makeNoiseBuffer(context);
   }
@@ -149,7 +154,8 @@ export class Soundscape {
     const inQuarry = this.state.area === 'quarry';
     const distance = Math.hypot(this.state.player.x - BALANCE.campX, this.state.player.y - BALANCE.campY);
     const campVolume = Math.max(0, 1 - distance / (BALANCE.campRadius + 4));
-    let birdVolume = 0.48;
+    // The birds leave for the winter.
+    let birdVolume = isWinter(this.state.day) ? 0 : 0.48;
     let cricketVolume = 0;
     let quarryVolume = 0;
     if (isNight) {
@@ -157,13 +163,14 @@ export class Soundscape {
       cricketVolume = inQuarry ? 0.22 : 0.34;
     }
     if (inQuarry) {
-      birdVolume = isNight ? 0 : 0.16;
+      birdVolume = isNight || isWinter(this.state.day) ? 0 : 0.16;
       quarryVolume = isNight ? 0.72 : 0.48;
     }
     this.setGain(this.birds, birdVolume);
     this.setGain(this.crickets, cricketVolume);
     this.setGain(this.fire, !inQuarry && this.state.fireFuel > 0 ? campVolume * 0.55 : 0);
     this.setGain(this.quarry, quarryVolume);
+    this.setGain(this.wolves, !inQuarry && wolvesClose(this.state) ? 0.5 : 0);
   }
 
   private resetAfterAudioFailure(): void {
@@ -172,16 +179,19 @@ export class Soundscape {
     if (this.cricketTimer !== undefined) globalThis.clearTimeout(this.cricketTimer);
     if (this.fireTimer !== undefined) globalThis.clearTimeout(this.fireTimer);
     if (this.quarryTimer !== undefined) globalThis.clearTimeout(this.quarryTimer);
+    if (this.howlTimer !== undefined) globalThis.clearTimeout(this.howlTimer);
     this.birdTimer = undefined;
     this.cricketTimer = undefined;
     this.fireTimer = undefined;
     this.quarryTimer = undefined;
+    this.howlTimer = undefined;
     this.context = undefined;
     this.master = undefined;
     this.birds = undefined;
     this.crickets = undefined;
     this.fire = undefined;
     this.quarry = undefined;
+    this.wolves = undefined;
     this.noise = undefined;
     this.started = false;
     if (context) void context.close().catch(() => undefined);
@@ -199,7 +209,7 @@ export class Soundscape {
 
   private scheduleBirds(): void {
     this.birdTimer = globalThis.setTimeout(() => {
-      if (this.state && this.state.timeOfDay < nightStart(this.state.day)) this.playBirdPhrase();
+      if (this.state && this.state.timeOfDay < nightStart(this.state.day) && !isWinter(this.state.day)) this.playBirdPhrase();
       this.scheduleBirds();
     }, 2400 + Math.random() * 3600);
   }
@@ -308,6 +318,38 @@ export class Soundscape {
     oscillator.connect(filter).connect(envelope).connect(this.quarry);
     oscillator.start(start);
     oscillator.stop(start + 1.85);
+  }
+
+  private scheduleHowl(): void {
+    this.howlTimer = globalThis.setTimeout(() => {
+      if (this.state && this.state.area !== 'quarry' && wolvesClose(this.state)) this.playHowl();
+      this.scheduleHowl();
+    }, 12000 + Math.random() * 12000);
+  }
+
+  /** A long, low howl that rises, holds and falls away. */
+  private playHowl(): void {
+    if (!this.context || !this.wolves || this.muted || this.context.state !== 'running') return;
+    const start = this.context.currentTime;
+    const oscillator = this.context.createOscillator();
+    const envelope = this.context.createGain();
+    const filter = this.context.createBiquadFilter();
+    const panner = this.context.createStereoPanner();
+    filter.type = 'lowpass';
+    filter.frequency.value = 900;
+    oscillator.type = 'triangle';
+    oscillator.frequency.setValueAtTime(330, start);
+    oscillator.frequency.exponentialRampToValueAtTime(520, start + 0.6);
+    oscillator.frequency.setValueAtTime(520, start + 1.3);
+    oscillator.frequency.exponentialRampToValueAtTime(300, start + 2.2);
+    envelope.gain.setValueAtTime(0.0001, start);
+    envelope.gain.linearRampToValueAtTime(0.09, start + 0.4);
+    envelope.gain.setValueAtTime(0.09, start + 1.3);
+    envelope.gain.exponentialRampToValueAtTime(0.0001, start + 2.3);
+    panner.pan.value = Math.random() * 1.4 - 0.7;
+    oscillator.connect(filter).connect(envelope).connect(panner).connect(this.wolves);
+    oscillator.start(start);
+    oscillator.stop(start + 2.35);
   }
 
   private playCrackle(): void {
