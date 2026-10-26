@@ -114,6 +114,17 @@ describe('native-size scene art', () => {
     expect(sceneVisuals(state, 0).map(item => item.texture)).toContain('firePit:burning0');
   });
 
+  it('shows bare bushes and an iced spring in winter', () => {
+    const textures = (day: number) => sceneVisuals({ ...createGame(), day }, 0).map(item => item.texture);
+    const bushes = (day: number) => textures(day).filter(texture => texture.startsWith('berryBush:'));
+    expect(bushes(12).length).toBeGreaterThan(0);
+    expect(bushes(12).every(texture => texture === 'berryBush:picked')).toBe(true);
+    expect(textures(12)).toContain('spring:frozen');
+    expect(bushes(2).every(texture => texture === 'berryBush:ready')).toBe(true);
+    expect(textures(2)).toContain('spring:still');
+    expect(sprites.spring.frames.frozen).toBeDefined();
+  });
+
   it('draws loose piles by count', () => {
     const state = createGame();
     state.stonePiles = [{ id: 'p1', x: 5, y: 5, count: 1, area: 'camp' }, { id: 'p2', x: 8, y: 5, count: 2, area: 'camp' }, { id: 'p5', x: 11, y: 5, count: 5, area: 'camp' }];

@@ -1327,3 +1327,27 @@ describe('winter nights', () => {
     expect(failed.player.energy).toBeLessThanOrEqual(BALANCE.coldNightFailureEnergy);
   });
 });
+
+describe('winter larder', () => {
+  const base = createGame();
+  const bush = base.nodes.find(node => node.id === 'berry-0')!;
+  const winterDay = { ...base, day: 12, player: { ...base.player, x: bush.x, y: bush.y } };
+  const atSpringInWinter = { ...base, day: 12, player: { ...base.player, x: SITES.spring.x, y: SITES.spring.y, energy: 50 } };
+
+  it('leaves the bushes bare all winter', () => {
+    const result = applyAction(winterDay, { type: 'gather', nodeId: 'berry-0' });
+    expect(result.message).toBe('The bushes are bare until spring.');
+    expect(result.state).toBe(winterDay);
+    expect(applyAction({ ...winterDay, day: 51 }, { type: 'gather', nodeId: 'berry-0' }).state).toMatchObject({ day: 51 });
+    expect(applyAction({ ...winterDay, day: 51 }, { type: 'gather', nodeId: 'berry-0' }).message).toBe('The bushes are bare until spring.');
+    expect(applyAction({ ...winterDay, day: 21 }, { type: 'gather', nodeId: 'berry-0' }).state.inventory.food).toBe(1);
+  });
+
+  it('freezes the quiet spring, but still marks it found', () => {
+    const result = applyAction(atSpringInWinter, { type: 'visitSite', siteId: 'spring' });
+    expect(result.message).toBe('The spring is frozen over.');
+    expect(result.state.player.energy).toBe(atSpringInWinter.player.energy);
+    expect(result.state.timeOfDay).toBe(atSpringInWinter.timeOfDay);
+    expect(result.state.progress.discoveries.spring).toBe(true);
+  });
+});

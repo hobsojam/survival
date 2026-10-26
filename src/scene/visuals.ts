@@ -1,4 +1,4 @@
-import { nightStart } from '../game/calendar';
+import { isWinter, nightStart } from '../game/calendar';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceNode } from '../game/state';
 import { isFreezingNight } from '../game/rules';
 import { TILE, worldX, worldY } from './art';
@@ -38,7 +38,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     addPiles(state, visuals, add);
     return visuals;
   }
-  for (const node of state.nodes) add(node.id, nodeTexture(node, timeMs, gathered), node.x, node.y);
+  for (const node of state.nodes) add(node.id, nodeTexture(node, timeMs, gathered, isWinter(state.day)), node.x, node.y);
   addPiles(state, visuals, add);
   for (const tree of state.trees) add(tree.id, tree.readyDay <= state.day ? `${tree.sprite}:still` : 'stump:still', tree.x, tree.y);
   addCamp(state, add);
@@ -68,7 +68,9 @@ function pileSize(count: number): string {
 const NODE_SPRITES: Record<ResourceNode['kind'], string> = { branch: 'branchPile', berry: 'berryBush', fiber: 'fiberReeds', stone: 'rock0' };
 const EMPTY_FRAMES: Record<ResourceNode['kind'], string> = { branch: 'depleted', berry: 'picked', fiber: 'cut', stone: 'depleted' };
 
-function nodeTexture(node: ResourceNode, timeMs: number, gathered: Gathered): string {
+/** In winter the berry bushes stand bare, whatever they would hold. */
+function nodeTexture(node: ResourceNode, timeMs: number, gathered: Gathered, winter: boolean): string {
+  if (winter && node.kind === 'berry') return 'berryBush:picked';
   if (node.kind === 'stone') return node.amount > 0 ? 'rock0:still' : 'pebbles0:still';
   return `${NODE_SPRITES[node.kind]}:${nodeFrame(node, timeMs, gathered)}`;
 }
@@ -96,7 +98,7 @@ function addCamp(state: GameState, add: AddVisual): void {
   add('logSeat', 'logSeat:still', x - 1, y + 1);
   add('lookout', progress.lookoutRepaired ? 'lookout:restored' : 'lookout:damaged', LOOKOUT.x, LOOKOUT.y);
   add('site-basket', progress.discoveries.basket ? 'oldBasket:empty' : 'oldBasket:full', SITES.basket.x, SITES.basket.y);
-  add('site-spring', 'spring:still', SITES.spring.x, SITES.spring.y);
+  add('site-spring', isWinter(state.day) ? 'spring:frozen' : 'spring:still', SITES.spring.x, SITES.spring.y);
   add('site-cairn', progress.discoveries.cairn ? 'cairn:empty' : 'cairn:full', SITES.cairn.x, SITES.cairn.y);
   if (progress.hearthUnlocked && !structures.hearth) add('hearthSite', 'hearthSite:still', x + 1, y + 2, GROUND_DECAL_DEPTH);
 }

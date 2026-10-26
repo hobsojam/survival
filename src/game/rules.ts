@@ -258,6 +258,11 @@ const cross: ActionHandler<'cross'> = state => {
   };
 };
 
+/** Whether a node has something to gather: berry bushes stay bare all winter. */
+export function canGather(state: GameState, node: GameState['nodes'][number]): boolean {
+  return node.amount > 0 && !(node.kind === 'berry' && isWinter(state.day));
+}
+
 const NODE_RESOURCE: Record<GameState['nodes'][number]['kind'], keyof GameState['inventory']> = { branch: 'wood', berry: 'food', fiber: 'fiber', stone: 'stone' };
 const GATHER_MESSAGE: Partial<Record<keyof GameState['inventory'], string>> = {
   wood: 'Picked up fallen branches.', food: 'Picked berries.', fiber: 'Gathered fiber.', stone: 'Collected stone.'
@@ -266,6 +271,7 @@ const GATHER_MESSAGE: Partial<Record<keyof GameState['inventory'], string>> = {
 const gather: ActionHandler<'gather'> = (state, action) => {
   const node = state.nodes.find(item => item.id === action.nodeId);
   if (!node || state.area !== 'camp' || !near(state.player.x, state.player.y, node.x, node.y)) return refuse(state, 'Move closer to gather.');
+  if (node.kind === 'berry' && isWinter(state.day)) return refuse(state, 'The bushes are bare until spring.');
   if (node.amount <= 0) return refuse(state, 'Nothing to gather yet.');
   const resource = NODE_RESOURCE[node.kind];
   if (freeSpaces(state) < spaceFor(resource)) return refuse(state, FULL_BAG_MESSAGE);
@@ -360,6 +366,10 @@ const chopTree: ActionHandler<'chopTree'> = (state, action) => {
 };
 
 function restAtSpring(state: GameState): ActionResult {
+  if (isWinter(state.day)) return {
+    state: { ...state, progress: { ...state.progress, discoveries: { ...state.progress.discoveries, spring: true } } },
+    message: 'The spring is frozen over.'
+  };
   const rested = advanceTime({ ...state, progress: { ...state.progress,
     discoveries: { ...state.progress.discoveries, spring: true } } }, BALANCE.restSeconds, 'resting');
   return {

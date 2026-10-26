@@ -292,7 +292,7 @@ function pileCount(g: Grid, glyphs: string[]): void {
 }
 const countLegend = { k: 'ink', p: 'paper' } as const;
 
-const siteLegend = { ...campLegend, u: 'flower4', v: 'frost' } as const;
+const siteLegend = { ...campLegend, u: 'flower4', v: 'frost', x: 'paper' } as const;
 function oldBasket(g: Grid, full: boolean): void {
   oval(g, 8, 14, 6, 2, 's');
   line(g, 3, 9, 6, 5, 'd'); line(g, 6, 5, 10, 5, 'd'); line(g, 10, 5, 13, 9, 'd');
@@ -300,9 +300,15 @@ function oldBasket(g: Grid, full: boolean): void {
   for (const x of [4, 7, 10]) line(g, x, 10, x + 1, 13, 'b');
   if (full) for (const [x, y] of [[5, 8], [8, 7], [11, 8]]) { box(g, x, y, 2, 2, 'k'); dot(g, x, y, 'l'); }
 }
-function spring(g: Grid): void {
+function spring(g: Grid, frozen = false): void {
   oval(g, 12, 13, 10, 2, 's'); oval(g, 12, 10, 10, 5, 'm');
-  oval(g, 12, 9, 8, 3, 'u'); line(g, 6, 9, 18, 9, 'v');
+  if (frozen) {
+    // Ice: pale frost with bright streaks and one blue crack.
+    oval(g, 12, 9, 8, 3, 'v');
+    line(g, 7, 8, 10, 8, 'x'); line(g, 13, 10, 16, 10, 'x'); line(g, 9, 10, 14, 8, 'u');
+  } else {
+    oval(g, 12, 9, 8, 3, 'u'); line(g, 6, 9, 18, 9, 'v');
+  }
   for (const [x, y] of [[3, 7], [7, 5], [17, 6], [20, 10]]) {
     box(g, x, y, 3, 3, 'n'); dot(g, x, y, 'q');
   }
@@ -334,7 +340,7 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   logSeat: define(24, 12, campLegend, { still: logSeat }),
   lookout: define(32, 32, campLegend, { damaged: g => lookout(g, false), restored: g => lookout(g, true) }, [16, 29]),
   oldBasket: define(16, 16, siteLegend, { full: g => oldBasket(g, true), empty: g => oldBasket(g, false) }),
-  spring: define(24, 16, siteLegend, { still: spring }),
+  spring: define(24, 16, siteLegend, { still: g => spring(g), frozen: g => spring(g, true) }),
   cairn: define(16, 16, siteLegend, { full: g => cairn(g, true), empty: g => cairn(g, false) }),
   looseStones: define(16, 16, campLegend, { one: g => looseStones(g, 1), two: g => looseStones(g, 2), many: g => looseStones(g, 3) }),
   stonePileSite: define(16, 16, campLegend, { still: stonePileSite }),
