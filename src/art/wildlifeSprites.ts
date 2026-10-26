@@ -134,6 +134,20 @@ const windStreak = define(12, 3, { a: 'frost' }, {
   streak1: g => { line(g, 1, 2, 8, 0, 'a'); box(g, 8, 0, 4, 1, 'a'); },
   streak2: g => { line(g, 2, 2, 8, 1, 'a'); box(g, 8, 1, 2, 1, 'a'); }
 }, [6, 1], { drift: { frames: ['streak0', 'streak1', 'streak2'], frameRate: 8, repeat: -1 } });
+/** A falling raindrop, leaning slightly with the wind. */
+const rainStreak = define(3, 6, { a: 'frost', b: 'flower4' }, {
+  still: g => { dot(g, 2, 0, 'b'); dot(g, 2, 1, 'a'); dot(g, 1, 2, 'a'); dot(g, 1, 3, 'a'); dot(g, 0, 4, 'b'); dot(g, 0, 5, 'b'); }
+}, [0, 0]);
+
+/** A shallow puddle left by a spring shower: a dark rim, the sky in it, one glint. */
+const puddle = define(16, 6, { r: 'earth1', w: 'flower4', g: 'frost' }, {
+  still: g => {
+    box(g, 2, 0, 12, 6, 'r'); box(g, 0, 1, 16, 4, 'r');
+    box(g, 3, 1, 10, 4, 'w'); box(g, 1, 2, 14, 2, 'w');
+    box(g, 5, 2, 3, 1, 'g');
+  }
+}, [8, 3]);
+
 const sleetFleck = define(2, 1, { a: 'frost' }, { still: g => box(g, 0, 0, 2, 1, 'a') }, [0, 0]);
 const cookSteam = define(4, 6, { a: 'stone3', b: 'stone4' }, {
   steam0: g => { dot(g, 1, 5, 'a'); dot(g, 2, 4, 'b'); dot(g, 1, 3, 'a'); },
@@ -159,5 +173,5 @@ const morningFrost = define(16, 16, frostLegend, frostPainters, [8, 15]);
 
 export const wildlifeSprites: Record<string, SpriteDef> = {
   bird: birdSprite, fox: foxSprite, firefly: fireflySprite, leaf: leafSprite, eyes: eyesSprite, wolfTracks: wolfTracksSprite, gatherPop, smokePuff, spark,
-  windStreak, sleetFleck, cookSteam, shootingStar, morningFrost
+  windStreak, sleetFleck, rainStreak, puddle, cookSteam, shootingStar, morningFrost
 };

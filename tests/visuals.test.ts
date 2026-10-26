@@ -134,6 +134,17 @@ describe('native-size scene art', () => {
     expect(sceneVisuals({ ...state, area: 'quarry' }, 0).some(item => item.texture === 'wolfTracks:still')).toBe(false);
   });
 
+  it('gathers puddles at camp from the start of a shower until the day ends', () => {
+    const puddles = (changes: Partial<ReturnType<typeof createGame>>) =>
+      sceneVisuals({ ...createGame(), ...changes }, 0).filter(item => item.texture === 'puddle:still');
+    expect(puddles({ day: 22, timeOfDay: 40 })).toHaveLength(4);
+    expect(puddles({ day: 22, timeOfDay: 40 }).every(item => item.depth === GROUND_DECAL_DEPTH)).toBe(true);
+    expect(puddles({ day: 22, timeOfDay: 200 })).toHaveLength(4);
+    expect(puddles({ day: 22, timeOfDay: 20 })).toHaveLength(0);
+    expect(puddles({ day: 21, timeOfDay: 40 })).toHaveLength(0);
+    expect(puddles({ day: 22, timeOfDay: 40, area: 'quarry' })).toHaveLength(0);
+  });
+
   it('draws loose piles by count', () => {
     const state = createGame();
     state.stonePiles = [{ id: 'p1', x: 5, y: 5, count: 1, area: 'camp' }, { id: 'p2', x: 8, y: 5, count: 2, area: 'camp' }, { id: 'p5', x: 11, y: 5, count: 5, area: 'camp' }];

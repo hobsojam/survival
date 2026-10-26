@@ -40,3 +40,11 @@ describe('wolf tracks', () => {
     expect(Object.keys(wildlifeSprites.wolfTracks.frames)).toEqual(['still']);
   });
 });
+
+describe('rain art', () => {
+  it('has a valid rain streak and puddle', () => {
+    expect(() => validateSprite(wildlifeSprites.rainStreak)).not.toThrow();
+    expect(() => validateSprite(wildlifeSprites.puddle)).not.toThrow();
+    expect(wildlifeSprites.puddle.size).toEqual([16, 6]);
+  });
+});

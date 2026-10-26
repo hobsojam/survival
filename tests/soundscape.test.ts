@@ -52,9 +52,9 @@ function memoryStorage(initial: Record<string, string> = {}): Storage {
 function setup(storage = memoryStorage()) {
   const context = new FakeAudioContext();
   const sound = new Soundscape(storage, () => context as unknown as AudioContext);
-  // The layers are created in order: master, birds, crickets, fire, quarry, wolves.
+  // The layers are created in order: master, birds, crickets, fire, quarry, wolves, rain.
   const layer = (index: number) => context.gains[index].gain.value;
-  return { context, sound, storage, master: () => layer(0), birds: () => layer(1), crickets: () => layer(2), fire: () => layer(3), quarry: () => layer(4), wolves: () => layer(5) };
+  return { context, sound, storage, master: () => layer(0), birds: () => layer(1), crickets: () => layer(2), fire: () => layer(3), quarry: () => layer(4), wolves: () => layer(5), rain: () => layer(6) };
 }
 
 function world(changes: Partial<GameState> = {}): GameState {
@@ -111,6 +111,17 @@ describe('the soundscape', () => {
     expect(birds()).toBe(0);
     sound.update(winterNight);
     expect(crickets()).toBe(0);
+  });
+
+  it('plays the rain while a shower falls, wherever the survivor is', () => {
+    const { sound, rain } = setup();
+    sound.start();
+    sound.update(world({ day: 22, timeOfDay: 40 }));
+    expect(rain()).toBeCloseTo(0.35);
+    sound.update(world({ day: 22, timeOfDay: 40, area: 'quarry' }));
+    expect(rain()).toBeCloseTo(0.35);
+    sound.update(world({ day: 22, timeOfDay: 80 }));
+    expect(rain()).toBe(0);
   });
 
   it('mutes and unmutes, and remembers the choice', () => {

@@ -93,3 +93,14 @@ describe('winter weather', () => {
     expect(effectVisuals(autumn, 0, []).some(visual => visual.id.startsWith('weather:'))).toBe(false);
   });
 });
+
+describe('spring rain', () => {
+  it('falls in streaks only while it rains', () => {
+    const shower = { ...state, day: 22, timeOfDay: 40 };
+    const visuals = effectVisuals(shower, 0, []);
+    expect(visuals.filter(visual => visual.id.startsWith('weather:rain:'))).toHaveLength(40);
+    expect(visuals.some(visual => visual.id.startsWith('weather:sleet'))).toBe(false);
+    expect(visuals.every(visual => !visual.id.startsWith('weather:rain:') || visual.texture === 'rainStreak:still')).toBe(true);
+    expect(effectVisuals({ ...shower, timeOfDay: 80 }, 0, []).some(visual => visual.id.startsWith('weather:rain:'))).toBe(false);
+  });
+});
