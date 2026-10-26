@@ -160,7 +160,8 @@ export class Soundscape {
     let quarryVolume = 0;
     if (isNight) {
       birdVolume = 0;
-      cricketVolume = inQuarry ? 0.22 : 0.34;
+      // No crickets in the snow.
+      cricketVolume = isWinter(this.state.day) ? 0 : inQuarry ? 0.22 : 0.34;
     }
     if (inQuarry) {
       birdVolume = isNight || isWinter(this.state.day) ? 0 : 0.16;
@@ -239,7 +240,7 @@ export class Soundscape {
 
   private scheduleCrickets(): void {
     this.cricketTimer = globalThis.setTimeout(() => {
-      if (this.state && this.state.timeOfDay >= nightStart(this.state.day)) this.playCricketTrill();
+      if (this.state && this.state.timeOfDay >= nightStart(this.state.day) && !isWinter(this.state.day)) this.playCricketTrill();
       this.scheduleCrickets();
     }, 3600 + Math.random() * 3600);
   }

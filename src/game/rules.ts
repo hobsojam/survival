@@ -260,11 +260,6 @@ const cross: ActionHandler<'cross'> = state => {
   };
 };
 
-/** Whether a node has something to gather: berry bushes stay bare all winter. */
-export function canGather(state: GameState, node: GameState['nodes'][number]): boolean {
-  return node.amount > 0 && !(node.kind === 'berry' && isWinter(state.day));
-}
-
 const NODE_RESOURCE: Record<GameState['nodes'][number]['kind'], keyof GameState['inventory']> = { branch: 'wood', berry: 'food', fiber: 'fiber', stone: 'stone' };
 const GATHER_MESSAGE: Partial<Record<keyof GameState['inventory'], string>> = {
   wood: 'Picked up fallen branches.', food: 'Picked berries.', fiber: 'Gathered fiber.', stone: 'Collected stone.'

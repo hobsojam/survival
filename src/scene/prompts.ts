@@ -1,4 +1,4 @@
-import { nightStart } from '../game/calendar';
+import { isWinter, nightStart } from '../game/calendar';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceKind, type SiteId, type TreeNode } from '../game/state';
 import { isAtCamp, sleepBlocker, type GameAction } from '../game/rules';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
@@ -27,7 +27,9 @@ const GATHER_PROMPTS: Record<ResourceKind, string> = {
   branch: 'E  Pick up fallen branches', berry: 'E  Pick berries', fiber: 'E  Gather fiber', stone: 'E  Collect stone'
 };
 
-function gatherPrompt(found: Gatherable): string {
+function gatherPrompt(found: Gatherable, winter: boolean): string {
+  // E still tries a bare winter bush, so the survivor hears why it is empty.
+  if (found.kind === 'node' && found.node.kind === 'berry' && winter) return 'E  Search the bare bush';
   if (found.kind === 'pile') return `E  Pick up stone (×${found.pile.count})`;
   return found.kind === 'node' ? GATHER_PROMPTS[found.node.kind] : GATHER_PROMPTS.branch;
 }
@@ -87,7 +89,7 @@ export function promptFor(state: GameState): string {
   const site = closestSite(state);
   const nearby = lookoutPrompt(state) || (site ? sitePrompt(state, site.id) : '') || treePrompt(state);
   if (found) {
-    const gather = gatherPrompt(found);
+    const gather = gatherPrompt(found, isWinter(state.day));
     if (nearby) return `${gather} · ${nearby}`;
     return sleepBlocker(state) ? gather : `${gather} · Z Sleep until morning`;
   }

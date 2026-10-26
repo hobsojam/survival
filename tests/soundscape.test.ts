@@ -95,7 +95,7 @@ describe('the soundscape', () => {
   });
 
   it('lets the wolves howl near a dying fire on winter nights, and silences winter birds', () => {
-    const { sound, birds, wolves } = setup();
+    const { sound, birds, crickets, wolves } = setup();
     sound.start();
     const weathered = { ...createGame().progress, hearthUnlocked: true, nextStormDay: null };
     const winterNight = world({ day: 12, timeOfDay: nightStart(12) + 10, fireFuel: 0, progress: weathered });
@@ -109,6 +109,8 @@ describe('the soundscape', () => {
     expect(wolves()).toBe(0);
     sound.update(world({ day: 12, timeOfDay: 30, progress: weathered }));
     expect(birds()).toBe(0);
+    sound.update(winterNight);
+    expect(crickets()).toBe(0);
   });
 
   it('mutes and unmutes, and remembers the choice', () => {
