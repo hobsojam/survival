@@ -19,11 +19,7 @@ export interface ActionResult {
   message: string;
 }
 
-function near(x1: number, y1: number, x2: number, y2: number): boolean {
-  return Math.hypot(x1 - x2, y1 - y2) <= BALANCE.interactionRadius;
-}
-
-function near2(x1: number, y1: number, x2: number, y2: number, radius: number): boolean {
+function near(x1: number, y1: number, x2: number, y2: number, radius: number = BALANCE.interactionRadius): boolean {
   return Math.hypot(x1 - x2, y1 - y2) <= radius;
 }
 
@@ -228,7 +224,7 @@ function payAndBuild(state: GameState, cost: { wood: number; fiber: number; ston
 }
 
 function quarryFoundOnArrival(moved: GameState): ActionResult {
-  if (moved.area === 'quarry' && !moved.progress.quarryFound && near2(moved.player.x, moved.player.y, QUARRY_SITE.x, QUARRY_SITE.y, 2)) {
+  if (moved.area === 'quarry' && !moved.progress.quarryFound && near(moved.player.x, moved.player.y, QUARRY_SITE.x, QUARRY_SITE.y, 2)) {
     return { state: { ...moved, progress: { ...moved.progress, quarryFound: true } }, message: 'You found an old quarry. A pickaxe could work this stone.' };
   }
   return { state: moved, message: '' };
@@ -248,7 +244,7 @@ const move: ActionHandler<'move'> = (state, action) => {
 const cross: ActionHandler<'cross'> = state => {
   const toQuarry = state.area === 'camp';
   const exit = toQuarry ? CAMP_EXIT : QUARRY_EXIT;
-  if (!near2(state.player.x, state.player.y, exit.x, exit.y, 0.5)) return refuse(state, 'Walk to the end of the west path to cross.');
+  if (!near(state.player.x, state.player.y, exit.x, exit.y, 0.5)) return refuse(state, 'Walk to the end of the west path to cross.');
   if (!pathOpen(state)) return refuse(state, 'Build a shelter to open the west path.');
   return {
     state: { ...state, area: toQuarry ? 'quarry' : 'camp', player: { ...state.player, x: toQuarry ? BALANCE.mapWidth - 1.5 : 0.5, y: exit.y } },

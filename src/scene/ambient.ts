@@ -105,7 +105,7 @@ const EYE_FAR = 6;
 
 /**
  * One pair of eyes: visible about 6 s of every 12 s (three pairs at a time), only in the dark.
- * Near the survivor a pair backs off up to a tile and fades, then vanishes inside 4 tiles.
+ * Near the survivor a pair backs off up to a tile and fades out completely by 4 tiles.
  */
 export function eyesAt(index: number, timeMs: number, dark: number, player: Point):
   { x: number; y: number; alpha: number; frame: 'open' | 'blink' } | null {
@@ -123,7 +123,7 @@ export function eyesAt(index: number, timeMs: number, dark: number, player: Poin
   const blinking = (seconds + index * 0.7) % 3.5 > 3.25;
   return {
     x: spot.x + dx * near, y: spot.y + dy * near,
-    alpha: Math.min(1, dark) * edge * (1 - near * 0.8),
+    alpha: Math.min(1, dark) * edge * (1 - near),
     frame: blinking ? 'blink' : 'open'
   };
 }

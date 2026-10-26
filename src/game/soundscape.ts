@@ -5,6 +5,11 @@ const MASTER_VOLUME = 0.34;
 
 export type SoundCue = 'gather' | 'build';
 
+/** The browser's audio, or nothing where there is none. */
+function browserAudioContext(): AudioContext | undefined {
+  return typeof AudioContext === 'undefined' ? undefined : new AudioContext();
+}
+
 export class Soundscape {
   private context?: AudioContext;
   private master?: GainNode;
@@ -23,7 +28,7 @@ export class Soundscape {
   private fireTimer?: number;
   private quarryTimer?: number;
 
-  constructor(private readonly storage?: Storage) {
+  constructor(private readonly storage?: Storage, private readonly createContext: () => AudioContext | undefined = browserAudioContext) {
     this.muted = this.readMuted();
   }
 
@@ -108,9 +113,8 @@ export class Soundscape {
   }
 
   private createAudioGraph(): void {
-    const AudioContextClass = window.AudioContext;
-    if (!AudioContextClass) return;
-    const context = new AudioContextClass();
+    const context = this.createContext();
+    if (!context) return;
     this.context = context;
     const master = context.createGain();
     master.gain.value = this.muted ? 0 : MASTER_VOLUME;
@@ -163,10 +167,10 @@ export class Soundscape {
 
   private resetAfterAudioFailure(): void {
     const context = this.context;
-    if (this.birdTimer !== undefined) window.clearTimeout(this.birdTimer);
-    if (this.cricketTimer !== undefined) window.clearTimeout(this.cricketTimer);
-    if (this.fireTimer !== undefined) window.clearTimeout(this.fireTimer);
-    if (this.quarryTimer !== undefined) window.clearTimeout(this.quarryTimer);
+    if (this.birdTimer !== undefined) globalThis.clearTimeout(this.birdTimer);
+    if (this.cricketTimer !== undefined) globalThis.clearTimeout(this.cricketTimer);
+    if (this.fireTimer !== undefined) globalThis.clearTimeout(this.fireTimer);
+    if (this.quarryTimer !== undefined) globalThis.clearTimeout(this.quarryTimer);
     this.birdTimer = undefined;
     this.cricketTimer = undefined;
     this.fireTimer = undefined;
@@ -193,7 +197,7 @@ export class Soundscape {
   }
 
   private scheduleBirds(): void {
-    this.birdTimer = window.setTimeout(() => {
+    this.birdTimer = globalThis.setTimeout(() => {
       if (this.state && this.state.timeOfDay < BALANCE.nightStart) this.playBirdPhrase();
       this.scheduleBirds();
     }, 2400 + Math.random() * 3600);
@@ -223,7 +227,7 @@ export class Soundscape {
   }
 
   private scheduleCrickets(): void {
-    this.cricketTimer = window.setTimeout(() => {
+    this.cricketTimer = globalThis.setTimeout(() => {
       if (this.state && this.state.timeOfDay >= BALANCE.nightStart) this.playCricketTrill();
       this.scheduleCrickets();
     }, 3600 + Math.random() * 3600);
@@ -250,7 +254,7 @@ export class Soundscape {
   }
 
   private scheduleFire(): void {
-    this.fireTimer = window.setTimeout(() => {
+    this.fireTimer = globalThis.setTimeout(() => {
       if (this.state?.area !== 'quarry' && this.state?.fireFuel && this.fire && this.context?.state === 'running') this.playCrackle();
       this.scheduleFire();
     }, 120 + Math.random() * 380);
@@ -278,7 +282,7 @@ export class Soundscape {
   }
 
   private scheduleQuarry(): void {
-    this.quarryTimer = window.setTimeout(() => {
+    this.quarryTimer = globalThis.setTimeout(() => {
       if (this.state?.area === 'quarry') this.playStoneMoan();
       this.scheduleQuarry();
     }, 9000 + Math.random() * 9000);

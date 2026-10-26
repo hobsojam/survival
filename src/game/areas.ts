@@ -14,10 +14,10 @@ export function pathOpen(state: GameState): boolean {
 
 /** Where walking to (rawX, rawY) lands the survivor in the other area, or null if they stay put. */
 export function crossing(state: GameState, rawX: number, rawY: number): { area: AreaId; x: number; y: number } | null {
+  // Inside the crossing's half-width, y is already well within the map, so it needs no clamp.
   if (Math.abs(rawY - CROSSING.y) > CROSSING.halfWidth) return null;
-  const y = Math.max(0, Math.min(BALANCE.mapHeight - 1, rawY));
   if (state.area === 'camp') {
-    return pathOpen(state) && rawX < 0 ? { area: 'quarry', x: BALANCE.mapWidth - 1.5, y } : null;
+    return pathOpen(state) && rawX < 0 ? { area: 'quarry', x: BALANCE.mapWidth - 1.5, y: rawY } : null;
   }
-  return rawX > BALANCE.mapWidth - 1 ? { area: 'camp', x: 0.5, y } : null;
+  return rawX > BALANCE.mapWidth - 1 ? { area: 'camp', x: 0.5, y: rawY } : null;
 }

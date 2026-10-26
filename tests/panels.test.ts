@@ -51,7 +51,8 @@ describe('axe panel', () => {
 
   it('reads as crafted once made', () => {
     expect(axeView(game({ progress: { ...afterColdNight, axeCrafted: true }, structures: { toolshed: true } })))
-      .toMatchObject({ title: 'Stone axe ready', cost: 'Crafted', disabled: true, ready: false });
+      .toMatchObject({ title: 'Stone axe ready', cost: 'Crafted', disabled: true, ready: false,
+        copy: 'Tap a mature tree, or stand by one and press X, to gather two wood. Stumps regrow after three dawns.' });
   });
 });
 
@@ -69,7 +70,8 @@ describe('pickaxe panel', () => {
 
   it('reads as crafted once made', () => {
     expect(pickaxeView(game({ progress: { quarryFound: true, pickaxeCrafted: true }, structures: { shelter: true, toolshed: true } })))
-      .toMatchObject({ title: 'Pickaxe ready', cost: 'Crafted', disabled: true, ready: false });
+      .toMatchObject({ title: 'Pickaxe ready', cost: 'Crafted', disabled: true, ready: false,
+        copy: 'Tap the quarry face, or stand at it and press E, to dig a stone. It is ready again each dawn.' });
   });
 });
 

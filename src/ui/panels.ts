@@ -23,7 +23,7 @@ export function axeView(state: GameState): ActionPanelView {
   const { hearthUnlocked, axeCrafted } = state.progress;
   const button = { disabled: !hearthUnlocked || axeCrafted, ready: !axeBlocker(state) };
   if (axeCrafted) {
-    return { ...button, title: 'Stone axe ready', copy: 'Stand near a mature tree and press X to gather two wood. Stumps regrow after three dawns.', cost: 'Crafted' };
+    return { ...button, title: 'Stone axe ready', copy: 'Tap a mature tree, or stand by one and press X, to gather two wood. Stumps regrow after three dawns.', cost: 'Crafted' };
   }
   if (hearthUnlocked) {
     const copy = state.structures.toolshed
@@ -40,7 +40,7 @@ export function pickaxeView(state: GameState): ActionPanelView & { shown: boolea
   const blocker = pickaxeBlocker(state);
   const button = { shown: quarryFound, disabled: !quarryFound || pickaxeCrafted, ready: quarryFound && !blocker };
   if (pickaxeCrafted) {
-    return { ...button, title: 'Pickaxe ready', copy: 'Stand at the quarry face and press E, or tap it, to dig a stone. It is ready again each dawn.', cost: 'Crafted' };
+    return { ...button, title: 'Pickaxe ready', copy: 'Tap the quarry face, or stand at it and press E, to dig a stone. It is ready again each dawn.', cost: 'Crafted' };
   }
   return { ...button, title: 'Craft a pickaxe', copy: blocker ?? 'Your toolshed is ready. Craft a pickaxe to work the quarry face.', cost: '2 wood · 1 fiber · 2 stone' };
 }

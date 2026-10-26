@@ -138,6 +138,15 @@ describe('quarry eyes', () => {
     expect(at(3.9)).toBeNull();
   });
 
+  it('fades all the way out before vanishing, rather than blinking off', () => {
+    const t = Array.from({ length: 48 }, (_, k) => k * 250).find(ms => eyesAt(0, ms, 1, far))! + 3000;
+    const spot = EYE_SPOTS[0];
+    const alpha = (d: number) => eyesAt(0, t, 1, { x: spot.x + d, y: spot.y })?.alpha ?? 0;
+    expect(alpha(6)).toBeCloseTo(1);
+    expect(alpha(5)).toBeGreaterThan(alpha(4.5));
+    expect(alpha(4.01)).toBeLessThan(0.02);
+  });
+
   it('blinks', () => {
     const frames = new Set<string>();
     for (let t = 0; t < 12000; t += 50) { const e = eyesAt(0, t, 1, far); if (e) frames.add(e.frame); }

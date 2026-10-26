@@ -71,7 +71,8 @@ function buildQuarryMap(): TerrainMap {
 function layQuarryTile(x: number, y: number, map: TerrainMap): string {
   const edge = edgeDistance(x, y);
   const nearSite = [QUARRY_SITE, RUBBLE_SITE].some(site => Math.hypot(x - site.x, y - site.y) < 1.5);
-  if (edge <= 1 && x < 24 && hash(x, y, 2) % 3 !== 0 && clearForTree(x, y, [], [])) {
+  // Quarry trees only line the outer edge, far from the camp circle and with no paths or supplies to dodge.
+  if (edge <= 1 && x < 24 && hash(x, y, 2) % 3 !== 0) {
     map.trees.push({ x, y, sprite: TREE_SPRITES[hash(x, y, 3) % 3] });
   } else if (edge > 0 && !nearSite && hash(x, y, 4) % 4 === 0) {
     const detail = hash(x, y, 5) % 4;
