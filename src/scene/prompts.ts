@@ -117,10 +117,19 @@ function campPrompt(state: GameState): string {
 }
 
 function quarryPrompt(state: GameState, found: Gatherable | undefined): string {
-  if (found?.kind === 'pile') return `E  Pick up stone (×${found.pile.count})`;
+  if (found?.kind === 'pile') {
+    const pile = `E  Pick up stone (×${found.pile.count})`;
+    return within(state, QUARRY_SITE) ? `${pile} · ${quarryFaceNote(state)}` : pile;
+  }
   if (found?.kind === 'rubble') return 'E  Gather rubble';
   if (found?.kind === 'quarry') return state.progress.pickaxeCrafted ? 'E  Dig the quarry' : 'Quarry · craft a pickaxe at the toolshed';
   if (within(state, QUARRY_SITE) && state.quarryReadyDay > state.day) return 'Quarry · worked out until morning';
   if (within(state, QUARRY_EXIT)) return 'Walk east to return to camp';
   return 'WASD / arrows  Move';
+}
+
+/** What the quarry face is doing, for when E is busy with a loose pile beside it. */
+function quarryFaceNote(state: GameState): string {
+  if (state.quarryReadyDay > state.day) return 'Quarry · worked out until morning';
+  return state.progress.pickaxeCrafted ? 'Quarry · tap the face to dig' : 'Quarry · craft a pickaxe at the toolshed';
 }

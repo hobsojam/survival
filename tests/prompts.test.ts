@@ -97,6 +97,16 @@ describe('quarry prompts', () => {
     expect(promptFor({ ...state, progress: { ...state.progress, pickaxeCrafted: true } })).toBe('E  Dig the quarry');
   });
 
+  it('still mentions the quarry face when a loose pile beside it is nearer', () => {
+    const pile = { id: 'p', x: QUARRY_SITE.x + 1, y: QUARRY_SITE.y, count: 2, area: 'quarry' as const };
+    const state = { ...quarry(QUARRY_SITE.x + 1, QUARRY_SITE.y), stonePiles: [pile] };
+    expect(promptFor(state)).toBe('E  Pick up stone (×2) · Quarry · craft a pickaxe at the toolshed');
+    const withPickaxe = { ...state, progress: { ...state.progress, pickaxeCrafted: true } };
+    expect(promptFor(withPickaxe)).toBe('E  Pick up stone (×2) · Quarry · tap the face to dig');
+    expect(promptFor({ ...withPickaxe, quarryReadyDay: 2 })).toBe('E  Pick up stone (×2) · Quarry · worked out until morning');
+    expect(promptFor({ ...state, player: { ...state.player, x: 30, y: 3 }, stonePiles: [{ ...pile, x: 30, y: 3 }] })).toBe('E  Pick up stone (×2)');
+  });
+
   it('says the face is worked out until morning', () => {
     const state = { ...quarry(QUARRY_SITE.x, QUARRY_SITE.y), quarryReadyDay: 2 };
     expect(promptFor(state)).toBe('Quarry · worked out until morning');
