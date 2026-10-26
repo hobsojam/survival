@@ -1,6 +1,7 @@
-import { isWinter, nightStart } from './calendar';
+import { isSpring, isWinter, nightStart } from './calendar';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } from './areas';
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
+import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
 import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, type GameState, type SiteId, type StructureId } from './state';
 
@@ -166,7 +167,7 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
     next.player.hunger = Math.max(0, next.player.hunger - step / 8);
     next.player.energy = Math.max(0, next.player.energy - step * drain);
     next.player.warmth = Math.max(0, Math.min(100, next.player.warmth + warmthChange(next, step, camp, coldNight)));
-    next.fireFuel = Math.max(0, next.fireFuel - step * (coldNight ? BALANCE.coldNightFireBurn : 1));
+    next.fireFuel = Math.max(0, next.fireFuel - step * fireBurn(next, coldNight));
     next.timeOfDay += step;
     remaining -= step;
     wolfVisit(next);
@@ -175,17 +176,24 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
   return next;
 }
 
-/** How much warmth one step of time adds or takes, read before the step's fire burn. */
+/** How fast the fire burns: twice as fast on a freezing night, half as fast again in a spring shower. */
+function fireBurn(state: GameState, coldNight: boolean): number {
+  if (coldNight) return BALANCE.coldNightFireBurn;
+  return isRaining(state) ? BALANCE.rainFireBurn : 1;
+}
+
+/** How much warmth one step of time adds or takes, read before the step's fire burn. Rain chills like an ordinary night, except in the shelter. */
 function warmthChange(state: GameState, step: number, camp: boolean, coldNight: boolean): number {
-  if (state.timeOfDay < nightStart(state.day)) return step / 10;
+  const sheltered = camp && state.structures.shelter;
+  if (state.timeOfDay < nightStart(state.day) && !(isRaining(state) && !sheltered)) return step / 10;
   const lit = state.fireFuel > 0;
   if (camp && lit) return step / 2;
   let change = -step / 2;
   if (coldNight) {
-    change = -step * (camp && state.structures.shelter
+    change = -step * (sheltered
       ? BALANCE.coldNightShelteredWarmthLossPerSecond
       : BALANCE.coldNightOutdoorWarmthLossPerSecond);
-  } else if (camp && state.structures.shelter) {
+  } else if (sheltered) {
     change = -step / 4;
   }
   return camp && !lit && state.structures.windbreak ? change * 0.5 : change;
@@ -344,6 +352,11 @@ const digQuarry: ActionHandler<'digQuarry'> = state => {
   };
 };
 
+/** Days a chopped tree takes to regrow: quicker in spring. */
+export function treeRegrowDays(day: number): number {
+  return isSpring(day) ? BALANCE.springTreeRegrowDays : BALANCE.treeRegrowDays;
+}
+
 const chopTree: ActionHandler<'chopTree'> = (state, action) => {
   if (!state.progress.axeCrafted) return refuse(state, 'Craft a stone axe before chopping trees.');
   const tree = state.trees.find(item => item.id === action.treeId);
@@ -356,7 +369,7 @@ const chopTree: ActionHandler<'chopTree'> = (state, action) => {
       ...state,
       player: tire(state, BALANCE.chopEnergyCost),
       inventory: { ...state.inventory, wood: state.inventory.wood + 2 },
-      trees: state.trees.map(item => item.id === tree.id ? { ...item, readyDay: state.day + BALANCE.treeRegrowDays } : item)
+      trees: state.trees.map(item => item.id === tree.id ? { ...item, readyDay: state.day + treeRegrowDays(state.day) } : item)
     }, workSeconds(state, BALANCE.chopSeconds), 'working'),
     message: 'Chopped the tree and collected two wood. A stump remains.'
   };

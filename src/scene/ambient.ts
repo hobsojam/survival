@@ -169,6 +169,33 @@ export const wolfCount = (day: number): number => 1 + Math.floor(hash(day + 17) 
 /** How strongly the wolves press in: not at all with 20 s of fuel, fully once the fire is out. */
 export const wolfWatch = (fireFuel: number): number => Math.max(0, Math.min(1, (WOLF_LOW_FUEL - fireFuel) / 10));
 
+/** Where the spring rabbits live: in the meadow beside the bushes at (16, 18), (25, 11) and (23, 17). */
+export const RABBIT_HOMES: Point[] = [{ x: 14.5, y: 17.5 }, { x: 26.5, y: 13.5 }, { x: 22.5, y: 20.5 }];
+export const RABBIT_FLEE_RADIUS = 2.5;
+const RABBIT_SPOTS: readonly Point[] = [{ x: 0, y: 0 }, { x: 0.6, y: 0.3 }, { x: -0.5, y: 0.4 }, { x: 0.2, y: -0.5 }];
+const RABBIT_CYCLE = 6;
+
+/** Two or three rabbits, the same on any given day. */
+export const rabbitCount = (day: number): number => 2 + Math.floor(hash(day + 31) * 2);
+
+/** One rabbit's 6 s round: it sits for 2 s, nibbles for 2 s, then hops to the next of four spots near home. */
+export function rabbitAt(index: number, timeMs: number): { x: number; y: number; frame: string; facing: 1 | -1 } {
+  const seconds = timeMs / 1000 + index * 1.9;
+  const cycle = Math.floor(seconds / RABBIT_CYCLE);
+  const phase = seconds - cycle * RABBIT_CYCLE;
+  const home = RABBIT_HOMES[index];
+  const from = RABBIT_SPOTS[cycle % 4];
+  const to = RABBIT_SPOTS[(cycle + 1) % 4];
+  const facing = to.x < from.x ? -1 : 1;
+  if (phase < 2) return { x: home.x + from.x, y: home.y + from.y, frame: 'rabbit:sit', facing };
+  if (phase < 4) return { x: home.x + from.x, y: home.y + from.y, frame: `rabbit:nibble${Math.floor((phase - 2) / 0.2) % 2}`, facing };
+  const progress = (phase - 4) / 2;
+  return {
+    x: home.x + from.x + (to.x - from.x) * progress, y: home.y + from.y + (to.y - from.y) * progress,
+    frame: `rabbit:hop${Math.floor((phase - 4) / 0.15) % 2}`, facing
+  };
+}
+
 export function birdGroundFrame(index: number, timeMs: number): string {
   const phase = (timeMs / 1000 + index * 1.37) % 4;
   if (phase > 3.6) return 'bird:hop';

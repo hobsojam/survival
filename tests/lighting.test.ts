@@ -88,3 +88,11 @@ describe('winter night tint', () => {
     expect(lightingTint(autumn)).toEqual({ color: rgb(palette.night), alpha: darkness(8, nightStart(8) + 15) * 0.55 });
   });
 });
+
+describe('rain tint', () => {
+  it('greys the day while it rains', () => {
+    const base = createGame();
+    expect(lightingTint({ ...base, day: 22, timeOfDay: 40 })).toEqual({ color: rgb(palette.storm), alpha: 0.18 });
+    expect(lightingTint({ ...base, day: 22, timeOfDay: 80 }).alpha).toBe(0);
+  });
+});

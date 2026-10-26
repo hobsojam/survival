@@ -134,6 +134,39 @@ const windStreak = define(12, 3, { a: 'frost' }, {
   streak1: g => { line(g, 1, 2, 8, 0, 'a'); box(g, 8, 0, 4, 1, 'a'); },
   streak2: g => { line(g, 2, 2, 8, 1, 'a'); box(g, 8, 1, 2, 1, 'a'); }
 }, [6, 1], { drift: { frames: ['streak0', 'streak1', 'streak2'], frameRate: 8, repeat: -1 } });
+/** A spring rabbit side-on, facing right: brown body, a pale belly, a white tail and one long ear. */
+const rabbitLegend = { a: 'bird0', b: 'bird1', c: 'bird2', d: 'bird3', e: 'bird4', w: 'paper', k: 'ink' } as const;
+function rabbit(g: Grid, pose: 'sit' | 'nibble0' | 'nibble1' | 'hop0' | 'hop1'): void {
+  const lift = pose === 'hop1' ? 1 : 0;
+  const low = pose === 'hop0' ? 1 : 0;
+  const headY = pose.startsWith('nibble') ? 4 : 2 + low - lift;
+  box(g, 1, 4 + low - lift, 6, 3 - low, 'c'); box(g, 2, 3 + low - lift, 4, 1, 'd');
+  box(g, 2, 6 - lift, 4, 1, 'e');
+  box(g, 6, headY, 3, 3, 'c'); dot(g, 8, headY + 1, 'k'); dot(g, 9, headY + 2, pose === 'nibble1' ? 'e' : 'd');
+  line(g, 6, headY - 1, 6, Math.max(0, headY - 2), 'b'); dot(g, 7, Math.max(0, headY - 2), 'a');
+  dot(g, 0, 4 + low - lift, 'w'); dot(g, 1, 4 + low - lift, 'w');
+  if (pose === 'hop1') { line(g, 0, 6, 1, 7, 'b'); dot(g, 7, 6, 'b'); }
+  else { box(g, 1, 7, 2, 1, 'b'); box(g, 5, 7, 2, 1, 'b'); }
+}
+const rabbitSprite = define(10, 8, rabbitLegend, {
+  sit: g => rabbit(g, 'sit'), nibble0: g => rabbit(g, 'nibble0'), nibble1: g => rabbit(g, 'nibble1'),
+  hop0: g => rabbit(g, 'hop0'), hop1: g => rabbit(g, 'hop1')
+}, [5, 7]);
+
+/** A falling raindrop, leaning slightly with the wind. */
+const rainStreak = define(3, 6, { a: 'frost', b: 'flower4' }, {
+  still: g => { dot(g, 2, 0, 'b'); dot(g, 2, 1, 'a'); dot(g, 1, 2, 'a'); dot(g, 1, 3, 'a'); dot(g, 0, 4, 'b'); dot(g, 0, 5, 'b'); }
+}, [0, 0]);
+
+/** A shallow puddle left by a spring shower: a dark rim, the sky in it, one glint. */
+const puddle = define(16, 6, { r: 'earth1', w: 'flower4', g: 'frost' }, {
+  still: g => {
+    box(g, 2, 0, 12, 6, 'r'); box(g, 0, 1, 16, 4, 'r');
+    box(g, 3, 1, 10, 4, 'w'); box(g, 1, 2, 14, 2, 'w');
+    box(g, 5, 2, 3, 1, 'g');
+  }
+}, [8, 3]);
+
 const sleetFleck = define(2, 1, { a: 'frost' }, { still: g => box(g, 0, 0, 2, 1, 'a') }, [0, 0]);
 const cookSteam = define(4, 6, { a: 'stone3', b: 'stone4' }, {
   steam0: g => { dot(g, 1, 5, 'a'); dot(g, 2, 4, 'b'); dot(g, 1, 3, 'a'); },
@@ -158,6 +191,6 @@ for (let variant = 0; variant < 3; variant++) frostPainters[`frost${variant}`] =
 const morningFrost = define(16, 16, frostLegend, frostPainters, [8, 15]);
 
 export const wildlifeSprites: Record<string, SpriteDef> = {
-  bird: birdSprite, fox: foxSprite, firefly: fireflySprite, leaf: leafSprite, eyes: eyesSprite, wolfTracks: wolfTracksSprite, gatherPop, smokePuff, spark,
-  windStreak, sleetFleck, cookSteam, shootingStar, morningFrost
+  bird: birdSprite, fox: foxSprite, firefly: fireflySprite, leaf: leafSprite, eyes: eyesSprite, rabbit: rabbitSprite, wolfTracks: wolfTracksSprite, gatherPop, smokePuff, spark,
+  windStreak, sleetFleck, rainStreak, puddle, cookSteam, shootingStar, morningFrost
 };

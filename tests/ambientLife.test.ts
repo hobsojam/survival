@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createGame } from '../src/game/state';
 import { worldX } from '../src/scene/art';
-import { BIRD_HOMES, EYE_SPOTS, WOLF_SPOTS, wolfCount } from '../src/scene/ambient';
+import { BIRD_HOMES, EYE_SPOTS, RABBIT_HOMES, WOLF_SPOTS, rabbitCount, wolfCount } from '../src/scene/ambient';
 import { nightStart } from '../src/game/calendar';
 import { AmbientLife } from '../src/scene/ambientLife';
 
@@ -192,5 +192,35 @@ describe('winter at camp', () => {
     autumnLife.update({ ...day, day: 8 }, 0.1, 100);
     autumnLife.update({ ...day, day: 8 }, 0.1, 200);
     expect(autumn.of('bird').some(image => image.visible)).toBe(true);
+  });
+});
+
+describe('spring rabbits at camp', () => {
+  const base = createGame();
+  const springDay = { ...base, day: 21, timeOfDay: 60, player: { ...base.player, x: 20, y: 15 } };
+  const visible = (images: { visible: boolean }[]) => images.filter(image => image.visible).length;
+
+  it('shows the day\'s rabbits on a spring day, and none in summer or at night', () => {
+    const { scene, of } = sceneWithImages();
+    const life = new AmbientLife(scene as never);
+    life.update(springDay, 0.1, 100);
+    expect(visible(of('rabbit'))).toBe(rabbitCount(21));
+    life.update({ ...springDay, day: 31 }, 0.1, 200);
+    expect(visible(of('rabbit'))).toBe(0);
+    life.update({ ...springDay, timeOfDay: nightStart(21) + 40 }, 0.1, 300);
+    expect(visible(of('rabbit'))).toBe(0);
+  });
+
+  it('runs off when the survivor comes close, and comes back once they leave', () => {
+    const { scene, of } = sceneWithImages();
+    const life = new AmbientLife(scene as never);
+    const home = RABBIT_HOMES[0];
+    const near = { ...springDay, player: { ...springDay.player, x: home.x, y: home.y } };
+    const rabbit = of('rabbit')[0];
+    life.update(near, 0.1, 100);
+    for (let t = 200; t <= 1200; t += 100) life.update(near, 0.1, t);
+    expect(rabbit.visible).toBe(false);
+    for (let t = 1300; t <= 10500; t += 100) life.update(springDay, 0.1, t);
+    expect(rabbit.visible).toBe(true);
   });
 });

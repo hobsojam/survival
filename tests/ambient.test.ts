@@ -3,6 +3,7 @@ import { nightStart } from '../src/game/calendar';
 import { QUARRY_SITE } from '../src/game/areas';
 import { BALANCE, createGame } from '../src/game/state';
 import {
+  RABBIT_HOMES, rabbitAt, rabbitCount,
   WOLF_SPOTS, wolfCount, wolfWatch,
   BIRD_FLEE_RADIUS, BIRD_FORAGE_RADIUS, BIRD_HOMES, FIREFLY_HOMES, FOX, birdForageTarget, birdMayReturn, birdShouldLeave, EYE_SPOTS, LEAF_HOMES, darkness, eyesAt, fireflyGlow, foxAt, foxVisits, foxWindow, leafAt
 } from '../src/scene/ambient';
@@ -217,5 +218,24 @@ describe('wolves at the camp edge', () => {
 
   it('press in harder as the fire burns down', () => {
     expect([25, 20, 15, 0].map(wolfWatch)).toEqual([0, 0, 0.5, 1]);
+  });
+});
+
+describe('spring rabbits', () => {
+  it('come in twos and threes', () => {
+    const counts = new Set(Array.from({ length: 200 }, (_, i) => rabbitCount(i + 1)));
+    expect(counts).toEqual(new Set([2, 3]));
+  });
+
+  it('sit, nibble and hop about close to home', () => {
+    const frames = new Set<string>();
+    RABBIT_HOMES.forEach((home, index) => {
+      for (let t = 0; t < 30000; t += 50) {
+        const rabbit = rabbitAt(index, t);
+        frames.add(rabbit.frame);
+        expect(Math.hypot(rabbit.x - home.x, rabbit.y - home.y)).toBeLessThanOrEqual(0.8);
+      }
+    });
+    expect(frames).toEqual(new Set(['rabbit:sit', 'rabbit:nibble0', 'rabbit:nibble1', 'rabbit:hop0', 'rabbit:hop1']));
   });
 });

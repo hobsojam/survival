@@ -1,5 +1,5 @@
 import { BALANCE, type GameState, type ResourceNode } from '../game/state';
-import { season } from '../game/calendar';
+import { season, type Season } from '../game/calendar';
 import { QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 import { campCircleTile, pathTile, terrainSprites } from '../art/terrain';
 import { CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_OPEN_PATHS, CAMP_PATHS, pathDistance, type PathRoute } from './mapGeometry';
@@ -89,22 +89,24 @@ function layQuarryTile(x: number, y: number, map: TerrainMap): string {
   return bare ? `earth${hash(x, y, 1) % 3}` : `grass${hash(x, y) % 4}`;
 }
 
-export function buildMap(nodes: ResourceNode[], key: TerrainKey): TerrainMap {
+/** Builds an area's terrain. The camp meadow flowers more in spring, and its flowers are under the snow in winter. */
+export function buildMap(nodes: ResourceNode[], key: TerrainKey, time: Season = 'summer'): TerrainMap {
   if (key === 'quarry') return buildQuarryMap();
   const routes = ROUTES[key];
   const map = emptyMap();
   for (let y = 0; y < BALANCE.mapHeight; y++) {
     const row: string[] = [];
-    for (let x = 0; x < BALANCE.mapWidth; x++) row.push(layCampTile(x, y, nodes, routes, map));
+    for (let x = 0; x < BALANCE.mapWidth; x++) row.push(layCampTile(x, y, nodes, routes, map, time === 'spring'));
     map.ground.push(row);
   }
+  if (time === 'winter') map.decorations = map.decorations.filter(item => !item.sprite.startsWith('flower'));
   plantGroves(nodes, routes, map);
   map.rimStones = campRimStones(routes);
   return map;
 }
 
 /** Adds one camp tile's path, circle edge, tree or decoration to the map and returns its ground sprite. */
-function layCampTile(x: number, y: number, nodes: ResourceNode[], routes: readonly PathRoute[], map: TerrainMap): string {
+function layCampTile(x: number, y: number, nodes: ResourceNode[], routes: readonly PathRoute[], map: TerrainMap, spring: boolean): string {
   const circle = campCircleTile(x - BALANCE.campX, y - BALANCE.campY);
   const path = pathTile(x, y, routes);
   if (path && circle !== 'full') map.pathTiles.push({ x, y, sprite: path });
@@ -113,7 +115,7 @@ function layCampTile(x: number, y: number, nodes: ResourceNode[], routes: readon
   const borderTree = edge <= 2 && hash(x, y, 2) % 5 !== 0;
   if (borderTree && clearForTree(x, y, nodes, routes)) map.trees.push({ x, y, sprite: TREE_SPRITES[hash(x, y, 3) % 3] });
   else if (edge > 2 && !earthAt(x + .5, y + .5, routes)) {
-    const sprite = campDecoration(x, y, nodes, routes);
+    const sprite = campDecoration(x, y, nodes, routes) ?? (spring ? springFlower(x, y, nodes) : null);
     if (sprite) map.decorations.push({ x, y, sprite });
   }
   return circle === 'full' ? `earth${hash(x, y, 1) % 3}` : `grass${hash(x, y) % 4}`;
@@ -128,6 +130,12 @@ function campDecoration(x: number, y: number, nodes: ResourceNode[], routes: rea
   if (special && detail === 0) return 'stump';
   if (special && detail === 1) return 'mushrooms';
   return ['tuft0', 'tuft1', 'pebbles0', 'pebbles1', 'fallenLeaf'][detail % 5];
+}
+
+/** Spring scatters extra flowers across the open meadow, clear of the nodes. */
+function springFlower(x: number, y: number, nodes: ResourceNode[]): string | null {
+  if (hash(x, y, 6) % 5 !== 0 || nodes.some(node => Math.hypot(x - node.x, y - node.y) < 1)) return null;
+  return `flower${hash(x, y, 5) % 3}`;
 }
 
 /** Preferred grove spots first, then a shuffled grid of fallbacks. */

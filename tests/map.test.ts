@@ -224,3 +224,30 @@ describe('the shown terrain through the year', () => {
     expect(shownTerrainKey({ ...createGame(), day: 11, area: 'quarry' })).toBe('quarry-winter');
   });
 });
+
+describe('seasonal flowers', () => {
+  const nodes = createGame().nodes;
+  const flowers = (map: TerrainMap) => map.decorations.filter(item => item.sprite.startsWith('flower'));
+  const key = (item: { x: number; y: number }) => `${item.x},${item.y}`;
+
+  it('scatters more flowers across the meadow in spring and none in the snow', () => {
+    const summer = buildMap(nodes, 'camp', 'summer');
+    const spring = buildMap(nodes, 'camp', 'spring');
+    expect(flowers(spring).length).toBeGreaterThanOrEqual(flowers(summer).length * 1.5);
+    const springSpots = new Set(flowers(spring).map(key));
+    expect(flowers(summer).every(item => springSpots.has(key(item)))).toBe(true);
+    expect(flowers(buildMap(nodes, 'camp', 'winter'))).toHaveLength(0);
+    expect(buildMap(nodes, 'camp')).toEqual(summer);
+  });
+
+  it('keeps spring flowers off the paths, the camp circle and the nodes', () => {
+    const spring = buildMap(nodes, 'camp', 'spring');
+    // Like every decoration, a flower may share a tile with a path's edge, but sits no nearer the path than the summer ones do.
+    const nearest = Math.min(...buildMap(nodes, 'camp', 'summer').decorations.map(item => pathDistance(item.x + .5, item.y + .5)));
+    for (const item of flowers(spring)) {
+      expect(pathDistance(item.x + .5, item.y + .5), key(item)).toBeGreaterThanOrEqual(nearest);
+      expect(Math.hypot(item.x - BALANCE.campX, item.y - BALANCE.campY)).toBeGreaterThan(BALANCE.campRadius);
+      expect(nodes.every(node => Math.hypot(item.x - node.x, item.y - node.y) >= 1)).toBe(true);
+    }
+  });
+});

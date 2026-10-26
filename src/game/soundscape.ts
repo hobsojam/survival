@@ -1,4 +1,5 @@
 import { isWinter, nightStart } from './calendar';
+import { isRaining } from './rain';
 import { wolvesClose } from './wolves';
 import { BALANCE, type GameState } from './state';
 
@@ -20,6 +21,7 @@ export class Soundscape {
   private fire?: GainNode;
   private quarry?: GainNode;
   private wolves?: GainNode;
+  private rain?: GainNode;
   private noise?: AudioBuffer;
   private state?: GameState & { area?: string };
   private muted: boolean;
@@ -130,8 +132,10 @@ export class Soundscape {
     this.fire = this.makeLayer(context, master, 0);
     this.quarry = this.makeLayer(context, master, 0);
     this.wolves = this.makeLayer(context, master, 0);
+    this.rain = this.makeLayer(context, master, 0);
     this.makeQuarryDrone(context, this.quarry);
     this.noise = this.makeNoiseBuffer(context);
+    this.makeRainHiss(context, this.noise, this.rain);
   }
 
   private makeLayer(context: AudioContext, destination: GainNode, initialGain: number): GainNode {
@@ -172,6 +176,7 @@ export class Soundscape {
     this.setGain(this.fire, !inQuarry && this.state.fireFuel > 0 ? campVolume * 0.55 : 0);
     this.setGain(this.quarry, quarryVolume);
     this.setGain(this.wolves, !inQuarry && wolvesClose(this.state) ? 0.5 : 0);
+    this.setGain(this.rain, isRaining(this.state) ? 0.35 : 0);
   }
 
   private resetAfterAudioFailure(): void {
@@ -193,6 +198,7 @@ export class Soundscape {
     this.fire = undefined;
     this.quarry = undefined;
     this.wolves = undefined;
+    this.rain = undefined;
     this.noise = undefined;
     this.started = false;
     if (context) void context.close().catch(() => undefined);
@@ -270,6 +276,19 @@ export class Soundscape {
       if (this.state?.area !== 'quarry' && this.state?.fireFuel && this.fire && this.context?.state === 'running') this.playCrackle();
       this.scheduleFire();
     }, 120 + Math.random() * 380);
+  }
+
+  /** Rain is looping noise through a soft bandpass, silent until a shower turns its layer up. */
+  private makeRainHiss(context: AudioContext, noise: AudioBuffer, destination: GainNode): void {
+    const source = context.createBufferSource();
+    const filter = context.createBiquadFilter();
+    source.buffer = noise;
+    source.loop = true;
+    filter.type = 'bandpass';
+    filter.frequency.value = 1200;
+    filter.Q.value = 0.7;
+    source.connect(filter).connect(destination);
+    source.start();
   }
 
   private makeQuarryDrone(context: AudioContext, destination: GainNode): void {

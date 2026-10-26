@@ -57,6 +57,14 @@ describe('axe panel', () => {
   });
 });
 
+describe('axe panel in spring', () => {
+  it('promises faster regrowth in spring', () => {
+    const crafted = { progress: { ...afterColdNight, axeCrafted: true }, structures: { toolshed: true } };
+    expect(axeView(game(crafted, { day: 22 })).copy).toBe('Tap a mature tree, or stand by one and press X, to gather two wood. Stumps regrow after two dawns.');
+    expect(axeView(game(crafted, { day: 8 })).copy).toMatch(/three dawns\.$/);
+  });
+});
+
 describe('pickaxe panel', () => {
   it('is hidden until the quarry is found', () => {
     expect(pickaxeView(game())).toMatchObject({ shown: false, disabled: true, ready: false });

@@ -40,3 +40,19 @@ describe('wolf tracks', () => {
     expect(Object.keys(wildlifeSprites.wolfTracks.frames)).toEqual(['still']);
   });
 });
+
+describe('rain art', () => {
+  it('has a valid rain streak and puddle', () => {
+    expect(() => validateSprite(wildlifeSprites.rainStreak)).not.toThrow();
+    expect(() => validateSprite(wildlifeSprites.puddle)).not.toThrow();
+    expect(wildlifeSprites.puddle.size).toEqual([16, 6]);
+  });
+});
+
+describe('the rabbit', () => {
+  it('is a valid sprite that sits, nibbles and hops', () => {
+    expect(() => validateSprite(wildlifeSprites.rabbit)).not.toThrow();
+    expect(wildlifeSprites.rabbit.size).toEqual([10, 8]);
+    expect(Object.keys(wildlifeSprites.rabbit.frames)).toEqual(['sit', 'nibble0', 'nibble1', 'hop0', 'hop1']);
+  });
+});

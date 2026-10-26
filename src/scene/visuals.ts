@@ -2,6 +2,7 @@ import { isWinter, nightStart } from '../game/calendar';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceNode } from '../game/state';
 import { isFreezingNight } from '../game/rules';
 import { wolfTracksShown } from '../game/wolves';
+import { rainWindow } from '../game/rain';
 import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 
@@ -41,6 +42,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
   }
   for (const node of state.nodes) add(node.id, nodeTexture(node, timeMs, gathered, isWinter(state.day)), node.x, node.y);
   addPiles(state, visuals, add);
+  addPuddles(state, add);
   for (const tree of state.trees) add(tree.id, tree.readyDay <= state.day ? `${tree.sprite}:still` : 'stump:still', tree.x, tree.y);
   addCamp(state, add);
   addFire(state, timeMs, visuals, add);
@@ -82,6 +84,15 @@ function nodeFrame(node: ResourceNode, timeMs: number, gathered: Gathered): stri
   if (node.amount <= 0) return EMPTY_FRAMES[node.kind];
   if (node.kind === 'fiber') return ['ready', 'sway0', 'ready', 'sway1'][(Math.floor(timeMs / 500) + node.id.length + node.x) % 4];
   return 'ready';
+}
+
+/** Where puddles gather at camp once a spring shower starts; they stay until the day ends. */
+export const PUDDLE_SPOTS = [{ x: 15, y: 12 }, { x: 25, y: 19 }, { x: 11, y: 18 }, { x: 29, y: 9 }] as const;
+
+function addPuddles(state: GameState, add: AddVisual): void {
+  const rain = rainWindow(state.day);
+  if (!rain || state.timeOfDay < rain.start) return;
+  PUDDLE_SPOTS.forEach((spot, index) => add(`puddle-${index}`, 'puddle:still', spot.x, spot.y, GROUND_DECAL_DEPTH));
 }
 
 /** Small camp structures: where each stands from the fire, drawn as a flat site until built. */
