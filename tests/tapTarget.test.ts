@@ -185,6 +185,14 @@ describe('the quarry area', () => {
     expect(pickTapTarget(state, RUBBLE_SITE.x, RUBBLE_SITE.y + 0.4)).toEqual({ kind: 'rubble', x: RUBBLE_SITE.x, y: RUBBLE_SITE.y });
   });
 
+  it('gives every tap close to the rubble to the rubble, never the quarry art beside it', () => {
+    const state = quarryState();
+    for (let dx = -0.9; dx <= 0.9; dx += 0.3) for (let dy = -0.9; dy <= 0.9; dy += 0.3) {
+      if (Math.hypot(dx, dy) > 0.9) continue;
+      expect(pickTapTarget(state, RUBBLE_SITE.x + dx, RUBBLE_SITE.y + dy).kind, `${dx},${dy}`).toBe('rubble');
+    }
+  });
+
   it('tapping the path end picks the crossing once open', () => {
     const state = createGame();
     expect(pickTapTarget(state, 0.3, 15).kind).not.toBe('crossing');

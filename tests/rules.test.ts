@@ -1106,6 +1106,30 @@ describe('quarry and tools', () => {
     expect(found.message).toBe('You found an old quarry. A pickaxe could work this stone.');
   });
 
+  it('crafts the pickaxe only at camp', () => {
+    const state = atCamp();
+    state.structures = { ...state.structures, shelter: true, toolshed: true };
+    state.progress.quarryFound = true;
+    state.inventory = { ...state.inventory, wood: 2, fiber: 1, stone: 2 };
+    expect(pickaxeBlocker(state)).toBeNull();
+    const away = { ...state, player: { ...state.player, x: 5, y: 25 } };
+    expect(pickaxeBlocker(away)).toBe('Return to camp to craft the pickaxe.');
+    expect(applyAction(away, { type: 'craftPickaxe' }).state).toBe(away);
+  });
+
+  it('digs and gathers rubble only beside them in the quarry area', () => {
+    const quarry = inQuarry(QUARRY_SITE.x, QUARRY_SITE.y);
+    quarry.progress.pickaxeCrafted = true;
+    const farFromFace = { ...quarry, player: { ...quarry.player, x: QUARRY_SITE.x + 5 } };
+    expect(applyAction(farFromFace, { type: 'digQuarry' }).message).toBe('Move closer to the quarry face.');
+    const sameSpotAtCamp = { ...quarry, area: 'camp' as const };
+    expect(applyAction(sameSpotAtCamp, { type: 'digQuarry' }).message).toBe('Move closer to the quarry face.');
+    const farFromRubble = inQuarry(RUBBLE_SITE.x - 5, RUBBLE_SITE.y);
+    expect(applyAction(farFromRubble, { type: 'gatherRubble' }).message).toBe('Move closer to the rubble.');
+    const rubbleSpotAtCamp = { ...inQuarry(RUBBLE_SITE.x, RUBBLE_SITE.y), area: 'camp' as const };
+    expect(applyAction(rubbleSpotAtCamp, { type: 'gatherRubble' }).message).toBe('Move closer to the rubble.');
+  });
+
   it('rubble gives one stone and refills three dawns later', () => {
     const state = inQuarry(RUBBLE_SITE.x + 1, RUBBLE_SITE.y);
     const first = applyAction(state, { type: 'gatherRubble' }).state;

@@ -5,12 +5,13 @@ import { BIRD_HOMES, EYE_SPOTS } from '../src/scene/ambient';
 import { AmbientLife } from '../src/scene/ambientLife';
 
 function sceneWithImages() {
-  const images: Array<{ texture: string; x: number; visible: boolean }> = [];
+  const images: Array<{ kind: string; texture: string; x: number; visible: boolean }> = [];
   const scene = {
     add: {
-      image: () => {
+      image: (_x: number, _y: number, key: string) => {
         const image = {
-          texture: '', x: 0, visible: false,
+          // What the image was made as (bird, fox, eyes...), so tests don't depend on creation order.
+          kind: key.split(':')[0], texture: key, x: 0, visible: false,
           setOrigin() { return this; },
           setDepth() { return this; },
           setVisible(value: boolean) { this.visible = value; return this; },
@@ -24,7 +25,8 @@ function sceneWithImages() {
       }
     }
   };
-  return { scene, images };
+  const of = (kind: string) => images.filter(image => image.kind === kind);
+  return { scene, images, of };
 }
 
 describe('ambient bird foraging', () => {
@@ -32,27 +34,29 @@ describe('ambient bird foraging', () => {
 
   it('flies to a berry bush and pecks without taking the player’s berries', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.49);
-    const { scene, images } = sceneWithImages();
+    const { scene, of } = sceneWithImages();
     const life = new AmbientLife(scene as never);
+    const bird = of('bird')[0];
     const state = createGame();
     const berriesBefore = state.nodes.filter(node => node.kind === 'berry').map(node => node.amount);
     life.update(state, 0, 0);
     life.update(state, 1.6, 1600);
     life.update(state, 0.1, 1700);
-    expect(images[0].visible).toBe(true);
-    expect(images[0].texture).toMatch(/^bird:peck/);
-    expect(images[0].x).not.toBe(Math.round(worldX(BIRD_HOMES[0].x)));
+    expect(bird.visible).toBe(true);
+    expect(bird.texture).toMatch(/^bird:peck/);
+    expect(bird.x).not.toBe(Math.round(worldX(BIRD_HOMES[0].x)));
     life.update(state, 0.1, 5200);
     life.update(state, 1.6, 6800);
     life.update(state, 0.1, 6900);
-    expect(images[0].x).toBe(Math.round(worldX(BIRD_HOMES[0].x)));
+    expect(bird.x).toBe(Math.round(worldX(BIRD_HOMES[0].x)));
     expect(state.nodes.filter(node => node.kind === 'berry').map(node => node.amount)).toEqual(berriesBefore);
   });
 
   it('flees from a bush when the survivor approaches', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.49);
-    const { scene, images } = sceneWithImages();
+    const { scene, of } = sceneWithImages();
     const life = new AmbientLife(scene as never);
+    const bird = of('bird')[0];
     const state = createGame();
     life.update(state, 0, 0);
     life.update(state, 1.6, 1600);
@@ -60,9 +64,9 @@ describe('ambient bird foraging', () => {
     state.player.x = 16;
     state.player.y = 18;
     life.update(state, 0.1, 1800);
-    expect(images[0].visible).toBe(false);
+    expect(bird.visible).toBe(false);
     life.update(state, 0.1, 1900);
-    expect(images[0].texture).toMatch(/^bird:fly/);
+    expect(bird.texture).toMatch(/^bird:fly/);
   });
 });
 
@@ -76,15 +80,16 @@ describe('ambient life by area', () => {
     life.update(state, 0.1, 0);
     expect(images.some(image => image.visible)).toBe(true);
     life.update({ ...state, area: 'quarry' }, 0.1, 100);
-    expect(images.slice(0, -EYE_SPOTS.length).filter(image => image.visible)).toEqual([]);
+    expect(images.filter(image => image.kind !== 'eyes' && image.visible)).toEqual([]);
   });
 });
 
 describe('ambient quarry eyes', () => {
   it('shows no eyes at camp, by day or by night', () => {
-    const { scene, images } = sceneWithImages();
+    const { scene, of } = sceneWithImages();
     const life = new AmbientLife(scene as never);
-    const eyes = images.slice(-EYE_SPOTS.length);
+    const eyes = of('eyes');
+    expect(eyes).toHaveLength(EYE_SPOTS.length);
     const state = createGame();
     state.timeOfDay = 200;
     for (let t = 0; t < 12000; t += 500) life.update(state, 0.5, t);
@@ -92,9 +97,9 @@ describe('ambient quarry eyes', () => {
   });
 
   it('shows some eyes at the quarry at night, none by day', () => {
-    const { scene, images } = sceneWithImages();
+    const { scene, of } = sceneWithImages();
     const life = new AmbientLife(scene as never);
-    const eyes = images.slice(-EYE_SPOTS.length);
+    const eyes = of('eyes');
     const state = createGame();
     state.area = 'quarry';
     state.player.x = 38; state.player.y = 2;

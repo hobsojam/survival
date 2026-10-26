@@ -97,6 +97,31 @@ describe('local save', () => {
     expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
   });
 
+  it('keeps a repaired lookout without a toolshed, which only the axe needs', () => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    state.progress = { ...state.progress, nextStormDay: null, hearthUnlocked: true, lookoutRepaired: true };
+    expect(state.structures.toolshed).toBe(false);
+    expect(saveGame(storage, state)).toEqual({ ok: true });
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
+  });
+
+  it('accepts the quarry and rubble ready days right up to their limits', () => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    state.day = 2;
+    state.quarryReadyDay = state.day + 1;
+    state.rubbleReadyDay = state.day + BALANCE.rubbleRegrowDays;
+    expect(saveGame(storage, state)).toEqual({ ok: true });
+    expect(loadGame(storage).kind).toBe('loaded');
+    for (const change of [(s: typeof state) => { s.quarryReadyDay = 0; }, (s: typeof state) => { s.rubbleReadyDay = 0; }]) {
+      const broken = structuredClone(state);
+      change(broken);
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 12, state: broken }));
+      expect(loadGame(storage).kind).toBe('invalid');
+    }
+  });
+
   it('reports no save when storage is empty', () => {
     expect(loadGame(new MemoryStorage()).kind).toBe('empty');
   });
