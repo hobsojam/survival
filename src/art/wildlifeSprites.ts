@@ -107,6 +107,15 @@ const eyesSprite = define(7, 3, { a: 'fire4', b: 'firefly' }, {
   blink: g => { box(g, 0, 1, 2, 1, 'a'); box(g, 5, 1, 2, 1, 'a'); }
 }, [3, 1]);
 
+/** Paw prints in a loose ring around the fire pit, left by a wolf that came into the dark camp. */
+const wolfTracksSprite = define(40, 24, { k: 'stone1', l: 'stone2' }, {
+  still: g => {
+    for (const [x, y] of [[4, 11], [8, 5], [15, 2], [23, 2], [31, 5], [35, 11], [33, 17], [26, 21], [14, 21], [6, 17]]) {
+      box(g, x, y, 2, 2, 'k'); dot(g, x, y, 'l');
+    }
+  }
+}, [20, 12]);
+
 const gatherLegend = { a: 'wood1', b: 'wood3', c: 'berry2', d: 'berry4', e: 'canvas2', f: 'canvas4', g: 'stone1', h: 'stone3' } as const;
 const gatherPop = define(8, 8, gatherLegend, {
   wood: g => { line(g, 1, 6, 6, 2, 'a'); line(g, 1, 5, 6, 1, 'b'); dot(g, 1, 5, 'f'); },
@@ -149,6 +158,6 @@ for (let variant = 0; variant < 3; variant++) frostPainters[`frost${variant}`] =
 const morningFrost = define(16, 16, frostLegend, frostPainters, [8, 15]);
 
 export const wildlifeSprites: Record<string, SpriteDef> = {
-  bird: birdSprite, fox: foxSprite, firefly: fireflySprite, leaf: leafSprite, eyes: eyesSprite, gatherPop, smokePuff, spark,
+  bird: birdSprite, fox: foxSprite, firefly: fireflySprite, leaf: leafSprite, eyes: eyesSprite, wolfTracks: wolfTracksSprite, gatherPop, smokePuff, spark,
   windStreak, sleetFleck, cookSteam, shootingStar, morningFrost
 };

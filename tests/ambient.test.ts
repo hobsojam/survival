@@ -3,6 +3,7 @@ import { nightStart } from '../src/game/calendar';
 import { QUARRY_SITE } from '../src/game/areas';
 import { BALANCE, createGame } from '../src/game/state';
 import {
+  WOLF_SPOTS, wolfCount, wolfWatch,
   BIRD_FLEE_RADIUS, BIRD_FORAGE_RADIUS, BIRD_HOMES, FIREFLY_HOMES, FOX, birdForageTarget, birdMayReturn, birdShouldLeave, EYE_SPOTS, LEAF_HOMES, darkness, eyesAt, fireflyGlow, foxAt, foxVisits, foxWindow, leafAt
 } from '../src/scene/ambient';
 
@@ -197,5 +198,24 @@ describe('falling leaves', () => {
       expect(tree.sprite).toBe('treeBroadleaf');
       expect(Math.hypot(home.x - tree.x, home.y - tree.y)).toBeLessThanOrEqual(2);
     }
+  });
+});
+
+describe('wolves at the camp edge', () => {
+  it('come in ones, twos and threes', () => {
+    const counts = Array.from({ length: 200 }, (_, i) => wolfCount(i + 1));
+    expect(new Set(counts)).toEqual(new Set([1, 2, 3]));
+  });
+
+  it('watch from their own spots and keep back from the survivor', () => {
+    const far = { x: BALANCE.campX, y: BALANCE.campY };
+    const eyes = eyesAt(0, 1000, 1, far, WOLF_SPOTS);
+    expect(eyes).not.toBeNull();
+    expect(Math.hypot(eyes!.x - WOLF_SPOTS[0].x, eyes!.y - WOLF_SPOTS[0].y)).toBeLessThanOrEqual(1);
+    expect(eyesAt(0, 1000, 1, WOLF_SPOTS[0], WOLF_SPOTS)).toBeNull();
+  });
+
+  it('press in harder as the fire burns down', () => {
+    expect([25, 20, 15, 0].map(wolfWatch)).toEqual([0, 0, 0.5, 1]);
   });
 });

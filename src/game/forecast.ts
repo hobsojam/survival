@@ -1,6 +1,6 @@
 import { nightStart } from './calendar';
 import { BALANCE, type GameState } from './state';
-import { isColdNight } from './rules';
+import { isFreezingNight } from './rules';
 
 export interface StormReadiness {
   /** Seconds of fuel already in the pit when it matters: at nightfall, or right now during the storm. */
@@ -21,10 +21,14 @@ export function logsForColdNight(day: number): number {
 export const secondsPerLog = (state: GameState) =>
   state.structures.hearth ? BALANCE.hearthFireSecondsPerWood : BALANCE.fireSecondsPerWood;
 
-/** Whether the camp fire already has enough fuel to last through the cold night. */
+/** The freezing night the forecast plans for: the cold front's while one is pending, otherwise tonight's. */
+const plannedNight = (state: GameState): number => state.progress.nextStormDay ?? state.day;
+
+/** Whether the camp fire already has enough fuel to last through the freezing night. */
 export function stormReadiness(state: GameState): StormReadiness {
   const perLog = secondsPerLog(state);
-  const storm = isColdNight(state);
+  const storm = isFreezingNight(state);
+  const night = plannedNight(state);
   const carried = state.inventory.wood * perLog;
   let fuel: number;
   let needed: number;
@@ -33,9 +37,9 @@ export function stormReadiness(state: GameState): StormReadiness {
     needed = Math.ceil((BALANCE.daySeconds - state.timeOfDay) * BALANCE.coldNightFireBurn);
   } else {
     // The fire burns one second per second until nightfall; before the storm day it will be long out.
-    const left = state.day === state.progress.nextStormDay ? Math.max(0, state.fireFuel - (nightStart(state.day) - state.timeOfDay)) : 0;
+    const left = state.day === night ? Math.max(0, state.fireFuel - (nightStart(state.day) - state.timeOfDay)) : 0;
     fuel = left;
-    needed = (BALANCE.daySeconds - nightStart(state.progress.nextStormDay ?? state.day)) * BALANCE.coldNightFireBurn;
+    needed = (BALANCE.daySeconds - nightStart(night)) * BALANCE.coldNightFireBurn;
   }
   const ready = fuel > needed;
   const reach = fuel + carried;
@@ -49,7 +53,7 @@ export function forecastFireCheck(state: GameState): string {
   let hint = '';
   if (!ready && logsShort === 0) {
     if (storm) hint = ' · add carried wood to the fire';
-    else if (state.day === state.progress.nextStormDay) hint = ' · add carried wood at nightfall';
+    else if (state.day === plannedNight(state)) hint = ' · add carried wood at nightfall';
     else hint = ' · keep the logs for nightfall';
   }
   else if (!ready) hint = ` · ${logsShort} more log${logsShort === 1 ? '' : 's'}`;

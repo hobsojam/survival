@@ -1,7 +1,7 @@
 import type { Season } from '../game/calendar';
 import { palette, type PaletteKey } from './palette';
 
-const ramp = (prefix: 'grass' | 'crown' | 'leaf', colors: string): Partial<Record<PaletteKey, string>> =>
+const ramp = (prefix: 'grass' | 'crown' | 'leaf' | 'path', colors: string): Partial<Record<PaletteKey, string>> =>
   Object.fromEntries(colors.split(' ').map((color, index) => [`${prefix}${index}`, color]));
 
 /** Summer is the painted look; the other seasons recolour the grass and the trees. */
@@ -13,7 +13,8 @@ const OVERRIDES: Record<Season, Partial<Record<PaletteKey, string>>> = {
   winter: {
     ...ramp('grass', '#8a98a8 #b4c2cc #d4e0e6 #e6eef0 #f6fafa'),
     ...ramp('crown', '#2e2420 #4a3a32 #6b5a4c #8a7a6a #b0a494'),
-    ...ramp('leaf', '#142826 #1c3a32 #2a5040 #3e6a50 #c8dce0')
+    ...ramp('leaf', '#142826 #1c3a32 #2a5040 #3e6a50 #c8dce0'),
+    ...ramp('path', '#6a7480 #8a96a2 #aab6c0 #c4ced6 #dce4ea')
   },
   spring: {
     ...ramp('grass', '#33603a #457a42 #64a04a #86bc52 #b4d866'),

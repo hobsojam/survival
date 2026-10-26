@@ -52,6 +52,9 @@ export interface StonePile {
 
 export type AreaId = 'camp' | 'quarry';
 
+/** What a wolf took on its last visit. */
+export type WolfTake = 'ration' | 'berry' | 'nothing';
+
 export interface GameState {
   area: AreaId;
   day: number;
@@ -72,6 +75,8 @@ export interface GameState {
   quarryReadyDay: number;
   /** First day the rubble pile gives stone again. */
   rubbleReadyDay: number;
+  /** The last winter night a wolf came into the dark camp, and what it took. */
+  lastWolf: { day: number; took: WolfTake } | null;
 }
 
 export const BALANCE = {
@@ -181,6 +186,7 @@ export function createGame(): GameState {
     stonePiles: [],
     storedStone: 0,
     quarryReadyDay: 1,
-    rubbleReadyDay: 1
+    rubbleReadyDay: 1,
+    lastWolf: null
   };
 }

@@ -2,7 +2,7 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState } from './state';
 import { bagCapacity, carriedCount } from './rules';
 
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 12;
+const SAVE_VERSION = 13;
 export type SaveResult = { ok: true } | { ok: false; error: string };
 export type LoadResult = { kind: 'empty' } | { kind: 'loaded'; state: GameState } | { kind: 'invalid'; reason: string };
 
@@ -80,10 +80,18 @@ function validWorld({ nodes, trees, stonePiles, day }: SaveShape): boolean {
   return nodesMatch && treesMatch && pilesValid;
 }
 
-/** Checks a version 12 save: two areas, the toolshed's tools and the quarry's timers. */
+const WOLF_TAKES: readonly unknown[] = ['ration', 'berry', 'nothing'];
+
+/** No wolf yet, or one that came on a day already lived, taking something it could take. */
+function validWolf({ lastWolf, day }: SaveShape): boolean {
+  if (lastWolf === null) return true;
+  return object(lastWolf) && whole(lastWolf.day) && lastWolf.day >= 1 && lastWolf.day <= (day as number) && WOLF_TAKES.includes(lastWolf.took);
+}
+
+/** Checks a version 13 save: two areas, the toolshed's tools, the quarry's timers and the last wolf visit. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWorld];
+  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWorld, validWolf];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

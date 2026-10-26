@@ -1,6 +1,7 @@
-import { nightStart } from './calendar';
+import { isWinter, nightStart } from './calendar';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } from './areas';
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
+import { wolfVisit } from './wolves';
 import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
@@ -87,6 +88,11 @@ export function isColdNight(state: GameState): boolean {
   return state.progress.nextStormDay === state.day && state.timeOfDay >= nightStart(state.day);
 }
 
+/** The forecast front's night, or any winter night: the fire burns fast and the cold bites. */
+export function isFreezingNight(state: GameState): boolean {
+  return isColdNight(state) || (isWinter(state.day) && state.timeOfDay >= nightStart(state.day));
+}
+
 export function movementFactor(state: GameState): number {
   const { energy, hunger, warmth } = state.player;
   return isLowMeter(energy) || isLowMeter(hunger) || isLowMeter(warmth) ? 0.65 : 1;
@@ -155,7 +161,7 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
   while (remaining > 0.000001) {
     const step = Math.min(remaining, 1, BALANCE.daySeconds - next.timeOfDay);
     const camp = isAtCamp(next);
-    const coldNight = isColdNight(next);
+    const coldNight = isFreezingNight(next);
     const drain = (activity === 'awake' ? BALANCE.energyDrainPerSecond : 0) + (next.player.hunger <= 0 ? BALANCE.starvingEnergyDrainPerSecond : 0);
     next.player.hunger = Math.max(0, next.player.hunger - step / 8);
     next.player.energy = Math.max(0, next.player.energy - step * drain);
@@ -163,6 +169,7 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
     next.fireFuel = Math.max(0, next.fireFuel - step * (coldNight ? BALANCE.coldNightFireBurn : 1));
     next.timeOfDay += step;
     remaining -= step;
+    wolfVisit(next);
     if (next.timeOfDay >= BALANCE.daySeconds - 0.000001) dawn(next, camp);
   }
   return next;
@@ -261,6 +268,7 @@ const GATHER_MESSAGE: Partial<Record<keyof GameState['inventory'], string>> = {
 const gather: ActionHandler<'gather'> = (state, action) => {
   const node = state.nodes.find(item => item.id === action.nodeId);
   if (!node || state.area !== 'camp' || !near(state.player.x, state.player.y, node.x, node.y)) return refuse(state, 'Move closer to gather.');
+  if (node.kind === 'berry' && isWinter(state.day)) return refuse(state, 'The bushes are bare until spring.');
   if (node.amount <= 0) return refuse(state, 'Nothing to gather yet.');
   const resource = NODE_RESOURCE[node.kind];
   if (freeSpaces(state) < spaceFor(resource)) return refuse(state, FULL_BAG_MESSAGE);
@@ -355,6 +363,10 @@ const chopTree: ActionHandler<'chopTree'> = (state, action) => {
 };
 
 function restAtSpring(state: GameState): ActionResult {
+  if (isWinter(state.day)) return {
+    state: { ...state, progress: { ...state.progress, discoveries: { ...state.progress.discoveries, spring: true } } },
+    message: 'The spring is frozen over.'
+  };
   const rested = advanceTime({ ...state, progress: { ...state.progress,
     discoveries: { ...state.progress.discoveries, spring: true } } }, BALANCE.restSeconds, 'resting');
   return {

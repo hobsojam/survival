@@ -19,6 +19,8 @@ const sprite = (g: Grid, legend: Record<string, PaletteKey>, anchor?: [number, n
 });
 const groundLegend = { a: 'grass1', b: 'grass2', c: 'grass3', d: 'grass4', e: 'earth0', f: 'earth1', g: 'earth2', h: 'earth3', i: 'earth4', s: 'stone2', t: 'stone3' } as const;
 
+const pathLegend = { ...groundLegend, e: 'path0', f: 'path1', g: 'path2', h: 'path3', i: 'path4' } as const;
+
 export const terrainSprites: Record<string, SpriteDef> = {};
 for (let variant = 0; variant < 4; variant++) {
   const g = blank(16, 16, 'b');
@@ -119,7 +121,7 @@ function pathSpriteFor(g: Grid): string {
   let name = pathSprites.get(shape);
   if (!name) {
     name = `pathTile${pathSprites.size}`;
-    terrainSprites[name] = sprite(g, groundLegend);
+    terrainSprites[name] = sprite(g, pathLegend);
     pathSprites.set(shape, name);
   }
   return name;

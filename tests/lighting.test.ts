@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createGame } from '../src/game/state';
 import { palette } from '../src/art/palette';
+import { nightStart } from '../src/game/calendar';
+import { darkness } from '../src/scene/ambient';
 import { fireGlow, fireRadii, lightMaskPixels, lightScreenPosition, lightingTint } from '../src/scene/lighting';
 
 const rgb = (hex: string) => parseInt(hex.slice(1), 16);
@@ -69,9 +71,20 @@ describe('fire glow by area', () => {
 
 describe('lighting through the year', () => {
   it('darkens early in midwinter and holds the dusk late in midsummer', () => {
-    expect(lightingTint({ ...state, day: 16, timeOfDay: 135 }).color).toBe(rgb(palette.night));
+    // Night has fallen by 135 s in midwinter, and winter nights take the bitter tint.
+    expect(lightingTint({ ...state, day: 16, timeOfDay: 135 }).color).toBe(rgb(palette.storm));
     const summer = lightingTint({ ...state, day: 36, timeOfDay: 165 });
     expect(summer.color).toBe(rgb(palette.dusk));
     expect(summer.alpha).toBeCloseTo(0.12 * 5 / 30);
+  });
+});
+
+describe('winter night tint', () => {
+  it('tints every winter night like the cold front, and autumn nights as plain night', () => {
+    const base = createGame();
+    const winter = { ...base, day: 12, timeOfDay: nightStart(12) + 15, progress: { ...base.progress, hearthUnlocked: true, nextStormDay: null } };
+    expect(lightingTint(winter)).toEqual({ color: rgb(palette.storm), alpha: darkness(12, nightStart(12) + 15) * 0.64 });
+    const autumn = { ...winter, day: 8, timeOfDay: nightStart(8) + 15 };
+    expect(lightingTint(autumn)).toEqual({ color: rgb(palette.night), alpha: darkness(8, nightStart(8) + 15) * 0.55 });
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, BUILDINGS, LOOKOUT, SITES, createGame } from '../src/game/state';
 import { QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
-import { FULL_BAG_MESSAGE, advanceTime, isAtCamp, isColdNight, applyAction, buildStatus, carriedCount, freeSpaces, lookoutRepairBlocker, pickaxeBlocker, sleepBlocker } from '../src/game/rules';
+import { FULL_BAG_MESSAGE, advanceTime, isAtCamp, isColdNight, isFreezingNight, applyAction, buildStatus, carriedCount, freeSpaces, lookoutRepairBlocker, pickaxeBlocker, sleepBlocker } from '../src/game/rules';
 import { nightStart, seasonMessage } from '../src/game/calendar';
 
 // Night falls at 181 s on day 1, and the day-three cold front's night starts at 174 s.
@@ -1295,5 +1295,59 @@ describe('night through the year', () => {
     const woke = applyAction(state, { type: 'sleep' }).state;
     expect([woke.day, woke.timeOfDay]).toEqual([11, 0]);
     expect(seasonMessage(state.day, woke.day)).toBe('Snow fell in the night. Winter has come.');
+  });
+});
+
+describe('winter nights', () => {
+  const base = createGame();
+  const winterNight = { ...base, day: 12, timeOfDay: nightStart(12) + 1,
+    progress: { ...base.progress, hearthUnlocked: true, nextStormDay: null } };
+
+  it('makes every winter night freezing, and autumn nights not', () => {
+    expect(isFreezingNight(winterNight)).toBe(true);
+    expect(isFreezingNight({ ...winterNight, timeOfDay: nightStart(12) - 1 })).toBe(false);
+    expect(isFreezingNight({ ...winterNight, day: 8, timeOfDay: nightStart(8) + 1 })).toBe(false);
+  });
+
+  it('burns the fire twice as fast and chills the survivor away from it', () => {
+    const atFire = advanceTime({ ...winterNight, fireFuel: 50 }, 10);
+    expect(atFire.fireFuel).toBeCloseTo(30);
+    const away = advanceTime({ ...winterNight, player: { ...winterNight.player, x: 5, y: 25, warmth: 80 } }, 10);
+    expect(away.player.warmth).toBeCloseTo(80 - 12.5);
+  });
+
+  it('gives winter nights no penalty, but keeps the front\'s', () => {
+    const dawn = advanceTime({ ...winterNight, timeOfDay: 239, player: { ...winterNight.player, energy: 90 } }, 2);
+    expect(dawn).toMatchObject({ day: 13, progress: { nextStormDay: null } });
+    expect(dawn.timeOfDay).toBeCloseTo(1);
+    expect(dawn.player.energy).toBeGreaterThan(BALANCE.coldNightFailureEnergy);
+    const front = { ...winterNight, timeOfDay: 239, progress: { ...winterNight.progress, hearthUnlocked: false, nextStormDay: 12 } };
+    const failed = advanceTime(front, 2);
+    expect(failed.progress.nextStormDay).toBe(12 + BALANCE.coldNightRetryDays);
+    expect(failed.player.energy).toBeLessThanOrEqual(BALANCE.coldNightFailureEnergy);
+  });
+});
+
+describe('winter larder', () => {
+  const base = createGame();
+  const bush = base.nodes.find(node => node.id === 'berry-0')!;
+  const winterDay = { ...base, day: 12, player: { ...base.player, x: bush.x, y: bush.y } };
+  const atSpringInWinter = { ...base, day: 12, player: { ...base.player, x: SITES.spring.x, y: SITES.spring.y, energy: 50 } };
+
+  it('leaves the bushes bare all winter', () => {
+    const result = applyAction(winterDay, { type: 'gather', nodeId: 'berry-0' });
+    expect(result.message).toBe('The bushes are bare until spring.');
+    expect(result.state).toBe(winterDay);
+    expect(applyAction({ ...winterDay, day: 51 }, { type: 'gather', nodeId: 'berry-0' }).state).toMatchObject({ day: 51 });
+    expect(applyAction({ ...winterDay, day: 51 }, { type: 'gather', nodeId: 'berry-0' }).message).toBe('The bushes are bare until spring.');
+    expect(applyAction({ ...winterDay, day: 21 }, { type: 'gather', nodeId: 'berry-0' }).state.inventory.food).toBe(1);
+  });
+
+  it('freezes the quiet spring, but still marks it found', () => {
+    const result = applyAction(atSpringInWinter, { type: 'visitSite', siteId: 'spring' });
+    expect(result.message).toBe('The spring is frozen over.');
+    expect(result.state.player.energy).toBe(atSpringInWinter.player.energy);
+    expect(result.state.timeOfDay).toBe(atSpringInWinter.timeOfDay);
+    expect(result.state.progress.discoveries.spring).toBe(true);
   });
 });

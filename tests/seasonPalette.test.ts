@@ -31,4 +31,14 @@ describe('season palettes', () => {
     for (const key of ['crown0', 'crown1', 'crown2', 'crown3', 'crown4'] as const) expect(hasColor(pine, autumn[key])).toBe(false);
     expect(hasColor(pine, palette.leaf2)).toBe(true);
   });
+
+  it('snows over the paths in winter but keeps the camp circle trodden earth', () => {
+    const winter = seasonPalette('winter');
+    for (let i = 0; i < 5; i++) {
+      const key = `path${i}` as PaletteKey;
+      expect(winter[key]).not.toBe(palette[`earth${i}` as PaletteKey]);
+      for (const season of ['autumn', 'spring', 'summer'] as const) expect(seasonPalette(season)[key]).toBe(palette[`earth${i}` as PaletteKey]);
+    }
+    expect(winter.earth2).toBe(palette.earth2);
+  });
 });

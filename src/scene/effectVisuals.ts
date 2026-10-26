@@ -1,5 +1,5 @@
 import { BALANCE, type GameState, type ResourceKind } from '../game/state';
-import { isColdNight } from '../game/rules';
+import { isFreezingNight } from '../game/rules';
 import { TILE, worldX, worldY } from './art';
 import { GROUND_DECAL_DEPTH, LIGHT_DEPTH, WEATHER_DEPTH } from './visuals';
 
@@ -27,7 +27,7 @@ const visual = (id: string, texture: string, x: number, y: number, depth: number
 export function effectVisuals(state: GameState, timeMs: number, events: EffectEvent[]): EffectVisual[] {
   const results: EffectVisual[] = [];
   if (state.area === 'camp' && state.fireFuel > 0) results.push(...fireVisuals(timeMs));
-  if (isColdNight(state)) results.push(...weatherVisuals(timeMs));
+  if (isFreezingNight(state)) results.push(...weatherVisuals(timeMs));
   events.forEach((event, index) => {
     const age = timeMs - event.startedAtMs;
     if (age >= 0) results.push(...eventVisuals(state, event, index, age));

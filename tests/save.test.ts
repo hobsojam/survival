@@ -46,7 +46,7 @@ describe('local save', () => {
     state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
     state.nodes.find(node => node.kind === 'fiber')!.readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(12);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(13);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);
@@ -80,10 +80,10 @@ describe('local save', () => {
     const storage = new MemoryStorage();
     const state = createGame();
     state.trees[0].x += 1;
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 12, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 13, state }));
     expect(loadGame(storage).kind).toBe('invalid');
     state.trees[0] = { ...createGame().trees[0], readyDay: state.day + BALANCE.treeRegrowDays + 1 };
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 12, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 13, state }));
     expect(loadGame(storage).kind).toBe('invalid');
   });
 
@@ -117,7 +117,7 @@ describe('local save', () => {
     for (const change of [(s: typeof state) => { s.quarryReadyDay = 0; }, (s: typeof state) => { s.rubbleReadyDay = 0; }]) {
       const broken = structuredClone(state);
       change(broken);
-      storage.setItem(SAVE_KEY, JSON.stringify({ version: 12, state: broken }));
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 13, state: broken }));
       expect(loadGame(storage).kind).toBe('invalid');
     }
   });
@@ -145,7 +145,7 @@ describe('local save', () => {
     const storage = new MemoryStorage();
     const state = createGame();
     state.timeOfDay = 240;
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 12, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 13, state }));
     expect(loadGame(storage).kind).toBe('invalid');
   });
 
@@ -206,24 +206,45 @@ describe('local save', () => {
       const storage = new MemoryStorage();
       const state = createGame();
       change(state);
-      storage.setItem(SAVE_KEY, JSON.stringify({ version: 12, state }));
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 13, state }));
       expect(loadGame(storage).kind, `variant ${index}`).toBe('invalid');
     });
   });
 
   it('rejects every earlier version', () => {
-    for (let version = 1; version <= 11; version++) {
+    for (let version = 1; version <= 12; version++) {
       const storage = new MemoryStorage();
       storage.setItem(SAVE_KEY, JSON.stringify({ version, state: createGame() }));
       expect(loadGame(storage).kind, `version ${version}`).toBe('invalid');
     }
   });
 
+  it('round-trips the last wolf visit', () => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    state.day = 13;
+    state.progress.nextStormDay = 13;
+    state.lastWolf = { day: 12, took: 'berry' };
+    expect(saveGame(storage, state).ok).toBe(true);
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
+  });
+
+  it('rejects a wolf visit from the future or of an unknown kind', () => {
+    const visits: unknown[] = [{ day: 14, took: 'nothing' }, { day: 12, took: 'fish' }, { day: 1.5, took: 'ration' }, { day: 0, took: 'ration' }, 'yes', { took: 'ration' }];
+    visits.forEach((lastWolf, index) => {
+      const storage = new MemoryStorage();
+      const state = { ...createGame(), day: 13, lastWolf };
+      state.progress.nextStormDay = 13;
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 13, state }));
+      expect(loadGame(storage).kind, `visit ${index}`).toBe('invalid');
+    });
+  });
+
   it('rejects bags over capacity counting stone as two spaces', () => {
     const storage = new MemoryStorage();
     const state = createGame();
     state.inventory.stone = 5;
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 12, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 13, state }));
     expect(loadGame(storage).kind).toBe('invalid');
   });
 
@@ -240,7 +261,7 @@ describe('local save', () => {
       const storage = new MemoryStorage();
       const state = createGame();
       change(state);
-      storage.setItem(SAVE_KEY, JSON.stringify({ version: 12, state }));
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 13, state }));
       expect(loadGame(storage).kind, `variant ${index}`).toBe('invalid');
     });
   });

@@ -187,3 +187,13 @@ describe('action feedback', () => {
     expect(gatherSpot({ type: 'eat' }, state)).toBeUndefined();
   });
 });
+
+describe('winter prompts', () => {
+  it('offers to search a bare bush, and E tries it so the survivor hears why it is empty', () => {
+    const bush = createGame().nodes.find(node => node.id === 'berry-0')!;
+    const winter = { ...bareCamp(bush.x, bush.y), day: 12, nodes: [bush] };
+    expect(promptFor(winter)).toContain('E  Search the bare bush');
+    expect(gatherKeyAction(winter)).toEqual({ type: 'gather', nodeId: 'berry-0' });
+    expect(promptFor({ ...winter, day: 2 })).toContain('E  Pick berries');
+  });
+});

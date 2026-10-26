@@ -247,3 +247,13 @@ describe('the quarry area', () => {
     expect(targetAction({ kind: 'rubble', x: 16, y: 16 })).toEqual({ type: 'gatherRubble' });
   });
 });
+
+describe('winter tap targets', () => {
+  it('keeps bare winter bushes as targets, so the survivor can learn why they are empty', () => {
+    const state = createGame();
+    const bush = state.nodes.find(item => item.id === 'berry-0')!;
+    const winter = { ...state, day: 12, player: { ...state.player, x: bush.x, y: bush.y } };
+    expect(closestGatherable(winter)).toMatchObject({ kind: 'node', node: { id: 'berry-0' } });
+    expect(pickTapTarget(winter, bush.x, bush.y)).toMatchObject({ kind: 'node', id: 'berry-0' });
+  });
+});

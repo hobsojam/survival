@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { BALANCE, type GameState } from '../game/state';
+import { wolfMessage } from '../game/wolves';
 import { advanceTime, applyAction, isColdNight, type GameAction } from '../game/rules';
 import { TILE, worldX, worldY, drawTerrain } from './art';
 import { shownTerrainKey } from './map';
@@ -160,7 +161,7 @@ export class GameScene extends Phaser.Scene {
     if (result.state !== before) this.showActionDone(action, before);
     if (action.type === 'gather') this.noteBerryPicked(action.nodeId, before);
     const message = this.weatherMessage(before, this.state) ?? (announce ? result.message : '');
-    this.say(message, seasonMessage(before.day, this.state.day), this.needsAlert());
+    this.say(message, wolfMessage(before, this.state), seasonMessage(before.day, this.state.day), this.needsAlert());
     if (announce) {
       this.onStateChange(this.state, 'action');
       if (this.playerSprite) this.paintObjects();
@@ -294,7 +295,7 @@ export class GameScene extends Phaser.Scene {
 
   private reportWeather(before: GameState, after: GameState): void {
     this.showMorningFrost(before, after);
-    this.say(this.weatherMessage(before, after), seasonMessage(before.day, after.day), this.needsAlert());
+    this.say(this.weatherMessage(before, after), wolfMessage(before, after), seasonMessage(before.day, after.day), this.needsAlert());
   }
 
   /** The tired or hungry warning due now, if a meter just reached its line. */

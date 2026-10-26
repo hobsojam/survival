@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, createGame } from '../src/game/state';
+import { nightStart } from '../src/game/calendar';
 import { sceneVisuals, playerVisualDepth, GROUND_DECAL_DEPTH, NIGHT_DEPTH, LIGHT_DEPTH, WEATHER_DEPTH } from '../src/scene/visuals';
 import { sprites } from '../src/art/sprites';
+import { worldX, worldY } from '../src/scene/art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { validateSprite } from '../src/art/textures';
 
@@ -99,6 +101,37 @@ describe('native-size scene art', () => {
     expect(sceneVisuals(state, 180).map(item => item.texture)).toContain('hearth:lowWindy1');
     expect(sceneVisuals(state, 180).map(item => item.texture)).toContain('hearthFlame:lowWindy1');
     expect(sceneVisuals(state, 180).map(item => item.texture)).not.toContain('hearthSite:still');
+  });
+
+  it('blows the fire about on winter nights, but not on autumn nights', () => {
+    const state = createGame();
+    state.progress = { ...state.progress, hearthUnlocked: true, nextStormDay: null };
+    state.fireFuel = 60;
+    state.day = 12;
+    state.timeOfDay = nightStart(12) + 5;
+    expect(sceneVisuals(state, 0).map(item => item.texture)).toContain('firePit:windy0');
+    state.day = 8;
+    state.timeOfDay = nightStart(8) + 5;
+    expect(sceneVisuals(state, 0).map(item => item.texture)).toContain('firePit:burning0');
+  });
+
+  it('shows bare bushes and an iced spring in winter', () => {
+    const textures = (day: number) => sceneVisuals({ ...createGame(), day }, 0).map(item => item.texture);
+    const bushes = (day: number) => textures(day).filter(texture => texture.startsWith('berryBush:'));
+    expect(bushes(12).length).toBeGreaterThan(0);
+    expect(bushes(12).every(texture => texture === 'berryBush:picked')).toBe(true);
+    expect(textures(12)).toContain('spring:frozen');
+    expect(bushes(2).every(texture => texture === 'berryBush:ready')).toBe(true);
+    expect(textures(2)).toContain('spring:still');
+    expect(sprites.spring.frames.frozen).toBeDefined();
+  });
+
+  it('circles the fire pit with wolf tracks until the next nightfall', () => {
+    const state = { ...createGame(), day: 13, timeOfDay: 30, lastWolf: { day: 12, took: 'ration' as const } };
+    const tracks = sceneVisuals(state, 0).find(item => item.texture === 'wolfTracks:still');
+    expect(tracks).toMatchObject({ x: Math.round(worldX(BALANCE.campX)), y: Math.round(worldY(BALANCE.campY)), depth: GROUND_DECAL_DEPTH });
+    expect(sceneVisuals({ ...state, timeOfDay: nightStart(13) }, 0).some(item => item.texture === 'wolfTracks:still')).toBe(false);
+    expect(sceneVisuals({ ...state, area: 'quarry' }, 0).some(item => item.texture === 'wolfTracks:still')).toBe(false);
   });
 
   it('draws loose piles by count', () => {

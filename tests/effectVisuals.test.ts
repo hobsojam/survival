@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createGame } from '../src/game/state';
 import { effectVisuals, type EffectEvent } from '../src/scene/effectVisuals';
 import { sprites } from '../src/art/sprites';
+import { nightStart } from '../src/game/calendar';
 
 const state = createGame();
 
@@ -80,5 +81,15 @@ describe('phase 5 scene effects', () => {
       const [name, frame] = effect.texture.split(':');
       expect(sprites[name]?.frames[frame], effect.texture).toBeDefined();
     }
+  });
+});
+
+describe('winter weather', () => {
+  it('blows sleet across every winter night, and not across autumn nights', () => {
+    const weathered = { ...state.progress, hearthUnlocked: true, nextStormDay: null };
+    const winter = { ...state, day: 12, timeOfDay: nightStart(12) + 5, progress: weathered };
+    expect(effectVisuals(winter, 0, []).some(visual => visual.id.startsWith('weather:'))).toBe(true);
+    const autumn = { ...winter, day: 8, timeOfDay: nightStart(8) + 5 };
+    expect(effectVisuals(autumn, 0, []).some(visual => visual.id.startsWith('weather:'))).toBe(false);
   });
 });

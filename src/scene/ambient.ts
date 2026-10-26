@@ -1,5 +1,6 @@
 import { BALANCE, type ResourceNode } from '../game/state';
 import { nightStart } from '../game/calendar';
+import { WOLF_LOW_FUEL } from '../game/wolves';
 
 // Ambient life is decoration only: it reads game state but never changes or saves it.
 // Positions are in tiles, like the game state.
@@ -138,10 +139,10 @@ const EYE_FAR = 6;
  * One pair of eyes: visible about 6 s of every 12 s (three pairs at a time), only in the dark.
  * Near the survivor a pair backs off up to a tile and fades out completely by 4 tiles.
  */
-export function eyesAt(index: number, timeMs: number, dark: number, player: Point):
+export function eyesAt(index: number, timeMs: number, dark: number, player: Point, spots: Point[] = EYE_SPOTS):
   { x: number; y: number; alpha: number; frame: 'open' | 'blink' } | null {
   if (dark < 0.5) return null;
-  const spot = EYE_SPOTS[index];
+  const spot = spots[index];
   const seconds = timeMs / 1000;
   const phase = (seconds + index * 2) % EYE_CYCLE;
   if (phase >= EYE_WINDOW) return null;
@@ -158,6 +159,15 @@ export function eyesAt(index: number, timeMs: number, dark: number, player: Poin
     frame: blinking ? 'blink' : 'open'
   };
 }
+
+/** Where wolves watch the camp from on winter nights: about seven tiles out from the fire, clear of the trees. */
+export const WOLF_SPOTS: Point[] = [{ x: 13.5, y: 12.5 }, { x: 26.5, y: 18.5 }, { x: 17.5, y: 21.5 }];
+
+/** One to three wolves, the same on any given night. */
+export const wolfCount = (day: number): number => 1 + Math.floor(hash(day + 17) * 3);
+
+/** How strongly the wolves press in: not at all with 20 s of fuel, fully once the fire is out. */
+export const wolfWatch = (fireFuel: number): number => Math.max(0, Math.min(1, (WOLF_LOW_FUEL - fireFuel) / 10));
 
 export function birdGroundFrame(index: number, timeMs: number): string {
   const phase = (timeMs / 1000 + index * 1.37) % 4;

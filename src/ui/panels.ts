@@ -1,7 +1,7 @@
-import { nightStart } from '../game/calendar';
+import { isWinter, nightStart } from '../game/calendar';
 import { BALANCE, BUILDINGS, SITES, type GameState, type SiteId, type StructureId } from '../game/state';
 import { workSeconds } from '../game/needs';
-import { axeBlocker, bagCapacity, buildStatus, carriedCount, isAtCamp, isColdNight, lookoutRepairBlocker, pickaxeBlocker, trailFoodBlocker } from '../game/rules';
+import { axeBlocker, bagCapacity, buildStatus, carriedCount, isAtCamp, isColdNight, isFreezingNight, lookoutRepairBlocker, pickaxeBlocker, trailFoodBlocker } from '../game/rules';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
 
@@ -63,9 +63,22 @@ export interface ForecastView { active: boolean; weathered: boolean; title: stri
 // A cold night always needs two to three logs: 132 s to 220 s of fuel at 90 s a log.
 const LOG_WORDS: Record<number, string> = { 2: 'two', 3: 'three' };
 
+/** Once the cold front is behind the survivor, winter's nights take over the forecast. */
+function winterForecast(state: GameState): ForecastView {
+  const active = isFreezingNight(state);
+  return {
+    active, weathered: false,
+    title: active ? 'A bitter night' : 'Winter nights',
+    copy: 'Winter nights are bitter. Keep the fire alive until dawn, or the wolves will come close.',
+    shelter: state.structures.shelter ? '✓ Shelter ready' : '○ Shelter needed',
+    fire: forecastFireCheck(state)
+  };
+}
+
 export function forecastView(state: GameState): ForecastView {
   const storm = isColdNight(state);
   const weathered = state.progress.hearthUnlocked;
+  if (weathered && isWinter(state.day)) return winterForecast(state);
   if (weathered) {
     return { active: storm, weathered, title: 'The cold night is behind you', copy: 'You kept your camp warm through dawn. The stone hearth is ready to build.',
       shelter: '✓ Shelter held firm', fire: '✓ Hearth unlocked' };
