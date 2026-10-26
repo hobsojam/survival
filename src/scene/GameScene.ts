@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { BALANCE, type GameState } from '../game/state';
+import { rainMessage } from '../game/rain';
 import { wolfMessage } from '../game/wolves';
 import { advanceTime, applyAction, isColdNight, type GameAction } from '../game/rules';
 import { TILE, worldX, worldY, drawTerrain } from './art';
@@ -295,7 +296,7 @@ export class GameScene extends Phaser.Scene {
 
   private reportWeather(before: GameState, after: GameState): void {
     this.showMorningFrost(before, after);
-    this.say(this.weatherMessage(before, after), wolfMessage(before, after), seasonMessage(before.day, after.day), this.needsAlert());
+    this.say(this.weatherMessage(before, after), rainMessage(before, after), wolfMessage(before, after), seasonMessage(before.day, after.day), this.needsAlert());
   }
 
   /** The tired or hungry warning due now, if a meter just reached its line. */

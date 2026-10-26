@@ -135,6 +135,8 @@ export const BALANCE = {
   coldNightStartDay: 3,
   coldNightRetryDays: 3,
   coldNightFireBurn: 2,
+  /** A spring shower makes the fire burn this much faster. */
+  rainFireBurn: 1.5,
   coldNightShelteredWarmthLossPerSecond: 0.75,
   coldNightOutdoorWarmthLossPerSecond: 1.25,
   coldNightFailureEnergy: 25,
