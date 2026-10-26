@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { nightStart } from '../src/game/calendar';
 import { QUARRY_SITE } from '../src/game/areas';
 import { BALANCE, createGame } from '../src/game/state';
 import {
-  BIRD_FLEE_RADIUS, BIRD_FORAGE_RADIUS, BIRD_HOMES, FIREFLY_HOMES, FOX, birdForageTarget, birdMayReturn, birdShouldLeave, EYE_SPOTS, darkness, eyesAt, fireflyGlow, foxAt, foxVisits
+  BIRD_FLEE_RADIUS, BIRD_FORAGE_RADIUS, BIRD_HOMES, FIREFLY_HOMES, FOX, birdForageTarget, birdMayReturn, birdShouldLeave, EYE_SPOTS, LEAF_HOMES, darkness, eyesAt, fireflyGlow, foxAt, foxVisits, foxWindow, leafAt
 } from '../src/scene/ambient';
 
 const visitDay = Array.from({ length: 20 }, (_, i) => i + 1).find(foxVisits)!;
@@ -12,7 +13,7 @@ describe('darkness', () => {
   it('is zero by day, deepens after nightfall, and lifts after dawn', () => {
     expect(darkness(1, 0)).toBe(0);
     expect(darkness(1, 100)).toBe(0);
-    expect(darkness(1, BALANCE.nightStart + 15)).toBeCloseTo(0.5);
+    expect(darkness(1, nightStart(1) + 15)).toBeCloseTo(0.5);
     expect(darkness(1, BALANCE.daySeconds - 1)).toBe(1);
     expect(darkness(2, 0)).toBe(1);
     expect(darkness(2, 30)).toBe(0);
@@ -29,17 +30,18 @@ describe('fox', () => {
 
   it('is absent outside its visit window and on quiet days', () => {
     expect(foxAt(visitDay, 60)).toBeNull();
-    expect(foxAt(visitDay, FOX.leave + 1)).toBeNull();
-    expect(foxAt(quietDay, FOX.arrive + FOX.travel + 5)).toBeNull();
+    expect(foxAt(visitDay, foxWindow(visitDay).leave + 1)).toBeNull();
+    expect(foxAt(quietDay, foxWindow(quietDay).arrive + FOX.travel + 5)).toBeNull();
   });
 
   it('trots in from the den, sits facing the fire, and leaves the way it came', () => {
-    const start = foxAt(visitDay, FOX.arrive)!;
+    const { arrive, leave } = foxWindow(visitDay);
+    const start = foxAt(visitDay, arrive)!;
     expect(start).toMatchObject({ x: FOX.den.x, y: FOX.den.y, sitting: false });
-    const sitting = foxAt(visitDay, FOX.arrive + FOX.travel + 5)!;
+    const sitting = foxAt(visitDay, arrive + FOX.travel + 5)!;
     expect(sitting).toMatchObject({ x: FOX.seat.x, y: FOX.seat.y, sitting: true });
     expect(Math.sign(BALANCE.campX - sitting.x)).toBe(sitting.facing);
-    const leaving = foxAt(visitDay, FOX.leave - FOX.travel / 2)!;
+    const leaving = foxAt(visitDay, leave - FOX.travel / 2)!;
     expect(leaving.sitting).toBe(false);
     expect(Math.sign(FOX.den.x - FOX.seat.x)).toBe(leaving.facing);
   });
@@ -151,5 +153,49 @@ describe('quarry eyes', () => {
     const frames = new Set<string>();
     for (let t = 0; t < 12000; t += 50) { const e = eyesAt(0, t, 1, far); if (e) frames.add(e.frame); }
     expect(frames).toEqual(new Set(['open', 'blink']));
+  });
+});
+
+describe('evening life through the year', () => {
+  it('darkens from each day’s own nightfall', () => {
+    expect(darkness(16, 145)).toBeCloseTo(0.5);
+    expect(darkness(36, 145)).toBe(0);
+  });
+
+  it('brings the fox by earlier on winter evenings', () => {
+    expect(foxWindow(16)).toEqual({ arrive: 110, leave: 180 });
+    const winterVisit = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20].find(foxVisits)!;
+    const { arrive, leave } = foxWindow(winterVisit);
+    expect(foxAt(winterVisit, arrive + 5)).not.toBeNull();
+    expect(foxAt(winterVisit, leave + 1)).toBeNull();
+  });
+});
+
+describe('falling leaves', () => {
+  it('fall for four seconds in every nine, then rest', () => {
+    const leaf = leafAt(0, 1000);
+    expect(leaf).not.toBeNull();
+    expect(leaf!.alpha).toBeGreaterThan(0);
+    expect(leafAt(0, 6000)).toBeNull();
+  });
+
+  it('only ever drift downward, about two tiles below their tree', () => {
+    let last = -Infinity;
+    for (let ms = 0; ms < 4000; ms += 100) {
+      const leaf = leafAt(0, ms);
+      if (!leaf) continue;
+      expect(leaf.y).toBeGreaterThanOrEqual(last);
+      last = leaf.y;
+    }
+    expect(last - LEAF_HOMES[0].y).toBeLessThanOrEqual(2);
+  });
+
+  it('start beside the broadleaf trees at camp', () => {
+    const game = createGame();
+    for (const home of LEAF_HOMES) {
+      const tree = game.trees.find(each => each.id === home.treeId)!;
+      expect(tree.sprite).toBe('treeBroadleaf');
+      expect(Math.hypot(home.x - tree.x, home.y - tree.y)).toBeLessThanOrEqual(2);
+    }
   });
 });

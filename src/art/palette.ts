@@ -2,6 +2,8 @@
 export const palette = {
   grass0: '#2f5236', grass1: '#3d6b3f', grass2: '#5a8a45', grass3: '#7aa64f', grass4: '#a3c45e',
   leaf0: '#16302e', leaf1: '#1f4a3a', leaf2: '#2f6b44', leaf3: '#4a8f4c', leaf4: '#7db55a',
+  // Broadleaf crowns: the same greens as leaf, but they turn with the seasons while pines keep theirs.
+  crown0: '#16302e', crown1: '#1f4a3a', crown2: '#2f6b44', crown3: '#4a8f4c', crown4: '#7db55a',
   earth0: '#3a2620', earth1: '#5c3d2b', earth2: '#8a5f3c', earth3: '#b58a5a', earth4: '#dbb985',
   wood0: '#2e1c18', wood1: '#573423', wood2: '#85512f', wood3: '#b07a47', wood4: '#d9a86a',
   stone0: '#2b2d3a', stone1: '#4d5161', stone2: '#767b88', stone3: '#a3a7ad', stone4: '#d0d2cc',

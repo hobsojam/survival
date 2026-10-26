@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, BUILDINGS, LOOKOUT, SITES, createGame } from '../src/game/state';
 import { QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
-import { FULL_BAG_MESSAGE, advanceTime, isAtCamp, applyAction, buildStatus, carriedCount, freeSpaces, lookoutRepairBlocker, pickaxeBlocker } from '../src/game/rules';
+import { FULL_BAG_MESSAGE, advanceTime, isAtCamp, isColdNight, applyAction, buildStatus, carriedCount, freeSpaces, lookoutRepairBlocker, pickaxeBlocker, sleepBlocker } from '../src/game/rules';
+import { nightStart, seasonMessage } from '../src/game/calendar';
+
+// Night falls at 181 s on day 1, and the day-three cold front's night starts at 174 s.
+const NIGHT = nightStart(1);
+const STORM_NIGHT = nightStart(3);
+const STORM_LENGTH = BALANCE.daySeconds - STORM_NIGHT;
 
 describe('gathering and inventory', () => {
   it('prepares a trail ration only at a built rack in camp, including with a full bag', () => {
@@ -299,7 +305,7 @@ describe('time and gentle survival', () => {
     state.player.x = 0;
     state.player.y = 0;
     state.player.hunger = 1;
-    state.timeOfDay = 159;
+    state.timeOfDay = NIGHT - 1;
     const beforeNight = advanceTime(state, 1);
     expect(beforeNight.player.warmth).toBe(100);
     const atNight = advanceTime(beforeNight, 2);
@@ -432,7 +438,7 @@ describe('fire and camp upgrades', () => {
   it('shelter and fire reduce cold exposure at camp', async () => {
     const { advanceTime } = await import('../src/game/rules');
     const state = createGame();
-    state.timeOfDay = 160;
+    state.timeOfDay = NIGHT;
     state.player.warmth = 50;
     const outdoors = advanceTime(state, 4).player.warmth;
     state.structures.shelter = true;
@@ -465,7 +471,7 @@ describe('daylight spent on work', () => {
 describe('tiredness and sleep', () => {
   const nightAtCamp = () => {
     const state = createGame();
-    state.timeOfDay = BALANCE.nightStart + 10;
+    state.timeOfDay = NIGHT + 10;
     state.structures.shelter = true;
     state.player.energy = 20;
     return state;
@@ -514,14 +520,14 @@ describe('tiredness and sleep', () => {
 describe('optional night activities', () => {
   it('cooks one berry by a lit campfire for a warm meal', () => {
     const state = createGame();
-    state.timeOfDay = 170;
+    state.timeOfDay = NIGHT + 10;
     state.inventory.food = 1;
     state.fireFuel = 30;
     state.player.hunger = 30;
     state.player.warmth = 40;
     const cooked = applyAction(state, { type: 'cook' });
     expect(cooked.state.inventory.food).toBe(0);
-    expect(cooked.state.timeOfDay).toBe(178);
+    expect(cooked.state.timeOfDay).toBe(NIGHT + 18);
     expect(cooked.state.fireFuel).toBe(22);
     expect(cooked.state.player.hunger).toBeCloseTo(64);
     expect(cooked.state.player.warmth).toBe(54);
@@ -534,9 +540,9 @@ describe('optional night activities', () => {
     state.fireFuel = 20;
     for (const setup of [
       (s: typeof state) => { s.timeOfDay = 100; },
-      (s: typeof state) => { s.timeOfDay = 170; s.player.x = 0; },
-      (s: typeof state) => { s.timeOfDay = 170; s.inventory.food = 0; },
-      (s: typeof state) => { s.timeOfDay = 170; s.fireFuel = 0; }
+      (s: typeof state) => { s.timeOfDay = NIGHT + 10; s.player.x = 0; },
+      (s: typeof state) => { s.timeOfDay = NIGHT + 10; s.inventory.food = 0; },
+      (s: typeof state) => { s.timeOfDay = NIGHT + 10; s.fireFuel = 0; }
     ]) {
       const attempt = structuredClone(state);
       setup(attempt);
@@ -559,7 +565,7 @@ describe('optional night activities', () => {
   it('does not stargaze during daylight or away from camp', () => {
     const state = createGame();
     expect(applyAction(state, { type: 'stargaze' }).state).toBe(state);
-    state.timeOfDay = 170;
+    state.timeOfDay = NIGHT + 10;
     state.player.x = 0;
     expect(applyAction(state, { type: 'stargaze' }).state).toBe(state);
   });
@@ -599,7 +605,7 @@ describe('more camp structures', () => {
 
   it('makes cooked berries more filling without changing supplies or cooking time', () => {
     const state = createGame();
-    state.timeOfDay = 170;
+    state.timeOfDay = NIGHT + 10;
     state.inventory.food = 1;
     state.fireFuel = 30;
     state.player.hunger = 20;
@@ -609,13 +615,13 @@ describe('more camp structures', () => {
     expect(plain.player.hunger).toBeCloseTo(54);
     expect(improved.player.hunger).toBeCloseTo(69);
     expect(improved.inventory.food).toBe(0);
-    expect(improved.timeOfDay).toBe(178);
+    expect(improved.timeOfDay).toBe(NIGHT + 18);
     expect(improved.fireFuel).toBe(22);
   });
 
   it('halves unlit night warmth loss at camp but not fire gain or outdoor loss', () => {
     const state = createGame();
-    state.timeOfDay = 170;
+    state.timeOfDay = NIGHT + 10;
     state.player.warmth = 80;
     state.structures.shelter = true;
     const ordinary = advanceTime(state, 4).player.warmth;
@@ -632,7 +638,7 @@ describe('more camp structures', () => {
   it('halves warmth loss during a cold front without changing its retry rule', () => {
     const state = createGame();
     state.day = 3;
-    state.timeOfDay = 170;
+    state.timeOfDay = STORM_NIGHT + 10;
     state.player.warmth = 80;
     state.structures.shelter = true;
     state.structures.windbreak = true;
@@ -646,19 +652,19 @@ describe('forecast cold night', () => {
     const state = createGame();
     expect(state.progress).toMatchObject({ nextStormDay: 3, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false });
     state.day = 3;
-    state.timeOfDay = BALANCE.nightStart - 5;
+    state.timeOfDay = STORM_NIGHT - 5;
     state.fireFuel = 20;
     expect(advanceTime(state, 5).fireFuel).toBe(15);
     expect(advanceTime(state, 10).fireFuel).toBe(5);
     state.day = 2;
-    state.timeOfDay = BALANCE.nightStart;
+    state.timeOfDay = nightStart(2);
     expect(advanceTime(state, 5).fireFuel).toBe(15);
   });
 
   it('makes an unlit sheltered storm night colder', () => {
     const state = createGame();
     state.day = 3;
-    state.timeOfDay = BALANCE.nightStart;
+    state.timeOfDay = STORM_NIGHT;
     state.structures.shelter = true;
     state.player.warmth = 80;
     expect(advanceTime(state, 10).player.warmth).toBe(72.5);
@@ -667,23 +673,23 @@ describe('forecast cold night', () => {
   it('unlocks the hearth after a sheltered night with fire through dawn', () => {
     const state = createGame();
     state.day = 3;
-    state.timeOfDay = BALANCE.nightStart;
+    state.timeOfDay = STORM_NIGHT;
     state.structures.shelter = true;
     state.fireFuel = 180;
-    const dawn = advanceTime(state, 80);
+    const dawn = advanceTime(state, STORM_LENGTH);
     expect(dawn.day).toBe(4);
     expect(dawn.timeOfDay).toBe(0);
-    expect(dawn.fireFuel).toBe(20);
+    expect(dawn.fireFuel).toBe(180 - 2 * STORM_LENGTH);
     expect(dawn.progress).toMatchObject({ nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false, axeCrafted: false });
   });
 
   it('retries after a missed storm and costs the next morning', () => {
     const state = createGame();
     state.day = 3;
-    state.timeOfDay = BALANCE.nightStart;
+    state.timeOfDay = STORM_NIGHT;
     state.structures.shelter = true;
     state.fireFuel = 90;
-    const dawn = advanceTime(state, 80);
+    const dawn = advanceTime(state, STORM_LENGTH);
     expect(dawn.progress).toMatchObject({ nextStormDay: 6, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false });
     expect(dawn.day).toBe(4);
     expect(dawn.timeOfDay).toBe(30);
@@ -695,19 +701,19 @@ describe('forecast cold night', () => {
   it('requires fire after the last storm second and the survivor at camp', () => {
     const state = createGame();
     state.day = 3;
-    state.timeOfDay = BALANCE.nightStart;
+    state.timeOfDay = STORM_NIGHT;
     state.structures.shelter = true;
-    state.fireFuel = 160;
-    expect(advanceTime(state, 80).progress.hearthUnlocked).toBe(false);
+    state.fireFuel = 2 * STORM_LENGTH;
+    expect(advanceTime(state, STORM_LENGTH).progress.hearthUnlocked).toBe(false);
     state.fireFuel = 180;
     state.player.x = 0;
-    expect(advanceTime(state, 80).progress.hearthUnlocked).toBe(false);
+    expect(advanceTime(state, STORM_LENGTH).progress.hearthUnlocked).toBe(false);
   });
 
   it('resolves each retry once when advancing over several days', () => {
     const state = createGame();
     state.day = 3;
-    state.timeOfDay = BALANCE.nightStart;
+    state.timeOfDay = STORM_NIGHT;
     const later = advanceTime(state, 800);
     expect(later.day).toBe(7);
     expect(later.progress.nextStormDay).toBe(9);
@@ -717,7 +723,7 @@ describe('forecast cold night', () => {
   it('does not let sleep bypass the storm setback', () => {
     const state = createGame();
     state.day = 3;
-    state.timeOfDay = BALANCE.nightStart;
+    state.timeOfDay = STORM_NIGHT;
     state.structures.shelter = true;
     state.structures.bed = true;
     state.player.energy = 10;
@@ -1042,7 +1048,7 @@ describe('the second area', () => {
   it('camp actions need the camp area', () => {
     const state = sheltered();
     state.area = 'quarry';
-    state.timeOfDay = BALANCE.nightStart;
+    state.timeOfDay = NIGHT;
     state.player.x = 20;
     state.player.y = 15;
     state.inventory.wood = 20;
@@ -1069,7 +1075,7 @@ describe('the second area', () => {
       const state = createGame();
       state.area = area;
       state.day = 3;
-      state.timeOfDay = 170;
+      state.timeOfDay = STORM_NIGHT + 10;
       state.player.warmth = 80;
       state.player.x = 20;
       state.player.y = 15;
@@ -1259,5 +1265,35 @@ describe('quarry and tools', () => {
       state = advanceTime({ ...state, player: { ...state.player, energy: 100, hunger: 100, warmth: 100 } }, BALANCE.daySeconds - state.timeOfDay);
     }
     expect(crafted).toBe(true);
+  });
+});
+
+describe('night through the year', () => {
+  const sheltered = (day: number, timeOfDay: number) => {
+    const state = createGame();
+    state.day = day;
+    state.timeOfDay = timeOfDay;
+    state.structures.shelter = true;
+    state.player.x = BALANCE.campX;
+    state.player.y = BALANCE.campY;
+    return state;
+  };
+
+  it('lets you sleep early on a winter evening but not on a summer one', () => {
+    expect(sleepBlocker(sheltered(16, 131))).toBeNull();
+    expect(sleepBlocker(sheltered(36, 160))).toMatch(/once night falls/);
+  });
+
+  it('starts the day-three cold front at that day’s nightfall', () => {
+    expect(isColdNight(sheltered(3, 170))).toBe(false);
+    expect(isColdNight(sheltered(3, 175))).toBe(true);
+  });
+
+  it('sleeps across the edge of winter into its first morning', () => {
+    const state = sheltered(10, 150);
+    state.progress.nextStormDay = null;
+    const woke = applyAction(state, { type: 'sleep' }).state;
+    expect([woke.day, woke.timeOfDay]).toEqual([11, 0]);
+    expect(seasonMessage(state.day, woke.day)).toBe('Snow fell in the night. Winter has come.');
   });
 });

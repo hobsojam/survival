@@ -1,3 +1,4 @@
+import { nightStart } from '../game/calendar';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceNode } from '../game/state';
 import { isColdNight } from '../game/rules';
 import { TILE, worldX, worldY } from './art';
@@ -115,7 +116,7 @@ function addFire(state: GameState, timeMs: number, visuals: SceneVisual[], add: 
   const mode = fireMode(state);
   const frame = mode === 'unlit' ? mode : mode + phase;
   add('fire', `${fire}:${frame}`, x, y);
-  if (state.fireFuel > 0 && state.timeOfDay >= BALANCE.nightStart) visuals.push({
+  if (state.fireFuel > 0 && state.timeOfDay >= nightStart(state.day)) visuals.push({
     id: 'flame', texture: `${state.structures.hearth ? 'hearthFlame' : 'flame'}:${mode}${phase}`,
     x: Math.round(worldX(x)), y: Math.round(worldY(y)), depth: LIGHT_DEPTH
   });

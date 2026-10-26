@@ -1,3 +1,4 @@
+import { nightStart } from './calendar';
 import { BALANCE, type GameState } from './state';
 
 const MUTE_KEY = 'hearthwild.sound-muted';
@@ -144,7 +145,7 @@ export class Soundscape {
 
   private syncAmbience(): void {
     if (!this.context || !this.state) return;
-    const isNight = this.state.timeOfDay >= BALANCE.nightStart;
+    const isNight = this.state.timeOfDay >= nightStart(this.state.day);
     const inQuarry = this.state.area === 'quarry';
     const distance = Math.hypot(this.state.player.x - BALANCE.campX, this.state.player.y - BALANCE.campY);
     const campVolume = Math.max(0, 1 - distance / (BALANCE.campRadius + 4));
@@ -198,7 +199,7 @@ export class Soundscape {
 
   private scheduleBirds(): void {
     this.birdTimer = globalThis.setTimeout(() => {
-      if (this.state && this.state.timeOfDay < BALANCE.nightStart) this.playBirdPhrase();
+      if (this.state && this.state.timeOfDay < nightStart(this.state.day)) this.playBirdPhrase();
       this.scheduleBirds();
     }, 2400 + Math.random() * 3600);
   }
@@ -228,7 +229,7 @@ export class Soundscape {
 
   private scheduleCrickets(): void {
     this.cricketTimer = globalThis.setTimeout(() => {
-      if (this.state && this.state.timeOfDay >= BALANCE.nightStart) this.playCricketTrill();
+      if (this.state && this.state.timeOfDay >= nightStart(this.state.day)) this.playCricketTrill();
       this.scheduleCrickets();
     }, 3600 + Math.random() * 3600);
   }

@@ -1,4 +1,5 @@
 import { BALANCE, type ResourceNode } from '../game/state';
+import { nightStart } from '../game/calendar';
 
 // Ambient life is decoration only: it reads game state but never changes or saves it.
 // Positions are in tiles, like the game state.
@@ -13,14 +14,13 @@ const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 
 /** 0 in daylight, 1 in deep night; eases in after nightfall and out after dawn. */
 export function darkness(day: number, timeOfDay: number): number {
-  if (timeOfDay >= BALANCE.nightStart) return Math.min(1, (timeOfDay - BALANCE.nightStart) / 30);
+  const night = nightStart(day);
+  if (timeOfDay >= night) return Math.min(1, (timeOfDay - night) / 30);
   if (day > 1 && timeOfDay < 25) return 1 - timeOfDay / 25;
   return 0;
 }
 
 export const FOX = {
-  arrive: BALANCE.nightStart - 20,
-  leave: BALANCE.nightStart + 50,
   travel: 12,
   den: { x: 26, y: -1 },
   seat: { x: 20.8, y: 11.6 },
@@ -32,10 +32,17 @@ export interface FoxPose extends Point { sitting: boolean; facing: 1 | -1 }
 /** The fox comes by on the first evening, then on roughly two evenings in three. */
 export const foxVisits = (day: number) => day === 1 || hash(day) < 0.65;
 
+/** The fox arrives 20 s before that evening's nightfall and leaves 50 s after it. */
+export function foxWindow(day: number): { arrive: number; leave: number } {
+  const night = nightStart(day);
+  return { arrive: night - 20, leave: night + 50 };
+}
+
 export function foxAt(day: number, timeOfDay: number): FoxPose | null {
-  if (!foxVisits(day) || timeOfDay < FOX.arrive || timeOfDay > FOX.leave) return null;
-  const progress = Math.min(1, (timeOfDay - FOX.arrive) / FOX.travel, (FOX.leave - timeOfDay) / FOX.travel);
-  const leaving = timeOfDay - FOX.arrive > FOX.leave - timeOfDay;
+  const { arrive, leave } = foxWindow(day);
+  if (!foxVisits(day) || timeOfDay < arrive || timeOfDay > leave) return null;
+  const progress = Math.min(1, (timeOfDay - arrive) / FOX.travel, (leave - timeOfDay) / FOX.travel);
+  const leaving = timeOfDay - arrive > leave - timeOfDay;
   const sitting = progress >= 1;
   // Sitting, the fox faces the fire; walking, it faces where it's going.
   let heading: number;
@@ -92,6 +99,30 @@ export function fireflyOffset(index: number, timeMs: number): Point {
 export function fireflyGlow(index: number, timeMs: number, dark: number): number {
   const pulse = 0.5 + 0.5 * Math.sin(timeMs / (600 + hash(index + 307) * 500) + index * 2.3);
   return dark * pulse * pulse;
+}
+
+/** Where autumn leaves start: two under the crown of each broadleaf tree at camp. */
+export const LEAF_HOMES: (Point & { treeId: string })[] = [
+  { x: 19.6, y: 5.6, treeId: 'tree-0' }, { x: 20.8, y: 6.2, treeId: 'tree-0' },
+  { x: 16.6, y: 7.6, treeId: 'tree-1' }, { x: 17.8, y: 8.2, treeId: 'tree-1' },
+  { x: 26.6, y: 3.6, treeId: 'tree-2' }, { x: 27.6, y: 4.2, treeId: 'tree-2' }
+];
+const LEAF_CYCLE = 9;
+const LEAF_FALL = 4;
+const LEAF_FADE = 0.5;
+
+/** One leaf: it tumbles two tiles down for 4 s of every 9 s, swaying side to side, and fades in and out at the ends. */
+export function leafAt(index: number, timeMs: number): { x: number; y: number; alpha: number; frame: 'leaf:fall0' | 'leaf:fall1' } | null {
+  const phase = (timeMs / 1000 + index * 1.5) % LEAF_CYCLE;
+  if (phase >= LEAF_FALL) return null;
+  const home = LEAF_HOMES[index];
+  const progress = phase / LEAF_FALL;
+  return {
+    x: home.x + Math.sin(phase * 2.4 + index) * 0.6,
+    y: home.y + progress * 2,
+    alpha: Math.min(1, phase / LEAF_FADE, (LEAF_FALL - phase) / LEAF_FADE),
+    frame: Math.floor(phase * 3) % 2 ? 'leaf:fall1' : 'leaf:fall0'
+  };
 }
 
 /** Pairs of eyes that watch from the dark edges of the quarry. They are only a look; nothing follows the survivor. */

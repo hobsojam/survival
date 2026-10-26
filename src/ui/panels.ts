@@ -1,7 +1,8 @@
+import { nightStart } from '../game/calendar';
 import { BALANCE, BUILDINGS, SITES, type GameState, type SiteId, type StructureId } from '../game/state';
 import { workSeconds } from '../game/needs';
 import { axeBlocker, bagCapacity, buildStatus, carriedCount, isAtCamp, isColdNight, lookoutRepairBlocker, pickaxeBlocker, trailFoodBlocker } from '../game/rules';
-import { forecastFireCheck } from '../game/forecast';
+import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
 
 /** What a panel with one action button shows: its heading, its copy, its price line and its button state. */
@@ -52,12 +53,15 @@ export function sitesFound(state: GameState): string {
 }
 
 export function nightHint(state: GameState): string {
-  if (state.timeOfDay < BALANCE.nightStart) return 'These small moments are waiting for nightfall.';
+  if (state.timeOfDay < nightStart(state.day)) return 'These small moments are waiting for nightfall.';
   if (!isAtCamp(state)) return 'Return to the camp circle for a quiet evening.';
   return 'Optional comforts while the night passes.';
 }
 
 export interface ForecastView { active: boolean; weathered: boolean; title: string; copy: string; shelter: string; fire: string }
+
+// A cold night always needs two to three logs: 132 s to 220 s of fuel at 90 s a log.
+const LOG_WORDS: Record<number, string> = { 2: 'two', 3: 'three' };
 
 export function forecastView(state: GameState): ForecastView {
   const storm = isColdNight(state);
@@ -71,7 +75,7 @@ export function forecastView(state: GameState): ForecastView {
   return {
     active: storm, weathered,
     title: storm ? 'The cold front is here' : `Cold front · day ${day} night`,
-    copy: storm ? 'Stay at camp and keep the fire alive until dawn.' : `Build a shelter and bring two logs to camp before nightfall on day ${day}.`,
+    copy: storm ? 'Stay at camp and keep the fire alive until dawn.' : `Build a shelter and bring ${LOG_WORDS[logsForColdNight(day)]} logs to camp before nightfall on day ${day}.`,
     shelter: sheltered ? '✓ Shelter ready' : '○ Shelter needed',
     fire: forecastFireCheck(state)
   };

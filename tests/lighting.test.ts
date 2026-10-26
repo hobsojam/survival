@@ -4,11 +4,12 @@ import { palette } from '../src/art/palette';
 import { fireGlow, fireRadii, lightMaskPixels, lightScreenPosition, lightingTint } from '../src/scene/lighting';
 
 const rgb = (hex: string) => parseInt(hex.slice(1), 16);
-const state = createGame();
+// Day 6 is mid-autumn, when night falls at 160 s.
+const state = { ...createGame(), day: 6 };
 
 describe('time-of-day lighting', () => {
   it('has no day tint and warms the last thirty seconds before night', () => {
-    expect(lightingTint(state)).toEqual({ color: rgb(palette.dusk), alpha: 0 });
+    expect(lightingTint({ ...state, timeOfDay: 60 })).toEqual({ color: rgb(palette.dusk), alpha: 0 });
     expect(lightingTint({ ...state, timeOfDay: 145 }).color).toBe(rgb(palette.dusk));
     expect(lightingTint({ ...state, timeOfDay: 145 }).alpha).toBeCloseTo(0.06);
     expect(lightingTint({ ...state, timeOfDay: 160 })).toEqual({ color: rgb(palette.night), alpha: 0 });
@@ -16,7 +17,7 @@ describe('time-of-day lighting', () => {
 
   it('reaches 55% at ordinary night and 64% during a cold front', () => {
     expect(lightingTint({ ...state, timeOfDay: 190 })).toEqual({ color: rgb(palette.night), alpha: 0.55 });
-    const storm = { ...state, day: 3, timeOfDay: 190, progress: { ...state.progress, nextStormDay: 3 } };
+    const storm = { ...state, day: 3, timeOfDay: 204, progress: { ...state.progress, nextStormDay: 3 } };
     expect(lightingTint(storm)).toEqual({ color: rgb(palette.storm), alpha: 0.64 });
   });
 
@@ -63,5 +64,14 @@ describe('fire glow by area', () => {
     expect(fireGlow(lit, 0)).toEqual(fireRadii(40, false, 0));
     expect(fireGlow({ ...lit, fireFuel: 0 }, 0)).toBeNull();
     expect(fireGlow({ ...lit, area: 'quarry' }, 0)).toBeNull();
+  });
+});
+
+describe('lighting through the year', () => {
+  it('darkens early in midwinter and holds the dusk late in midsummer', () => {
+    expect(lightingTint({ ...state, day: 16, timeOfDay: 135 }).color).toBe(rgb(palette.night));
+    const summer = lightingTint({ ...state, day: 36, timeOfDay: 165 });
+    expect(summer.color).toBe(rgb(palette.dusk));
+    expect(summer.alpha).toBeCloseTo(0.12 * 5 / 30);
   });
 });

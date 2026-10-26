@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { nightStart } from '../src/game/calendar';
 import { BALANCE, LOOKOUT, SITES, createGame, type GameState } from '../src/game/state';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { KEY_ACTIONS, actionPose, closestSite, closestTree, gatherKeyAction, gatherSpot, promptFor } from '../src/scene/prompts';
@@ -17,11 +18,11 @@ describe('camp prompts', () => {
   });
 
   it('offers night comforts at camp after dark', () => {
-    expect(promptFor({ ...bareCamp(), timeOfDay: BALANCE.nightStart + 1 })).toBe('At camp · C Cook · G Stargaze · F Fire · R Rest');
+    expect(promptFor({ ...bareCamp(), timeOfDay: nightStart(1) + 1 })).toBe('At camp · C Cook · G Stargaze · F Fire · R Rest');
   });
 
   it('offers sleep at camp once sleep is allowed', () => {
-    const state = { ...bareCamp(), timeOfDay: BALANCE.nightStart + 1, structures: { ...createGame().structures, shelter: true } };
+    const state = { ...bareCamp(), timeOfDay: nightStart(1) + 1, structures: { ...createGame().structures, shelter: true } };
     expect(promptFor(state)).toBe('At camp · C Cook · G Stargaze · Z Sleep · F Fire');
   });
 
@@ -52,7 +53,7 @@ describe('camp prompts', () => {
 
   it('adds sleep after the gather prompt when sleep is allowed', () => {
     const base = bareCamp();
-    const state = { ...base, timeOfDay: BALANCE.nightStart + 1, structures: { ...base.structures, shelter: true },
+    const state = { ...base, timeOfDay: nightStart(1) + 1, structures: { ...base.structures, shelter: true },
       nodes: [{ id: 'b', kind: 'branch' as const, x: base.player.x, y: base.player.y, amount: 1, readyDay: 1 }] };
     expect(promptFor(state)).toBe('E  Pick up fallen branches · Z Sleep until morning');
   });

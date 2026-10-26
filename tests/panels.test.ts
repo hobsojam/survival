@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { axeView, bagView, buildButtonView, forecastView, lookoutView, nightHint, pickaxeView, sitesFound, startNote } from '../src/ui/panels';
 
@@ -78,7 +79,7 @@ describe('pickaxe panel', () => {
 describe('night hint', () => {
   it('waits for nightfall, then invites the survivor back to camp', () => {
     expect(nightHint(game())).toBe('These small moments are waiting for nightfall.');
-    const night = game({}, { timeOfDay: BALANCE.nightStart + 1 });
+    const night = game({}, { timeOfDay: nightStart(1) + 1 });
     expect(nightHint(night)).toBe('Optional comforts while the night passes.');
     expect(nightHint({ ...night, player: { ...night.player, x: 5, y: 25 } })).toBe('Return to the camp circle for a quiet evening.');
   });
@@ -93,9 +94,16 @@ describe('forecast panel', () => {
     expect(forecastView(game({ structures: { shelter: true } })).shelter).toBe('✓ Shelter ready');
   });
 
+  it('asks for enough logs for a longer retry night', () => {
+    // The day-9 night lasts 94 s, which burns 188 s of fuel at double rate: two logs (180 s) are not enough.
+    const retry = game({}, { day: 7 });
+    retry.progress.nextStormDay = 9;
+    expect(forecastView(retry).copy).toBe('Build a shelter and bring three logs to camp before nightfall on day 9.');
+  });
+
   it('calls the survivor home while the front is here', () => {
     const day = createGame().progress.nextStormDay!;
-    expect(forecastView(game({}, { day, timeOfDay: BALANCE.nightStart + 1 })))
+    expect(forecastView(game({}, { day, timeOfDay: nightStart(day) + 1 })))
       .toMatchObject({ active: true, title: 'The cold front is here', copy: 'Stay at camp and keep the fire alive until dawn.' });
   });
 

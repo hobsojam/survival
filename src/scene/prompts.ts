@@ -1,3 +1,4 @@
+import { nightStart } from '../game/calendar';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceKind, type SiteId, type TreeNode } from '../game/state';
 import { isAtCamp, sleepBlocker, type GameAction } from '../game/rules';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
@@ -112,7 +113,7 @@ function campPrompt(state: GameState): string {
   if (pathOpen(state) && within(state, CAMP_EXIT)) return 'Walk west to leave camp';
   if (!isAtCamp(state)) return 'WASD / arrows  Move';
   if (!sleepBlocker(state)) return 'At camp · C Cook · G Stargaze · Z Sleep · F Fire';
-  if (state.timeOfDay >= BALANCE.nightStart) return 'At camp · C Cook · G Stargaze · F Fire · R Rest';
+  if (state.timeOfDay >= nightStart(state.day)) return 'At camp · C Cook · G Stargaze · F Fire · R Rest';
   return 'At camp · F Fire · R Rest · Click an upgrade to build';
 }
 

@@ -1,4 +1,5 @@
 import { BALANCE, type GameState, type ResourceNode } from '../game/state';
+import { season } from '../game/calendar';
 import { QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 import { campCircleTile, pathTile, terrainSprites } from '../art/terrain';
 import { CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_OPEN_PATHS, CAMP_PATHS, pathDistance, type PathRoute } from './mapGeometry';
@@ -12,6 +13,11 @@ export type TerrainKey = 'camp' | 'camp-open' | 'quarry';
 export function terrainKey(state: GameState): TerrainKey {
   if (state.area === 'quarry') return 'quarry';
   return pathOpen(state) ? 'camp-open' : 'camp';
+}
+
+/** The terrain the scene has drawn: it is redrawn when the area, the west path or the season changes. */
+export function shownTerrainKey(state: GameState): string {
+  return `${terrainKey(state)}-${season(state.day)}`;
 }
 
 const ROUTES: Record<Exclude<TerrainKey, 'quarry'>, readonly PathRoute[]> = { camp: CAMP_PATHS, 'camp-open': CAMP_OPEN_PATHS };

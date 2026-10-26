@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { nightStart } from '../src/game/calendar';
 import { BALANCE, LOOKOUT, createGame, type GameState } from '../src/game/state';
 import { QUARRY_SITE } from '../src/game/areas';
 import { advanceTime, applyAction, buildStatus } from '../src/game/rules';
@@ -91,7 +92,7 @@ describe('hungry recovery', () => {
   it('halves sleep and stops it above 50, even in a bed', () => {
     const night = (energy: number, bed: boolean) => {
       const state = camp(energy, 20);
-      state.timeOfDay = BALANCE.nightStart + 10;
+      state.timeOfDay = nightStart(1) + 10;
       state.structures = { ...state.structures, shelter: true, bed };
       return state;
     };
@@ -101,7 +102,7 @@ describe('hungry recovery', () => {
   });
 
   it('halves stargazing', () => {
-    const state = { ...camp(40, 20), timeOfDay: BALANCE.nightStart + 10, fireFuel: 60 };
+    const state = { ...camp(40, 20), timeOfDay: nightStart(1) + 10, fireFuel: 60 };
     expect(applyAction(state, { type: 'stargaze' }).state.player.energy).toBe(40 + BALANCE.stargazeEnergyGain / 2);
   });
 });

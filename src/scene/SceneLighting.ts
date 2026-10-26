@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { GameState } from '../game/state';
 import { BALANCE } from '../game/state';
 import { FIREFLY_HOMES, fireflyGlow, fireflyOffset } from './ambient';
+import { firefliesOut } from '../game/calendar';
 import { worldX, worldY } from './art';
 import { fireGlow, lightMaskPixels, lightScreenPosition, lightingTint, type LightRadii } from './lighting';
 import { NIGHT_DEPTH } from './visuals';
@@ -34,8 +35,8 @@ export class SceneLighting {
       const position = lightScreenPosition(worldX(BALANCE.campX), worldY(BALANCE.campY), camera.scrollX, camera.scrollY);
       this.layer.erase(this.mask(radii), position.x, position.y);
     }
-    // Fireflies live at camp, so the quarry area has none.
-    if (state.area === 'camp') FIREFLY_HOMES.forEach((home, index) => {
+    // Fireflies live at camp and only come out in summer.
+    if (state.area === 'camp' && firefliesOut(state.day)) FIREFLY_HOMES.forEach((home, index) => {
       const glow = fireflyGlow(index, timeMs, tint.alpha / 0.55);
       if (glow < 0.08) return;
       const offset = fireflyOffset(index, timeMs);

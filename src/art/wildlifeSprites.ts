@@ -97,6 +97,11 @@ const fireflySprite = define(3, 3, { a: 'fire4', b: 'firefly' }, {
   glow1: g => { dot(g, 1, 1, 'b'); dot(g, 1, 0, 'a'); dot(g, 1, 2, 'a'); dot(g, 0, 1, 'a'); dot(g, 2, 1, 'a'); }
 }, [1, 1], { glow: { frames: ['glow0', 'glow1'], frameRate: 2, repeat: -1 } });
 
+const leafSprite = define(3, 3, { a: 'crown2', b: 'crown3', c: 'crown4' }, {
+  fall0: g => { dot(g, 0, 0, 'b'); dot(g, 1, 1, 'c'); dot(g, 2, 2, 'a'); },
+  fall1: g => { dot(g, 0, 1, 'a'); dot(g, 1, 1, 'b'); dot(g, 2, 1, 'c'); }
+}, [1, 1]);
+
 const eyesSprite = define(7, 3, { a: 'fire4', b: 'firefly' }, {
   open: g => { box(g, 0, 1, 2, 1, 'b'); box(g, 5, 1, 2, 1, 'b'); dot(g, 0, 0, 'a'); dot(g, 5, 0, 'a'); dot(g, 1, 2, 'a'); dot(g, 6, 2, 'a'); },
   blink: g => { box(g, 0, 1, 2, 1, 'a'); box(g, 5, 1, 2, 1, 'a'); }
@@ -144,6 +149,6 @@ for (let variant = 0; variant < 3; variant++) frostPainters[`frost${variant}`] =
 const morningFrost = define(16, 16, frostLegend, frostPainters, [8, 15]);
 
 export const wildlifeSprites: Record<string, SpriteDef> = {
-  bird: birdSprite, fox: foxSprite, firefly: fireflySprite, eyes: eyesSprite, gatherPop, smokePuff, spark,
+  bird: birdSprite, fox: foxSprite, firefly: fireflySprite, leaf: leafSprite, eyes: eyesSprite, gatherPop, smokePuff, spark,
   windStreak, sleetFleck, cookSteam, shootingStar, morningFrost
 };

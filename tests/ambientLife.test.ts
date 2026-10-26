@@ -72,15 +72,48 @@ describe('ambient bird foraging', () => {
 
 describe('ambient life by area', () => {
   it('hides the birds, the fox and the fireflies in the quarry area', () => {
-    const { scene, images } = sceneWithImages();
+    const { scene, images, of } = sceneWithImages();
     const life = new AmbientLife(scene as never);
     const state = createGame();
-    state.day = 2;
-    state.timeOfDay = 200;
+    // A summer night, when the fireflies are out.
+    state.day = 32;
+    state.timeOfDay = 220;
     life.update(state, 0.1, 0);
     expect(images.some(image => image.visible)).toBe(true);
     life.update({ ...state, area: 'quarry' }, 0.1, 100);
     expect(images.filter(image => image.kind !== 'eyes' && image.visible)).toEqual([]);
+    life.update({ ...state, area: 'quarry', day: 2, timeOfDay: 60 }, 0.1, 1000);
+    expect(of('leaf').filter(image => image.visible)).toEqual([]);
+  });
+});
+
+describe('seasonal life at camp', () => {
+  const glowing = (day: number) => {
+    const { scene, of } = sceneWithImages();
+    const life = new AmbientLife(scene as never);
+    const state = { ...createGame(), day, timeOfDay: 230 };
+    let seen = 0;
+    for (let t = 0; t < 4000; t += 250) { life.update(state, 0.25, t); seen += of('firefly').filter(image => image.visible).length; }
+    return seen;
+  };
+
+  it('brings out the fireflies on summer nights only', () => {
+    expect(glowing(31)).toBeGreaterThan(0);
+    expect(glowing(1)).toBe(0);
+    expect(glowing(21)).toBe(0);
+  });
+
+  it('lets leaves fall on autumn days only', () => {
+    const falling = (day: number) => {
+      const { scene, of } = sceneWithImages();
+      const life = new AmbientLife(scene as never);
+      const state = { ...createGame(), day, timeOfDay: 60 };
+      let seen = 0;
+      for (let t = 0; t < 9000; t += 500) { life.update(state, 0.5, t); seen += of('leaf').filter(image => image.visible).length; }
+      return seen;
+    };
+    expect(falling(1)).toBeGreaterThan(0);
+    expect(falling(11)).toBe(0);
   });
 });
 

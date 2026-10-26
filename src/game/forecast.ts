@@ -1,3 +1,4 @@
+import { nightStart } from './calendar';
 import { BALANCE, type GameState } from './state';
 import { isColdNight } from './rules';
 
@@ -10,6 +11,11 @@ export interface StormReadiness {
   /** Logs still to find, beyond those already carried. */
   logsShort: number;
   storm: boolean;
+}
+
+/** Plain logs that last the cold front's whole night on that day at double burn. Nights lengthen toward winter. */
+export function logsForColdNight(day: number): number {
+  return Math.ceil((BALANCE.daySeconds - nightStart(day)) * BALANCE.coldNightFireBurn / BALANCE.fireSecondsPerWood);
 }
 
 export const secondsPerLog = (state: GameState) =>
@@ -27,9 +33,9 @@ export function stormReadiness(state: GameState): StormReadiness {
     needed = Math.ceil((BALANCE.daySeconds - state.timeOfDay) * BALANCE.coldNightFireBurn);
   } else {
     // The fire burns one second per second until nightfall; before the storm day it will be long out.
-    const left = state.day === state.progress.nextStormDay ? Math.max(0, state.fireFuel - (BALANCE.nightStart - state.timeOfDay)) : 0;
+    const left = state.day === state.progress.nextStormDay ? Math.max(0, state.fireFuel - (nightStart(state.day) - state.timeOfDay)) : 0;
     fuel = left;
-    needed = (BALANCE.daySeconds - BALANCE.nightStart) * BALANCE.coldNightFireBurn;
+    needed = (BALANCE.daySeconds - nightStart(state.progress.nextStormDay ?? state.day)) * BALANCE.coldNightFireBurn;
   }
   const ready = fuel > needed;
   const reach = fuel + carried;

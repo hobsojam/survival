@@ -156,6 +156,7 @@ for (let i = 0; i < 2; i++) addDecal(`rimStone${i}`, g => {
 }, 14, 12);
 
 const treeLegend = { a: 'leaf0', b: 'leaf1', c: 'leaf2', d: 'leaf3', e: 'leaf4', f: 'wood0', g: 'wood1', h: 'wood2', i: 'wood3', s: 'shadow' } as const;
+const crownLegend = { ...treeLegend, a: 'crown0', b: 'crown1', c: 'crown2', d: 'crown3', e: 'crown4' } as const;
 function tree(name: string, w: number, h: number, shape: 'broad' | 'pine' | 'young'): void {
   const g = blank(w, h), cx = Math.floor(w / 2);
   ellipse(g, cx + 1, h - 3, w * .32, 2, 's');
@@ -179,7 +180,7 @@ function tree(name: string, w: number, h: number, shape: 'broad' | 'pine' | 'you
     const x = 3 + (i * 11) % (w - 6), y = 6 + (i * 13) % Math.floor(h * .55);
     if (g[y][x] === 'c' || g[y][x] === 'd') dot(g, x, y, 'e');
   }
-  terrainSprites[name] = sprite(g, treeLegend, [cx, h - 3]);
+  terrainSprites[name] = sprite(g, shape === 'pine' ? treeLegend : crownLegend, [cx, h - 3]);
 }
 tree('treeBroadleaf', 32, 48, 'broad');
 tree('treePine', 32, 48, 'pine');

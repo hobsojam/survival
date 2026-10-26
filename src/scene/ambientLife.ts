@@ -3,9 +3,10 @@ import type { GameState } from '../game/state';
 import { worldX, worldY } from './art';
 import { LIGHT_DEPTH } from './visuals';
 import { sprites } from '../art/sprites';
+import { firefliesOut, leavesFalling } from '../game/calendar';
 import {
   BIRD_HOMES, EYE_SPOTS, FIREFLY_HOMES, FOX, birdForageTarget, birdMayReturn, birdShouldLeave, birdGroundFrame, birdFlightFrame,
-  darkness, eyesAt, fireflyFrame, fireflyGlow, fireflyOffset, foxAt, foxFrame, type Point
+  LEAF_HOMES, darkness, eyesAt, fireflyFrame, fireflyGlow, fireflyOffset, foxAt, foxFrame, leafAt, type Point
 } from './ambient';
 
 type BirdFlightKind = 'flee' | 'return' | 'forage' | 'home';
@@ -55,6 +56,7 @@ export class AmbientLife {
   private readonly birds: Bird[];
   private readonly fox: Phaser.GameObjects.Image;
   private readonly fireflies: Phaser.GameObjects.Image[];
+  private readonly leaves: Phaser.GameObjects.Image[];
   private readonly eyes: Phaser.GameObjects.Image[];
   private foxRun: Motion | null = null;
   private foxFledDay = 0;
@@ -68,6 +70,7 @@ export class AmbientLife {
     }));
     this.fox = sprite(scene, 'fox', 'trot0');
     this.fireflies = FIREFLY_HOMES.map(() => sprite(scene, 'firefly', 'glow0', LIGHT_DEPTH));
+    this.leaves = LEAF_HOMES.map(() => sprite(scene, 'leaf', 'fall0'));
     this.eyes = EYE_SPOTS.map(() => sprite(scene, 'eyes', 'open', LIGHT_DEPTH));
   }
 
@@ -77,13 +80,15 @@ export class AmbientLife {
     if (state.area === 'quarry') this.updateEyes(dark, state, timeMs);
     else for (const image of this.eyes) image.setVisible(false);
     if (state.area !== 'camp') {
-      for (const image of [...this.birds.map(bird => bird.image), this.fox, ...this.fireflies]) image.setVisible(false);
+      for (const image of [...this.birds.map(bird => bird.image), this.fox, ...this.fireflies, ...this.leaves]) image.setVisible(false);
       return;
     }
     if (!this.started) this.start(dark, timeMs);
     for (const bird of this.birds) this.updateBird(bird, state, dark, seconds, timeMs);
     this.updateFox(state, seconds, timeMs);
-    this.updateFireflies(dark, timeMs);
+    // Fireflies are a summer-night sight, and leaves fall on autumn days.
+    this.updateFireflies(firefliesOut(state.day) ? dark : 0, timeMs);
+    this.updateLeaves(state, dark, timeMs);
   }
 
   /** Staggers the birds' first forage, and sends them away if camp opens after dark. */
@@ -199,6 +204,19 @@ export class AmbientLife {
       if (!eyes) { image.setVisible(false); return; }
       image.setTexture(`eyes:${eyes.frame}`).setPosition(Math.round(worldX(eyes.x)), Math.round(worldY(eyes.y)))
         .setAlpha(eyes.alpha).setVisible(true);
+    });
+  }
+
+  private updateLeaves(state: GameState, dark: number, timeMs: number): void {
+    const falling = leavesFalling(state.day) && dark < 0.3;
+    LEAF_HOMES.forEach((home, index) => {
+      const image = this.leaves[index];
+      const tree = state.trees.find(each => each.id === home.treeId);
+      const leaf = falling && tree && tree.readyDay <= state.day ? leafAt(index, timeMs) : null;
+      if (!leaf) { image.setVisible(false); return; }
+      this.show(image, leaf.x, leaf.y, leaf.frame, 1, leaf.alpha);
+      // Drawn in front of the crown it falls from.
+      image.setDepth(Math.round(worldY(home.y + 2)));
     });
   }
 
