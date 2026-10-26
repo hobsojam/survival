@@ -1,4 +1,4 @@
-import { nightStart } from './calendar';
+import { isWinter, nightStart } from './calendar';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } from './areas';
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, type GameState, type SiteId, type StructureId } from './state';
@@ -87,6 +87,11 @@ export function isColdNight(state: GameState): boolean {
   return state.progress.nextStormDay === state.day && state.timeOfDay >= nightStart(state.day);
 }
 
+/** The forecast front's night, or any winter night: the fire burns fast and the cold bites. */
+export function isFreezingNight(state: GameState): boolean {
+  return isColdNight(state) || (isWinter(state.day) && state.timeOfDay >= nightStart(state.day));
+}
+
 export function movementFactor(state: GameState): number {
   const { energy, hunger, warmth } = state.player;
   return isLowMeter(energy) || isLowMeter(hunger) || isLowMeter(warmth) ? 0.65 : 1;
@@ -155,7 +160,7 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
   while (remaining > 0.000001) {
     const step = Math.min(remaining, 1, BALANCE.daySeconds - next.timeOfDay);
     const camp = isAtCamp(next);
-    const coldNight = isColdNight(next);
+    const coldNight = isFreezingNight(next);
     const drain = (activity === 'awake' ? BALANCE.energyDrainPerSecond : 0) + (next.player.hunger <= 0 ? BALANCE.starvingEnergyDrainPerSecond : 0);
     next.player.hunger = Math.max(0, next.player.hunger - step / 8);
     next.player.energy = Math.max(0, next.player.energy - step * drain);

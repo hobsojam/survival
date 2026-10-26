@@ -1,6 +1,6 @@
 import { nightStart } from '../game/calendar';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceNode } from '../game/state';
-import { isColdNight } from '../game/rules';
+import { isFreezingNight } from '../game/rules';
 import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 
@@ -103,7 +103,7 @@ function addCamp(state: GameState, add: AddVisual): void {
 
 function fireMode(state: GameState): string {
   if (state.fireFuel <= 0) return 'unlit';
-  const storm = isColdNight(state);
+  const storm = isFreezingNight(state);
   const low = state.fireFuel < 30;
   if (storm) return low ? 'lowWindy' : 'windy';
   return low ? 'low' : 'burning';

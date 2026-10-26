@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, createGame } from '../src/game/state';
+import { nightStart } from '../src/game/calendar';
 import { sceneVisuals, playerVisualDepth, GROUND_DECAL_DEPTH, NIGHT_DEPTH, LIGHT_DEPTH, WEATHER_DEPTH } from '../src/scene/visuals';
 import { sprites } from '../src/art/sprites';
 import { QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
@@ -99,6 +100,18 @@ describe('native-size scene art', () => {
     expect(sceneVisuals(state, 180).map(item => item.texture)).toContain('hearth:lowWindy1');
     expect(sceneVisuals(state, 180).map(item => item.texture)).toContain('hearthFlame:lowWindy1');
     expect(sceneVisuals(state, 180).map(item => item.texture)).not.toContain('hearthSite:still');
+  });
+
+  it('blows the fire about on winter nights, but not on autumn nights', () => {
+    const state = createGame();
+    state.progress = { ...state.progress, hearthUnlocked: true, nextStormDay: null };
+    state.fireFuel = 60;
+    state.day = 12;
+    state.timeOfDay = nightStart(12) + 5;
+    expect(sceneVisuals(state, 0).map(item => item.texture)).toContain('firePit:windy0');
+    state.day = 8;
+    state.timeOfDay = nightStart(8) + 5;
+    expect(sceneVisuals(state, 0).map(item => item.texture)).toContain('firePit:burning0');
   });
 
   it('draws loose piles by count', () => {

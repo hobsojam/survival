@@ -107,6 +107,27 @@ describe('forecast panel', () => {
       .toMatchObject({ active: true, title: 'The cold front is here', copy: 'Stay at camp and keep the fire alive until dawn.' });
   });
 
+  it('warns of winter nights once the front is weathered', () => {
+    const winter = game({ progress: afterColdNight }, { day: 12 });
+    // nightStart(12) is 136, so the night needs (240 - 136) × 2 = 208 s of fire.
+    expect(forecastView(winter)).toEqual({ active: false, weathered: false, title: 'Winter nights',
+      copy: 'Winter nights are bitter. Keep the fire alive until dawn, or the wolves will come close.',
+      shelter: '○ Shelter needed', fire: '○ Fire: 0 / 208s for the night · 3 more logs' });
+    expect(forecastView({ ...winter, timeOfDay: nightStart(12) + 1 })).toMatchObject({ active: true, title: 'A bitter night' });
+  });
+
+  it('counts a fire lit on a winter afternoon toward tonight', () => {
+    const afternoon = game({ progress: afterColdNight, inventory: { wood: 2 } }, { day: 12, timeOfDay: 100, fireFuel: 100 });
+    // 100 s of fuel less the 36 s until nightfall leaves 64 s; two carried logs reach past 208 s.
+    expect(forecastView(afternoon).fire).toBe('○ Fire: 64 / 208s for the night · add carried wood at nightfall');
+  });
+
+  it('keeps the cold front card while a front is still pending in winter', () => {
+    const pending = game({}, { day: 12 });
+    pending.progress.nextStormDay = 12;
+    expect(forecastView(pending).title).toBe('Cold front · day 12 night');
+  });
+
   it('marks the front as weathered', () => {
     expect(forecastView(game({ progress: afterColdNight }))).toEqual({ active: false, weathered: true,
       title: 'The cold night is behind you', copy: 'You kept your camp warm through dawn. The stone hearth is ready to build.',

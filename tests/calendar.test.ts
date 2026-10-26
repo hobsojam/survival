@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  afternoonStart, daysLeftInSeason, firefliesOut, leavesFalling, nightStart, season, seasonMessage, seasonName
+  afternoonStart, daysLeftInSeason, firefliesOut, isWinter, leavesFalling, nightStart, season, seasonMessage, seasonName
 } from '../src/game/calendar';
 
 describe('the seasonal calendar', () => {
@@ -41,5 +41,9 @@ describe('the seasonal calendar', () => {
   it('brings out fireflies in summer and falling leaves in autumn', () => {
     expect([31, 40, 1, 11, 21].map(firefliesOut)).toEqual([true, true, false, false, false]);
     expect([1, 11, 31].map(leavesFalling)).toEqual([true, false, false]);
+  });
+
+  it('treats the second year\'s winter as winter', () => {
+    expect([10, 11, 20, 21, 51].map(isWinter)).toEqual([false, true, true, false, true]);
   });
 });
