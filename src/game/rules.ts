@@ -1,3 +1,4 @@
+import { nightStart } from './calendar';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } from './areas';
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, type GameState, type SiteId, type StructureId } from './state';
@@ -83,7 +84,7 @@ export function lookoutRepairBlocker(state: GameState): string | null {
 }
 
 export function isColdNight(state: GameState): boolean {
-  return state.progress.nextStormDay === state.day && state.timeOfDay >= BALANCE.nightStart;
+  return state.progress.nextStormDay === state.day && state.timeOfDay >= nightStart(state.day);
 }
 
 export function movementFactor(state: GameState): number {
@@ -93,7 +94,7 @@ export function movementFactor(state: GameState): number {
 
 /** Why the survivor can't sleep right now, or null if they can. */
 export function sleepBlocker(state: GameState): string | null {
-  if (state.timeOfDay < BALANCE.nightStart) return 'You can sleep once night falls. Rest (R) for a short break.';
+  if (state.timeOfDay < nightStart(state.day)) return 'You can sleep once night falls. Rest (R) for a short break.';
   if (!isAtCamp(state)) return 'Return to the marked camp area to sleep.';
   if (!state.structures.shelter) return 'Build a shelter to sleep through the night.';
   return null;
@@ -101,7 +102,7 @@ export function sleepBlocker(state: GameState): string | null {
 
 /** Why the survivor can't cook right now, or null if they can. */
 export function cookBlocker(state: GameState): string | null {
-  if (state.timeOfDay < BALANCE.nightStart) return 'Cook berries after nightfall.';
+  if (state.timeOfDay < nightStart(state.day)) return 'Cook berries after nightfall.';
   if (!isAtCamp(state)) return 'Return to camp to cook.';
   if (state.fireFuel <= 0) return 'Light the campfire before cooking.';
   if (state.inventory.food <= 0) return 'Gather a berry to cook.';
@@ -110,7 +111,7 @@ export function cookBlocker(state: GameState): string | null {
 
 /** Why the survivor can't watch the stars right now, or null if they can. */
 export function stargazeBlocker(state: GameState): string | null {
-  if (state.timeOfDay < BALANCE.nightStart) return 'Wait until nightfall to watch the stars.';
+  if (state.timeOfDay < nightStart(state.day)) return 'Wait until nightfall to watch the stars.';
   if (!isAtCamp(state)) return 'Return to camp to watch the stars.';
   return null;
 }
@@ -169,7 +170,7 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
 
 /** How much warmth one step of time adds or takes, read before the step's fire burn. */
 function warmthChange(state: GameState, step: number, camp: boolean, coldNight: boolean): number {
-  if (state.timeOfDay < BALANCE.nightStart) return step / 10;
+  if (state.timeOfDay < nightStart(state.day)) return step / 10;
   const lit = state.fireFuel > 0;
   if (camp && lit) return step / 2;
   let change = -step / 2;

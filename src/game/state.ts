@@ -80,8 +80,6 @@ export const BALANCE = {
   campX: 20,
   campY: 15,
   daySeconds: 240,
-  afternoonStart: 110,
-  nightStart: 160,
   baseCapacity: 8,
   crateCapacity: 16,
   gatherEnergyCost: 4,

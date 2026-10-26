@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame } from '../src/game/state';
 import { buildStatus, cookBlocker, pickaxeBlocker, stargazeBlocker } from '../src/game/rules';
 
@@ -37,7 +38,7 @@ describe('after-dark actions', () => {
     const state = createGame();
     expect(cookBlocker(state)).toMatch(/nightfall/);
     expect(stargazeBlocker(state)).toMatch(/nightfall/);
-    state.timeOfDay = BALANCE.nightStart;
+    state.timeOfDay = nightStart(1);
     expect(stargazeBlocker(state)).toBeNull();
     state.fireFuel = 0;
     expect(cookBlocker(state)).toMatch(/campfire/);

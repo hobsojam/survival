@@ -1,4 +1,5 @@
 import { BALANCE, type ResourceNode } from '../game/state';
+import { nightStart } from '../game/calendar';
 
 // Ambient life is decoration only: it reads game state but never changes or saves it.
 // Positions are in tiles, like the game state.
@@ -13,14 +14,13 @@ const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 
 /** 0 in daylight, 1 in deep night; eases in after nightfall and out after dawn. */
 export function darkness(day: number, timeOfDay: number): number {
-  if (timeOfDay >= BALANCE.nightStart) return Math.min(1, (timeOfDay - BALANCE.nightStart) / 30);
+  const night = nightStart(day);
+  if (timeOfDay >= night) return Math.min(1, (timeOfDay - night) / 30);
   if (day > 1 && timeOfDay < 25) return 1 - timeOfDay / 25;
   return 0;
 }
 
 export const FOX = {
-  arrive: BALANCE.nightStart - 20,
-  leave: BALANCE.nightStart + 50,
   travel: 12,
   den: { x: 26, y: -1 },
   seat: { x: 20.8, y: 11.6 },
@@ -32,10 +32,17 @@ export interface FoxPose extends Point { sitting: boolean; facing: 1 | -1 }
 /** The fox comes by on the first evening, then on roughly two evenings in three. */
 export const foxVisits = (day: number) => day === 1 || hash(day) < 0.65;
 
+/** The fox arrives 20 s before that evening's nightfall and leaves 50 s after it. */
+export function foxWindow(day: number): { arrive: number; leave: number } {
+  const night = nightStart(day);
+  return { arrive: night - 20, leave: night + 50 };
+}
+
 export function foxAt(day: number, timeOfDay: number): FoxPose | null {
-  if (!foxVisits(day) || timeOfDay < FOX.arrive || timeOfDay > FOX.leave) return null;
-  const progress = Math.min(1, (timeOfDay - FOX.arrive) / FOX.travel, (FOX.leave - timeOfDay) / FOX.travel);
-  const leaving = timeOfDay - FOX.arrive > FOX.leave - timeOfDay;
+  const { arrive, leave } = foxWindow(day);
+  if (!foxVisits(day) || timeOfDay < arrive || timeOfDay > leave) return null;
+  const progress = Math.min(1, (timeOfDay - arrive) / FOX.travel, (leave - timeOfDay) / FOX.travel);
+  const leaving = timeOfDay - arrive > leave - timeOfDay;
   const sitting = progress >= 1;
   // Sitting, the fox faces the fire; walking, it faces where it's going.
   let heading: number;

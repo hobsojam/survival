@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { Soundscape } from '../src/game/soundscape';
 
@@ -61,7 +62,7 @@ function world(changes: Partial<GameState> = {}): GameState {
   return { ...state, player: { ...state.player, x: BALANCE.campX, y: BALANCE.campY }, fireFuel: 30, ...changes };
 }
 
-const night = BALANCE.nightStart + 10;
+const night = nightStart(1) + 10;
 
 describe('the soundscape', () => {
   it('starts the audio at the master volume, or silent when muted last time', () => {

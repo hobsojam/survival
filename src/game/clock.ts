@@ -1,16 +1,18 @@
 import { BALANCE } from './state';
+import { afternoonStart, nightStart } from './calendar';
 
 export type DayPhase = 'Morning' | 'Afternoon' | 'Night';
 
-export function dayPhase(timeOfDay: number): DayPhase {
-  if (timeOfDay >= BALANCE.nightStart) return 'Night';
-  return timeOfDay >= BALANCE.afternoonStart ? 'Afternoon' : 'Morning';
+export function dayPhase(timeOfDay: number, day: number): DayPhase {
+  if (timeOfDay >= nightStart(day)) return 'Night';
+  return timeOfDay >= afternoonStart(day) ? 'Afternoon' : 'Morning';
 }
 
 /** The next change of light and how many whole seconds until it. */
-export function nextChange(timeOfDay: number): { event: 'Night' | 'Dawn'; seconds: number } {
-  return timeOfDay < BALANCE.nightStart
-    ? { event: 'Night', seconds: Math.ceil(BALANCE.nightStart - timeOfDay) }
+export function nextChange(timeOfDay: number, day: number): { event: 'Night' | 'Dawn'; seconds: number } {
+  const night = nightStart(day);
+  return timeOfDay < night
+    ? { event: 'Night', seconds: Math.ceil(night - timeOfDay) }
     : { event: 'Dawn', seconds: Math.ceil(BALANCE.daySeconds - timeOfDay) };
 }
 

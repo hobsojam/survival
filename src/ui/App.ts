@@ -5,6 +5,7 @@ import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WID
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
 import { cookBlocker, isAtCamp, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { dayPhase, formatClock, nextChange } from '../game/clock';
+import { nightStart } from '../game/calendar';
 import { isLowMeter } from '../game/needs';
 import { gateTap, nextOpenTab, wireSidebarTabs, type DockTab } from './dock';
 import { createPause, wirePause, type PauseControl } from './pause';
@@ -54,7 +55,7 @@ export class App {
       <div class="shell">
         <header class="topbar">
           <div class="brand"><span class="brand-icon">✦</span><div><strong>Hearthwild</strong><small>A little place to begin again</small></div></div>
-          <div class="top-actions"><button type="button" id="sound-toggle" class="sound-toggle" aria-pressed="true" aria-label="Mute game sounds" title="Mute game sounds"><span aria-hidden="true">♫</span><span class="sound-toggle-label">Sound on</span></button><button type="button" id="pause-toggle" class="sound-toggle pause-toggle" aria-pressed="false" title="Pause the game (Esc)"><span class="pause-icon" aria-hidden="true">❚❚</span><span class="pause-label">Pause</span></button><span id="save-status" class="save-status">Local save</span><button id="restart-game" class="restart-button" hidden>New game</button><div class="day-pill" id="day-pill"><span id="day-label">Day 1 · Morning</span><span class="day-dial" aria-hidden="true"><span class="day-dial-night" style="left: ${BALANCE.nightStart / BALANCE.daySeconds * 100}%"></span><span id="day-dial-hand" class="day-dial-hand"></span></span><span id="day-countdown" class="day-countdown"></span></div></div>
+          <div class="top-actions"><button type="button" id="sound-toggle" class="sound-toggle" aria-pressed="true" aria-label="Mute game sounds" title="Mute game sounds"><span aria-hidden="true">♫</span><span class="sound-toggle-label">Sound on</span></button><button type="button" id="pause-toggle" class="sound-toggle pause-toggle" aria-pressed="false" title="Pause the game (Esc)"><span class="pause-icon" aria-hidden="true">❚❚</span><span class="pause-label">Pause</span></button><span id="save-status" class="save-status">Local save</span><button id="restart-game" class="restart-button" hidden>New game</button><div class="day-pill" id="day-pill"><span id="day-label">Day 1 · Morning</span><span class="day-dial" aria-hidden="true"><span id="day-dial-night" class="day-dial-night"></span><span id="day-dial-hand" class="day-dial-hand"></span></span><span id="day-countdown" class="day-countdown"></span></div></div>
         </header>
         <div class="layout">
           <main class="game-panel">
@@ -286,13 +287,15 @@ export class App {
 
   private renderClock(): void {
     const { timeOfDay } = this.state;
-    const phase = dayPhase(timeOfDay);
-    const change = nextChange(timeOfDay);
+    const phase = dayPhase(timeOfDay, this.state.day);
+    const change = nextChange(timeOfDay, this.state.day);
     this.setText('day-label', `Day ${this.state.day} · ${phase}`);
     this.setText('day-countdown', `${change.event} in ${formatClock(change.seconds)}`);
     this.root.querySelector('#day-pill')?.classList.toggle('night', phase === 'Night');
     const hand = this.root.querySelector<HTMLElement>('#day-dial-hand');
     if (hand) hand.style.left = `${timeOfDay / BALANCE.daySeconds * 100}%`;
+    const night = this.root.querySelector<HTMLElement>('#day-dial-night');
+    if (night) night.style.left = `${nightStart(this.state.day) / BALANCE.daySeconds * 100}%`;
     this.root.querySelector('#sleep-button')?.classList.toggle('ready', !sleepBlocker(this.state));
     this.root.querySelector('#dock-sleep')?.classList.toggle('ready', !sleepBlocker(this.state));
   }

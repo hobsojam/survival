@@ -1,5 +1,5 @@
+import { nightStart } from '../game/calendar';
 import type { GameState } from '../game/state';
-import { BALANCE } from '../game/state';
 import { isColdNight } from '../game/rules';
 import { palette } from '../art/palette';
 import { darkness } from './ambient';
@@ -22,11 +22,11 @@ export function lightingTint(state: GameState): LightingTint {
     };
     return { color: color(palette.dawn), alpha: 0.15 * (25 - time) / 12.5 };
   }
-  if (time >= BALANCE.nightStart) {
+  if (time >= nightStart(state.day)) {
     const storm = isColdNight(state);
     return { color: color(storm ? palette.storm : palette.night), alpha: darkness(state.day, time) * (storm ? 0.64 : 0.55) };
   }
-  const duskStart = BALANCE.nightStart - 30;
+  const duskStart = nightStart(state.day) - 30;
   const alpha = time > duskStart ? 0.12 * (time - duskStart) / 30 : 0;
   return { color: color(palette.dusk), alpha };
 }

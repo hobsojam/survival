@@ -1,25 +1,51 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE } from '../src/game/state';
+import { afternoonStart, nightStart } from '../src/game/calendar';
+import { BALANCE, createGame } from '../src/game/state';
+import { loadGame, saveGame } from '../src/game/save';
 import { dayPhase, formatClock, nextChange } from '../src/game/clock';
 
 describe('clock', () => {
   it('names the part of the day', () => {
-    expect(dayPhase(0)).toBe('Morning');
-    expect(dayPhase(BALANCE.afternoonStart)).toBe('Afternoon');
-    expect(dayPhase(BALANCE.nightStart)).toBe('Night');
-    expect(dayPhase(BALANCE.daySeconds - 1)).toBe('Night');
+    expect(dayPhase(0, 6)).toBe('Morning');
+    expect(dayPhase(afternoonStart(6), 6)).toBe('Afternoon');
+    expect(dayPhase(nightStart(6), 6)).toBe('Night');
+    expect(dayPhase(BALANCE.daySeconds - 1, 6)).toBe('Night');
   });
 
   it('counts down to nightfall by day and to dawn by night', () => {
-    expect(nextChange(0)).toEqual({ event: 'Night', seconds: BALANCE.nightStart });
-    expect(nextChange(100)).toEqual({ event: 'Night', seconds: BALANCE.nightStart - 100 });
-    expect(nextChange(BALANCE.nightStart)).toEqual({ event: 'Dawn', seconds: BALANCE.daySeconds - BALANCE.nightStart });
-    expect(nextChange(BALANCE.daySeconds - 0.4)).toEqual({ event: 'Dawn', seconds: 1 });
+    expect(nextChange(0, 6)).toEqual({ event: 'Night', seconds: nightStart(6) });
+    expect(nextChange(100, 6)).toEqual({ event: 'Night', seconds: nightStart(6) - 100 });
+    expect(nextChange(nightStart(6), 6)).toEqual({ event: 'Dawn', seconds: BALANCE.daySeconds - nightStart(6) });
+    expect(nextChange(BALANCE.daySeconds - 0.4, 6)).toEqual({ event: 'Dawn', seconds: 1 });
   });
 
   it('formats seconds as minutes and seconds', () => {
     expect(formatClock(160)).toBe('2:40');
     expect(formatClock(80)).toBe('1:20');
     expect(formatClock(5)).toBe('0:05');
+  });
+});
+
+describe('the clock through the year', () => {
+  it('names the part of the day from that day’s light', () => {
+    expect(dayPhase(135, 16)).toBe('Night');
+    expect(dayPhase(135, 36)).toBe('Afternoon');
+    expect(dayPhase(100, 36)).toBe('Morning');
+  });
+
+  it('counts down to that day’s nightfall and dawn', () => {
+    expect(nextChange(0, 36)).toEqual({ event: 'Night', seconds: 190 });
+    expect(nextChange(130, 16)).toEqual({ event: 'Dawn', seconds: 110 });
+  });
+
+  it('reads a winter save from mid-evening as night', () => {
+    const fresh = createGame();
+    const state = { ...fresh, day: 16, timeOfDay: 135, progress: { ...fresh.progress, nextStormDay: 18 } };
+    const saved = new Map<string, string>();
+    const storage = { getItem: (key: string) => saved.get(key) ?? null, setItem: (key: string, value: string) => { saved.set(key, value); } } as Storage;
+    saveGame(storage, state);
+    const loaded = loadGame(storage);
+    expect(loaded.kind).toBe('loaded');
+    if (loaded.kind === 'loaded') expect(dayPhase(loaded.state.timeOfDay, loaded.state.day)).toBe('Night');
   });
 });

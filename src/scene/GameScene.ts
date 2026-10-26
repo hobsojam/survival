@@ -7,6 +7,7 @@ import { sceneVisuals, playerVisualDepth, WEATHER_DEPTH } from './visuals';
 import { sprites } from '../art/sprites';
 import { AmbientLife } from './ambientLife';
 import { registerSpriteTextures } from '../art/textures';
+import { seasonMessage } from '../game/calendar';
 import { LOGICAL_WIDTH, LOGICAL_HEIGHT } from './pixelScale';
 import { facingFromInput, selectSurvivorVisual, type Facing, type SurvivorAction } from './survivorVisual';
 import { SceneEffects } from './SceneEffects';
@@ -287,7 +288,7 @@ export class GameScene extends Phaser.Scene {
 
   private reportWeather(before: GameState, after: GameState): void {
     this.showMorningFrost(before, after);
-    this.say(this.weatherMessage(before, after), this.needsAlert());
+    this.say(this.weatherMessage(before, after), seasonMessage(before.day, after.day), this.needsAlert());
   }
 
   /** The tired or hungry warning due now, if a meter just reached its line. */

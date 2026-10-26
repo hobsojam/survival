@@ -1,3 +1,4 @@
+import { nightStart } from '../game/calendar';
 import { BALANCE, BUILDINGS, SITES, type GameState, type SiteId, type StructureId } from '../game/state';
 import { workSeconds } from '../game/needs';
 import { axeBlocker, bagCapacity, buildStatus, carriedCount, isAtCamp, isColdNight, lookoutRepairBlocker, pickaxeBlocker, trailFoodBlocker } from '../game/rules';
@@ -52,7 +53,7 @@ export function sitesFound(state: GameState): string {
 }
 
 export function nightHint(state: GameState): string {
-  if (state.timeOfDay < BALANCE.nightStart) return 'These small moments are waiting for nightfall.';
+  if (state.timeOfDay < nightStart(state.day)) return 'These small moments are waiting for nightfall.';
   if (!isAtCamp(state)) return 'Return to the camp circle for a quiet evening.';
   return 'Optional comforts while the night passes.';
 }

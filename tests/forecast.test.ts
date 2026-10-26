@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { forecastFireCheck, stormReadiness } from '../src/game/forecast';
 
-const NIGHT_NEED = (BALANCE.daySeconds - BALANCE.nightStart) * BALANCE.coldNightFireBurn;
+const NIGHT_NEED = (BALANCE.daySeconds - nightStart(3)) * BALANCE.coldNightFireBurn;
 
 function stormDay(timeOfDay: number): GameState {
   const state = createGame();
@@ -16,7 +17,7 @@ describe('stormReadiness', () => {
     const state = stormDay(100);
     state.fireFuel = 170;
     const readiness = stormReadiness(state);
-    expect(readiness.fuel).toBe(170 - (BALANCE.nightStart - 100));
+    expect(readiness.fuel).toBe(170 - (nightStart(3) - 100));
     expect(readiness.needed).toBe(NIGHT_NEED);
     expect(readiness.ready).toBe(false);
     expect(forecastFireCheck(state)).toMatch(/^○/);
@@ -55,6 +56,15 @@ describe('stormReadiness', () => {
     state.structures.hearth = true;
     state.inventory.wood = 1;
     expect(stormReadiness(state).fuel).toBe(0);
-    expect(stormReadiness(state).logsShort).toBe(1);
+    // One hearth log (150 s) covers day three's 132 s of double burn; a plain log does not.
+    expect(stormReadiness(state).logsShort).toBe(0);
+    state.structures.hearth = false;
+    expect(stormReadiness(state).logsShort).toBeGreaterThan(0);
+  });
+});
+
+describe('the forecast with the autumn day length', () => {
+  it('needs enough fire for day three’s night, which starts at 174', () => {
+    expect(stormReadiness(stormDay(100)).needed).toBe((240 - 174) * 2);
   });
 });
