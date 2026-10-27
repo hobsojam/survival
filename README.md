@@ -72,7 +72,7 @@ Spring is wet and green. On about one spring day in three a **shower** passes th
 
 ### Summer
 
-Summer is the season of plenty. **Nights are warm**: your warmth doesn't fall anywhere after dark, so the fire is optional, though it still warms you and you still need it to cook. (If the autumn cold front is somehow still waiting, its night stays cold.) In the **midday heat**, from a minute into the day until a little past two minutes ten, you get hungry a quarter faster, and a message tells you when it starts. The bushes are heavy with fruit, so **each pick gives two berries**, or one if your bag has only one space left. Evenings glow gold for a little longer before night, fireflies come out after dark, and the birds and the fox are around as usual.
+Summer is the season of plenty. **Nights are warm**: your warmth doesn't fall anywhere after dark, so the fire is optional, though it still warms you and you still need it to cook. (If the autumn cold front is somehow still waiting, its night stays cold.) In the **midday heat**, from a minute into the day until two minutes ten, you get hungry a quarter faster, and a message tells you when it starts. The bushes are heavy with fruit, so **each pick gives two berries**, or one if your bag has only one space left. Evenings glow gold for a little longer before night, fireflies come out after dark, and the birds and the fox are around as usual.
 
 ### The cold night
 
