@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE, BUILDINGS, LOOKOUT, SITES, createGame } from '../src/game/state';
+import { BALANCE, BUILDINGS, LOOKOUT, SITES, createGame, type GameState } from '../src/game/state';
 import { QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { FULL_BAG_MESSAGE, advanceTime, isAtCamp, isColdNight, isFreezingNight, applyAction, buildStatus, carriedCount, freeSpaces, lookoutRepairBlocker, pickaxeBlocker, sleepBlocker } from '../src/game/rules';
 import { nightStart, seasonMessage } from '../src/game/calendar';
@@ -1361,5 +1361,67 @@ describe('spring growth', () => {
     expect(applyAction({ ...ready, day: 30 }, { type: 'chopTree', treeId: tree.id }).state.trees[0].readyDay).toBe(32);
     expect(applyAction({ ...ready, day: 8 }, { type: 'chopTree', treeId: tree.id }).state.trees[0].readyDay).toBe(11);
     expect(BALANCE.springTreeRegrowDays).toBe(2);
+  });
+});
+
+describe('summer', () => {
+  const base = createGame();
+  const bush = base.nodes.find(node => node.id === 'berry-0')!;
+  const night = (day: number, warmth: number, away: boolean, extra: Partial<GameState> = {}): GameState => ({
+    ...base, day, timeOfDay: nightStart(day) + 10, ...extra,
+    player: { ...base.player, warmth, ...(away ? { x: 5, y: 25 } : {}) }
+  });
+  const atBush = (day: number): GameState => ({ ...base, day, player: { ...base.player, x: bush.x, y: bush.y } });
+
+  it('keeps warmth steady on a summer night away from the fire', () => {
+    expect(advanceTime(night(34, 60, true), 20).player.warmth).toBeCloseTo(60);
+  });
+
+  it('still warms you by a lit fire on a summer night', () => {
+    expect(advanceTime(night(34, 60, false, { fireFuel: 50 }), 10).player.warmth).toBeCloseTo(65);
+  });
+
+  it('keeps the forecast cold front cold, even in summer', () => {
+    const front = night(33, 60, true, { progress: { ...base.progress, nextStormDay: 33 } });
+    expect(advanceTime(front, 10).player.warmth).toBeLessThan(60);
+  });
+
+  it('chills nights again once autumn returns', () => {
+    expect(advanceTime(night(41, 60, true), 10).player.warmth).toBeCloseTo(55);
+  });
+
+  it('sleeps through a summer night without getting colder', () => {
+    const state = night(34, 50, false, { structures: { ...base.structures, shelter: true } });
+    const woke = applyAction(state, { type: 'sleep' }).state;
+    expect(woke.day).toBe(35);
+    expect(woke.player.warmth).toBeGreaterThanOrEqual(50);
+  });
+
+  it('makes you hungry faster in the midday heat', () => {
+    const lost = (day: number, from: number, to: number) =>
+      100 - advanceTime({ ...base, day, timeOfDay: from }, to - from, 'resting').player.hunger;
+    expect(lost(34, 55, 65)).toBeCloseTo(5 / 8 + 5 * 1.25 / 8);
+    expect(lost(34, 130, 140)).toBeCloseTo(10 / 8);
+    expect(lost(24, 70, 80)).toBeCloseTo(10 / 8);
+  });
+
+  it('picks two berries from a summer bush', () => {
+    const result = applyAction(atBush(34), { type: 'gather', nodeId: 'berry-0' });
+    expect(result.state.inventory.food).toBe(base.inventory.food + 2);
+    expect(result.state.nodes.find(node => node.id === 'berry-0')!.amount).toBe(0);
+    expect(result.message).toBe('Picked two handfuls of berries.');
+  });
+
+  it('picks one berry when the bag has a single space', () => {
+    const state = atBush(34);
+    state.inventory = { ...state.inventory, wood: freeSpaces(state) - 1 + state.inventory.wood };
+    expect(freeSpaces(state)).toBe(1);
+    const result = applyAction(state, { type: 'gather', nodeId: 'berry-0' });
+    expect(result.state.inventory.food).toBe(state.inventory.food + 1);
+    expect(result.message).toBe('Picked berries.');
+  });
+
+  it('picks one berry in autumn', () => {
+    expect(applyAction(atBush(41), { type: 'gather', nodeId: 'berry-0' }).state.inventory.food).toBe(base.inventory.food + 1);
   });
 });

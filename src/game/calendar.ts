@@ -44,6 +44,7 @@ export function seasonMessage(beforeDay: number, afterDay: number): string | nul
 }
 
 export const isSpring = (day: number): boolean => season(day) === 'spring';
+export const isSummer = (day: number): boolean => season(day) === 'summer';
 export const isWinter = (day: number): boolean => season(day) === 'winter';
 export const firefliesOut = (day: number): boolean => season(day) === 'summer';
 export const leavesFalling = (day: number): boolean => season(day) === 'autumn';

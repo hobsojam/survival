@@ -139,6 +139,12 @@ export const BALANCE = {
   coldNightFireBurn: 2,
   /** A spring shower makes the fire burn this much faster. */
   rainFireBurn: 1.5,
+  /** Summer's midday heat: from this time of day until the end, hunger falls faster by the factor. */
+  summerHeatStart: 60,
+  summerHeatEnd: 130,
+  summerHeatHunger: 1.25,
+  /** Berries a summer bush gives with each gather. */
+  summerBerries: 2,
   coldNightShelteredWarmthLossPerSecond: 0.75,
   coldNightOutdoorWarmthLossPerSecond: 1.25,
   coldNightFailureEnergy: 25,
