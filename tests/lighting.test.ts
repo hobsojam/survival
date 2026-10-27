@@ -74,8 +74,8 @@ describe('lighting through the year', () => {
     // Night has fallen by 135 s in midwinter, and winter nights take the bitter tint.
     expect(lightingTint({ ...state, day: 16, timeOfDay: 135 }).color).toBe(rgb(palette.storm));
     const summer = lightingTint({ ...state, day: 36, timeOfDay: 165 });
-    expect(summer.color).toBe(rgb(palette.dusk));
-    expect(summer.alpha).toBeCloseTo(0.12 * 5 / 30);
+    expect(summer.color).toBe(rgb(palette.golden));
+    expect(summer.alpha).toBeCloseTo(0.16 * 20 / 45);
   });
 });
 
@@ -94,5 +94,21 @@ describe('rain tint', () => {
     const base = createGame();
     expect(lightingTint({ ...base, day: 22, timeOfDay: 40 })).toEqual({ color: rgb(palette.storm), alpha: 0.18 });
     expect(lightingTint({ ...base, day: 22, timeOfDay: 80 }).alpha).toBe(0);
+  });
+});
+
+describe('summer evenings', () => {
+  const base = createGame();
+  const at = (day: number, beforeNight: number) => lightingTint({ ...base, day, timeOfDay: nightStart(day) - beforeNight });
+
+  it('glows gold for longer on a summer evening', () => {
+    expect(at(34, 40).color).toBe(rgb(palette.golden));
+    expect(at(34, 40).alpha).toBeGreaterThan(0);
+    expect(at(34, 1).alpha).toBeCloseTo(0.16 * 44 / 45);
+  });
+
+  it('keeps the other seasons\' short orange dusk', () => {
+    expect(at(24, 40).alpha).toBe(0);
+    expect(at(24, 1).color).toBe(rgb(palette.dusk));
   });
 });

@@ -1,4 +1,4 @@
-import { nightStart } from '../game/calendar';
+import { isSummer, nightStart } from '../game/calendar';
 import type { GameState } from '../game/state';
 import { isFreezingNight } from '../game/rules';
 import { isRaining } from '../game/rain';
@@ -28,9 +28,12 @@ export function lightingTint(state: GameState): LightingTint {
     return { color: color(storm ? palette.storm : palette.night), alpha: darkness(state.day, time) * (storm ? 0.64 : 0.55) };
   }
   if (isRaining(state)) return { color: color(palette.storm), alpha: 0.18 };
-  const duskStart = nightStart(state.day) - 30;
-  const alpha = time > duskStart ? 0.12 * (time - duskStart) / 30 : 0;
-  return { color: color(palette.dusk), alpha };
+  // Summer evenings glow gold, longer and a little stronger.
+  const summer = isSummer(state.day);
+  const length = summer ? 45 : 30;
+  const duskStart = nightStart(state.day) - length;
+  const alpha = time > duskStart ? (summer ? 0.16 : 0.12) * (time - duskStart) / length : 0;
+  return { color: color(summer ? palette.golden : palette.dusk), alpha };
 }
 
 /** Fire radii are whole art pixels. The frame sequence matches the 180 ms flame cycle. */
