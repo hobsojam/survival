@@ -1,11 +1,13 @@
 import { BALANCE, type GameState, type ResourceNode } from '../game/state';
 import { season, type Season } from '../game/calendar';
-import { QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
+import { QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 import { campCircleTile, pathTile, terrainSprites } from '../art/terrain';
-import { CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_OPEN_PATHS, CAMP_PATHS, pathDistance, type PathRoute } from './mapGeometry';
+import { CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_OPEN_PATHS, CAMP_PATHS, CAMP_SIGN, QUARRY_PATHS, QUARRY_SIGN, pathDistance, type PathRoute } from './mapGeometry';
 
 export interface MapItem { x: number; y: number; sprite: string }
-export interface TerrainMap { ground: string[][]; pathTiles: MapItem[]; campEdges: MapItem[]; decorations: MapItem[]; rimStones: MapItem[]; trees: MapItem[]; groves: MapItem[][] }
+export interface TerrainMap { ground: string[][]; pathTiles: MapItem[]; campEdges: MapItem[]; decorations: MapItem[]; rimStones: MapItem[]; trees: MapItem[]; groves: MapItem[][];
+  /** Signposts, drawn standing like the trees. */
+  signs: MapItem[] }
 
 export type TerrainKey = 'camp' | 'camp-open' | 'quarry';
 
@@ -32,8 +34,9 @@ const flowerPatches = [[11, 8], [30, 7], [7, 23], [28, 23]];
 function earthAt(x: number, y: number, routes: readonly PathRoute[]): boolean {
   return Math.hypot(x - CAMP_CENTER_X, y - CAMP_CENTER_Y) <= BALANCE.campRadius || pathDistance(x, y, routes) <= .5;
 }
+const nearSign = (x: number, y: number, sign: { x: number; y: number }): boolean => Math.hypot(x - sign.x, y - sign.y) < 1.5;
 function clearForTree(x: number, y: number, nodes: ResourceNode[], routes: readonly PathRoute[]): boolean {
-  return Math.hypot(x - BALANCE.campX, y - BALANCE.campY) > BALANCE.campRadius + 1 &&
+  return Math.hypot(x - BALANCE.campX, y - BALANCE.campY) > BALANCE.campRadius + 1 && !nearSign(x, y, CAMP_SIGN) &&
     nodes.every(node => Math.hypot(x - node.x, y - node.y) >= (node.kind === 'branch' ? 1.5 : 3.5)) &&
     pathDistance(x + .5, y + .5, routes) >= 1.35;
 }
@@ -60,33 +63,69 @@ function patchNoise(x: number, y: number): number {
 
 const TREE_SPRITES = ['treeBroadleaf', 'treePine', 'treeYoung'];
 const edgeDistance = (x: number, y: number): number => Math.min(x, y, BALANCE.mapWidth - 1 - x, BALANCE.mapHeight - 1 - y);
-const emptyMap = (): TerrainMap => ({ ground: [], pathTiles: [], campEdges: [], decorations: [], rimStones: [], trees: [], groves: [] });
+const emptyMap = (): TerrainMap => ({ ground: [], pathTiles: [], campEdges: [], decorations: [], rimStones: [], trees: [], groves: [], signs: [] });
 
-/** The quarry: mixed earth and grass, scattered stones, and trees only along its west side. */
+/** Boulders sit about the quarry's open ground; clumps of trees stand between them. */
+const QUARRY_BOULDERS = [[20, 9], [27, 11], [33, 19], [24, 20], [9, 17], [18, 25], [35, 7], [6, 8], [29, 26], [14, 5]];
+const QUARRY_CLUMPS = [[30, 8], [33, 23], [22, 5], [7, 24], [22, 22], [27, 17]];
+const CLUMP_OFFSETS = [[0, 0], [1, 0], [0, 1], [-1, 1], [1, 1], [-1, 0], [0, -1]];
+
+/** Whether a quarry spot is free for something standing: off the path, out of the way home and clear of the workings and the sign. */
+function quarryClear(x: number, y: number): boolean {
+  const workings = [QUARRY_SITE, RUBBLE_SITE].every(site => Math.hypot(x - site.x, y - site.y) >= 2.5);
+  const exit = Math.abs(y - QUARRY_EXIT.y) > 2 || x < QUARRY_EXIT.x - 3;
+  return workings && exit && !nearSign(x, y, QUARRY_SIGN) && pathDistance(x + .5, y + .5, QUARRY_PATHS) >= 1.35;
+}
+
+/** The quarry: mixed earth and grass, boulders and scattered stones, a worn path home and woods all round. */
 function buildQuarryMap(): TerrainMap {
   const map = emptyMap();
+  const boulders = QUARRY_BOULDERS.filter(([x, y]) => quarryClear(x, y))
+    .map(([x, y]) => ({ x, y, sprite: `boulder${hash(x, y, 11) % 2}` }));
+  const taken = (x: number, y: number) => [...boulders, ...map.trees].some(item => Math.hypot(item.x - x, item.y - y) < 1.2);
   for (let y = 0; y < BALANCE.mapHeight; y++) {
     const row: string[] = [];
-    for (let x = 0; x < BALANCE.mapWidth; x++) row.push(layQuarryTile(x, y, map));
+    for (let x = 0; x < BALANCE.mapWidth; x++) row.push(layQuarryTile(x, y, map, boulders));
     map.ground.push(row);
   }
+  map.trees = map.trees.filter(tree => quarryClear(tree.x, tree.y) && !boulders.some(item => Math.hypot(item.x - tree.x, item.y - tree.y) < 1.2));
+  for (const [cx, cy] of QUARRY_CLUMPS) {
+    const clump = CLUMP_OFFSETS.filter((_, index) => index < 3 || hash(cx, cy, 12 + index) % 2 === 0)
+      .map(([dx, dy]) => ({ x: cx + dx, y: cy + dy }))
+      .filter(({ x, y }) => quarryClear(x, y) && !taken(x, y));
+    map.trees.push(...clump.map(({ x, y }) => ({ x, y, sprite: TREE_SPRITES[hash(x, y, 3) % 3] })));
+  }
+  // Nothing lies flat under a clump's trunks; the boulders go in last, among the stones.
+  map.decorations = [...map.decorations.filter(item => !taken(item.x, item.y)), ...boulders];
+  map.signs = [{ ...QUARRY_SIGN, sprite: 'signpostCamp' }];
   return map;
 }
 
-/** Adds one quarry tile's path, tree or decoration to the map and returns its ground sprite. */
-function layQuarryTile(x: number, y: number, map: TerrainMap): string {
+/** Adds one quarry tile's path, border tree or decoration to the map and returns its ground sprite. */
+function layQuarryTile(x: number, y: number, map: TerrainMap, boulders: readonly MapItem[]): string {
+  const path = pathTile(x, y, QUARRY_PATHS);
+  if (path) map.pathTiles.push({ x, y, sprite: path });
   const edge = edgeDistance(x, y);
-  const nearSite = [QUARRY_SITE, RUBBLE_SITE].some(site => Math.hypot(x - site.x, y - site.y) < 1.5);
-  // Quarry trees only line the outer edge, far from the camp circle and with no paths or supplies to dodge.
-  if (edge <= 1 && x < 24 && hash(x, y, 2) % 3 !== 0) {
+  const open = !path && !nearSign(x, y, QUARRY_SIGN) && boulders.every(item => Math.hypot(item.x - x, item.y - y) >= 1.2)
+    && [QUARRY_SITE, RUBBLE_SITE].every(site => Math.hypot(x - site.x, y - site.y) >= 1.5);
+  // The woods close in two deep on every side, thinning on the inner row.
+  if (edge <= 1 && hash(x, y, 2) % (edge === 0 ? 4 : 2) !== 0) {
     map.trees.push({ x, y, sprite: TREE_SPRITES[hash(x, y, 3) % 3] });
-  } else if (edge > 0 && !nearSite && hash(x, y, 4) % 4 === 0) {
-    const detail = hash(x, y, 5) % 4;
-    map.decorations.push({ x, y, sprite: detail === 3 ? 'tuft0' : `pebbles${detail % 2}` });
+  } else if (edge > 0 && open && hash(x, y, 4) % 4 === 0) {
+    map.decorations.push({ x, y, sprite: quarryDetail(x, y) });
   }
-  // Bare earth lies in patches that grow commoner toward the quarry in the west.
-  const bare = patchNoise(x, y) + (hash(x, y, 7) % 5) / 25 > .55 + x / BALANCE.mapWidth * .2;
+  // Bare earth lies in patches that grow commoner toward the quarry in the west; the path keeps to grass so it shows.
+  const bare = !path && patchNoise(x, y) + (hash(x, y, 7) % 5) / 25 > .55 + x / BALANCE.mapWidth * .2;
   return bare ? `earth${hash(x, y, 1) % 3}` : `grass${hash(x, y) % 4}`;
+}
+
+/** Mostly loose stones, with a tuft of grass, an old stump or a ring of mushrooms here and there. */
+function quarryDetail(x: number, y: number): string {
+  const detail = hash(x, y, 5) % 40;
+  if (detail === 0) return 'stump';
+  if (detail < 3) return 'mushrooms';
+  if (detail < 15) return `tuft${detail % 2}`;
+  return `pebbles${detail % 2}`;
 }
 
 /** Builds an area's terrain. The camp meadow flowers more in spring, and its flowers are under the snow in winter. */
@@ -102,6 +141,8 @@ export function buildMap(nodes: ResourceNode[], key: TerrainKey, time: Season = 
   if (time === 'winter') map.decorations = map.decorations.filter(item => !item.sprite.startsWith('flower'));
   plantGroves(nodes, routes, map);
   map.rimStones = campRimStones(routes);
+  map.decorations = map.decorations.filter(item => !nearSign(item.x, item.y, CAMP_SIGN));
+  if (key === 'camp-open') map.signs = [{ ...CAMP_SIGN, sprite: 'signpostQuarry' }];
   return map;
 }
 
