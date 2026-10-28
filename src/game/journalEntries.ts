@@ -18,7 +18,6 @@ export interface JournalEntry { year: number; id: JournalId; day: number; varian
 
 interface PageEntry {
   id: JournalId;
-  icon: string;
   lines: readonly string[];
   /** Announced already by its own message, so writing it adds no second line. */
   silent?: boolean;
@@ -26,33 +25,33 @@ interface PageEntry {
 
 export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
   autumn: [
-    { id: 'leaves', icon: '🍂', lines: ['The first leaves came down over camp.'] },
-    { id: 'fox', icon: '🦊', lines: ['A fox nosed around the berry bushes at dusk.'] },
-    { id: 'coldFront', icon: '❄️', lines: ['The cold front came. I kept the fire through it.', 'The cold front came, and it got the better of me.',
+    { id: 'leaves', lines: ['The first leaves came down over camp.'] },
+    { id: 'fox', lines: ['A fox nosed around the berry bushes at dusk.'] },
+    { id: 'coldFront', lines: ['The cold front came. I kept the fire through it.', 'The cold front came, and it got the better of me.',
       'A cold autumn night, and the fire kept me warm.'] },
-    { id: 'driedBerries', icon: '🫐', lines: ['Dried berries for the winter.'] },
-    { id: 'stars', icon: '✨', lines: ['Lay back and counted stars.'] }
+    { id: 'driedBerries', lines: ['Dried berries for the winter.'] },
+    { id: 'stars', lines: ['Lay back and counted stars.'] }
   ],
   winter: [
-    { id: 'firstSnow', icon: '🌨️', lines: ['Snow fell in the night.'], silent: true },
-    { id: 'wolfTracks', icon: '🐾', lines: ['Paw prints round the fire this morning.'], silent: true },
-    { id: 'frozenSpring', icon: '🧊', lines: ['The quiet spring had frozen over.'] },
-    { id: 'winterFire', icon: '🔥', lines: ['Kept the fire alive through a whole winter night.'] },
-    { id: 'winterCooking', icon: '🍲', lines: ['Cooked berries by the fire, with the snow coming down.'] }
+    { id: 'firstSnow', lines: ['Snow fell in the night.'], silent: true },
+    { id: 'wolfTracks', lines: ['Paw prints round the fire this morning.'], silent: true },
+    { id: 'frozenSpring', lines: ['The quiet spring had frozen over.'] },
+    { id: 'winterFire', lines: ['Kept the fire alive through a whole winter night.'] },
+    { id: 'winterCooking', lines: ['Cooked berries by the fire, with the snow coming down.'] }
   ],
   spring: [
-    { id: 'firstRain', icon: '🌧️', lines: ['The first rain of spring.'], silent: true },
-    { id: 'rabbits', icon: '🐇', lines: ['Rabbits in the meadow.'] },
-    { id: 'bushesFull', icon: '🌿', lines: ['The bushes are full again.'] },
-    { id: 'stumpGrowing', icon: '🌱', lines: ['A stump I cut is growing back already.'] },
-    { id: 'springRest', icon: '💧', lines: ['Sat a while at the spring, now that it\'s thawed.'] }
+    { id: 'firstRain', lines: ['The first rain of spring.'], silent: true },
+    { id: 'rabbits', lines: ['Rabbits in the meadow.'] },
+    { id: 'bushesFull', lines: ['The bushes are full again.'] },
+    { id: 'stumpGrowing', lines: ['A stump I cut is growing back already.'] },
+    { id: 'springRest', lines: ['Sat a while at the spring, now that it\'s thawed.'] }
   ],
   summer: [
-    { id: 'fireflies', icon: '🌟', lines: ['Fireflies over camp.'] },
-    { id: 'twoHandfuls', icon: '🍓', lines: ['Two handfuls from one bush.'] },
-    { id: 'goldEvening', icon: '🌇', lines: ['The evening went gold.'] },
-    { id: 'warmSleep', icon: '🌙', lines: ['Slept out without a fire, and it was warm.'] },
-    { id: 'lookoutEvening', icon: '🔭', lines: ['Watched the land from the lookout on a long evening.'] }
+    { id: 'fireflies', lines: ['Fireflies over camp.'] },
+    { id: 'twoHandfuls', lines: ['Two handfuls from one bush.'] },
+    { id: 'goldEvening', lines: ['The evening went gold.'] },
+    { id: 'warmSleep', lines: ['Slept out without a fire, and it was warm.'] },
+    { id: 'lookoutEvening', lines: ['Watched the land from the lookout on a long evening.'] }
   ]
 };
 
