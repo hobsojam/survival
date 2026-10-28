@@ -65,7 +65,8 @@ describe('ambient bird foraging', () => {
     state.player.x = 16;
     state.player.y = 18;
     life.update(state, 0.1, 1800);
-    expect(bird.visible).toBe(false);
+    // It takes off from where it was, with no blank frame between.
+    expect(bird.visible).toBe(true);
     life.update(state, 0.1, 1900);
     expect(bird.texture).toMatch(/^bird:fly/);
   });
@@ -205,10 +206,27 @@ describe('spring rabbits at camp', () => {
     const life = new AmbientLife(scene as never);
     life.update(springDay, 0.1, 100);
     expect(visible(of('rabbit'))).toBe(rabbitCount(21));
-    life.update({ ...springDay, day: 31 }, 0.1, 200);
+    for (let t = 200; t <= 1200; t += 100) life.update({ ...springDay, day: 31 }, 0.1, t);
     expect(visible(of('rabbit'))).toBe(0);
-    life.update({ ...springDay, timeOfDay: nightStart(21) + 40 }, 0.1, 300);
+    // At nightfall they hop off home over a moment.
+    life.update(springDay, 0.1, 1250);
+    for (let t = 1300; t <= 2300; t += 100) life.update({ ...springDay, timeOfDay: nightStart(21) + 40 }, 0.1, t);
     expect(visible(of('rabbit'))).toBe(0);
+  });
+
+  it('hops away and fades at dusk rather than vanishing', () => {
+    const night = nightStart(21);
+    const fresh = sceneWithImages();
+    const watched = new AmbientLife(fresh.scene as never);
+    const hopper = fresh.of('rabbit')[0];
+    const alphas: number[] = [];
+    for (let t = night; t < night + 20; t += 0.1) {
+      watched.update({ ...springDay, timeOfDay: t }, 0.1, t * 1000);
+      if (hopper.visible) alphas.push(hopper.alpha);
+    }
+    // Its last visible frames are a fading hop, not a full-strength rabbit.
+    expect(alphas.at(-1)).toBeLessThan(0.5);
+    expect(hopper.texture).toMatch(/^rabbit:hop/);
   });
 
   it('runs off when the survivor comes close, and comes back once they leave', () => {

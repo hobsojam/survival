@@ -1,6 +1,6 @@
 import { BALANCE, type GameState, type ResourceKind } from '../game/state';
 import { isFreezingNight } from '../game/rules';
-import { isRaining } from '../game/rain';
+import { rainFade } from '../game/rain';
 import { TILE, worldX, worldY } from './art';
 import { GROUND_DECAL_DEPTH, LIGHT_DEPTH, WEATHER_DEPTH } from './visuals';
 
@@ -29,7 +29,8 @@ export function effectVisuals(state: GameState, timeMs: number, events: EffectEv
   const results: EffectVisual[] = [];
   if (state.area === 'camp' && state.fireFuel > 0) results.push(...fireVisuals(timeMs));
   if (isFreezingNight(state)) results.push(...weatherVisuals(timeMs));
-  if (isRaining(state)) results.push(...rainVisuals(timeMs));
+  const shower = rainFade(state);
+  if (shower > 0) results.push(...rainVisuals(timeMs, shower));
   events.forEach((event, index) => {
     const age = timeMs - event.startedAtMs;
     if (age >= 0) results.push(...eventVisuals(state, event, index, age));
@@ -79,14 +80,14 @@ function weatherVisuals(timeMs: number): EffectVisual[] {
   return results;
 }
 
-/** Spring rain: forty streaks falling steeply across the whole map, leaning a little. */
-function rainVisuals(timeMs: number): EffectVisual[] {
+/** Spring rain: forty streaks falling steeply across the whole map, leaning a little, as bold as the shower is heavy. */
+function rainVisuals(timeMs: number, heaviness: number): EffectVisual[] {
   const width = BALANCE.mapWidth * TILE;
   const height = BALANCE.mapHeight * TILE;
   return Array.from({ length: 40 }, (_, i) => {
     const x = wrap(i * 113 - Math.floor(timeMs / 60), width);
     const y = wrap(i * 71 + Math.floor(timeMs / 4), height);
-    return visual(`weather:rain:${i}`, 'rainStreak:still', x, y, WEATHER_DEPTH, 0.5);
+    return visual(`weather:rain:${i}`, 'rainStreak:still', x, y, WEATHER_DEPTH, 0.8 * heaviness);
   });
 }
 

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { Friend, GameState } from '../game/state';
+import { BALANCE, type Friend, type GameState } from '../game/state';
 import { worldX, worldY } from './art';
 import { LIGHT_DEPTH } from './visuals';
 import { sprites } from '../art/sprites';
@@ -202,7 +202,6 @@ export class AmbientLife {
     bird.flight = { from, to, elapsed: 0, duration: FLIGHT_SECONDS, kind: 'flee' };
     bird.forageUntilMs = 0;
     bird.forageNodeId = null;
-    bird.image.setVisible(false);
   }
 
   private updateBird(bird: Bird, state: GameState, dark: number, seconds: number, timeMs: number): void {
@@ -310,8 +309,18 @@ export class AmbientLife {
   /** A rabbit hops about near home, bolts from the survivor, hides, and comes back once they have gone. */
   private updateRabbit(rabbit: Rabbit, state: GameState, out: boolean, seconds: number, timeMs: number): void {
     const { image } = rabbit;
-    if (!out) { image.setVisible(false); return; }
     const player = state.player;
+    if (!out && !rabbit.run) {
+      // At dusk a rabbit still in sight hops off home, fading as it goes.
+      if (image.visible && !rabbit.away) {
+        const pose = rabbitAt(rabbit.index, timeMs);
+        const dx = pose.x >= BALANCE.campX ? 1 : -1;
+        rabbit.run = { from: pose, to: { x: pose.x + dx * 4, y: pose.y + 1 }, elapsed: 0, duration: RABBIT_RUN_SECONDS };
+      } else {
+        image.setVisible(false);
+        return;
+      }
+    }
     if (rabbit.run) {
       const run = rabbit.run;
       run.elapsed += seconds;

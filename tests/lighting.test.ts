@@ -90,10 +90,26 @@ describe('winter night tint', () => {
 });
 
 describe('rain tint', () => {
+  const base = createGame();
   it('greys the day while it rains', () => {
-    const base = createGame();
     expect(lightingTint({ ...base, day: 22, timeOfDay: 40 })).toEqual({ color: rgb(palette.storm), alpha: 0.18 });
     expect(lightingTint({ ...base, day: 22, timeOfDay: 80 }).alpha).toBe(0);
+  });
+
+  it('fades in as a shower starts and out as it ends', () => {
+    // Day 22's shower runs from 30 s to 76 s.
+    expect(lightingTint({ ...base, day: 22, timeOfDay: 32 }).alpha).toBeCloseTo(0.09);
+    expect(lightingTint({ ...base, day: 22, timeOfDay: 74 }).alpha).toBeCloseTo(0.09);
+    expect(lightingTint({ ...base, day: 22, timeOfDay: 29 }).alpha).toBe(0);
+  });
+
+  it('lets a late shower give way to the dusk glow', () => {
+    // Day 61's shower runs from 63 s to 118 s, and its dusk begins at 109 s.
+    const dusk = (time: number) => lightingTint({ ...base, day: 61, timeOfDay: time });
+    expect(dusk(112).alpha).toBeGreaterThan(0.12 * 3 / 30);
+    expect(dusk(112).color).not.toBe(rgb(palette.storm));
+    expect(dusk(118.01).color).toBe(rgb(palette.dusk));
+    expect(Math.abs(dusk(117.9).alpha - dusk(118.01).alpha)).toBeLessThan(0.01);
   });
 });
 
