@@ -216,7 +216,7 @@
   - **`tests/journal.test.ts`:** milestones have length 4 before the lookout is repaired, and 0 after.
 
 - [ ] **Step 2: Run them and watch them fail**
-  Run: `npx vitest run tests/panels.test.ts` tests/journal.test.ts.
+  Run: `npx vitest run tests/panels.test.ts tests/journal.test.ts`
   Expected: FAIL.
 
 - [ ] **Step 3: Implement** the view changes, the App wiring and the markup removal.
