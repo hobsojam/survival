@@ -7,10 +7,13 @@ import type { GameState, WolfTake } from './state';
 /** Below this much fuel on a winter night, wolves gather at the camp edge. */
 export const WOLF_LOW_FUEL = 20;
 
-const MESSAGES: Record<WolfTake, string> = {
+const MESSAGES: Record<WolfTake, string | null> = {
   ration: 'A wolf slipped into the dark camp and took a ration.',
   berry: 'A wolf slipped into the dark camp and took a berry.',
-  nothing: 'A wolf circled the dark camp but found nothing to take.'
+  nothing: 'A wolf circled the dark camp but found nothing to take.',
+  // The offering said so itself.
+  offered: null,
+  chased: 'Your wolf saw the others off into the dark.'
 };
 
 const winterNight = (state: GameState): boolean => isWinter(state.day) && state.timeOfDay >= nightStart(state.day);

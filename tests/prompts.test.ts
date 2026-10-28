@@ -158,7 +158,7 @@ describe('the E key', () => {
 describe('single-press keys', () => {
   it('map each letter to one action', () => {
     const keys = Object.fromEntries(KEY_ACTIONS.map(([key, action]) => [key, action.type]));
-    expect(keys).toEqual({ F: 'stokeFire', R: 'rest', Q: 'eat', T: 'eatTrailFood', P: 'prepareTrailFood', C: 'cook', G: 'stargaze', Z: 'sleep', L: 'repairLookout' });
+    expect(keys).toEqual({ F: 'stokeFire', R: 'rest', Q: 'eat', T: 'eatTrailFood', P: 'prepareTrailFood', C: 'cook', G: 'stargaze', Z: 'sleep', L: 'repairLookout', O: 'befriend' });
   });
 });
 
@@ -195,5 +195,19 @@ describe('winter prompts', () => {
     expect(promptFor(winter)).toContain('E  Search the bare bush');
     expect(gatherKeyAction(winter)).toEqual({ type: 'gather', nodeId: 'berry-0' });
     expect(promptFor({ ...winter, day: 2 })).toContain('E  Pick berries');
+  });
+});
+
+describe('offering prompts', () => {
+  it('offers the fox a berry with O while it sits at dusk', () => {
+    const dusk = { ...bareCamp(), timeOfDay: nightStart(1) - 5, inventory: { ...createGame().inventory, food: 1 } };
+    expect(promptFor(dusk)).toBe('O  Leave a berry for the fox');
+    expect(KEY_ACTIONS).toContainEqual(['O', { type: 'befriend' }]);
+  });
+
+  it('adds the offering beside a bush the birds visit', () => {
+    const bush = createGame().nodes.find(node => node.id === 'berry-0')!;
+    const spring = { ...bareCamp(19, 14), day: 22, timeOfDay: 60, nodes: [bush], inventory: { ...createGame().inventory, food: 1 } };
+    expect(promptFor(spring)).toBe('E  Pick berries · O  Scatter a berry for the birds');
   });
 });

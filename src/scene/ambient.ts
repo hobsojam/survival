@@ -1,16 +1,13 @@
-import { BALANCE, RABBIT_HOMES, type ResourceNode } from '../game/state';
+import { BALANCE, type ResourceNode } from '../game/state';
 import { nightStart } from '../game/calendar';
 import { WOLF_LOW_FUEL } from '../game/wolves';
+import { RABBIT_HOMES, dayHash as hash, type Point } from '../game/wildlife';
 
 // Ambient life is decoration only: it reads game state but never changes or saves it.
 // Positions are in tiles, like the game state.
 
-export interface Point { x: number; y: number }
-
-const hash = (n: number) => {
-  const value = Math.sin(n * 12.9898) * 43758.5453;
-  return value - Math.floor(value);
-};
+export type { Point };
+export { FOX, foxAt, foxVisits, foxWindow, type FoxPose } from '../game/wildlife';
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 
 /** 0 in daylight, 1 in deep night; eases in after nightfall and out after dawn. */
@@ -19,43 +16,6 @@ export function darkness(day: number, timeOfDay: number): number {
   if (timeOfDay >= night) return Math.min(1, (timeOfDay - night) / 30);
   if (day > 1 && timeOfDay < 25) return 1 - timeOfDay / 25;
   return 0;
-}
-
-export const FOX = {
-  travel: 12,
-  den: { x: 26, y: -1 },
-  seat: { x: 20.8, y: 11.6 },
-  spookRadius: 2
-} as const;
-
-export interface FoxPose extends Point { sitting: boolean; facing: 1 | -1 }
-
-/** The fox comes by on the first evening, then on roughly two evenings in three. */
-export const foxVisits = (day: number) => day === 1 || hash(day) < 0.65;
-
-/** The fox arrives 20 s before that evening's nightfall and leaves 50 s after it. */
-export function foxWindow(day: number): { arrive: number; leave: number } {
-  const night = nightStart(day);
-  return { arrive: night - 20, leave: night + 50 };
-}
-
-export function foxAt(day: number, timeOfDay: number): FoxPose | null {
-  const { arrive, leave } = foxWindow(day);
-  if (!foxVisits(day) || timeOfDay < arrive || timeOfDay > leave) return null;
-  const progress = Math.min(1, (timeOfDay - arrive) / FOX.travel, (leave - timeOfDay) / FOX.travel);
-  const leaving = timeOfDay - arrive > leave - timeOfDay;
-  const sitting = progress >= 1;
-  // Sitting, the fox faces the fire; walking, it faces where it's going.
-  let heading: number;
-  if (sitting) heading = BALANCE.campX - FOX.seat.x;
-  else if (leaving) heading = FOX.den.x - FOX.seat.x;
-  else heading = FOX.seat.x - FOX.den.x;
-  return {
-    x: FOX.den.x + (FOX.seat.x - FOX.den.x) * progress,
-    y: FOX.den.y + (FOX.seat.y - FOX.den.y) * progress,
-    sitting,
-    facing: heading < 0 ? -1 : 1
-  };
 }
 
 export const BIRD_HOMES: Point[] = [

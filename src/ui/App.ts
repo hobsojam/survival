@@ -4,6 +4,7 @@ import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
 import { cookBlocker, isAtCamp, sleepBlocker, stargazeBlocker } from '../game/rules';
+import { offerBlocker } from '../game/companion';
 import { dayPillView, renderDayPill, renderYearWheel, yearWheelView, type CalendarRoot } from './calendarView';
 import { isLowMeter } from '../game/needs';
 import { gateTap, nextOpenTab, wireSidebarTabs, type DockTab } from './dock';
@@ -72,7 +73,7 @@ export class App {
               <div class="meter"><div class="meter-title"><span>Energy</span><b id="energy-value">100</b></div><div class="track"><div id="energy-bar" class="fill energy"></div></div></div>
               <div class="meter"><div class="meter-title"><span>Hunger</span><b id="hunger-value">100</b></div><div class="track"><div id="hunger-bar" class="fill hunger"></div></div></div>
               <div class="meter"><div class="meter-title"><span>Warmth</span><b id="warmth-value">100</b></div><div class="track"><div id="warmth-bar" class="fill warmth"></div></div></div>
-              <div class="quick-actions"><button data-action="eat">Eat berries</button><button data-action="eatTrailFood" id="eat-ration-button">Eat ration</button><button data-action="rest">Rest</button><button data-action="stokeFire">Feed fire</button><button data-action="sleep" id="sleep-button">Sleep</button></div>
+              <div class="quick-actions"><button data-action="eat">Eat berries</button><button data-action="eatTrailFood" id="eat-ration-button">Eat ration</button><button data-action="rest">Rest</button><button data-action="stokeFire">Feed fire</button><button data-action="sleep" id="sleep-button">Sleep</button><button data-action="befriend" id="offer-button" hidden>Offer</button></div>
             </section>
             <div class="sidebar-tabs" role="tablist" aria-label="Sidebar"><button type="button" role="tab" data-sidebar-button="bag">🎒 Bag</button><button type="button" role="tab" data-sidebar-button="build">🔨 Build</button><button type="button" role="tab" data-sidebar-button="camp">🌙 Camp</button></div>
             <div class="sidebar-pages">
@@ -98,7 +99,7 @@ export class App {
           </aside>
         </div>
         <nav class="phone-dock" aria-label="Camp actions">
-          <div class="dock-actions"><button type="button" data-action="eat">Eat</button><button type="button" data-action="rest">Rest</button><button type="button" data-action="stokeFire">Fire</button><button type="button" data-action="sleep" id="dock-sleep">Sleep</button><button type="button" data-action="cook" id="dock-cook" hidden>Cook</button><button type="button" data-action="stargaze" id="dock-stargaze" hidden>Stars</button></div>
+          <div class="dock-actions"><button type="button" data-action="eat">Eat</button><button type="button" data-action="rest">Rest</button><button type="button" data-action="stokeFire">Fire</button><button type="button" data-action="sleep" id="dock-sleep">Sleep</button><button type="button" data-action="cook" id="dock-cook" hidden>Cook</button><button type="button" data-action="stargaze" id="dock-stargaze" hidden>Stars</button><button type="button" data-action="befriend" id="dock-offer" hidden>Offer</button></div>
           <div class="dock-tabs"><button type="button" data-tab-button="bag">🎒 Bag</button><button type="button" data-tab-button="build">🔨 Build</button><button type="button" data-tab-button="camp">🌙 Camp</button></div>
         </nav>
         <div id="start-screen" class="start-screen"><div class="start-card"><div class="start-mark">✦</div><p class="eyebrow">A SMALL SURVIVAL STORY</p><h1>Make a little place<br>feel like home.</h1><p class="start-copy">Gather what you need, keep a fire glowing, and build a refuge one day at a time.</p><p id="start-note" class="start-note"></p><div class="start-buttons"><button id="continue-game" class="primary-button" hidden>Continue your camp</button><button id="new-game" class="secondary-button">Start a new game</button></div><small>Single player · Saves in this browser</small></div></div>
@@ -427,6 +428,8 @@ export class App {
     this.setText('night-hint', nightHint(this.state));
     this.root.querySelector('#cook-button')?.classList.toggle('ready', !cookBlocker(this.state));
     this.root.querySelector('#stargaze-button')?.classList.toggle('ready', !stargazeBlocker(this.state));
+    const offerHidden = Boolean(offerBlocker(this.state));
+    this.root.querySelectorAll<HTMLButtonElement>('#offer-button, #dock-offer').forEach(button => { button.hidden = offerHidden; });
     const dockCook = this.root.querySelector<HTMLButtonElement>('#dock-cook');
     if (dockCook) dockCook.hidden = Boolean(cookBlocker(this.state));
     const dockStargaze = this.root.querySelector<HTMLButtonElement>('#dock-stargaze');

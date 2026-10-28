@@ -3,6 +3,7 @@ import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } 
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
+import { makeOffering, offerBlocker } from './companion';
 import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
@@ -11,7 +12,7 @@ export type GameAction =
   | { type: 'visitSite'; siteId: SiteId }
   | { type: 'build'; structureId: StructureId }
   | { type: 'move'; dx: number; dy: number }
-  | { type: 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' }
+  | { type: 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'befriend' }
   | { type: 'pickUpStone'; pileId: string };
 
 /** Awake time tires the survivor; work already costs energy, and resting doesn't. */
@@ -625,10 +626,16 @@ const sleep: ActionHandler<'sleep'> = state => {
   };
 };
 
+const befriend: ActionHandler<'befriend'> = state => {
+  const offered = makeOffering(state);
+  if (!offered) return refuse(state, offerBlocker(state) ?? '');
+  return { state: advanceTime(offered.state, BALANCE.offerSeconds, 'resting'), message: offered.message };
+};
+
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   move, cross, gather, craftAxe, craftPickaxe, gatherRubble, digQuarry, chopTree, visitSite,
   storeStone, takeStone, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, rest, sleep
+  cook, stargaze, stokeFire, repairLookout, build, rest, sleep, befriend
 };
 
 export function applyAction(state: GameState, action: GameAction): ActionResult {

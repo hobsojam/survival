@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { RABBIT_HOMES, SITES, createGame, type GameState } from '../src/game/state';
+import { SITES, createGame, type GameState } from '../src/game/state';
+import { RABBIT_HOMES } from '../src/game/wildlife';
 import { advanceTime, applyAction, type GameAction } from '../src/game/rules';
 import { nightStart } from '../src/game/calendar';
 import { recordJournal, type JournalId } from '../src/game/journalEntries';
@@ -47,6 +48,7 @@ describe('the year journal', () => {
     const night = at(12, 239.5, { fireFuel: 50 });
     expect(ids(tick(night).state)).toContain('winterFire');
     expect(ids(tick({ ...night, lastWolf: { day: 12, took: 'nothing' } }).state)).not.toContain('winterFire');
+    expect(ids(tick({ ...night, lastWolf: { day: 12, took: 'offered' } }).state)).toContain('winterFire');
   });
 
   it('writes summer evenings during a timed action', () => {
