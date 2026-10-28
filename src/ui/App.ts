@@ -3,8 +3,7 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type SiteId, typ
 import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
-import { cookBlocker, harvestGardenBlocker, isAtCamp, plantGardenBlocker, sleepBlocker, stargazeBlocker } from '../game/rules';
-import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
+import { cookBlocker, isAtCamp, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { offerBlocker } from '../game/companion';
 import { dayPillView, renderDayPill, renderYearWheel, yearWheelView, type CalendarRoot } from './calendarView';
 import { isLowMeter } from '../game/needs';
@@ -12,7 +11,7 @@ import { gateTap, nextOpenTab, wireSidebarTabs, type DockTab } from './dock';
 import { createPause, wirePause, type PauseControl } from './pause';
 import { journalView, QUARRY_MARKER } from './journal';
 import { currentPage, journalPageView, renderJournalPage, turnPage } from './yearJournal';
-import { axeView, bagView, buildButtonView, cloakView, forecastView, keepsakeView, lookoutView, nightHint, pickaxeView, pillowView, startNote, type ActionPanelView } from './panels';
+import { axeView, bagView, buildButtonView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightHint, pickaxeView, pillowView, startNote, type ActionPanelView } from './panels';
 import { Soundscape } from '../game/soundscape';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
@@ -471,21 +470,12 @@ export class App {
   }
 
   private renderGarden(): void {
-    const plots = this.root.querySelector<HTMLElement>('#garden-plots');
-    if (!plots) return;
-    const built = this.state.structures.garden;
+    const view = gardenPanelView(this.state);
     const panel = this.root.querySelector<HTMLElement>('.garden-panel');
-    if (panel) panel.hidden = !built;
-    this.setText('garden-hint', built ? 'Plant one berry in spring. Each bush bears berries every autumn and will wait safely until picked.' : 'Build a garden from the Build tab to plant berry bushes.');
-    plots.innerHTML = this.state.gardenPlots.map((plot, index) => {
-      const stage = gardenPlotStage(this.state, plot);
-      const label = gardenPlotLabel(stage, plot.harvestReady);
-      const plantBlocker = plantGardenBlocker(this.state, index);
-      const harvestBlocker = harvestGardenBlocker(this.state, index);
-      const plantDisabled = !built || plot.plantedYear !== null || Boolean(plantBlocker);
-      const harvestDisabled = !built || !plot.harvestReady || Boolean(harvestBlocker);
-      return `<div class="garden-plot"><span><strong>Plot ${index + 1}</strong><small>${label}</small></span><button type="button" data-action="plantGarden" data-plot-index="${index}"${plantDisabled ? ` disabled title="${plantBlocker ?? 'Already planted.'}"` : ''}>Plant</button><button type="button" data-action="harvestGarden" data-plot-index="${index}"${harvestDisabled ? ` disabled title="${harvestBlocker ?? 'No harvest is ready.'}"` : ''}>Pick</button></div>`;
-    }).join('');
+    if (panel) panel.hidden = !view.shown;
+    this.setText('garden-hint', view.hint);
+    const plots = this.root.querySelector<HTMLElement>('#garden-plots');
+    if (plots) plots.innerHTML = view.plots.map(gardenPlotMarkup).join('');
   }
 
   private renderBuild(): void {

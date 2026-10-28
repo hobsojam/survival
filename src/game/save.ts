@@ -79,7 +79,7 @@ function validGarden({ gardenPlots, structures, day }: SaveShape): boolean {
     const harvestedYear = plot.harvestedYear;
     if (plantedYear !== null && (!count(plantedYear) || plantedYear < 1 || plantedYear > yearOf(day as number))) return false;
     if (harvestedYear !== null && (!count(harvestedYear) || plantedYear === null || harvestedYear < plantedYear || harvestedYear > yearOf(day as number))) return false;
-    if (plot.harvestReady && (plantedYear === null || harvestedYear === yearOf(day as number) || !structures.garden)) return false;
+    if (plot.harvestReady && (plantedYear === null || plantedYear >= yearOf(day as number) || harvestedYear === yearOf(day as number) || !structures.garden)) return false;
     if (plantedYear !== null && !structures.garden) return false;
     return true;
   });

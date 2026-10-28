@@ -1,10 +1,46 @@
 import { isWinter, nightStart } from '../game/calendar';
 import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
+import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { workSeconds } from '../game/needs';
-import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, isAtCamp, isColdNight, isFreezingNight, lookoutRepairBlocker, pickaxeBlocker, trailFoodBlocker } from '../game/rules';
+import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, harvestGardenBlocker, isAtCamp, isColdNight, isFreezingNight, lookoutRepairBlocker, plantGardenBlocker, pickaxeBlocker, trailFoodBlocker } from '../game/rules';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
 import { KEEPSAKES_NEEDED, cloakBlocker, keepsakeKind, pillowBlocker } from '../game/companion';
+
+export interface GardenPlotPanelView {
+  label: string;
+  plantDisabled: boolean;
+  plantTitle: string;
+  harvestDisabled: boolean;
+  harvestTitle: string;
+}
+
+export interface GardenPanelView { shown: boolean; hint: string; plots: GardenPlotPanelView[] }
+
+export function gardenPanelView(state: GameState): GardenPanelView {
+  const shown = state.structures.garden;
+  const plots = state.gardenPlots.map((plot, index) => {
+    const plantBlocker = plantGardenBlocker(state, index);
+    const harvestBlocker = harvestGardenBlocker(state, index);
+    return {
+      label: gardenPlotLabel(gardenPlotStage(state, plot), plot.harvestReady),
+      plantDisabled: Boolean(plantBlocker),
+      plantTitle: plantBlocker ?? 'Plant a berry bush.',
+      harvestDisabled: Boolean(harvestBlocker),
+      harvestTitle: harvestBlocker ?? 'Pick 2 berries.'
+    };
+  });
+  const hint = shown
+    ? 'Plant one berry in spring. Each bush bears berries every autumn and will wait safely until picked.'
+    : 'Build a garden from the Build tab to plant berry bushes.';
+  return { shown, hint, plots };
+}
+
+export function gardenPlotMarkup(plot: GardenPlotPanelView, index: number): string {
+  const plantDisabled = plot.plantDisabled ? ` disabled title="${plot.plantTitle}"` : '';
+  const harvestDisabled = plot.harvestDisabled ? ` disabled title="${plot.harvestTitle}"` : '';
+  return `<div class="garden-plot"><span><strong>Plot ${index + 1}</strong><small>${plot.label}</small></span><button type="button" data-action="plantGarden" data-plot-index="${index}"${plantDisabled}>Plant</button><button type="button" data-action="harvestGarden" data-plot-index="${index}"${harvestDisabled}>Pick</button></div>`;
+}
 
 /** What a panel with one action button shows: its heading, its copy, its price line and its button state. */
 export interface ActionPanelView { title: string; copy: string; cost: string; disabled: boolean; ready: boolean }
