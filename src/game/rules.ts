@@ -3,6 +3,7 @@ import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } 
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
+import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
 import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
@@ -11,7 +12,7 @@ export type GameAction =
   | { type: 'visitSite'; siteId: SiteId }
   | { type: 'build'; structureId: StructureId }
   | { type: 'move'; dx: number; dy: number }
-  | { type: 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' }
+  | { type: 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'befriend' | 'craftPillow' | 'craftCloak' }
   | { type: 'pickUpStone'; pileId: string };
 
 /** Awake time tires the survivor; work already costs energy, and resting doesn't. */
@@ -171,6 +172,7 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
     next.timeOfDay += step;
     remaining -= step;
     wolfVisit(next);
+    startleFox(next);
     if (next.timeOfDay >= BALANCE.daySeconds - 0.000001) dawn(next, camp);
   }
   return next;
@@ -211,6 +213,8 @@ function warmthChange(state: GameState, step: number, camp: boolean, coldNight: 
     change = -step / 4;
   }
   if (camp && !lit && state.structures.windbreak) change *= 0.5;
+  // A fur cloak keeps a quarter of the night's chill off, wherever the survivor is.
+  if (state.companion.cloak && state.timeOfDay >= nightStart(state.day)) change *= BALANCE.cloakWarmthLoss;
   // Summer nights are warm, except the forecast front's.
   return isSummer(state.day) && !coldNight ? Math.max(0, change) : change;
 }
@@ -223,6 +227,7 @@ function dawn(next: GameState, camp: boolean): void {
   next.timeOfDay = 0;
   // Rocks give their stone once; everything else grows back at dawn.
   next.nodes = next.nodes.map(node => node.kind !== 'stone' && node.readyDay <= next.day ? { ...node, amount: 1 } : node);
+  companionDawn(next);
   if (!stormEnded) return;
   if (weathered) {
     next.progress = { ...next.progress, nextStormDay: null, hearthUnlocked: true };
@@ -270,7 +275,7 @@ const move: ActionHandler<'move'> = (state, action) => {
   const player = crossed
     ? { ...state.player, x: crossed.x, y: crossed.y }
     : { ...state.player, x: Math.max(0, Math.min(BALANCE.mapWidth - 1, rawX)), y: Math.max(0, Math.min(BALANCE.mapHeight - 1, rawY)) };
-  return quarryFoundOnArrival({ ...state, ...(crossed ? { area: crossed.area } : {}), player });
+  return quarryFoundOnArrival(pickUpKeepsake({ ...state, ...(crossed ? { area: crossed.area } : {}), player }));
 };
 
 const cross: ActionHandler<'cross'> = state => {
@@ -599,25 +604,37 @@ const build: ActionHandler<'build'> = (state, action) => {
 const rest: ActionHandler<'rest'> = state => {
   if (!isAtCamp(state)) return refuse(state, 'Return to the marked camp area to rest.');
   const rested = advanceTime(state, BALANCE.restSeconds, 'resting');
-  const gain = recovery(state, rested.structures.bed ? BALANCE.bedRestEnergyGain : BALANCE.restEnergyGain);
+  const bedGain = BALANCE.bedRestEnergyGain + (state.companion.pillow ? BALANCE.pillowEnergyGain : 0);
+  const gain = recovery(state, rested.structures.bed ? bedGain : BALANCE.restEnergyGain);
   return {
     state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + gain) } },
     message: 'You take a short rest.'
   };
 };
 
-/** Energy after a night's sleep: full in a bed, otherwise a good boost; hungry, half the boost and no more than the cap. */
+/** Energy after a night's sleep: full in a bed, otherwise a good boost; hungry, half the boost and no more than the cap, which a pillow raises. */
 function sleptEnergy(state: GameState): number {
   const { energy } = state.player;
   const rested = state.structures.bed ? 100 : Math.min(100, energy + BALANCE.sleepEnergyGain);
   if (!isHungry(state)) return rested;
-  return Math.max(energy, Math.min(BALANCE.hungrySleepCap, energy + (rested - energy) * BALANCE.hungryRecoveryFactor));
+  const cap = BALANCE.hungrySleepCap + (state.companion.pillow ? BALANCE.pillowEnergyGain : 0);
+  return Math.max(energy, Math.min(cap, energy + (rested - energy) * BALANCE.hungryRecoveryFactor));
 }
+
+const ALARM_MESSAGE = 'Your bird woke you. The fire is nearly out.';
 
 const sleep: ActionHandler<'sleep'> = state => {
   const blocked = sleepBlocker(state);
   if (blocked) return refuse(state, blocked);
-  const slept = advanceTime({ ...state, player: { ...state.player, energy: sleptEnergy(state) } }, BALANCE.daySeconds - state.timeOfDay, 'resting');
+  const night = BALANCE.daySeconds - state.timeOfDay;
+  const alarm = alarmAfter(state);
+  if (alarm !== null && alarm < night) {
+    // Woken early, the survivor gets the share of the night's rest they slept.
+    const energy = state.player.energy + (sleptEnergy(state) - state.player.energy) * alarm / night;
+    const woken = advanceTime({ ...state, player: { ...state.player, energy } }, alarm, 'resting');
+    return { state: { ...woken, companion: { ...woken.companion, alarmDay: state.day } }, message: ALARM_MESSAGE };
+  }
+  const slept = advanceTime({ ...state, player: { ...state.player, energy: sleptEnergy(state) } }, night, 'resting');
   const fireDied = state.fireFuel > 0 && slept.fireFuel <= 0;
   return {
     state: slept,
@@ -625,10 +642,30 @@ const sleep: ActionHandler<'sleep'> = state => {
   };
 };
 
+const befriend: ActionHandler<'befriend'> = state => {
+  const offered = makeOffering(state);
+  if (!offered) return refuse(state, offerBlocker(state) ?? '');
+  return { state: advanceTime(offered.state, BALANCE.offerSeconds, 'resting'), message: offered.message };
+};
+
+function craftKeepsake(state: GameState, item: 'pillow' | 'cloak', blocker: string | null, message: string): ActionResult {
+  if (blocker) return refuse(state, blocker);
+  return {
+    state: advanceTime({ ...state, player: tire(state, BALANCE.buildEnergyCost), companion: { ...state.companion, [item]: true, keepsakes: 0 } },
+      workSeconds(state, BALANCE.buildSeconds), 'working'),
+    message
+  };
+}
+
+const craftPillow: ActionHandler<'craftPillow'> = state =>
+  craftKeepsake(state, 'pillow', pillowBlocker(state), 'You stitched a feather pillow. The bed is softer for it.');
+const craftCloak: ActionHandler<'craftCloak'> = state =>
+  craftKeepsake(state, 'cloak', cloakBlocker(state), 'You made a fur cloak. The nights will bite a little less.');
+
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   move, cross, gather, craftAxe, craftPickaxe, gatherRubble, digQuarry, chopTree, visitSite,
   storeStone, takeStone, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, rest, sleep
+  cook, stargaze, stokeFire, repairLookout, build, rest, sleep, befriend, craftPillow, craftCloak
 };
 
 export function applyAction(state: GameState, action: GameAction): ActionResult {

@@ -1,10 +1,12 @@
 import Phaser from 'phaser';
-import type { GameState } from '../game/state';
+import type { Friend, GameState } from '../game/state';
 import { worldX, worldY } from './art';
 import { LIGHT_DEPTH } from './visuals';
 import { sprites } from '../art/sprites';
 import { firefliesOut, isSpring, isWinter, leavesFalling } from '../game/calendar';
 import { wolvesClose } from '../game/wolves';
+import { KEEPSAKE_SPOT, keepsakeKind, sceneryKeepsake } from '../game/companion';
+import { companionPose } from './companionPose';
 import {
   BIRD_HOMES, EYE_SPOTS, FIREFLY_HOMES, FOX, birdForageTarget, birdMayReturn, birdShouldLeave, birdGroundFrame, birdFlightFrame,
   LEAF_HOMES, RABBIT_FLEE_RADIUS, RABBIT_HOMES, WOLF_SPOTS, darkness, eyesAt, fireflyFrame, fireflyGlow, fireflyOffset, foxAt, foxFrame, leafAt, rabbitAt, rabbitCount, wolfCount, wolfWatch, type Point
@@ -28,6 +30,8 @@ const RABBIT_RETURN_DISTANCE = 4.5;
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const FLIGHT_SECONDS = 1.6;
 const FOX_RUN_SECONDS = 2.2;
+/** A bird that has started to trust the survivor lets them come this close before it flies. */
+const TRUSTING_FLEE_RADIUS = 1.2;
 
 function sprite(scene: Phaser.Scene, name: string, frame: string, depth = 0): Phaser.GameObjects.Image {
   const def = sprites[name];
@@ -69,6 +73,14 @@ export class AmbientLife {
   private readonly rabbits: Rabbit[];
   /** Eases toward how strongly the wolves press in, so their eyes fade rather than blink out. */
   private wolfPresence = 0;
+  private readonly friends: Record<Friend, Phaser.GameObjects.Image>;
+  private readonly keepsake: Phaser.GameObjects.Image;
+  /** The one smaller pair of eyes that comes to the firelight once the wolves begin to trust the survivor. */
+  private readonly trustingEyes: Phaser.GameObjects.Image;
+  /** How long the survivor has stood still, and which way they last walked, for the friend's pose. */
+  private stillSeconds = 0;
+  private facing: 1 | -1 = 1;
+  private lastPlayer: Point | null = null;
   private foxRun: Motion | null = null;
   private foxFledDay = 0;
   private started = false;
@@ -85,6 +97,9 @@ export class AmbientLife {
     this.eyes = EYE_SPOTS.map(() => sprite(scene, 'eyes', 'open', LIGHT_DEPTH));
     this.wolfEyes = WOLF_SPOTS.map(() => sprite(scene, 'eyes', 'open', LIGHT_DEPTH));
     this.rabbits = RABBIT_HOMES.map((_, index) => ({ index, image: sprite(scene, 'rabbit', 'sit'), run: null, hiddenSeconds: 0, away: false }));
+    this.friends = { bird: sprite(scene, 'bird', 'idle'), fox: sprite(scene, 'fox', 'sit0'), wolf: sprite(scene, 'wolf', 'sit') };
+    this.keepsake = sprite(scene, 'keepsake', 'feather');
+    this.trustingEyes = sprite(scene, 'eyes', 'open', LIGHT_DEPTH);
   }
 
   update(state: GameState, seconds: number, timeMs: number): void {
@@ -93,6 +108,7 @@ export class AmbientLife {
     if (state.area === 'quarry') this.updateEyes(dark, state, timeMs);
     else for (const image of this.eyes) image.setVisible(false);
     this.updateWolves(state, dark, seconds, timeMs);
+    this.updateFriend(state, seconds, timeMs);
     if (state.area !== 'camp') {
       for (const image of [...this.birds.map(bird => bird.image), this.fox, ...this.fireflies, ...this.leaves, ...this.rabbits.map(rabbit => rabbit.image)]) image.setVisible(false);
       return;
@@ -122,6 +138,26 @@ export class AmbientLife {
       .setDepth(Math.round(worldY(y))).setFlipX(facing < 0).setAlpha(alpha).setVisible(true);
   }
 
+  /** The friend, drawn where its pose puts it, and any piece of fur or feather it left by the fire. */
+  private updateFriend(state: GameState, seconds: number, timeMs: number): void {
+    const { x, y } = state.player;
+    const moved = this.lastPlayer ? x - this.lastPlayer.x : 0;
+    const still = this.lastPlayer !== null && Math.hypot(moved, y - this.lastPlayer.y) < 0.001;
+    this.stillSeconds = still ? this.stillSeconds + seconds : 0;
+    if (Math.abs(moved) > 0.001) this.facing = moved < 0 ? -1 : 1;
+    this.lastPlayer = { x, y };
+    const friend = state.companion.friend;
+    const pose = state.area === 'camp' ? companionPose(state, timeMs, this.stillSeconds, this.facing) : null;
+    for (const [kind, image] of Object.entries(this.friends) as [Friend, Phaser.GameObjects.Image][]) {
+      if (kind !== friend || !pose) { image.setVisible(false); continue; }
+      this.show(image, pose.x, pose.y - pose.height, pose.frame, pose.facing);
+      image.setDepth(Math.round(worldY(pose.y)));
+    }
+    const lying = friend && state.area === 'camp' && (state.companion.keepsakeLying || sceneryKeepsake(state));
+    if (lying) this.show(this.keepsake, KEEPSAKE_SPOT.x, KEEPSAKE_SPOT.y, `keepsake:${keepsakeKind(friend)}`);
+    else this.keepsake.setVisible(false);
+  }
+
   private startBirdFlee(bird: Bird, from: Point, player: Point, dark: number): void {
     const angle = dark > 0.3
       ? -Math.PI / 2 + (bird.index - 2) * 0.5
@@ -137,11 +173,17 @@ export class AmbientLife {
     const player = state.player;
     bird.restSeconds = Math.max(0, bird.restSeconds - seconds);
     if (bird.flight) this.updateFlight(bird, bird.flight, player, dark, seconds, timeMs);
-    else if (!bird.away && birdShouldLeave(bird.ground, player, dark)) this.startBirdFlee(bird, bird.ground, player, dark);
+    else if (!bird.away && birdShouldLeave(bird.ground, player, dark, this.fleeRadius(bird, state))) this.startBirdFlee(bird, bird.ground, player, dark);
     else if (bird.away && bird.restSeconds <= 0 && birdMayReturn(bird.home, player, dark)) {
       bird.flight = { from: bird.away, to: bird.home, elapsed: 0, duration: FLIGHT_SECONDS * 1.4, kind: 'return' };
     } else if (!bird.away) this.updateGroundedBird(bird, state, timeMs);
     else bird.image.setVisible(false);
+  }
+
+  /** One bird lingers once the birds have begun to trust the survivor. */
+  private fleeRadius(bird: Bird, state: GameState): number | undefined {
+    const trusting = bird.index === 0 && !state.companion.friend && state.companion.trust.bird > 0;
+    return trusting ? TRUSTING_FLEE_RADIUS : undefined;
   }
 
   private updateFlight(bird: Bird, flight: Flight, player: Point, dark: number, seconds: number, timeMs: number): void {
@@ -204,15 +246,18 @@ export class AmbientLife {
       if (progress >= 1) this.foxRun = null;
       return;
     }
-    if (this.foxFledDay === state.day) { this.fox.setVisible(false); return; }
-    const pose = foxAt(state.day, state.timeOfDay);
+    // A befriended fox is the friend now, and no longer comes by as a wild one.
+    if (this.foxFledDay === state.day || state.companion.friend === 'fox') { this.fox.setVisible(false); return; }
+    const pose = foxAt(state.day, state.timeOfDay, state.companion.trust.fox);
     if (!pose) { this.fox.setVisible(false); return; }
-    if (Math.hypot(pose.x - state.player.x, pose.y - state.player.y) < FOX.spookRadius) {
+    // The rules decide when the fox is startled, so the offering and the fox agree.
+    if (state.companion.foxFled === state.day) {
       this.foxFledDay = state.day;
       this.foxRun = { from: pose, to: FOX.den, elapsed: 0, duration: FOX_RUN_SECONDS };
       this.fox.setVisible(false);
       return;
     }
+    if (pose.nibbling) { this.show(this.fox, pose.x, pose.y, 'fox:trot0', pose.facing); return; }
     const foxPose = pose.sitting ? 'sit' : 'trot';
     this.show(this.fox, pose.x, pose.y, foxFrame(foxPose, timeMs / 1000), pose.facing);
   }
@@ -269,6 +314,17 @@ export class AmbientLife {
       image.setTexture(`eyes:${eyes.frame}`).setPosition(Math.round(worldX(eyes.x)), Math.round(worldY(eyes.y)))
         .setAlpha(alpha).setVisible(true);
     });
+    this.updateTrustingEyes(state, dark, timeMs);
+  }
+
+  /** Once the wolves have taken a ration, one smaller pair of eyes watches from the edge of the firelight, fire lit or not. */
+  private updateTrustingEyes(state: GameState, dark: number, timeMs: number): void {
+    const { friend, trust } = state.companion;
+    const trusting = !friend && trust.wolf > 0 && state.area === 'camp' && isWinter(state.day) && dark > 0.5;
+    const eyes = trusting ? eyesAt(0, timeMs, dark, state.player, WOLF_SPOTS) : null;
+    if (!eyes) { this.trustingEyes.setVisible(false); return; }
+    this.trustingEyes.setTexture(`eyes:${eyes.frame}`).setPosition(Math.round(worldX(eyes.x)), Math.round(worldY(eyes.y)))
+      .setAlpha(eyes.alpha * 0.7).setVisible(true);
   }
 
   private updateLeaves(state: GameState, dark: number, timeMs: number): void {

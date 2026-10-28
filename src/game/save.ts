@@ -2,9 +2,10 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState } from './state';
 import { bagCapacity, carriedCount } from './rules';
 import { season, yearOf } from './calendar';
 import { journalEntry, journalSeason, type JournalId } from './journalEntries';
+import { KEEPSAKES_NEEDED, TRUST_TARGET } from './companion';
 
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 14;
+const SAVE_VERSION = 15;
 export type SaveResult = { ok: true } | { ok: false; error: string };
 export type LoadResult = { kind: 'empty' } | { kind: 'loaded'; state: GameState } | { kind: 'invalid'; reason: string };
 
@@ -82,7 +83,7 @@ function validWorld({ nodes, trees, stonePiles, day }: SaveShape): boolean {
   return nodesMatch && treesMatch && pilesValid;
 }
 
-const WOLF_TAKES: readonly unknown[] = ['ration', 'berry', 'nothing'];
+const WOLF_TAKES: readonly unknown[] = ['ration', 'berry', 'nothing', 'offered', 'chased'];
 
 /** No wolf yet, or one that came on a day already lived, taking something it could take. */
 function validWolf({ lastWolf, day }: SaveShape): boolean {
@@ -105,10 +106,35 @@ function validJournal({ journal, day }: SaveShape): boolean {
   });
 }
 
-/** Checks a version 14 save: two areas, the toolshed's tools, the quarry's timers, the last wolf visit and the year journal. */
+const FRIENDS = ['bird', 'fox', 'wolf'] as const;
+
+/**
+ * No friend and trust still short of every target, or one friend that came on a lived day.
+ * Keepsakes come only from a friend, at most six, and each item only from its own friend's fur or feathers.
+ */
+function validCompanion({ companion, day, structures }: SaveShape): boolean {
+  if (!object(companion) || !object(companion.trust) || !object(companion.lastOffer)) return false;
+  const { friend, since, trust, lastOffer, keepsakes, keepsakeLying, pillow, cloak } = companion as ObjectValue
+    & { trust: ObjectValue; lastOffer: ObjectValue };
+  const lived = (value: unknown): boolean => count(value) && value <= (day as number);
+  const known = friend === null || FRIENDS.includes(friend as typeof FRIENDS[number]);
+  if (!known || !bool(keepsakeLying) || !bool(pillow) || !bool(cloak) || !count(keepsakes) || keepsakes > KEEPSAKES_NEEDED) return false;
+  if (!(['lastFind', 'lastGift', 'alarmDay', 'foxFled'] as const).every(key => lived(companion[key]))) return false;
+  if (!FRIENDS.every(animal => count(trust[animal]) && trust[animal] <= TRUST_TARGET[animal] && lived(lastOffer[animal]))) return false;
+  if (friend === null) {
+    return since === null && FRIENDS.every(animal => (trust[animal] as number) < TRUST_TARGET[animal])
+      && keepsakes === 0 && !keepsakeLying && !pillow && !cloak;
+  }
+  const made = pillow || cloak;
+  return lived(since) && (since as number) >= 1 && !(pillow && cloak)
+    && (!pillow || (friend === 'bird' && structures.bed === true)) && (!cloak || friend !== 'bird')
+    && (!made || (keepsakes === 0 && !keepsakeLying));
+}
+
+/** Checks a version 15 save: two areas, the toolshed's tools, the quarry's timers, the last wolf visit, the year journal and the companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWorld, validWolf, validJournal];
+  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWorld, validWolf, validJournal, validCompanion];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

@@ -1,7 +1,8 @@
 import { duskLength, nightStart, season, seasonMessage, yearOf, type Season } from './calendar';
 import { rainMessage } from './rain';
 import { isAtCamp, isColdNight, type GameAction } from './rules';
-import { LOOKOUT, RABBIT_HOMES, type GameState } from './state';
+import { LOOKOUT, type GameState } from './state';
+import { RABBIT_HOMES } from './wildlife';
 import { wolfMessage } from './wolves';
 
 // The year journal is a keepsake: the survivor writes small moments down as they happen,
@@ -26,7 +27,7 @@ interface PageEntry {
 export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
   autumn: [
     { id: 'leaves', icon: '🍂', lines: ['The first leaves came down over camp.'] },
-    { id: 'fox', icon: '🦊', lines: ['A fox came by the bushes at dusk.'] },
+    { id: 'fox', icon: '🦊', lines: ['A fox nosed around the berry bushes at dusk.'] },
     { id: 'coldFront', icon: '❄️', lines: ['The cold front came. I kept the fire through it.', 'The cold front came, and it got the better of me.',
       'A cold autumn night, and the fire kept me warm.'] },
     { id: 'driedBerries', icon: '🫐', lines: ['Dried berries for the winter.'] },
@@ -93,7 +94,9 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   wolfTracks: m => (wolfMessage(m.before, m.after) !== null && m.after.lastWolf ? { day: m.after.lastWolf.day } : null),
   frozenSpring: m => onBefore(m, atSpring(m)),
   // A wolf comes the moment a winter night's fire goes out, so a night without one kept its fire.
-  winterFire: m => onBefore(m, dawn(m) && isAtCamp(m.before) && m.before.lastWolf?.day !== m.before.day),
+  // A ration left out for the wolves is that night's visit, so then the fire itself tells.
+  winterFire: m => onBefore(m, dawn(m) && isAtCamp(m.before) && (m.before.lastWolf?.day !== m.before.day
+    || (m.before.lastWolf.took === 'offered' && m.before.fireFuel > 0))),
   winterCooking: m => onBefore(m, acted(m, 'cook')),
   firstRain: m => onAfter(m, rainMessage(m.before, m.after) !== null),
   rabbits: m => onAfter(m, awake(m) && m.after.area === 'camp' && daylight(m.after) && RABBIT_HOMES.some(home => within(m.after, home, 4))),

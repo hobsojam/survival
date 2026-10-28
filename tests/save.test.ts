@@ -46,7 +46,7 @@ describe('local save', () => {
     state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
     state.nodes.find(node => node.kind === 'fiber')!.readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(14);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(15);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);
@@ -80,10 +80,10 @@ describe('local save', () => {
     const storage = new MemoryStorage();
     const state = createGame();
     state.trees[0].x += 1;
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 14, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 15, state }));
     expect(loadGame(storage).kind).toBe('invalid');
     state.trees[0] = { ...createGame().trees[0], readyDay: state.day + BALANCE.treeRegrowDays + 1 };
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 14, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 15, state }));
     expect(loadGame(storage).kind).toBe('invalid');
   });
 
@@ -117,7 +117,7 @@ describe('local save', () => {
     for (const change of [(s: typeof state) => { s.quarryReadyDay = 0; }, (s: typeof state) => { s.rubbleReadyDay = 0; }]) {
       const broken = structuredClone(state);
       change(broken);
-      storage.setItem(SAVE_KEY, JSON.stringify({ version: 14, state: broken }));
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 15, state: broken }));
       expect(loadGame(storage).kind).toBe('invalid');
     }
   });
@@ -145,7 +145,7 @@ describe('local save', () => {
     const storage = new MemoryStorage();
     const state = createGame();
     state.timeOfDay = 240;
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 14, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 15, state }));
     expect(loadGame(storage).kind).toBe('invalid');
   });
 
@@ -206,13 +206,13 @@ describe('local save', () => {
       const storage = new MemoryStorage();
       const state = createGame();
       change(state);
-      storage.setItem(SAVE_KEY, JSON.stringify({ version: 14, state }));
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 15, state }));
       expect(loadGame(storage).kind, `variant ${index}`).toBe('invalid');
     });
   });
 
   it('rejects every earlier version', () => {
-    for (let version = 1; version <= 12; version++) {
+    for (let version = 1; version <= 14; version++) {
       const storage = new MemoryStorage();
       storage.setItem(SAVE_KEY, JSON.stringify({ version, state: createGame() }));
       expect(loadGame(storage).kind, `version ${version}`).toBe('invalid');
@@ -235,7 +235,7 @@ describe('local save', () => {
       const storage = new MemoryStorage();
       const state = { ...createGame(), day: 13, lastWolf };
       state.progress.nextStormDay = 13;
-      storage.setItem(SAVE_KEY, JSON.stringify({ version: 14, state }));
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 15, state }));
       expect(loadGame(storage).kind, `visit ${index}`).toBe('invalid');
     });
   });
@@ -244,7 +244,7 @@ describe('local save', () => {
     const storage = new MemoryStorage();
     const state = createGame();
     state.inventory.stone = 5;
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 14, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 15, state }));
     expect(loadGame(storage).kind).toBe('invalid');
   });
 
@@ -261,7 +261,7 @@ describe('local save', () => {
       const storage = new MemoryStorage();
       const state = createGame();
       change(state);
-      storage.setItem(SAVE_KEY, JSON.stringify({ version: 14, state }));
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 15, state }));
       expect(loadGame(storage).kind, `variant ${index}`).toBe('invalid');
     });
   });
@@ -278,7 +278,7 @@ describe('autosave backoff', () => {
 });
 
 describe('the year journal in the save', () => {
-  const store = (state: ReturnType<typeof createGame>, version = 14) => {
+  const store = (state: ReturnType<typeof createGame>, version = 15) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;
@@ -318,5 +318,50 @@ describe('the year journal in the save', () => {
     const journal = Array.from({ length: 10 }, (_, year) => ids.map((id, index) => ({ year: year + 1, id, day: year * 40 + index + 1, variant: 0 }))).flat();
     expect(store(onDay(5))).toBe('loaded');
     expect(store({ ...onDay(400), journal })).toBe('loaded');
+  });
+});
+
+describe('the companion in the save', () => {
+  const store = (state: unknown, version = 15) => {
+    const storage = new MemoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
+    return loadGame(storage).kind;
+  };
+  const onDay = (day: number) => {
+    const state = { ...createGame(), day };
+    state.progress = { ...state.progress, nextStormDay: null, hearthUnlocked: true };
+    return state;
+  };
+  const withCompanion = (changes: Record<string, unknown>, day = 30) => {
+    const state = onDay(day);
+    return { ...state, companion: { ...state.companion, ...changes } };
+  };
+
+  it('round-trips a friend and rejects version 14 saves', () => {
+    const storage = new MemoryStorage();
+    const state = withCompanion({ friend: 'fox', since: 20, trust: { bird: 2, fox: 4, wolf: 1 }, lastOffer: { bird: 3, fox: 20, wolf: 12 },
+      keepsakes: 3, keepsakeLying: true, lastFind: 28, lastGift: 27 });
+    expect(saveGame(storage, state).ok).toBe(true);
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
+    expect(store(state, 14)).toBe('invalid');
+  });
+
+  it('rejects companions that could not have come about', () => {
+    const cases = [
+      { friend: 'cat', since: 3 },
+      { friend: 'fox', since: 3, trust: { bird: 0, fox: 4, wolf: 0 }, keepsakes: 7 },
+      { trust: { bird: 5, fox: 0, wolf: 0 } },
+      { friend: 'fox', since: 3, trust: { bird: 0, fox: 4, wolf: 0 }, pillow: true },
+      { friend: 'bird', since: 3, trust: { bird: 5, fox: 0, wolf: 0 }, cloak: true },
+      { friend: 'bird', since: 40, trust: { bird: 5, fox: 0, wolf: 0 } },
+      { friend: null, since: null, keepsakes: 2 }
+    ];
+    cases.forEach((changes, index) => expect(store(withCompanion(changes)), `case ${index}`).toBe('invalid'));
+    expect(store(withCompanion({ friend: 'bird', since: 3, trust: { bird: 5, fox: 0, wolf: 0 } }))).toBe('loaded');
+  });
+
+  it('loads wolf visits that were offered or chased off', () => {
+    expect(store({ ...onDay(12), lastWolf: { day: 12, took: 'offered' } })).toBe('loaded');
+    expect(store({ ...onDay(12), lastWolf: { day: 11, took: 'chased' } })).toBe('loaded');
   });
 });

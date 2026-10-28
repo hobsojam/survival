@@ -65,7 +65,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setZoom(1);
     this.cameras.main.roundPixels = true;
     this.lighting = new SceneLighting(this, LOGICAL_WIDTH, LOGICAL_HEIGHT);
-    this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,T,P,C,G,Z,L,X,V') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,T,P,C,G,Z,L,O,X,V') as Record<string, Phaser.Input.Keyboard.Key>;
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       // Right and middle clicks don't walk; touches report button 0.
       if (pointer.button === 0) this.handleTap(pointer.worldX, pointer.worldY);

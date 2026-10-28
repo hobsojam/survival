@@ -16,9 +16,6 @@ export type StructureId = keyof typeof BUILDINGS;
 
 export const PICKAXE = { cost: { wood: 2, fiber: 1, stone: 2 } } as const;
 
-/** Where the spring rabbits live: in the meadow beside the bushes at (16, 18), (25, 11) and (23, 17). */
-export const RABBIT_HOMES: readonly { x: number; y: number }[] = [{ x: 14.5, y: 17.5 }, { x: 26.5, y: 13.5 }, { x: 22.5, y: 20.5 }];
-
 export const LOOKOUT = { x: 30, y: 8, cost: { wood: 4, fiber: 2, stone: 2 } } as const;
 
 export const SITES = {
@@ -56,8 +53,32 @@ export interface StonePile {
 
 export type AreaId = 'camp' | 'quarry';
 
-/** What a wolf took on its last visit. */
-export type WolfTake = 'ration' | 'berry' | 'nothing';
+/** What a wolf took on its last visit: a ration left out for it counts as its visit, and a friendly wolf sees the others off. */
+export type WolfTake = 'ration' | 'berry' | 'nothing' | 'offered' | 'chased';
+
+/** The wild animals that can become the camp's one friend. */
+export type Friend = 'bird' | 'fox' | 'wolf';
+
+export interface Companion {
+  /** The friend, once one has stayed; it never leaves. */
+  friend: Friend | null;
+  since: number | null;
+  /** Offerings each animal has taken, and the day (or night) of the last. */
+  trust: Record<Friend, number>;
+  lastOffer: Record<Friend, number>;
+  /** Fur or feathers picked up, kept outside the bag, and whether a piece lies by the fire. */
+  keepsakes: number;
+  keepsakeLying: boolean;
+  /** The last dawn a piece was shed, and the last the fox brought a berry. */
+  lastFind: number;
+  lastGift: number;
+  pillow: boolean;
+  cloak: boolean;
+  /** The last winter night the bird woke the sleeper. */
+  alarmDay: number;
+  /** The last evening the wild fox was startled away; it doesn't come back that evening. */
+  foxFled: number;
+}
 
 export interface GameState {
   area: AreaId;
@@ -83,6 +104,7 @@ export interface GameState {
   lastWolf: { day: number; took: WolfTake } | null;
   /** What the survivor has written in the year journal. */
   journal: JournalEntry[];
+  companion: Companion;
 }
 
 export const BALANCE = {
@@ -113,10 +135,14 @@ export const BALANCE = {
   rackCookHungerGain: 50,
   cookWarmthGain: 10,
   stargazeSeconds: 12,
+  /** Leaving an offering out for a wild animal. */
+  offerSeconds: 3,
   stargazeEnergyGain: 10,
   restSeconds: 20,
   restEnergyGain: 25,
   bedRestEnergyGain: 50,
+  /** A feather pillow adds this to resting in the bed, and to the hungry-sleep cap. */
+  pillowEnergyGain: 10,
   sleepEnergyGain: 60,
   energyDrainPerSecond: 1 / 6,
   /** At or below this, energy and hunger read as low: tired or hungry. */
@@ -143,6 +169,8 @@ export const BALANCE = {
   coldNightStartDay: 3,
   coldNightRetryDays: 3,
   coldNightFireBurn: 2,
+  /** A friendly bird wakes the sleeper as a winter fire falls to this much fuel. */
+  alarmFuel: 20,
   /** A spring shower makes the fire burn this much faster. */
   rainFireBurn: 1.5,
   /** Summer's midday heat: from this time of day until the end, hunger falls faster by the factor. */
@@ -153,6 +181,8 @@ export const BALANCE = {
   summerBerries: 2,
   coldNightShelteredWarmthLossPerSecond: 0.75,
   coldNightOutdoorWarmthLossPerSecond: 1.25,
+  /** A fur cloak leaves this share of any warmth lost at night. */
+  cloakWarmthLoss: 0.75,
   coldNightFailureEnergy: 25,
   coldNightFailureMorningLoss: 30,
   interactionRadius: 2,
@@ -204,6 +234,10 @@ export function createGame(): GameState {
     quarryReadyDay: 1,
     rubbleReadyDay: 1,
     lastWolf: null,
-    journal: []
+    journal: [],
+    companion: {
+      friend: null, since: null, trust: { bird: 0, fox: 0, wolf: 0 }, lastOffer: { bird: 0, fox: 0, wolf: 0 },
+      keepsakes: 0, keepsakeLying: false, lastFind: 0, lastGift: 0, pillow: false, cloak: false, alarmDay: 0, foxFled: 0
+    }
   };
 }

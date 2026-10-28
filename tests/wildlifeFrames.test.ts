@@ -56,3 +56,15 @@ describe('the rabbit', () => {
     expect(Object.keys(wildlifeSprites.rabbit.frames)).toEqual(['sit', 'nibble0', 'nibble1', 'hop0', 'hop1']);
   });
 });
+
+describe('the friends', () => {
+  it('has a young wolf that walks, sits and lies down', () => {
+    expect(() => validateSprite(wildlifeSprites.wolf)).not.toThrow();
+    expect(Object.keys(wildlifeSprites.wolf.frames)).toEqual(['walk0', 'walk1', 'sit', 'lie']);
+  });
+
+  it('has a feather and a tuft of fur to leave by the fire', () => {
+    expect(() => validateSprite(wildlifeSprites.keepsake)).not.toThrow();
+    expect(Object.keys(wildlifeSprites.keepsake.frames)).toEqual(['feather', 'fur']);
+  });
+});

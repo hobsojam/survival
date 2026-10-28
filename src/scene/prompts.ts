@@ -3,6 +3,7 @@ import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceKind, type SiteId
 import { isAtCamp, sleepBlocker, type GameAction } from '../game/rules';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 import { sitePrompt } from '../game/sitePrompt';
+import { OFFER_PROMPT, offerFor } from '../game/companion';
 import { closestGatherable, type Gatherable } from './tapTarget';
 import type { SurvivorAction } from './survivorVisual';
 
@@ -10,7 +11,7 @@ import type { SurvivorAction } from './survivorVisual';
 export const KEY_ACTIONS: readonly [string, GameAction][] = [
   ['F', { type: 'stokeFire' }], ['R', { type: 'rest' }], ['Q', { type: 'eat' }], ['T', { type: 'eatTrailFood' }],
   ['P', { type: 'prepareTrailFood' }], ['C', { type: 'cook' }], ['G', { type: 'stargaze' }], ['Z', { type: 'sleep' }],
-  ['L', { type: 'repairLookout' }]
+  ['L', { type: 'repairLookout' }], ['O', { type: 'befriend' }]
 ];
 
 const ACTION_POSES: Partial<Record<GameAction['type'], SurvivorAction>> = {
@@ -88,12 +89,12 @@ export function promptFor(state: GameState): string {
   if (state.area === 'quarry') return quarryPrompt(state, found);
   const site = closestSite(state);
   const nearby = lookoutPrompt(state) || (site ? sitePrompt(state, site.id) : '') || treePrompt(state);
-  if (found) {
-    const gather = gatherPrompt(found, isWinter(state.day));
-    if (nearby) return `${gather} · ${nearby}`;
-    return sleepBlocker(state) ? gather : `${gather} · Z Sleep until morning`;
-  }
-  return nearby || campPrompt(state);
+  const animal = offerFor(state);
+  const offer = animal ? `O  ${OFFER_PROMPT[animal]}` : '';
+  const gather = found ? gatherPrompt(found, isWinter(state.day)) : '';
+  const parts = [gather, nearby, offer].filter(Boolean);
+  if (gather && parts.length === 1 && !sleepBlocker(state)) return `${gather} · Z Sleep until morning`;
+  return parts.length ? parts.join(' · ') : campPrompt(state);
 }
 
 function lookoutPrompt(state: GameState): string {

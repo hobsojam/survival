@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
-import { axeView, bagView, buildButtonView, forecastView, lookoutView, nightHint, pickaxeView, startNote } from '../src/ui/panels';
+import { axeView, bagView, buildButtonView, cloakView, forecastView, keepsakeView, lookoutView, nightHint, pickaxeView, pillowView, startNote } from '../src/ui/panels';
 
 type Changes = { structures?: Partial<GameState['structures']>; progress?: Partial<GameState['progress']>; inventory?: Partial<GameState['inventory']> };
 
@@ -215,5 +215,28 @@ describe('forecast card visibility', () => {
     expect(forecastView(game()).shown).toBe(true);
     expect(forecastView(game({ progress: afterColdNight }, { day: 14 })).shown).toBe(true);
     expect(forecastView(game({ progress: afterColdNight }, { day: 24 })).shown).toBe(false);
+  });
+});
+
+describe('keepsakes and what they make', () => {
+  const friend = (friendId: 'bird' | 'fox', changes: Partial<GameState['companion']> = {}): GameState => {
+    const state = createGame();
+    return { ...state, companion: { ...state.companion, friend: friendId, since: 1, ...changes } };
+  };
+
+  it('counts feathers or fur until the item is made', () => {
+    expect(keepsakeView(createGame()).shown).toBe(false);
+    expect(keepsakeView(friend('bird', { keepsakes: 3 }))).toEqual({ shown: true, text: 'Feathers 3/6' });
+    expect(keepsakeView(friend('fox', { keepsakes: 1 }))).toEqual({ shown: true, text: 'Fur 1/6' });
+    expect(keepsakeView(friend('fox', { cloak: true })).shown).toBe(false);
+  });
+
+  it('shows only the item a friend can give', () => {
+    expect(cloakView(createGame()).shown).toBe(false);
+    expect(pillowView(createGame()).shown).toBe(false);
+    expect([pillowView(friend('bird')).shown, cloakView(friend('bird')).shown]).toEqual([true, false]);
+    expect(cloakView(friend('fox')).shown).toBe(true);
+    expect(cloakView(friend('fox', { cloak: true }))).toMatchObject({ title: 'Fur cloak', cost: 'Made', disabled: true });
+    expect(pillowView(friend('bird', { keepsakes: 2 }))).toMatchObject({ copy: 'Build a toolshed first.', cost: '6 feathers', ready: false });
   });
 });
