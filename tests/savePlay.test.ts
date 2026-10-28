@@ -37,9 +37,16 @@ function play(seed: number, each: (state: GameState, step: number) => void): Gam
   let state = createGame();
   const act = (action: GameAction) => { state = applyAction(state, action).state; };
   const goTo = (x: number, y: number) => act({ type: 'move', dx: x - state.player.x, dy: y - state.player.y });
-  for (let step = 0; step < 6000 && state.day <= 12; step++) {
+  for (let step = 0; step < 10000 && state.day <= 12; step++) {
     const roll = random();
-    const goal = structures.find(id => !state.structures[id] && (id !== 'hearth' || state.progress.hearthUnlocked));
+    const goal = structures.find(id => {
+      if (state.structures[id]) return false;
+      const definition = BUILDINGS[id];
+      const prerequisite = definition.prerequisite;
+      if (prerequisite === 'coldNight') return state.progress.hearthUnlocked;
+      if (prerequisite && !state.structures[prerequisite]) return false;
+      return !('alsoRequires' in definition) || state.structures[definition.alsoRequires];
+    });
     if (isColdNight(state) && roll < 0.8) {
       // Mostly hold camp through the storm, so some runs weather it and unlock the hearth.
       goTo(BALANCE.campX + 1, BALANCE.campY + 1);

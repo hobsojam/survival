@@ -48,8 +48,10 @@ export class App {
     this.pause = createPause(this.root, { scenes: () => this.game?.scene, sound: this.soundscape, save: () => { if (this.storage) this.saveCurrent(); }, started: () => Boolean(this.scene) });
     const buildMarkup = buildOptions.map(id => {
       const { name, description, symbol } = BUILDINGS[id];
-      return `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>`
-        + (id === 'stonePile' ? `<div id="stone-pile-controls" class="stone-pile-controls" hidden><span id="stone-pile-stored">Stored stone 0/${BALANCE.stonePileCapacity}</span><button type="button" data-action="storeStone">Store 1</button><button type="button" data-action="takeStone">Take 1</button></div>` : '');
+      const groupHeading = id === 'shelterThatched' ? '<h3 class="build-group-heading">Shelter upgrades</h3>' : '';
+      let extraControls = '';
+      if (id === 'stonePile') extraControls = `<div id="stone-pile-controls" class="stone-pile-controls" hidden><span id="stone-pile-stored">Stored stone 0/${BALANCE.stonePileCapacity}</span><button type="button" data-action="storeStone">Store 1</button><button type="button" data-action="takeStone">Take 1</button></div>`;
+      return groupHeading + `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>` + extraControls;
     }).join('');
     // The quarry marker is always in the markup and shown only once the west path opens.
     const markerPlaces = [...journalView(this.state).locations.filter(place => place.id !== 'quarry'), { id: 'quarry', ...QUARRY_MARKER }];

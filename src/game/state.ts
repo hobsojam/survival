@@ -3,6 +3,10 @@ export type ResourceKind = 'branch' | 'berry' | 'fiber' | 'stone';
 
 export const BUILDINGS = {
   shelter: { name: 'Shelter', description: 'A roof against the night cold', symbol: '⌂', cost: { wood: 6, fiber: 2 }, prerequisite: null },
+  shelterThatched: { name: 'Thatched roof', description: 'A thicker roof holds warmth after dark', symbol: '⌂', cost: { wood: 0, fiber: 4 }, prerequisite: 'shelter' },
+  shelterStonework: { name: 'Stone footing and chimney', description: 'Set the shelter on stone and add a chimney', symbol: '◆', cost: { wood: 0, fiber: 0, stone: 5 }, prerequisite: 'shelterThatched', alsoRequires: 'hearth' },
+  shelterPorch: { name: 'Small porch', description: 'Add a little covered space at the entrance', symbol: '⌂', cost: { wood: 3, fiber: 0, stone: 3 }, prerequisite: 'shelterStonework' },
+  shelterFinished: { name: 'Door and shutters', description: 'Finish the shelter with a door and shutters', symbol: '▣', cost: { wood: 2, fiber: 2 }, prerequisite: 'shelterPorch' },
   bed: { name: 'Bed', description: 'Rest more deeply at camp', symbol: '▣', cost: { wood: 4, fiber: 1 }, prerequisite: 'shelter' },
   crate: { name: 'Storage crate', description: 'Carry up to 16 supplies', symbol: '▤', cost: { wood: 4, fiber: 0 }, prerequisite: null },
   toolshed: { name: 'Toolshed', description: 'Make tools here', symbol: '⚒', cost: { wood: 5, fiber: 2 }, prerequisite: 'shelter' },
@@ -179,6 +183,7 @@ export const BALANCE = {
   summerHeatHunger: 1.25,
   /** Berries a summer bush gives with each gather. */
   summerBerries: 2,
+  thatchedShelteredWarmthLossPerSecond: 0.2,
   coldNightShelteredWarmthLossPerSecond: 0.75,
   coldNightOutdoorWarmthLossPerSecond: 1.25,
   /** A fur cloak leaves this share of any warmth lost at night. */
@@ -223,7 +228,7 @@ export function createGame(): GameState {
     player: { x: BALANCE.campX + 1, y: BALANCE.campY + 1, energy: 100, hunger: 100, warmth: 100 },
     inventory: { wood: 0, food: 0, fiber: 0, stone: 0, trailFood: 0 },
     fireFuel: 0,
-    structures: { shelter: false, bed: false, crate: false, hearth: false, dryingRack: false, windbreak: false, stonePile: false, toolshed: false },
+    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, crate: false, hearth: false, dryingRack: false, windbreak: false, stonePile: false, toolshed: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
       quarryFound: false, pickaxeCrafted: false,
       discoveries: { basket: false, spring: false, cairn: false } },

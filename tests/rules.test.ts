@@ -1170,6 +1170,14 @@ describe('quarry and tools', () => {
     expect(built.inventory.fiber).toBe(0);
   });
 
+  it('keeps shelter prerequisites distinct from later upgrade prerequisites', () => {
+    const state = createGame();
+    expect(buildStatus(state, 'shelterThatched')).toBe('needsShelter');
+    state.structures.shelter = true;
+    expect(buildStatus(state, 'shelterThatched')).toBe('unavailable');
+    expect(buildStatus(state, 'shelterStonework')).toBe('needsPrerequisite');
+  });
+
   it('the axe needs the toolshed', () => {
     const state = atCamp();
     state.progress.hearthUnlocked = true;
@@ -1265,6 +1273,56 @@ describe('quarry and tools', () => {
       state = advanceTime({ ...state, player: { ...state.player, energy: 100, hunger: 100, warmth: 100 } }, BALANCE.daySeconds - state.timeOfDay);
     }
     expect(crafted).toBe(true);
+  });
+});
+
+describe('shelter upgrades', () => {
+  it('builds each shelter stage in order and requires the stone hearth for stonework', () => {
+    const state = createGame();
+    state.structures.shelter = true;
+    state.inventory.fiber = 4;
+    expect(buildStatus(state, 'shelterThatched')).toBe('ready');
+    const thatched = applyAction(state, { type: 'build', structureId: 'shelterThatched' }).state;
+    expect(thatched.structures.shelterThatched).toBe(true);
+    expect(thatched.inventory.fiber).toBe(0);
+
+    thatched.storedStone = 5;
+    expect(buildStatus(thatched, 'shelterStonework')).toBe('needsPrerequisite');
+    thatched.structures.hearth = true;
+    thatched.progress = { ...thatched.progress, hearthUnlocked: true, nextStormDay: null };
+    expect(buildStatus(thatched, 'shelterStonework')).toBe('ready');
+    const stonework = applyAction(thatched, { type: 'build', structureId: 'shelterStonework' }).state;
+    expect(stonework.structures.shelterStonework).toBe(true);
+    expect(stonework.storedStone).toBe(0);
+
+    stonework.inventory.wood = 5;
+    stonework.storedStone = 3;
+    const porch = applyAction(stonework, { type: 'build', structureId: 'shelterPorch' }).state;
+    expect(porch.structures.shelterPorch).toBe(true);
+    expect(porch.inventory.wood).toBe(2);
+    expect(porch.storedStone).toBe(0);
+
+    porch.inventory.fiber = 2;
+    const finished = applyAction(porch, { type: 'build', structureId: 'shelterFinished' }).state;
+    expect(finished.structures.shelterFinished).toBe(true);
+    expect(finished.inventory.wood).toBe(0);
+    expect(finished.inventory.fiber).toBe(0);
+  });
+
+  it('reduces ordinary sheltered warmth loss but leaves cold-front and lit-fire warmth unchanged', () => {
+    const state = createGame();
+    state.timeOfDay = NIGHT + 10;
+    state.player.warmth = 80;
+    state.structures.shelter = true;
+    state.structures.shelterThatched = true;
+    expect(advanceTime(state, 4).player.warmth).toBeCloseTo(79.2);
+
+    state.day = 3;
+    state.timeOfDay = STORM_NIGHT + 10;
+    state.progress.nextStormDay = 3;
+    expect(advanceTime(state, 4).player.warmth).toBeCloseTo(77);
+    state.fireFuel = 10;
+    expect(advanceTime(state, 4).player.warmth).toBeCloseTo(82);
   });
 });
 

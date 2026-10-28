@@ -59,7 +59,7 @@ function reeds(g: Grid, ready: boolean, lean = 0): void {
   }
 }
 
-const campLegend = { s: 'shadow', a: 'wood0', b: 'wood1', c: 'wood2', d: 'wood3', e: 'wood4', f: 'canvas0', g: 'canvas1', h: 'canvas2', i: 'canvas3', j: 'canvas4', k: 'berry2', l: 'berry4', m: 'stone0', n: 'stone1', o: 'stone2', p: 'stone3', q: 'stone4', r: 'fire0', t: 'fire1', u: 'fire2', v: 'fire3', w: 'fire4', z: 'earth3' } as const;
+const campLegend = { s: 'shadow', a: 'wood0', b: 'wood1', c: 'wood2', d: 'wood3', e: 'wood4', f: 'canvas0', g: 'canvas1', h: 'canvas2', i: 'canvas3', j: 'canvas4', k: 'berry2', l: 'berry4', m: 'stone0', n: 'stone1', o: 'stone2', p: 'stone3', q: 'stone4', r: 'fire0', t: 'fire1', u: 'fire2', v: 'fire3', w: 'fire4', z: 'earth3', A: 'earth2', B: 'earth4', C: 'scarf3' } as const;
 function stake(g: Grid, x: number, y: number): void {
   box(g, x, y, 2, 4, 'a'); box(g, x, y, 1, 2, 'd'); dot(g, x, y, 'e');
 }
@@ -69,19 +69,44 @@ function shelterSite(g: Grid): void {
   line(g, 6, 19, 42, 19, 'h'); line(g, 6, 27, 42, 27, 'h');
   line(g, 5, 20, 5, 27, 'h'); line(g, 43, 20, 43, 27, 'h');
 }
-function shelter(g: Grid, bed: boolean): void {
+type ShelterStage = 'plain' | 'thatched' | 'stonework' | 'porch' | 'finished';
+function shelter(g: Grid, bed: boolean, stage: ShelterStage = 'plain'): void {
   oval(g, 24, 36, 21, 3, 's');
   box(g, 3, 17, 42, 17, 'a'); box(g, 5, 18, 38, 14, 'g');
   for (let y = 4; y <= 28; y++) {
     const half = Math.min(21, Math.floor((y - 4) * .88));
-    box(g, 24 - half, y, half + 1, 1, 'h'); box(g, 25, y, half, 1, 'g');
-    dot(g, 24 - half, y, 'f');
+    const roof = stage === 'plain' ? 'h' : 'A';
+    const highlight = stage === 'plain' ? 'g' : 'B';
+    box(g, 24 - half, y, half + 1, 1, roof); box(g, 25, y, half, 1, highlight);
+    dot(g, 24 - half, y, stage === 'plain' ? 'f' : 'C');
+  }
+  if (stage !== 'plain') {
+    for (let y = 8; y < 25; y += 4) {
+      line(g, 24 - Math.min(21, Math.floor((y - 4) * .88)), y, 17, y + 3, 'C');
+      line(g, 25 + Math.min(21, Math.floor((y - 4) * .88)), y, 31, y + 3, 'A');
+    }
   }
   line(g, 24, 4, 24, 25, 'j');
   box(g, 16, 23, 17, 11, 'f'); box(g, 19, 24, 11, 10, 'a');
   if (bed) { box(g, 19, 29, 11, 5, 'i'); box(g, 20, 28, 9, 2, 'j'); box(g, 20, 32, 9, 2, 'g'); }
-  box(g, 4, 34, 40, 2, 'c'); box(g, 5, 34, 38, 1, 'e');
+  if (stage === 'stonework' || stage === 'porch' || stage === 'finished') {
+    box(g, 4, 33, 40, 4, 'm');
+    for (const x of [8, 16, 24, 32, 40]) { line(g, x, 33, x, 36, 'o'); }
+    box(g, 37, 5, 5, 13, 'm'); box(g, 38, 4, 3, 2, 'p'); box(g, 38, 7, 3, 8, 'n');
+  } else {
+    box(g, 4, 34, 40, 2, 'c'); box(g, 5, 34, 38, 1, 'e');
+  }
   for (const x of [4, 43]) { line(g, 24, 5, x, 33, 'b'); dot(g, x, 33, 'e'); }
+  if (stage === 'porch' || stage === 'finished') {
+    box(g, 13, 34, 23, 2, 'a'); box(g, 14, 35, 21, 3, 'c'); box(g, 14, 35, 21, 1, 'e');
+    for (const x of [15, 34]) { box(g, x, 30, 2, 8, 'b'); dot(g, x, 30, 'e'); }
+    line(g, 14, 30, 36, 30, 'e');
+  }
+  if (stage === 'finished') {
+    box(g, 29, 24, 5, 10, 'b'); box(g, 30, 25, 3, 8, 'c'); dot(g, 32, 29, 'e');
+    box(g, 10, 21, 5, 4, 'a'); box(g, 11, 22, 3, 2, 'j'); line(g, 12, 22, 12, 24, 'b');
+    box(g, 34, 21, 4, 4, 'a'); box(g, 35, 22, 2, 2, 'j'); line(g, 36, 22, 36, 24, 'b');
+  }
 }
 function crateSite(g: Grid): void {
   for (const [x, y] of [[2, 9], [12, 9], [2, 13], [12, 13]]) stake(g, x, y);
@@ -330,7 +355,13 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   firePit: fireFrames(false), hearth: fireFrames(true), flame: flameOverlay(false), hearthFlame: flameOverlay(true),
   hearthSite: define(24, 12, campLegend, { still: hearthSite }),
   shelterSite: define(48, 32, campLegend, { still: shelterSite }),
-  shelter: define(48, 40, campLegend, { built: g => shelter(g, false), builtBed: g => shelter(g, true) }),
+  shelter: define(48, 40, campLegend, {
+    built: g => shelter(g, false), builtBed: g => shelter(g, true),
+    thatched: g => shelter(g, false, 'thatched'), thatchedBed: g => shelter(g, true, 'thatched'),
+    stonework: g => shelter(g, false, 'stonework'), stoneworkBed: g => shelter(g, true, 'stonework'),
+    porch: g => shelter(g, false, 'porch'), porchBed: g => shelter(g, true, 'porch'),
+    finished: g => shelter(g, false, 'finished'), finishedBed: g => shelter(g, true, 'finished')
+  }),
   crateSite: define(16, 16, campLegend, { still: crateSite }),
   crate: define(16, 16, campLegend, { built: crate }),
   dryingRackSite: define(32, 16, campLegend, { still: rackSite }),

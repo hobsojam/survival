@@ -46,7 +46,7 @@ describe('local save', () => {
     state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
     state.nodes.find(node => node.kind === 'fiber')!.readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(15);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(16);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);
@@ -63,12 +63,30 @@ describe('local save', () => {
     expect(saveGame(storage, state).ok).toBe(false);
   });
 
+  it('round-trips completed shelter upgrades and rejects a broken upgrade chain', () => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    state.structures.shelter = true;
+    state.structures.shelterThatched = true;
+    state.structures.hearth = true;
+    state.structures.shelterStonework = true;
+    state.structures.shelterPorch = true;
+    state.structures.shelterFinished = true;
+    state.progress = { ...state.progress, hearthUnlocked: true, nextStormDay: null };
+    expect(saveGame(storage, state).ok).toBe(true);
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
+
+    state.structures.shelterPorch = false;
+    expect(saveGame(storage, state).ok).toBe(false);
+  });
+
   it('persists a crafted axe and chopped tree timing in the current save', () => {
     const storage = new MemoryStorage();
     const state = createGame();
     state.day = 5;
     state.progress.hearthUnlocked = true;
     state.progress.nextStormDay = null;
+    state.structures.shelter = true;
     state.structures.toolshed = true;
     state.progress.axeCrafted = true;
     state.trees[0].readyDay = 8;
@@ -80,10 +98,10 @@ describe('local save', () => {
     const storage = new MemoryStorage();
     const state = createGame();
     state.trees[0].x += 1;
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 15, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 16, state }));
     expect(loadGame(storage).kind).toBe('invalid');
     state.trees[0] = { ...createGame().trees[0], readyDay: state.day + BALANCE.treeRegrowDays + 1 };
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 15, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 16, state }));
     expect(loadGame(storage).kind).toBe('invalid');
   });
 
@@ -117,7 +135,7 @@ describe('local save', () => {
     for (const change of [(s: typeof state) => { s.quarryReadyDay = 0; }, (s: typeof state) => { s.rubbleReadyDay = 0; }]) {
       const broken = structuredClone(state);
       change(broken);
-      storage.setItem(SAVE_KEY, JSON.stringify({ version: 15, state: broken }));
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 16, state: broken }));
       expect(loadGame(storage).kind).toBe('invalid');
     }
   });
@@ -145,7 +163,7 @@ describe('local save', () => {
     const storage = new MemoryStorage();
     const state = createGame();
     state.timeOfDay = 240;
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 15, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 16, state }));
     expect(loadGame(storage).kind).toBe('invalid');
   });
 
@@ -206,13 +224,13 @@ describe('local save', () => {
       const storage = new MemoryStorage();
       const state = createGame();
       change(state);
-      storage.setItem(SAVE_KEY, JSON.stringify({ version: 15, state }));
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 16, state }));
       expect(loadGame(storage).kind, `variant ${index}`).toBe('invalid');
     });
   });
 
   it('rejects every earlier version', () => {
-    for (let version = 1; version <= 14; version++) {
+    for (let version = 1; version <= 15; version++) {
       const storage = new MemoryStorage();
       storage.setItem(SAVE_KEY, JSON.stringify({ version, state: createGame() }));
       expect(loadGame(storage).kind, `version ${version}`).toBe('invalid');
@@ -235,7 +253,7 @@ describe('local save', () => {
       const storage = new MemoryStorage();
       const state = { ...createGame(), day: 13, lastWolf };
       state.progress.nextStormDay = 13;
-      storage.setItem(SAVE_KEY, JSON.stringify({ version: 15, state }));
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 16, state }));
       expect(loadGame(storage).kind, `visit ${index}`).toBe('invalid');
     });
   });
@@ -244,7 +262,7 @@ describe('local save', () => {
     const storage = new MemoryStorage();
     const state = createGame();
     state.inventory.stone = 5;
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 15, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 16, state }));
     expect(loadGame(storage).kind).toBe('invalid');
   });
 
@@ -261,7 +279,7 @@ describe('local save', () => {
       const storage = new MemoryStorage();
       const state = createGame();
       change(state);
-      storage.setItem(SAVE_KEY, JSON.stringify({ version: 15, state }));
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 16, state }));
       expect(loadGame(storage).kind, `variant ${index}`).toBe('invalid');
     });
   });
@@ -278,7 +296,7 @@ describe('autosave backoff', () => {
 });
 
 describe('the year journal in the save', () => {
-  const store = (state: ReturnType<typeof createGame>, version = 15) => {
+  const store = (state: ReturnType<typeof createGame>, version = 16) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;
@@ -322,7 +340,7 @@ describe('the year journal in the save', () => {
 });
 
 describe('the companion in the save', () => {
-  const store = (state: unknown, version = 15) => {
+  const store = (state: unknown, version = 16) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;
