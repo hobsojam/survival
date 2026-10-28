@@ -43,3 +43,59 @@ export function journalPageView(state: GameState, page: number): JournalPageView
     hasNext: index < last
   };
 }
+
+/** Leafs one page back or forward from the page being read (null follows today); reaching today's page follows the season again. */
+export function turnPage(page: number | null, step: number, day: number): number | null {
+  const today = currentPage(day);
+  const next = Math.max(0, (page ?? today) + step);
+  return next >= today ? null : next;
+}
+
+/** The small slice of the DOM the journal page writes to, so it can be drawn in tests without a browser. */
+export interface JournalNode {
+  className: string;
+  textContent: string | null;
+  disabled?: boolean;
+  classList: { toggle(name: string, force?: boolean): unknown };
+  setAttribute(name: string, value: string): void;
+  append(...nodes: (JournalNode | string)[]): void;
+  replaceChildren(...nodes: JournalNode[]): void;
+}
+export interface JournalRoot { querySelector(selector: string): unknown }
+export interface JournalDocument { createElement(tag: string): unknown }
+
+function row(make: JournalDocument, entry: JournalPageView['entries'][number] | null): JournalNode {
+  const element = (tag: string) => make.createElement(tag) as JournalNode;
+  const item = element('li');
+  item.classList.toggle('blank', entry === null);
+  const picture = element('span');
+  picture.className = 'year-journal-icon';
+  picture.textContent = entry?.icon ?? '?';
+  picture.setAttribute('aria-hidden', 'true');
+  const text = element('span');
+  text.className = 'year-journal-line';
+  if (entry) {
+    const when = element('small');
+    when.textContent = entry.day;
+    text.append(when, entry.line);
+  } else {
+    text.setAttribute('aria-label', 'Not yet written');
+  }
+  item.append(picture, text);
+  return item;
+}
+
+/** Draws a journal page: its heading, the page-turn buttons, and each written line followed by a blank for each still to come. */
+export function renderJournalPage(root: JournalRoot, view: JournalPageView, make: JournalDocument): void {
+  const find = (selector: string) => root.querySelector(selector) as JournalNode | null;
+  const title = find('#year-journal-title');
+  if (title) title.textContent = view.title;
+  const days = find('#year-journal-days');
+  if (days) days.textContent = view.days;
+  const previous = find('#year-journal-previous');
+  if (previous) previous.disabled = !view.hasPrevious;
+  const next = find('#year-journal-next');
+  if (next) next.disabled = !view.hasNext;
+  find('#year-journal-entries')?.replaceChildren(...view.entries.map(entry => row(make, entry)),
+    ...Array.from({ length: view.blanks }, () => row(make, null)));
+}

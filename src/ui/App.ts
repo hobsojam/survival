@@ -9,7 +9,7 @@ import { isLowMeter } from '../game/needs';
 import { gateTap, nextOpenTab, wireSidebarTabs, type DockTab } from './dock';
 import { createPause, wirePause, type PauseControl } from './pause';
 import { journalView, QUARRY_MARKER } from './journal';
-import { currentPage, journalPageView } from './yearJournal';
+import { currentPage, journalPageView, renderJournalPage, turnPage } from './yearJournal';
 import { axeView, bagView, buildButtonView, forecastView, lookoutView, nightHint, pickaxeView, startNote, type ActionPanelView } from './panels';
 import { Soundscape } from '../game/soundscape';
 
@@ -338,45 +338,13 @@ export class App {
     this.setText('fire-status', bag.fire);
   }
 
-  /** Leafs one page back or forward; reaching today's page follows the season again. */
   private turnJournalPage(step: number): void {
-    const today = currentPage(this.state.day);
-    const page = Math.max(0, (this.journalPage ?? today) + step);
-    this.journalPage = page >= today ? null : page;
+    this.journalPage = turnPage(this.journalPage, step, this.state.day);
     this.renderYearJournal();
   }
 
   private renderYearJournal(): void {
-    const view = journalPageView(this.state, this.journalPage ?? currentPage(this.state.day));
-    this.setText('year-journal-title', view.title);
-    this.setText('year-journal-days', view.days);
-    const previous = this.root.querySelector<HTMLButtonElement>('#year-journal-previous');
-    const next = this.root.querySelector<HTMLButtonElement>('#year-journal-next');
-    if (previous) previous.disabled = !view.hasPrevious;
-    if (next) next.disabled = !view.hasNext;
-    const list = this.root.querySelector('#year-journal-entries');
-    if (!list) return;
-    const row = (icon: string, day: string, line: string, blank: boolean): HTMLLIElement => {
-      const item = document.createElement('li');
-      item.classList.toggle('blank', blank);
-      const picture = document.createElement('span');
-      picture.className = 'year-journal-icon';
-      picture.textContent = icon;
-      picture.setAttribute('aria-hidden', 'true');
-      const text = document.createElement('span');
-      text.className = 'year-journal-line';
-      if (!blank) {
-        const when = document.createElement('small');
-        when.textContent = day;
-        text.append(when, line);
-      } else {
-        text.setAttribute('aria-label', 'Not yet written');
-      }
-      item.append(picture, text);
-      return item;
-    };
-    list.replaceChildren(...view.entries.map(entry => row(entry.icon, entry.day, entry.line, false)),
-      ...Array.from({ length: view.blanks }, () => row('?', '', '', true)));
+    renderJournalPage(this.root, journalPageView(this.state, this.journalPage ?? currentPage(this.state.day)), document);
   }
 
   private renderJournal(): void {
