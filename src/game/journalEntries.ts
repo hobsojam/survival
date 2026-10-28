@@ -93,10 +93,10 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   firstSnow: m => onAfter(m, seasonMessage(m.before.day, m.after.day) !== null),
   wolfTracks: m => (wolfMessage(m.before, m.after) !== null && m.after.lastWolf ? { day: m.after.lastWolf.day } : null),
   frozenSpring: m => onBefore(m, atSpring(m)),
-  // A wolf comes the moment a winter night's fire goes out, so a night without one kept its fire.
-  // A ration left out for the wolves is that night's visit, so then the fire itself tells.
-  winterFire: m => onBefore(m, dawn(m) && isAtCamp(m.before) && (m.before.lastWolf?.day !== m.before.day
-    || (m.before.lastWolf.took === 'offered' && m.before.fireFuel > 0))),
+  // Slept through at camp: a fire still burning at dawn never went out in the sleep, since nobody fed it.
+  // Before lying down, a fire that went out brought a wolf (or the friend's chase); a ration left out says nothing either way.
+  winterFire: m => onBefore(m, acted(m, 'sleep') && dawn(m) && isAtCamp(m.before) && m.after.fireFuel > 0
+    && (m.before.lastWolf?.day !== m.before.day || m.before.lastWolf.took === 'offered')),
   winterCooking: m => onBefore(m, acted(m, 'cook')),
   firstRain: m => onAfter(m, rainMessage(m.before, m.after) !== null),
   rabbits: m => onAfter(m, awake(m) && m.after.area === 'camp' && daylight(m.after) && RABBIT_HOMES.some(home => within(m.after, home, 4))),

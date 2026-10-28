@@ -201,7 +201,7 @@ describe('winter prompts', () => {
 describe('offering prompts', () => {
   it('offers the fox a berry with O while it sits at dusk', () => {
     const dusk = { ...bareCamp(), timeOfDay: nightStart(1) - 5, inventory: { ...createGame().inventory, food: 1 } };
-    expect(promptFor(dusk)).toBe('O  Leave a berry for the fox');
+    expect(promptFor(dusk)).toBe('O  Leave a berry for the fox · At camp · F Fire · R Rest · Click an upgrade to build');
     expect(KEY_ACTIONS).toContainEqual(['O', { type: 'befriend' }]);
   });
 

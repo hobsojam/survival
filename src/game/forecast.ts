@@ -1,6 +1,7 @@
 import { nightStart } from './calendar';
 import { BALANCE, type GameState } from './state';
 import { isFreezingNight } from './rules';
+import { rainWindow } from './rain';
 
 export interface StormReadiness {
   /** Seconds of fuel already in the pit when it matters: at nightfall, or right now during the storm. */
@@ -24,6 +25,14 @@ export const secondsPerLog = (state: GameState) =>
 /** The freezing night the forecast plans for: the cold front's while one is pending, otherwise tonight's. */
 const plannedNight = (state: GameState): number => state.progress.nextStormDay ?? state.day;
 
+/** Fuel the fire burns from now until nightfall: a second a second, and half again for the part in a shower. */
+function burnUntilNightfall(state: GameState): number {
+  const night = nightStart(state.day);
+  const shower = rainWindow(state.day);
+  const wet = shower ? Math.max(0, Math.min(shower.end, night) - Math.max(shower.start, state.timeOfDay)) : 0;
+  return night - state.timeOfDay + wet * (BALANCE.rainFireBurn - 1);
+}
+
 /** Whether the camp fire already has enough fuel to last through the freezing night. */
 export function stormReadiness(state: GameState): StormReadiness {
   const perLog = secondsPerLog(state);
@@ -36,8 +45,8 @@ export function stormReadiness(state: GameState): StormReadiness {
     fuel = state.fireFuel;
     needed = Math.ceil((BALANCE.daySeconds - state.timeOfDay) * BALANCE.coldNightFireBurn);
   } else {
-    // The fire burns one second per second until nightfall; before the storm day it will be long out.
-    const left = state.day === night ? Math.max(0, state.fireFuel - (nightStart(state.day) - state.timeOfDay)) : 0;
+    // The fire burns one second per second until nightfall, faster in a spring shower; before the storm day it will be long out.
+    const left = state.day === night ? Math.max(0, state.fireFuel - burnUntilNightfall(state)) : 0;
     fuel = left;
     needed = (BALANCE.daySeconds - nightStart(night)) * BALANCE.coldNightFireBurn;
   }

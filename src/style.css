@@ -80,7 +80,6 @@ kbd { display: inline-block; border: 1px solid #d4ddce; border-bottom-width: 2px
 .panel { border-radius: 17px; padding: 18px; }
 .forecast-panel { background: linear-gradient(145deg, #e7f0ed, #fffdf7 70%); border-color: #c8d9d5; }
 .forecast-panel.active { background: linear-gradient(145deg, #cbdae4, #eef4f2 70%); border-color: #88a7b6; }
-.forecast-panel.weathered { background: linear-gradient(145deg, #e7f0dc, #fffdf7 70%); border-color: #c1d4aa; }
 .forecast-panel .eyebrow { color: #5e8291; }
 .forecast-panel h2 { margin-bottom: 7px; }
 .forecast-copy { margin: 0 0 12px; color: #58706e; font-size: 12px; line-height: 1.45; }

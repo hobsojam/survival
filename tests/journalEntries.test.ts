@@ -44,11 +44,16 @@ describe('the year journal', () => {
     expect(rain.messages.some(text => text.includes('rain'))).toBe(false);
   });
 
-  it('notices a whole winter night by the fire', () => {
-    const night = at(12, 239.5, { fireFuel: 50 });
-    expect(ids(tick(night).state)).toContain('winterFire');
-    expect(ids(tick({ ...night, lastWolf: { day: 12, took: 'nothing' } }).state)).not.toContain('winterFire');
-    expect(ids(tick({ ...night, lastWolf: { day: 12, took: 'offered' } }).state)).toContain('winterFire');
+  it('notices a whole winter night slept by a fire that never went out', () => {
+    const night = sheltered(12, nightStart(12) + 5, 300);
+    const sleep: GameAction = { type: 'sleep' };
+    expect(ids(act(night, sleep).state)).toContain('winterFire');
+    expect(ids(act({ ...night, fireFuel: 50 }, sleep).state)).not.toContain('winterFire');
+    expect(ids(act({ ...night, lastWolf: { day: 12, took: 'nothing' } }, sleep).state)).not.toContain('winterFire');
+    expect(ids(act({ ...night, lastWolf: { day: 12, took: 'chased' } }, sleep).state)).not.toContain('winterFire');
+    expect(ids(act({ ...night, lastWolf: { day: 12, took: 'offered' } }, sleep).state)).toContain('winterFire');
+    // Walking in just before dawn, awake, isn't a night kept.
+    expect(ids(tick({ ...night, timeOfDay: 239.5 }).state)).not.toContain('winterFire');
   });
 
   it('writes summer evenings during a timed action', () => {
