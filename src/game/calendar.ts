@@ -43,6 +43,12 @@ export function seasonMessage(beforeDay: number, afterDay: number): string | nul
   return next === season(beforeDay) ? null : ARRIVALS[next];
 }
 
+/** Which year of camp a day falls in: days 1–40 are year one. */
+export const yearOf = (day: number): number => Math.floor((day - 1) / YEAR_LENGTH) + 1;
+
+/** Seconds of dusk before nightfall: summer evenings linger. */
+export const duskLength = (day: number): number => (season(day) === 'summer' ? 45 : 30);
+
 export const isSpring = (day: number): boolean => season(day) === 'spring';
 export const isSummer = (day: number): boolean => season(day) === 'summer';
 export const isWinter = (day: number): boolean => season(day) === 'winter';

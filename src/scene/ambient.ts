@@ -1,4 +1,4 @@
-import { BALANCE, type ResourceNode } from '../game/state';
+import { BALANCE, RABBIT_HOMES, type ResourceNode } from '../game/state';
 import { nightStart } from '../game/calendar';
 import { WOLF_LOW_FUEL } from '../game/wolves';
 
@@ -169,8 +169,7 @@ export const wolfCount = (day: number): number => 1 + Math.floor(hash(day + 17) 
 /** How strongly the wolves press in: not at all with 20 s of fuel, fully once the fire is out. */
 export const wolfWatch = (fireFuel: number): number => Math.max(0, Math.min(1, (WOLF_LOW_FUEL - fireFuel) / 10));
 
-/** Where the spring rabbits live: in the meadow beside the bushes at (16, 18), (25, 11) and (23, 17). */
-export const RABBIT_HOMES: Point[] = [{ x: 14.5, y: 17.5 }, { x: 26.5, y: 13.5 }, { x: 22.5, y: 20.5 }];
+export { RABBIT_HOMES };
 export const RABBIT_FLEE_RADIUS = 2.5;
 const RABBIT_SPOTS: readonly Point[] = [{ x: 0, y: 0 }, { x: 0.6, y: 0.3 }, { x: -0.5, y: 0.4 }, { x: 0.2, y: -0.5 }];
 const RABBIT_CYCLE = 6;

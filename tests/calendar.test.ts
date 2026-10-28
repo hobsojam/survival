@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  afternoonStart, daysLeftInSeason, firefliesOut, isSpring, isSummer, isWinter, leavesFalling, nightStart, season, seasonMessage, seasonName
+  afternoonStart, daysLeftInSeason, duskLength, firefliesOut, isSpring, isSummer, isWinter, leavesFalling, nightStart, season, seasonMessage, seasonName, yearOf
 } from '../src/game/calendar';
 
 describe('the seasonal calendar', () => {
@@ -49,6 +49,11 @@ describe('the seasonal calendar', () => {
 
   it('knows spring, in any year', () => {
     expect([20, 21, 30, 31, 61].map(isSpring)).toEqual([false, true, true, false, true]);
+  });
+
+  it('counts the years and stretches summer dusk', () => {
+    expect([1, 40, 41, 81].map(yearOf)).toEqual([1, 1, 2, 3]);
+    expect([duskLength(34), duskLength(4)]).toEqual([45, 30]);
   });
 
   it('knows summer, in any year', () => {
