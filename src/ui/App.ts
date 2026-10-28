@@ -475,7 +475,7 @@ export class App {
     if (panel) panel.hidden = !view.shown;
     this.setText('garden-hint', view.hint);
     const plots = this.root.querySelector<HTMLElement>('#garden-plots');
-    if (plots) plots.innerHTML = view.plots.map(gardenPlotMarkup).join('');
+    if (plots) plots.innerHTML = view.plots.map((plot, index) => gardenPlotMarkup(plot, index)).join('');
   }
 
   private renderBuild(): void {
