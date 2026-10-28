@@ -2,7 +2,7 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState } from './state';
 import { bagCapacity, carriedCount } from './rules';
 import { season, yearOf } from './calendar';
 import { journalEntry, journalSeason, type JournalId } from './journalEntries';
-import { TRUST_TARGET } from './companion';
+import { KEEPSAKES_NEEDED, TRUST_TARGET } from './companion';
 
 export const SAVE_KEY = 'hearthwild.save';
 const SAVE_VERSION = 15;
@@ -107,7 +107,6 @@ function validJournal({ journal, day }: SaveShape): boolean {
 }
 
 const FRIENDS = ['bird', 'fox', 'wolf'] as const;
-const KEEPSAKES_NEEDED = 6;
 
 /**
  * No friend and trust still short of every target, or one friend that came on a lived day.

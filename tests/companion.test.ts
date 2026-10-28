@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
-import { createGame, type GameState } from '../src/game/state';
+import { BALANCE, createGame, type Friend, type GameState } from '../src/game/state';
 import { advanceTime, applyAction } from '../src/game/rules';
-import { findDue, offerBlocker, offerFor } from '../src/game/companion';
+import { KEEPSAKE_SPOT, findDue, offerBlocker, offerFor, sceneryKeepsake } from '../src/game/companion';
+import { newsBetween } from '../src/game/news';
 import { foxAt } from '../src/game/wildlife';
 import { wolfMessage } from '../src/game/wolves';
 
@@ -85,5 +86,105 @@ describe('befriending', () => {
     expect(due / 400).toBeGreaterThan(0.4);
     expect(due / 400).toBeLessThan(0.6);
     expect(Array.from({ length: 50 }, (_, i) => findDue(i + 9, i, 50))).toEqual(Array.from({ length: 50 }, (_, i) => findDue(i + 9, i, 50)));
+  });
+});
+
+/** A friend that came long ago, at camp with the shelter and toolshed built. */
+const withFriend = (friend: Friend, changes: Partial<GameState['companion']> = {}, state: GameState = camp(5, 60)): GameState => ({
+  ...state,
+  structures: { ...state.structures, toolshed: true },
+  companion: { ...state.companion, friend, since: 1, trust: { ...state.companion.trust, [friend]: 3 }, ...changes }
+});
+/** The first day from `from` on whose dawn a find of this kind is due, three dawns after the last. */
+const dueDay = (salt: number, from = 42) => Array.from({ length: 60 }, (_, i) => from + i).find(day => findDue(day, day - 3, salt))!;
+/** Ticks across the dawn into `day`, with the fire well fed. */
+const dawnInto = (state: GameState, day: number) => {
+  const before = { ...state, day: day - 1, timeOfDay: BALANCE.daySeconds - 0.5, fireFuel: 100 };
+  const after = advanceTime(before, 1);
+  return { after, news: newsBetween(before, after) };
+};
+
+describe('what a friend does', () => {
+  it('chases the wild wolves off when the fire goes out', () => {
+    const night = withFriend('wolf', {}, { ...camp(12, nightStart(12) + 5, { trailFood: 1, food: 1 }), fireFuel: 1 });
+    const after = advanceTime(night, 2);
+    expect(after.inventory).toMatchObject({ trailFood: 1, food: 1 });
+    expect(after.lastWolf).toEqual({ day: 12, took: 'chased' });
+    expect(newsBetween(night, after)).toContain('Your wolf saw the others off into the dark.');
+  });
+
+  it('wakes the sleeper once when the fire burns low on a winter night', () => {
+    const night = withFriend('bird', {}, { ...camp(12, nightStart(12) + 5), player: { ...base.player, x: 20, y: 16 }, fireFuel: 60 });
+    const woken = applyAction(night, { type: 'sleep' });
+    expect(woken.message).toBe('Your bird woke you. The fire is nearly out.');
+    expect(woken.state.day).toBe(12);
+    expect(woken.state.fireFuel).toBeCloseTo(20);
+    expect(woken.state.companion.alarmDay).toBe(12);
+    expect(applyAction(woken.state, { type: 'sleep' }).state.day).toBe(13);
+    const low = applyAction({ ...night, fireFuel: 10 }, { type: 'sleep' });
+    expect([low.state.day, low.message]).toEqual([12, 'Your bird woke you. The fire is nearly out.']);
+    expect(applyAction({ ...night, fireFuel: 0 }, { type: 'sleep' }).state.day).toBe(13);
+  });
+
+  it('brings a berry on a find dawn, and waits when the bag is full', () => {
+    const day = dueDay(50);
+    const fox = withFriend('fox', { lastGift: day - 3, lastFind: day });
+    const { after, news } = dawnInto(fox, day);
+    expect(after.inventory.food).toBe(1);
+    expect(after.companion.lastGift).toBe(day);
+    expect(news).toContain('The fox left a berry by your bedroll.');
+    const full = dawnInto({ ...fox, inventory: { ...fox.inventory, wood: 8 } }, day).after;
+    expect([full.inventory.food, full.companion.lastGift]).toEqual([0, day - 3]);
+    expect(dawnInto(withFriend('wolf', { lastGift: day - 3, lastFind: day }), day).after.inventory.food).toBe(0);
+  });
+
+  it('sheds one piece at a time, only while it is needed', () => {
+    const day = dueDay(71);
+    const { after, news } = dawnInto(withFriend('fox', { lastFind: day - 3 }), day);
+    expect(after.companion).toMatchObject({ keepsakeLying: true, lastFind: day });
+    expect(news).toContain('A tuft of fur lies by the fire.');
+    expect(dawnInto(withFriend('fox', { lastFind: day - 3, keepsakeLying: true }), day).after.companion.lastFind).toBe(day - 3);
+    expect(dawnInto(withFriend('fox', { lastFind: day - 3, keepsakes: 6 }), day).after.companion.keepsakeLying).toBe(false);
+    const made = dawnInto(withFriend('fox', { lastFind: day - 3, cloak: true }), day).after;
+    expect(made.companion.keepsakeLying).toBe(false);
+    expect(sceneryKeepsake(made)).toBe(true);
+    expect(sceneryKeepsake({ ...made, day: day + 1 })).toBe(false);
+  });
+
+  it('picks a keepsake up by the fire', () => {
+    const lying = withFriend('bird', { keepsakeLying: true, keepsakes: 2 }, { ...camp(5, 60), player: { ...base.player, x: KEEPSAKE_SPOT.x + 0.5, y: KEEPSAKE_SPOT.y } });
+    const moved = applyAction(lying, { type: 'move', dx: -0.1, dy: 0 }).state;
+    expect(moved.companion).toMatchObject({ keepsakes: 3, keepsakeLying: false });
+    expect(newsBetween(lying, moved)).toContain('You found a feather by the fire.');
+    const far = { ...lying, player: { ...lying.player, x: KEEPSAKE_SPOT.x + 3 } };
+    expect(applyAction(far, { type: 'move', dx: -0.1, dy: 0 }).state.companion.keepsakes).toBe(2);
+  });
+
+  it('makes a fur cloak and keeps warmer at night', () => {
+    const fox = withFriend('fox', { keepsakes: 6 });
+    const made = applyAction(fox, { type: 'craftCloak' });
+    expect(made.state.companion).toMatchObject({ cloak: true, keepsakes: 0 });
+    expect(applyAction(withFriend('fox', { keepsakes: 5 }), { type: 'craftCloak' }).message).toBe('Need 6 fur for the cloak.');
+    const outdoors = { ...camp(5, nightStart(5) + 5), player: { ...base.player, x: 30, y: 25 }, fireFuel: 0 };
+    const lost = (state: GameState) => 100 - advanceTime({ ...state, player: { ...state.player, warmth: 100 } }, 8).player.warmth;
+    const cloaked = { ...outdoors, companion: made.state.companion };
+    expect(lost(cloaked)).toBeCloseTo(lost(outdoors) * 0.75);
+    const quarry = { ...outdoors, area: 'quarry' as const, player: { ...outdoors.player, x: 20, y: 15 } };
+    expect(lost({ ...quarry, companion: made.state.companion })).toBeCloseTo(lost(quarry) * 0.75);
+    expect(lost({ ...cloaked, timeOfDay: 60 })).toBe(lost({ ...outdoors, timeOfDay: 60 }));
+  });
+
+  it('makes a feather pillow that rests deeper', () => {
+    const bird = withFriend('bird', { keepsakes: 6 });
+    expect(applyAction(bird, { type: 'craftPillow' }).message).toBe('Build a bed first.');
+    const bed = { ...bird, structures: { ...bird.structures, bed: true } };
+    const made = applyAction(bed, { type: 'craftPillow' }).state;
+    expect(made.companion).toMatchObject({ pillow: true, keepsakes: 0 });
+    const rested = (state: GameState) => applyAction({ ...state, player: { ...state.player, energy: 30 } }, { type: 'rest' }).state.player.energy;
+    expect(rested(made) - rested(bed)).toBeCloseTo(10);
+    const hungry = (state: GameState) => applyAction({ ...state, timeOfDay: nightStart(5) + 5, player: { ...state.player, x: 20, y: 16, energy: 10, hunger: 10 } }, { type: 'sleep' }).state;
+    expect(hungry(bed).player.energy).toBeLessThanOrEqual(BALANCE.hungrySleepCap);
+    expect(hungry(made).player.energy).toBeGreaterThan(BALANCE.hungrySleepCap);
+    expect(hungry(made).player.energy).toBeLessThanOrEqual(BALANCE.hungrySleepCap + 10);
   });
 });

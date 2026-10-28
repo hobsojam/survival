@@ -1,5 +1,6 @@
 import { isWinter, nightStart } from './calendar';
-import { isAtCamp } from './rules';
+import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
+import { freeSpaces, isAtCamp } from './rules';
 import { BALANCE, type Friend, type GameState } from './state';
 import { dayHash, foxAt } from './wildlife';
 
@@ -76,3 +77,80 @@ export function makeOffering(state: GameState): { state: GameState; message: str
 export function findDue(day: number, lastDay: number, salt: number): boolean {
   return day - lastDay >= 3 && dayHash(day + salt) < 0.5;
 }
+
+/** Pieces of fur or feathers an item takes; the friend stops shedding while this many are held. */
+export const KEEPSAKES_NEEDED = 6;
+/** Where a shed piece lies, just beside the fire, and how near the survivor walks to pick it up. */
+export const KEEPSAKE_SPOT = { x: BALANCE.campX - 1, y: BALANCE.campY + 0.8 } as const;
+const PICK_UP_RADIUS = 0.9;
+// Shedding and the fox's berry each roll their own dice, on sequences of their own.
+const SHED_SALT = 71;
+const GIFT_SALT = 50;
+
+export const keepsakeKind = (friend: Friend): 'feather' | 'fur' => (friend === 'bird' ? 'feather' : 'fur');
+const itemMade = (state: GameState): boolean => state.companion.pillow || state.companion.cloak;
+
+/** Once the item is made, a shed piece still shows by the fire on its dawn, as scenery only. */
+export const sceneryKeepsake = (state: GameState): boolean => itemMade(state) && state.companion.lastFind === state.day;
+
+/** The friend's dawn: now and then a piece of fur or a feather by the fire, and the fox's berry. Mutates advanceTime's working copy. */
+export function companionDawn(next: GameState): void {
+  const companion = next.companion;
+  if (!companion.friend) return;
+  let changes: Partial<GameState['companion']> = {};
+  if (findDue(next.day, companion.lastFind, SHED_SALT)) {
+    if (itemMade(next)) changes = { lastFind: next.day };
+    else if (!companion.keepsakeLying && companion.keepsakes < KEEPSAKES_NEEDED) changes = { lastFind: next.day, keepsakeLying: true };
+  }
+  if (companion.friend === 'fox' && findDue(next.day, companion.lastGift, GIFT_SALT) && freeSpaces(next) >= 1) {
+    changes = { ...changes, lastGift: next.day };
+    next.inventory = { ...next.inventory, food: next.inventory.food + 1 };
+  }
+  next.companion = { ...companion, ...changes };
+}
+
+/** Walking up to a shed piece picks it up. */
+export function pickUpKeepsake(state: GameState): GameState {
+  const near = Math.hypot(state.player.x - KEEPSAKE_SPOT.x, state.player.y - KEEPSAKE_SPOT.y) <= PICK_UP_RADIUS;
+  if (!state.companion.keepsakeLying || state.area !== 'camp' || !near) return state;
+  return { ...state, companion: { ...state.companion, keepsakeLying: false, keepsakes: state.companion.keepsakes + 1 } };
+}
+
+/** What the survivor notices of their friend between two states. */
+export function companionNews(before: GameState, after: GameState): string[] {
+  const friend = after.companion.friend;
+  if (!friend) return [];
+  const piece = keepsakeKind(friend) === 'feather' ? 'a feather' : 'a tuft of fur';
+  const news: string[] = [];
+  if (after.companion.lastGift > before.companion.lastGift && friend === 'fox') news.push('The fox left a berry by your bedroll.');
+  if (after.companion.keepsakeLying && !before.companion.keepsakeLying) news.push(`${piece[0].toUpperCase()}${piece.slice(1)} lies by the fire.`);
+  if (after.companion.keepsakes > before.companion.keepsakes) news.push(`You found ${piece} by the fire.`);
+  return news;
+}
+
+/** Seconds of sleep before a friendly bird wakes the sleeper on a winter night, as the fire falls to 20 s; null if it won't. */
+export function alarmAfter(state: GameState): number | null {
+  const { friend, alarmDay } = state.companion;
+  if (friend !== 'bird' || !isWinter(state.day) || !night(state) || alarmDay === state.day || state.fireFuel <= 0) return null;
+  return Math.max(0, (state.fireFuel - BALANCE.alarmFuel) / BALANCE.coldNightFireBurn);
+}
+
+const ITEMS = {
+  pillow: { friendly: (friend: Friend | null) => friend === 'bird', name: 'pillow', pieces: 'feathers' },
+  cloak: { friendly: (friend: Friend | null) => friend !== null && friend !== 'bird', name: 'cloak', pieces: 'fur' }
+} as const;
+
+function itemBlocker(state: GameState, item: keyof typeof ITEMS): string | null {
+  const { friendly, name, pieces } = ITEMS[item];
+  if (state.companion[item]) return `You already have the ${name}.`;
+  if (!friendly(state.companion.friend)) return `You need ${pieces} for a ${name}.`;
+  if (!state.structures.toolshed) return 'Build a toolshed first.';
+  if (item === 'pillow' && !state.structures.bed) return 'Build a bed first.';
+  if (!isAtCamp(state)) return `Return to camp to make the ${name}.`;
+  if (isExhausted(state)) return TOO_TIRED_MESSAGE;
+  if (state.companion.keepsakes < KEEPSAKES_NEEDED) return `Need ${KEEPSAKES_NEEDED} ${pieces} for the ${name}.`;
+  return null;
+}
+
+export const pillowBlocker = (state: GameState): string | null => itemBlocker(state, 'pillow');
+export const cloakBlocker = (state: GameState): string | null => itemBlocker(state, 'cloak');

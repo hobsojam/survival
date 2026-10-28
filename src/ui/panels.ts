@@ -4,6 +4,7 @@ import { workSeconds } from '../game/needs';
 import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, isAtCamp, isColdNight, isFreezingNight, lookoutRepairBlocker, pickaxeBlocker, trailFoodBlocker } from '../game/rules';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
+import { KEEPSAKES_NEEDED, cloakBlocker, keepsakeKind, pillowBlocker } from '../game/companion';
 
 /** What a panel with one action button shows: its heading, its copy, its price line and its button state. */
 export interface ActionPanelView { title: string; copy: string; cost: string; disabled: boolean; ready: boolean }
@@ -44,6 +45,34 @@ export function pickaxeView(state: GameState): ActionPanelView & { shown: boolea
     return { ...button, title: 'Pickaxe ready', copy: 'Tap the quarry face, or stand at it and press E, to dig a stone. It is ready again each dawn.', cost: 'Crafted' };
   }
   return { ...button, title: 'Craft a pickaxe', copy: blocker ?? 'Your toolshed is ready. Craft a pickaxe to work the quarry face.', cost: '2 wood · 1 fiber · 2 stone' };
+}
+
+/** The fur or feathers gathered toward the friend's one item; gone once it is made. */
+export function keepsakeView(state: GameState): { shown: boolean; text: string } {
+  const { friend, keepsakes, pillow, cloak } = state.companion;
+  if (!friend || pillow || cloak) return { shown: false, text: '' };
+  return { shown: true, text: `${keepsakeKind(friend) === 'feather' ? 'Feathers' : 'Fur'} ${keepsakes}/${KEEPSAKES_NEEDED}` };
+}
+
+function keepsakeItemView(made: boolean, shown: boolean, blocker: string | null,
+  words: { title: string; ready: string; done: string; cost: string }): ActionPanelView & { shown: boolean } {
+  if (made) return { shown, title: words.title, copy: words.done, cost: 'Made', disabled: true, ready: false };
+  return { shown, title: words.title, copy: blocker ?? words.ready, cost: words.cost, disabled: false, ready: !blocker };
+}
+
+export function pillowView(state: GameState): ActionPanelView & { shown: boolean } {
+  return keepsakeItemView(state.companion.pillow, state.companion.friend === 'bird', pillowBlocker(state), {
+    title: 'Feather pillow', ready: 'Your bird\'s feathers would make the bed softer.', done: 'Resting in the bed goes a little deeper.',
+    cost: `${KEEPSAKES_NEEDED} feathers`
+  });
+}
+
+export function cloakView(state: GameState): ActionPanelView & { shown: boolean } {
+  const friend = state.companion.friend;
+  return keepsakeItemView(state.companion.cloak, friend === 'fox' || friend === 'wolf', cloakBlocker(state), {
+    title: 'Fur cloak', ready: 'Enough fur for a warm cloak against the night.', done: 'The nights bite a little less.',
+    cost: `${KEEPSAKES_NEEDED} fur`
+  });
 }
 
 /** The places along the paths found so far, for the Follow the paths panel. */

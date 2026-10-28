@@ -85,6 +85,22 @@ describe('the soundscape', () => {
     expect([birds(), crickets(), fire()]).toEqual([0, 0.34, 0]);
   });
 
+  it('lets a friendly bird sing at spring dawns and stay through winter', () => {
+    const { sound, birds } = setup();
+    sound.start();
+    const bird = { ...createGame().companion, friend: 'bird' as const, since: 1 };
+    sound.update(world({ day: 22, timeOfDay: 10, companion: bird }));
+    expect(birds()).toBe(0.8);
+    sound.update(world({ day: 22, timeOfDay: 10 }));
+    expect(birds()).toBe(0.48);
+    sound.update(world({ day: 22, timeOfDay: 60, companion: bird }));
+    expect(birds()).toBe(0.48);
+    sound.update(world({ day: 12, timeOfDay: 60, companion: bird }));
+    expect(birds()).toBe(0.16);
+    sound.update(world({ day: 12, timeOfDay: 60 }));
+    expect(birds()).toBe(0);
+  });
+
   it('quietens the birds and adds the stone drone in the quarry', () => {
     const { sound, birds, crickets, fire, quarry } = setup();
     sound.start();

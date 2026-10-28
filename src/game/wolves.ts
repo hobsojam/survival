@@ -22,9 +22,13 @@ export function wolvesClose(state: GameState): boolean {
   return winterNight(state) && state.fireFuel < WOLF_LOW_FUEL;
 }
 
-/** The first moment of a winter night that the fire is out, a wolf takes a ration, else a berry. Mutates advanceTime's working copy. */
+/** The first moment of a winter night that the fire is out, a wolf takes a ration, else a berry, unless a friendly wolf sees it off. Mutates advanceTime's working copy. */
 export function wolfVisit(next: GameState): void {
   if (!winterNight(next) || next.fireFuel > 0 || next.lastWolf?.day === next.day) return;
+  if (next.companion.friend === 'wolf') {
+    next.lastWolf = { day: next.day, took: 'chased' };
+    return;
+  }
   const { trailFood, food } = next.inventory;
   let took: WolfTake = 'nothing';
   if (trailFood > 0) took = 'ration';

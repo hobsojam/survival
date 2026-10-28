@@ -1,4 +1,4 @@
-import { isWinter, nightStart } from './calendar';
+import { isSpring, isWinter, nightStart } from './calendar';
 import { isRaining } from './rain';
 import { wolvesClose } from './wolves';
 import { BALANCE, type GameState } from './state';
@@ -158,8 +158,11 @@ export class Soundscape {
     const inQuarry = this.state.area === 'quarry';
     const distance = Math.hypot(this.state.player.x - BALANCE.campX, this.state.player.y - BALANCE.campY);
     const campVolume = Math.max(0, 1 - distance / (BALANCE.campRadius + 4));
-    // The birds leave for the winter.
+    // The birds leave for the winter, except a friend; a friend sings loud at spring dawns.
+    const friendlyBird = this.state.companion?.friend === 'bird';
     let birdVolume = isWinter(this.state.day) ? 0 : 0.48;
+    if (friendlyBird && isWinter(this.state.day)) birdVolume = 0.16;
+    if (friendlyBird && isSpring(this.state.day) && this.state.timeOfDay < 25) birdVolume = 0.8;
     let cricketVolume = 0;
     let quarryVolume = 0;
     if (isNight) {

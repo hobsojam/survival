@@ -139,6 +139,8 @@ export const BALANCE = {
   restSeconds: 20,
   restEnergyGain: 25,
   bedRestEnergyGain: 50,
+  /** A feather pillow adds this to resting in the bed, and to the hungry-sleep cap. */
+  pillowEnergyGain: 10,
   sleepEnergyGain: 60,
   energyDrainPerSecond: 1 / 6,
   /** At or below this, energy and hunger read as low: tired or hungry. */
@@ -165,6 +167,8 @@ export const BALANCE = {
   coldNightStartDay: 3,
   coldNightRetryDays: 3,
   coldNightFireBurn: 2,
+  /** A friendly bird wakes the sleeper as a winter fire falls to this much fuel. */
+  alarmFuel: 20,
   /** A spring shower makes the fire burn this much faster. */
   rainFireBurn: 1.5,
   /** Summer's midday heat: from this time of day until the end, hunger falls faster by the factor. */
@@ -175,6 +179,8 @@ export const BALANCE = {
   summerBerries: 2,
   coldNightShelteredWarmthLossPerSecond: 0.75,
   coldNightOutdoorWarmthLossPerSecond: 1.25,
+  /** A fur cloak leaves this share of any warmth lost at night. */
+  cloakWarmthLoss: 0.75,
   coldNightFailureEnergy: 25,
   coldNightFailureMorningLoss: 30,
   interactionRadius: 2,
