@@ -20,4 +20,12 @@ describe('news of what happened while time passed', () => {
     expect(newsBetween(before, after)).toEqual(['A wolf circled the dark camp but found nothing to take.', 'The snow is melting. Spring has come.']);
     expect(newsBetween(before, before)).toEqual([]);
   });
+
+  it('warns of the midday heat on a summer day only', () => {
+    const base = createGame();
+    const at = (day: number, timeOfDay: number): GameState => ({ ...base, day, timeOfDay });
+    expect(newsBetween(at(34, 55), at(34, 62))).toEqual(['The midday sun is hot. You will get hungry a little faster.']);
+    expect(newsBetween(at(24, 55), at(24, 62))).toEqual([]);
+    expect(newsBetween(at(34, 61), at(34, 70))).toEqual([]);
+  });
 });

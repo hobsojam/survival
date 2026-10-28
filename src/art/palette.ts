@@ -20,7 +20,7 @@ export const palette = {
   hair0: '#1c1418', hair1: '#3a2826', hair2: '#5e4038', hair3: '#7e5a48', hair4: '#9e7a60',
   flower0: '#5e3a6e', flower1: '#e6c25a', flower2: '#f2f0e0', flower3: '#e88aa0', flower4: '#8ab0e0',
   ink: '#1c1820', paper: '#f7f1e1', beak: '#e0a040', shadow: '#1a2a24',
-  night: '#1a2140', dusk: '#f0a050', dawn: '#e8a0a8', storm: '#23405a', frost: '#d8eef0', firefly: '#e9f79a'
+  night: '#1a2140', dusk: '#f0a050', golden: '#f6c75a', dawn: '#e8a0a8', storm: '#23405a', frost: '#d8eef0', firefly: '#e9f79a'
 } as const;
 
 export type PaletteKey = keyof typeof palette;

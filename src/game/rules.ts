@@ -1,4 +1,4 @@
-import { isSpring, isWinter, nightStart } from './calendar';
+import { isSpring, isSummer, isWinter, nightStart } from './calendar';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } from './areas';
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { isRaining } from './rain';
@@ -164,7 +164,7 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
     const camp = isAtCamp(next);
     const coldNight = isFreezingNight(next);
     const drain = (activity === 'awake' ? BALANCE.energyDrainPerSecond : 0) + (next.player.hunger <= 0 ? BALANCE.starvingEnergyDrainPerSecond : 0);
-    next.player.hunger = Math.max(0, next.player.hunger - step / 8);
+    next.player.hunger = Math.max(0, next.player.hunger - hungerLoss(next, step));
     next.player.energy = Math.max(0, next.player.energy - step * drain);
     next.player.warmth = Math.max(0, Math.min(100, next.player.warmth + warmthChange(next, step, camp, coldNight)));
     next.fireFuel = Math.max(0, next.fireFuel - step * fireBurn(next, coldNight));
@@ -174,6 +174,20 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
     if (next.timeOfDay >= BALANCE.daySeconds - 0.000001) dawn(next, camp);
   }
   return next;
+}
+
+/** Hunger lost over one step: an eighth a second, faster for the part of the step in summer's midday heat. */
+function hungerLoss(state: GameState, step: number): number {
+  if (!isSummer(state.day)) return step / 8;
+  const hot = Math.max(0, Math.min(state.timeOfDay + step, BALANCE.summerHeatEnd) - Math.max(state.timeOfDay, BALANCE.summerHeatStart));
+  return (step + hot * (BALANCE.summerHeatHunger - 1)) / 8;
+}
+
+/** The note when summer's midday heat begins, or null. */
+export function heatMessage(before: GameState, after: GameState): string | null {
+  const began = before.day === after.day && isSummer(after.day)
+    && before.timeOfDay < BALANCE.summerHeatStart && after.timeOfDay >= BALANCE.summerHeatStart;
+  return began ? 'The midday sun is hot. You will get hungry a little faster.' : null;
 }
 
 /** How fast the fire burns: twice as fast on a freezing night, half as fast again in a spring shower. */
@@ -196,7 +210,9 @@ function warmthChange(state: GameState, step: number, camp: boolean, coldNight: 
   } else if (sheltered) {
     change = -step / 4;
   }
-  return camp && !lit && state.structures.windbreak ? change * 0.5 : change;
+  if (camp && !lit && state.structures.windbreak) change *= 0.5;
+  // Summer nights are warm, except the forecast front's.
+  return isSummer(state.day) && !coldNight ? Math.max(0, change) : change;
 }
 
 /** Starts the next day in place: regrows nodes and settles the cold night if it just ended. */
@@ -281,14 +297,16 @@ const gather: ActionHandler<'gather'> = (state, action) => {
   const resource = NODE_RESOURCE[node.kind];
   if (freeSpaces(state) < spaceFor(resource)) return refuse(state, FULL_BAG_MESSAGE);
   const nodes = state.nodes.map(item => item === node ? { ...item, amount: item.amount - 1, readyDay: state.day + 1 } : item);
+  // Summer bushes are heavy: two berries a pick, if the bag has room.
+  const picked = node.kind === 'berry' && isSummer(state.day) ? Math.min(BALANCE.summerBerries, freeSpaces(state)) : 1;
   return {
     state: advanceTime({
       ...state,
       player: tire(state, BALANCE.gatherEnergyCost),
-      inventory: { ...state.inventory, [resource]: state.inventory[resource] + 1 },
+      inventory: { ...state.inventory, [resource]: state.inventory[resource] + picked },
       nodes
     }, workSeconds(state, BALANCE.gatherSeconds), 'working'),
-    message: GATHER_MESSAGE[resource] ?? ''
+    message: picked > 1 ? 'Picked two handfuls of berries.' : GATHER_MESSAGE[resource] ?? ''
   };
 };
 
