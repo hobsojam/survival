@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
-import { axeView, bagView, buildButtonView, forecastView, lookoutView, nightHint, pickaxeView, sitesFound, startNote } from '../src/ui/panels';
+import { axeView, bagView, buildButtonView, forecastView, lookoutView, nightHint, pickaxeView, startNote } from '../src/ui/panels';
 
 type Changes = { structures?: Partial<GameState['structures']>; progress?: Partial<GameState['progress']>; inventory?: Partial<GameState['inventory']> };
 
@@ -118,7 +118,7 @@ describe('forecast panel', () => {
   it('warns of winter nights once the front is weathered', () => {
     const winter = game({ progress: afterColdNight }, { day: 12 });
     // nightStart(12) is 136, so the night needs (240 - 136) × 2 = 208 s of fire.
-    expect(forecastView(winter)).toEqual({ active: false, weathered: false, title: 'Winter nights',
+    expect(forecastView(winter)).toEqual({ active: false, weathered: false, shown: true, title: 'Winter nights',
       copy: 'Winter nights are bitter. Keep the fire alive until dawn, or the wolves will come close.',
       shelter: '○ Shelter needed', fire: '○ Fire: 0 / 208s for the night · 3 more logs' });
     expect(forecastView({ ...winter, timeOfDay: nightStart(12) + 1 })).toMatchObject({ active: true, title: 'A bitter night' });
@@ -137,7 +137,7 @@ describe('forecast panel', () => {
   });
 
   it('marks the front as weathered', () => {
-    expect(forecastView(game({ progress: afterColdNight }))).toEqual({ active: false, weathered: true,
+    expect(forecastView(game({ progress: afterColdNight }))).toEqual({ active: false, weathered: true, shown: false,
       title: 'The cold night is behind you', copy: 'You kept your camp warm through dawn. The stone hearth is ready to build.',
       shelter: '✓ Shelter held firm', fire: '✓ Hearth unlocked' });
   });
@@ -210,10 +210,10 @@ describe('exhaustion in the panels', () => {
   });
 });
 
-describe('places found', () => {
-  it('lists the places found along the paths, in path order', () => {
-    expect(sitesFound(game())).toBe('Places found: none yet');
-    expect(sitesFound(game({ progress: { discoveries: { basket: false, spring: true, cairn: false } } }))).toBe('Places found: Quiet spring');
-    expect(sitesFound(game({ progress: { discoveries: { basket: true, spring: false, cairn: true } } }))).toBe('Places found: Old basket, Stone cairn');
+describe('forecast card visibility', () => {
+  it('shows while a front is due or in winter, and steps aside otherwise', () => {
+    expect(forecastView(game()).shown).toBe(true);
+    expect(forecastView(game({ progress: afterColdNight }, { day: 14 })).shown).toBe(true);
+    expect(forecastView(game({ progress: afterColdNight }, { day: 24 })).shown).toBe(false);
   });
 });

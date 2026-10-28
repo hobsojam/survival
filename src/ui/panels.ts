@@ -1,5 +1,5 @@
 import { isWinter, nightStart } from '../game/calendar';
-import { BALANCE, BUILDINGS, SITES, type GameState, type SiteId, type StructureId } from '../game/state';
+import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
 import { workSeconds } from '../game/needs';
 import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, isAtCamp, isColdNight, isFreezingNight, lookoutRepairBlocker, pickaxeBlocker, trailFoodBlocker } from '../game/rules';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
@@ -47,18 +47,15 @@ export function pickaxeView(state: GameState): ActionPanelView & { shown: boolea
 }
 
 /** The places along the paths found so far, for the Follow the paths panel. */
-export function sitesFound(state: GameState): string {
-  const found = (Object.keys(SITES) as SiteId[]).filter(id => state.progress.discoveries[id]).map(id => SITES[id].name);
-  return `Places found: ${found.length ? found.join(', ') : 'none yet'}`;
-}
-
 export function nightHint(state: GameState): string {
   if (state.timeOfDay < nightStart(state.day)) return 'These small moments are waiting for nightfall.';
   if (!isAtCamp(state)) return 'Return to the camp circle for a quiet evening.';
   return 'Optional comforts while the night passes.';
 }
 
-export interface ForecastView { active: boolean; weathered: boolean; title: string; copy: string; shelter: string; fire: string }
+export interface ForecastView { active: boolean; weathered: boolean; title: string; copy: string; shelter: string; fire: string;
+  /** Shown only while a front is due or under way, or in winter: otherwise there is nothing to forecast. */
+  shown: boolean }
 
 // A cold night always needs two to three logs: 132 s to 220 s of fuel at 90 s a log.
 const LOG_WORDS: Record<number, string> = { 2: 'two', 3: 'three' };
@@ -67,7 +64,7 @@ const LOG_WORDS: Record<number, string> = { 2: 'two', 3: 'three' };
 function winterForecast(state: GameState): ForecastView {
   const active = isFreezingNight(state);
   return {
-    active, weathered: false,
+    active, weathered: false, shown: true,
     title: active ? 'A bitter night' : 'Winter nights',
     copy: 'Winter nights are bitter. Keep the fire alive until dawn, or the wolves will come close.',
     shelter: state.structures.shelter ? '✓ Shelter ready' : '○ Shelter needed',
@@ -80,13 +77,13 @@ export function forecastView(state: GameState): ForecastView {
   const weathered = state.progress.hearthUnlocked;
   if (weathered && isWinter(state.day)) return winterForecast(state);
   if (weathered) {
-    return { active: storm, weathered, title: 'The cold night is behind you', copy: 'You kept your camp warm through dawn. The stone hearth is ready to build.',
+    return { active: storm, weathered, shown: storm, title: 'The cold night is behind you', copy: 'You kept your camp warm through dawn. The stone hearth is ready to build.',
       shelter: '✓ Shelter held firm', fire: '✓ Hearth unlocked' };
   }
   const day = state.progress.nextStormDay!;
   const sheltered = state.structures.shelter;
   return {
-    active: storm, weathered,
+    active: storm, weathered, shown: true,
     title: storm ? 'The cold front is here' : `Cold front · day ${day} night`,
     copy: storm ? 'Stay at camp and keep the fire alive until dawn.' : `Build a shelter and bring ${LOG_WORDS[logsForColdNight(day)]} logs to camp before nightfall on day ${day}.`,
     shelter: sheltered ? '✓ Shelter ready' : '○ Shelter needed',

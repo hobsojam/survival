@@ -31,7 +31,9 @@ describe('field journal', () => {
     expect(journalView(state).nextHint).toMatch(/west path/i);
     state.progress.quarryFound = true;
     expect(journalView(state).nextHint).toMatch(/all five paths/i);
-    expect(journalView(state).milestones.filter(item => item.done)).toHaveLength(4);
+    expect(journalView({ ...state, progress: { ...state.progress, lookoutRepaired: false } }).milestones).toHaveLength(4);
+    // Once the lookout stands, the year journal takes over and the milestones step aside.
+    expect(journalView(state).milestones).toEqual([]);
   });
 
   it('uses the rescheduled cold front day after a missed storm', () => {
