@@ -9,6 +9,7 @@ import { isLowMeter } from '../game/needs';
 import { gateTap, nextOpenTab, wireSidebarTabs, type DockTab } from './dock';
 import { createPause, wirePause, type PauseControl } from './pause';
 import { journalView, QUARRY_MARKER } from './journal';
+import { currentPage, journalPageView } from './yearJournal';
 import { axeView, bagView, buildButtonView, forecastView, lookoutView, nightHint, pickaxeView, sitesFound, startNote, type ActionPanelView } from './panels';
 import { Soundscape } from '../game/soundscape';
 
@@ -28,6 +29,8 @@ export class App {
   private lastSaveAt = 0;
   private saveFailures = 0;
   private openTab: DockTab | null = null;
+  /** The journal page being read, or null to follow the current season. */
+  private journalPage: number | null = null;
   private readonly pause: PauseControl;
   private toastTimer?: number;
 
@@ -78,7 +81,8 @@ export class App {
               <section class="panel axe-panel" data-tab="build"><p class="eyebrow">FOREST TOOLS</p><div class="tool-row"><h2 id="axe-title">Stone axe</h2><p id="axe-copy" class="lookout-copy"></p><button type="button" id="axe-button" data-action="craftAxe">Craft stone axe</button><small id="axe-cost">1 wood · 1 fiber · 1 stone</small></div><div id="pickaxe-row" class="tool-row" hidden><h2 id="pickaxe-title">Pickaxe</h2><p id="pickaxe-copy" class="lookout-copy"></p><button type="button" id="pickaxe-button" data-action="craftPickaxe">Craft pickaxe</button><small id="pickaxe-cost">2 wood · 1 fiber · 2 stone</small></div></section>
               <section class="panel ration-panel" data-tab="bag"><p class="eyebrow">TRAIL FOOD</p><h2>Drying rack</h2><p class="lookout-copy">Dry a berry at camp for a ration you can eat anywhere. Each restores 45 hunger.</p><button type="button" id="prepare-button" data-action="prepareTrailFood">Prepare trail ration</button><small id="prepare-hint">Build a drying rack first.</small></section>
               <section class="panel sites-panel" data-tab="camp"><p class="eyebrow">BEYOND CAMP</p><h2>Follow the paths</h2><p class="lookout-copy">An old basket, a quiet spring, and a stone cairn wait beyond the clearing.</p><p id="sites-seen" class="sites-seen">Places found: none yet</p><button type="button" id="site-button">Explore nearby place</button><small>Stand beside a place and press V</small></section>
-              <section class="panel journal-panel" data-tab="camp"><p class="eyebrow">YOUR FIELD JOURNAL</p><h2>Paths from camp</h2><p id="journal-hint" class="journal-hint"></p><div class="year-wheel"><span class="year-dial" aria-hidden="true"><span id="year-hand" class="year-hand"></span></span><p id="year-label" class="year-label"></p><ul class="visually-hidden" aria-label="Seasons"><li id="year-season-0">Autumn</li><li id="year-season-1">Winter</li><li id="year-season-2">Spring</li><li id="year-season-3">Summer</li></ul></div><details open><summary>Map and milestones</summary><div class="journal-map" aria-hidden="true"><svg viewBox="0 0 40 30" preserveAspectRatio="none"><path d="M20 15 L8 8 M20 15 L30 8 M20 15 L10 20 M20 15 L31 21" /><path id="map-west-path" d="M20 15 L1 15" style="display:none" /></svg><span class="map-point camp" style="left:50%;top:50%">✦</span>${mapMarkers}<span id="map-player" class="map-player"></span></div><p class="map-key">✦ Camp &nbsp; ● You &nbsp; ? Unexplored</p><ul id="journal-places" class="journal-list"></ul><p class="journal-subhead">Camp milestones</p><ul id="journal-milestones" class="journal-list"></ul></details></section>
+              <section class="panel journal-panel" data-tab="camp"><p class="eyebrow">YOUR FIELD JOURNAL</p><h2>Paths from camp</h2><p id="journal-hint" class="journal-hint"></p><details open><summary>Map and milestones</summary><div class="journal-map" aria-hidden="true"><svg viewBox="0 0 40 30" preserveAspectRatio="none"><path d="M20 15 L8 8 M20 15 L30 8 M20 15 L10 20 M20 15 L31 21" /><path id="map-west-path" d="M20 15 L1 15" style="display:none" /></svg><span class="map-point camp" style="left:50%;top:50%">✦</span>${mapMarkers}<span id="map-player" class="map-player"></span></div><p class="map-key">✦ Camp &nbsp; ● You &nbsp; ? Unexplored</p><ul id="journal-places" class="journal-list"></ul><p class="journal-subhead">Camp milestones</p><ul id="journal-milestones" class="journal-list"></ul></details></section>
+              <section class="panel year-journal-panel" data-tab="camp"><p class="eyebrow">THE YEAR SO FAR</p><div class="year-wheel"><span class="year-dial" aria-hidden="true"><span id="year-hand" class="year-hand"></span></span><p id="year-label" class="year-label"></p><ul class="visually-hidden" aria-label="Seasons"><li id="year-season-0">Autumn</li><li id="year-season-1">Winter</li><li id="year-season-2">Spring</li><li id="year-season-3">Summer</li></ul></div><div class="year-journal-page"><div class="year-journal-head"><button type="button" id="year-journal-previous" class="year-journal-turn" aria-label="Earlier page">‹</button><div><h2 id="year-journal-title"></h2><p id="year-journal-days" class="year-journal-days"></p></div><button type="button" id="year-journal-next" class="year-journal-turn" aria-label="Later page">›</button></div><ul id="year-journal-entries" class="year-journal-entries"></ul></div></section>
               <section class="panel bag-panel" data-tab="bag"><p class="eyebrow">IN YOUR BAG</p><div class="supplies">
                 <div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small><button type="button" class="supply-action" data-action="stokeFire" data-supply="wood" aria-label="Burn one wood">Burn</button></div>
                 <div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small><button type="button" class="supply-action" data-action="eat" data-supply="food" aria-label="Eat one berry">Eat</button></div>
@@ -124,6 +128,8 @@ export class App {
     this.root.querySelectorAll<HTMLButtonElement>('[data-tab-button]').forEach(button => {
       button.addEventListener('click', () => this.setOpenTab(nextOpenTab(this.openTab, button.dataset.tabButton as DockTab)));
     });
+    this.root.querySelector('#year-journal-previous')!.addEventListener('click', () => this.turnJournalPage(-1));
+    this.root.querySelector('#year-journal-next')!.addEventListener('click', () => this.turnJournalPage(1));
     wireSidebarTabs(this.root, this.storage);
     wirePause(this.root, document, this.pause);
     this.root.querySelector('#continue-exploring')!.addEventListener('click', () => {
@@ -333,7 +339,49 @@ export class App {
     this.setText('fire-status', bag.fire);
   }
 
+  /** Leafs one page back or forward; reaching today's page follows the season again. */
+  private turnJournalPage(step: number): void {
+    const today = currentPage(this.state.day);
+    const page = Math.max(0, (this.journalPage ?? today) + step);
+    this.journalPage = page >= today ? null : page;
+    this.renderYearJournal();
+  }
+
+  private renderYearJournal(): void {
+    const view = journalPageView(this.state, this.journalPage ?? currentPage(this.state.day));
+    this.setText('year-journal-title', view.title);
+    this.setText('year-journal-days', view.days);
+    const previous = this.root.querySelector<HTMLButtonElement>('#year-journal-previous');
+    const next = this.root.querySelector<HTMLButtonElement>('#year-journal-next');
+    if (previous) previous.disabled = !view.hasPrevious;
+    if (next) next.disabled = !view.hasNext;
+    const list = this.root.querySelector('#year-journal-entries');
+    if (!list) return;
+    const row = (icon: string, day: string, line: string, blank: boolean): HTMLLIElement => {
+      const item = document.createElement('li');
+      item.classList.toggle('blank', blank);
+      const picture = document.createElement('span');
+      picture.className = 'year-journal-icon';
+      picture.textContent = icon;
+      picture.setAttribute('aria-hidden', 'true');
+      const text = document.createElement('span');
+      text.className = 'year-journal-line';
+      if (!blank) {
+        const when = document.createElement('small');
+        when.textContent = day;
+        text.append(when, line);
+      } else {
+        text.setAttribute('aria-label', 'Not yet written');
+      }
+      item.append(picture, text);
+      return item;
+    };
+    list.replaceChildren(...view.entries.map(entry => row(entry.icon, entry.day, entry.line, false)),
+      ...Array.from({ length: view.blanks }, () => row('?', '', '', true)));
+  }
+
   private renderJournal(): void {
+    this.renderYearJournal();
     const journal = journalView(this.state);
     this.setText('journal-hint', journal.nextHint);
     renderYearWheel(this.calendarRoot, yearWheelView(this.state.day, this.state.timeOfDay));

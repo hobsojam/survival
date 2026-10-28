@@ -111,6 +111,23 @@ kbd { display: inline-block; border: 1px solid #d4ddce; border-bottom-width: 2px
 .year-hand { position: absolute; left: 50%; top: 4px; width: 3px; height: 18px; margin-left: -1.5px; border-radius: 2px; background: #2e4a38;
   box-shadow: 0 0 0 1px #fffdf7; transform-origin: 50% 16px; }
 .year-label { margin: 0; color: #2f5a41; font-size: 13px; font-weight: 700; }
+.year-journal-panel { background: linear-gradient(160deg, #f6efdd, #fffaf0 70%); border-color: #e2d4b6; }
+.year-journal-page { background: #fbf6ea; border: 1px solid #e4d8bd; border-radius: 10px; padding: 12px 12px 6px; box-shadow: inset 0 0 0 3px #f4ecd8; }
+.year-journal-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.year-journal-head > div { flex: 1; text-align: center; min-width: 0; }
+.year-journal-head h2 { margin: 0; color: #5a3e22; font-size: 18px; }
+.year-journal-days { margin: 2px 0 0; color: #b07a3e; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.year-journal-turn { flex: none; width: 34px; height: 34px; border: 1px solid #dccdab; border-bottom-width: 2px; border-radius: 9px; background: #f4ecd8; color: #5a3e22; font-size: 18px; line-height: 1; }
+.year-journal-turn:disabled { opacity: .35; }
+.year-journal-turn:focus-visible { outline: 3px solid #d69c5d; outline-offset: 2px; }
+.year-journal-entries { list-style: none; margin: 0; padding: 0; }
+.year-journal-entries li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px dashed #e2d5b8; color: #3b3226; font-family: Georgia, 'Times New Roman', serif; font-size: 14px; line-height: 1.4; }
+.year-journal-entries li:last-child { border-bottom: 0; }
+.year-journal-icon { flex: none; width: 26px; height: 26px; border-radius: 6px; background: #e9dcc0; display: flex; align-items: center; justify-content: center; font-family: 'DM Sans', sans-serif; font-size: 14px; }
+.year-journal-line { flex: 1; min-width: 0; }
+.year-journal-line small { display: block; color: #9a8a70; font-family: 'DM Sans', sans-serif; font-size: 11px; }
+.year-journal-entries li.blank .year-journal-icon { background: #f1e8d4; color: #c3b391; font-weight: 700; }
+.year-journal-entries li.blank .year-journal-line { height: 12px; margin-top: 8px; border-bottom: 2px solid #eadfc6; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .journal-panel details { margin-bottom: 12px; }
 .journal-panel summary { cursor: pointer; color: #426447; font-size: 11px; font-weight: 700; margin-bottom: 10px; }
