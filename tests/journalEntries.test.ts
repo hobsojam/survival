@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RABBIT_HOMES, createGame, type GameState } from '../src/game/state';
+import { RABBIT_HOMES, SITES, createGame, type GameState } from '../src/game/state';
 import { advanceTime, applyAction, type GameAction } from '../src/game/rules';
 import { nightStart } from '../src/game/calendar';
 import { recordJournal, type JournalId } from '../src/game/journalEntries';
@@ -14,7 +14,7 @@ const sheltered = (day: number, timeOfDay: number, fireFuel: number): GameState 
 
 describe('the year journal', () => {
   it('writes the first leaves of autumn once, with the day', () => {
-    const first = tick(at(1, 10));
+    const first = tick(at(1, 30));
     expect(first.state.journal).toEqual([{ year: 1, id: 'leaves', day: 1, variant: 0 }]);
     expect(first.messages).toEqual(['Written in your journal: The first leaves came down over camp.']);
     const again = recordJournal(first.state, first.state);
@@ -59,7 +59,7 @@ describe('the year journal', () => {
     expect(woke.day).toBe(41);
     expect(woke.journal).toContainEqual({ year: 1, id: 'warmSleep', day: 40, variant: 0 });
     expect(ids(woke)).not.toContain('fireflies');
-    expect(tick(woke).state.journal).toContainEqual({ year: 2, id: 'leaves', day: 41, variant: 0 });
+    expect(tick({ ...woke, timeOfDay: 30 }).state.journal).toContainEqual({ year: 2, id: 'leaves', day: 41, variant: 0 });
   });
 
   it('finds the rabbits near their homes in spring daylight', () => {
@@ -69,9 +69,36 @@ describe('the year journal', () => {
   });
 
   it('never changes the game', () => {
-    const before = at(1, 10);
+    const before = at(1, 30);
     const after = advanceTime(before, 1);
     const written = recordJournal(before, after).state;
     expect({ ...written, journal: after.journal }).toEqual(after);
+  });
+
+  it('leaves the new-game prompt alone on the first moments of a day', () => {
+    expect(tick(at(1, 0), 0.05).state.journal).toEqual([]);
+    expect(tick(at(41, 0), 0.05).state.journal).toEqual([]);
+  });
+
+  it('adds no second line for the cold front or the wolf, which have their own messages', () => {
+    const front = act(sheltered(3, nightStart(3) + 1, 300), { type: 'sleep' });
+    expect(ids(front.state)).toContain('coldFront');
+    const wolf = tick(at(12, nightStart(12) + 1, { fireFuel: 0 }));
+    expect(ids(wolf.state)).toContain('wolfTracks');
+    expect([...front.messages, ...wolf.messages].filter(text => /cold front|Paw prints/.test(text))).toEqual([]);
+  });
+
+  it('remembers a cold autumn night by the fire in the years after the front', () => {
+    const weathered = { ...base.progress, nextStormDay: null, hearthUnlocked: true };
+    const night = at(45, 239.5, { fireFuel: 50, progress: weathered });
+    expect(tick(night).state.journal).toContainEqual({ year: 2, id: 'coldFront', day: 45, variant: 2 });
+    expect(ids(tick({ ...night, fireFuel: 0 }).state)).not.toContain('coldFront');
+  });
+
+  it('writes two handfuls only from a bush, not from the old basket', () => {
+    const basket = at(34, 60, { player: { ...base.player, x: SITES.basket.x, y: SITES.basket.y } });
+    const found = act(basket, { type: 'visitSite', siteId: 'basket' });
+    expect(found.state.inventory.food).toBe(2);
+    expect(ids(found.state)).not.toContain('twoHandfuls');
   });
 });

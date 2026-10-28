@@ -27,13 +27,14 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
   autumn: [
     { id: 'leaves', icon: '🍂', lines: ['The first leaves came down over camp.'] },
     { id: 'fox', icon: '🦊', lines: ['A fox came by the bushes at dusk.'] },
-    { id: 'coldFront', icon: '❄️', lines: ['The cold front came. I kept the fire through it.', 'The cold front came, and the fire didn\'t last.'] },
+    { id: 'coldFront', icon: '❄️', lines: ['The cold front came. I kept the fire through it.', 'The cold front came, and it got the better of me.',
+      'A cold autumn night, and the fire kept me warm.'] },
     { id: 'driedBerries', icon: '🫐', lines: ['Dried berries for the winter.'] },
     { id: 'stars', icon: '✨', lines: ['Lay back and counted stars.'] }
   ],
   winter: [
     { id: 'firstSnow', icon: '🌨️', lines: ['Snow fell in the night.'], silent: true },
-    { id: 'wolfTracks', icon: '🐾', lines: ['Paw prints round the fire this morning.'] },
+    { id: 'wolfTracks', icon: '🐾', lines: ['Paw prints round the fire this morning.'], silent: true },
     { id: 'frozenSpring', icon: '🧊', lines: ['The quiet spring had frozen over.'] },
     { id: 'winterFire', icon: '🔥', lines: ['Kept the fire alive through a whole winter night.'] },
     { id: 'winterCooking', icon: '🍲', lines: ['Cooked berries by the fire, with the snow coming down.'] }
@@ -60,8 +61,8 @@ export const journalEntry = (id: JournalId): PageEntry | undefined => ENTRIES.ge
 export const journalSeason = (id: JournalId): Season | undefined =>
   (Object.keys(JOURNAL_PAGES) as Season[]).find(s => JOURNAL_PAGES[s].some(entry => entry.id === id));
 
-/** A moment just noticed: the day it belongs to, and which line tells it. */
-interface Noticed { day: number; variant?: number }
+/** A moment just noticed: the day it belongs to, which line tells it, and whether its own message already said so. */
+interface Noticed { day: number; variant?: number; silent?: boolean }
 interface Moment { before: GameState; after: GameState; action?: GameAction }
 
 const awake = ({ action }: Moment): boolean => action?.type !== 'sleep';
@@ -77,10 +78,15 @@ const onBefore = (m: Moment, when: boolean): Noticed | null => (when ? { day: m.
 const atSpring = (m: Moment): boolean => m.action?.type === 'visitSite' && m.action.siteId === 'spring' && done(m);
 
 const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
-  leaves: m => onAfter(m, awake(m) && isAtCamp(m.after) && daylight(m.after)),
+  // Not in the day's first moments, so the morning's own message (a new game, a waking) stays on screen.
+  leaves: m => onAfter(m, awake(m) && m.before.timeOfDay >= 30 && isAtCamp(m.after) && daylight(m.after)),
   fox: m => onAfter(m, awake(m) && isAtCamp(m.after) && atDusk(m.after)),
-  coldFront: m => (isColdNight(m.before) && !isColdNight(m.after)
-    ? { day: m.before.day, variant: m.after.progress.hearthUnlocked ? 0 : 1 } : null),
+  coldFront: m => {
+    if (isColdNight(m.before) && !isColdNight(m.after)) return { day: m.before.day, variant: m.after.progress.hearthUnlocked ? 0 : 1, silent: true };
+    // Once the front is long weathered, any autumn night kept warm at camp fills its place in later years.
+    const weathered = m.before.progress.hearthUnlocked && m.before.progress.nextStormDay === null;
+    return dawn(m) && weathered && isAtCamp(m.before) && m.before.fireFuel > 0 ? { day: m.before.day, variant: 2 } : null;
+  },
   driedBerries: m => onBefore(m, acted(m, 'prepareTrailFood')),
   stars: m => onBefore(m, acted(m, 'stargaze')),
   firstSnow: m => onAfter(m, seasonMessage(m.before.day, m.after.day) !== null),
@@ -95,7 +101,7 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   stumpGrowing: m => onAfter(m, dawn(m) && m.after.trees.some(tree => tree.readyDay === m.after.day && tree.readyDay > 1)),
   springRest: m => onBefore(m, atSpring(m)),
   fireflies: m => onAfter(m, awake(m) && isAtCamp(m.after) && !daylight(m.after)),
-  twoHandfuls: m => onBefore(m, m.after.inventory.food - m.before.inventory.food === 2),
+  twoHandfuls: m => onBefore(m, m.action?.type === 'gather' && m.after.inventory.food - m.before.inventory.food === 2),
   goldEvening: m => onAfter(m, awake(m) && isAtCamp(m.after) && m.before.day === m.after.day
     && daylight(m.before) && !daylight(m.after)),
   warmSleep: m => onBefore(m, acted(m, 'sleep') && m.after.fireFuel === 0),
@@ -119,7 +125,7 @@ export function recordJournal(before: GameState, after: GameState, action?: Game
       if (after.journal.some(item => item.year === year && item.id === entry.id)) continue;
       const variant = noticed.variant ?? 0;
       written.push({ year, id: entry.id, day: noticed.day, variant });
-      if (!entry.silent) messages.push(`Written in your journal: ${entry.lines[variant]}`);
+      if (!entry.silent && !noticed.silent) messages.push(`Written in your journal: ${entry.lines[variant]}`);
     }
   }
   return written.length ? { state: { ...after, journal: [...after.journal, ...written] }, messages } : { state: after, messages };

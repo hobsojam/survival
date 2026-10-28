@@ -43,6 +43,6 @@ describe('the year journal pages', () => {
 
   it('shows the cold front line that matched the night', () => {
     const view = journalPageView(on(5, [{ year: 1, id: 'coldFront', day: 3, variant: 1 }]), 0);
-    expect(view.entries[0].line).toBe('The cold front came, and the fire didn\'t last.');
+    expect(view.entries[0].line).toBe('The cold front came, and it got the better of me.');
   });
 });
