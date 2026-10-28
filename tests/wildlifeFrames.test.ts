@@ -58,9 +58,9 @@ describe('the rabbit', () => {
 });
 
 describe('the friends', () => {
-  it('has a young wolf that walks, sits and lies down', () => {
+  it('has a young wolf that walks, sits, lies down and lifts its head to howl', () => {
     expect(() => validateSprite(wildlifeSprites.wolf)).not.toThrow();
-    expect(Object.keys(wildlifeSprites.wolf.frames)).toEqual(['walk0', 'walk1', 'sit', 'lie']);
+    expect(Object.keys(wildlifeSprites.wolf.frames)).toEqual(['walk0', 'walk1', 'sit', 'lie', 'howl']);
   });
 
   it('has a feather and a tuft of fur to leave by the fire', () => {

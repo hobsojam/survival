@@ -6,7 +6,8 @@ import { sprites } from '../art/sprites';
 import { firefliesOut, isSpring, isWinter, leavesFalling } from '../game/calendar';
 import { wolvesClose } from '../game/wolves';
 import { KEEPSAKE_SPOT, keepsakeKind, sceneryKeepsake } from '../game/companion';
-import { companionPose } from './companionPose';
+import { CHORUS_SECONDS, chorusNight, companionPose, type CompanionPose } from './companionPose';
+import type { SoundCue } from '../game/soundscape';
 import {
   BIRD_HOMES, EYE_SPOTS, FIREFLY_HOMES, FOX, birdForageTarget, birdMayReturn, birdShouldLeave, birdGroundFrame, birdFlightFrame,
   LEAF_HOMES, RABBIT_FLEE_RADIUS, RABBIT_HOMES, WOLF_SPOTS, darkness, eyesAt, fireflyFrame, fireflyGlow, fireflyOffset, foxAt, foxFrame, leafAt, rabbitAt, rabbitCount, wolfCount, wolfWatch, type Point
@@ -32,6 +33,7 @@ const FLIGHT_SECONDS = 1.6;
 const FOX_RUN_SECONDS = 2.2;
 /** A bird that has started to trust the survivor lets them come this close before it flies. */
 const TRUSTING_FLEE_RADIUS = 1.2;
+const FRIEND_FLIGHT_SECONDS = 0.7;
 
 function sprite(scene: Phaser.Scene, name: string, frame: string, depth = 0): Phaser.GameObjects.Image {
   const def = sprites[name];
@@ -81,11 +83,15 @@ export class AmbientLife {
   private stillSeconds = 0;
   private facing: 1 | -1 = 1;
   private lastPlayer: Point | null = null;
+  /** Where the friend was last drawn, and its flight when it moves to a new perch. */
+  private friendDrawn: CompanionPose | null = null;
+  private friendFlight: { from: CompanionPose; elapsed: number } | null = null;
+  private lastChorus = -1;
   private foxRun: Motion | null = null;
   private foxFledDay = 0;
   private started = false;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(scene: Phaser.Scene, private readonly onCue: (cue: SoundCue) => void = () => undefined) {
     this.birds = BIRD_HOMES.map((home, index) => ({
       home, ground: home, away: null, flight: null, restSeconds: 0,
       nextForageAtMs: 0, forageUntilMs: 0, forageNodeId: null, index,
@@ -147,15 +153,45 @@ export class AmbientLife {
     if (Math.abs(moved) > 0.001) this.facing = moved < 0 ? -1 : 1;
     this.lastPlayer = { x, y };
     const friend = state.companion.friend;
-    const pose = state.area === 'camp' ? companionPose(state, timeMs, this.stillSeconds, this.facing) : null;
+    const target = state.area === 'camp' ? companionPose(state, timeMs, this.stillSeconds, this.facing) : null;
+    const pose = target && friend === 'bird' ? this.birdFlight(target, seconds) : target;
+    this.friendDrawn = pose;
     for (const [kind, image] of Object.entries(this.friends) as [Friend, Phaser.GameObjects.Image][]) {
       if (kind !== friend || !pose) { image.setVisible(false); continue; }
       this.show(image, pose.x, pose.y - pose.height, pose.frame, pose.facing);
       image.setDepth(Math.round(worldY(pose.y)));
     }
+    this.cueChorus(state, timeMs);
     const lying = friend && state.area === 'camp' && (state.companion.keepsakeLying || sceneryKeepsake(state));
     if (lying) this.show(this.keepsake, KEEPSAKE_SPOT.x, KEEPSAKE_SPOT.y, `keepsake:${keepsakeKind(friend)}`);
     else this.keepsake.setVisible(false);
+  }
+
+  /** A friendly bird flies to a new perch over a moment, rather than jumping there. */
+  private birdFlight(target: CompanionPose, seconds: number): CompanionPose {
+    const drawn = this.friendDrawn;
+    if (!this.friendFlight && drawn && Math.hypot(target.x - drawn.x, target.y - drawn.y, target.height - drawn.height) > 0.5) {
+      this.friendFlight = { from: drawn, elapsed: 0 };
+    }
+    const flight = this.friendFlight;
+    if (!flight) return target;
+    flight.elapsed += seconds;
+    const progress = Math.min(1, flight.elapsed / FRIEND_FLIGHT_SECONDS);
+    if (progress >= 1) { this.friendFlight = null; return target; }
+    return {
+      x: lerp(flight.from.x, target.x, progress), y: lerp(flight.from.y, target.y, progress),
+      height: lerp(flight.from.height, target.height, progress) + Math.sin(progress * Math.PI) * 0.6,
+      frame: birdFlightFrame(flight.elapsed), facing: target.x < flight.from.x ? -1 : 1
+    };
+  }
+
+  /** At the start of each chorus on a winter night, the wild wolves howl and the friend answers. */
+  private cueChorus(state: GameState, timeMs: number): void {
+    const cycle = Math.floor(timeMs / 1000 / CHORUS_SECONDS);
+    const starting = (timeMs / 1000) % CHORUS_SECONDS < 1;
+    if (!chorusNight(state) || !starting || cycle === this.lastChorus) return;
+    this.lastChorus = cycle;
+    this.onCue('wolfChorus');
   }
 
   private startBirdFlee(bird: Bird, from: Point, player: Point, dark: number): void {

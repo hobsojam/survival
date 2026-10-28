@@ -268,3 +268,36 @@ describe('the camp friend', () => {
     expect(unseen).not.toContain(true);
   });
 });
+
+describe('the friend in motion', () => {
+  const base = createGame();
+
+  it('cues the wolf chorus once a cycle on winter nights, and never in autumn', () => {
+    const { scene } = sceneWithImages();
+    const cues: string[] = [];
+    const life = new AmbientLife(scene as never, cue => cues.push(cue));
+    const night = { ...base, day: 12, timeOfDay: nightStart(12) + 20, fireFuel: 100,
+      companion: { ...base.companion, friend: 'wolf' as const, since: 1 } };
+    for (let t = 23000; t <= 49000; t += 250) life.update(night, 0.25, t);
+    expect(cues).toEqual(['wolfChorus', 'wolfChorus']);
+    const autumn: string[] = [];
+    const quiet = new AmbientLife(sceneWithImages().scene as never, cue => autumn.push(cue));
+    for (let t = 23000; t <= 49000; t += 250) quiet.update({ ...night, day: 5, timeOfDay: nightStart(5) + 20 }, 0.25, t);
+    expect(autumn).toEqual([]);
+  });
+
+  it('flies the bird between perches rather than jumping', () => {
+    const { scene, of } = sceneWithImages();
+    const life = new AmbientLife(scene as never);
+    const day = { ...base, day: 5, timeOfDay: 60, structures: { ...base.structures, shelter: true, dryingRack: true },
+      player: { ...base.player, x: 21, y: 14 }, companion: { ...base.companion, friend: 'bird' as const, since: 1 } };
+    const bird = of('bird').at(-1)!;
+    life.update(day, 0.1, 100);
+    life.update(day, 0.1, 200);
+    expect(bird.texture).toBe('bird:idle');
+    life.update({ ...day, player: { ...day.player, x: 18 } }, 0.1, 300);
+    expect(bird.texture).toMatch(/^bird:fly/);
+    for (let t = 400; t <= 1500; t += 100) life.update({ ...day, player: { ...day.player, x: 18 } }, 0.1, t);
+    expect(bird.texture).toBe('bird:idle');
+  });
+});
