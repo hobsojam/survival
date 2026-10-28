@@ -49,7 +49,7 @@ describe('befriending', () => {
 
   it('lets the fox take precedence when both could be offered', () => {
     const dusk = camp(1, nightStart(1) - 5, { food: 1 });
-    expect(foxAt(1, dusk.timeOfDay)?.sitting).toBe(true);
+    expect(foxAt(1, dusk.timeOfDay)?.nibbling).toBe(true);
     expect(offerFor(dusk)).toBe('fox');
     const result = offer(dusk);
     expect(result.state.companion.trust).toEqual({ bird: 0, fox: 1, wolf: 0 });

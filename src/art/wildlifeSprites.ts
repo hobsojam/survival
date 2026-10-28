@@ -92,6 +92,49 @@ const foxSprite = define(24, 16, foxLegend, foxPainters, [12, 15], {
   sit: { frames: ['sit0', 'sit1'], frameRate: 2, repeat: -1 }
 });
 
+/** A young grey wolf, a little leggier than the fox: walking, sitting up, and stretched out by the fire. */
+const wolfLegend = { a: 'stone0', b: 'stone1', c: 'stone2', d: 'stone3', e: 'stone4', s: 'shadow' } as const;
+function wolf(g: Grid, pose: 'walk0' | 'walk1' | 'sit' | 'lie'): void {
+  if (pose === 'lie') {
+    box(g, 2, 15, 20, 1, 's');
+    box(g, 1, 12, 6, 2, 'b'); box(g, 1, 12, 3, 1, 'd');
+    box(g, 5, 10, 13, 5, 'b'); box(g, 6, 10, 11, 3, 'c'); box(g, 8, 10, 7, 1, 'd');
+    box(g, 17, 9, 6, 5, 'c'); box(g, 18, 9, 4, 3, 'd');
+    box(g, 18, 7, 2, 3, 'b'); box(g, 21, 7, 2, 3, 'b');
+    dot(g, 21, 11, 'a'); box(g, 20, 13, 4, 1, 'e'); dot(g, 23, 12, 'a');
+    return;
+  }
+  if (pose === 'sit') {
+    box(g, 6, 15, 12, 1, 's');
+    box(g, 5, 12, 5, 3, 'b'); box(g, 5, 12, 2, 1, 'd');
+    box(g, 8, 6, 7, 9, 'b'); box(g, 9, 6, 6, 7, 'c');
+    box(g, 11, 8, 3, 6, 'e'); box(g, 13, 13, 2, 2, 'b');
+    box(g, 10, 1, 7, 6, 'c'); box(g, 11, 2, 6, 4, 'd');
+    box(g, 10, 0, 2, 2, 'b'); box(g, 15, 0, 2, 2, 'b');
+    dot(g, 15, 3, 'a'); box(g, 16, 5, 3, 2, 'e'); dot(g, 18, 5, 'a');
+    return;
+  }
+  const frame = pose === 'walk0' ? 0 : 1;
+  box(g, 2, 15, 19, 1, 's');
+  box(g, 0, 6 + frame, 5, 2, 'b'); box(g, 0, 6 + frame, 2, 1, 'd');
+  box(g, 4, 5, 13, 6, 'b'); box(g, 5, 5, 12, 4, 'c'); box(g, 7, 5, 8, 1, 'd'); box(g, 8, 9, 6, 2, 'e');
+  const swing = frame ? 1 : -1;
+  box(g, 5 + swing, 10, 2, 5, 'b'); box(g, 14 - swing, 10, 2, 5, 'b');
+  dot(g, 5 + swing, 14, 'a'); dot(g, 14 - swing, 14, 'a');
+  box(g, 15, 2, 6, 5, 'c'); box(g, 16, 2, 5, 3, 'd');
+  box(g, 16, 0, 2, 3, 'b'); box(g, 19, 0, 2, 3, 'b');
+  dot(g, 19, 4, 'a'); box(g, 20, 6, 3, 2, 'e'); dot(g, 23, 6, 'a');
+}
+const wolfSprite = define(24, 16, wolfLegend, {
+  walk0: g => wolf(g, 'walk0'), walk1: g => wolf(g, 'walk1'), sit: g => wolf(g, 'sit'), lie: g => wolf(g, 'lie')
+}, [12, 15]);
+
+/** A friend's shed feather or tuft of fur, lying by the fire. */
+const keepsakeSprite = define(5, 3, { a: 'bird2', b: 'bird4', c: 'stone3', d: 'fox3' }, {
+  feather: g => { line(g, 0, 2, 4, 0, 'a'); dot(g, 1, 1, 'b'); dot(g, 2, 0, 'b'); dot(g, 3, 1, 'b'); },
+  fur: g => { box(g, 1, 1, 3, 2, 'c'); dot(g, 0, 2, 'c'); dot(g, 2, 0, 'd'); dot(g, 4, 2, 'd'); }
+}, [2, 2]);
+
 const fireflySprite = define(3, 3, { a: 'fire4', b: 'firefly' }, {
   glow0: g => { dot(g, 1, 1, 'b'); dot(g, 0, 1, 'a'); dot(g, 2, 1, 'a'); },
   glow1: g => { dot(g, 1, 1, 'b'); dot(g, 1, 0, 'a'); dot(g, 1, 2, 'a'); dot(g, 0, 1, 'a'); dot(g, 2, 1, 'a'); }
@@ -191,6 +234,6 @@ for (let variant = 0; variant < 3; variant++) frostPainters[`frost${variant}`] =
 const morningFrost = define(16, 16, frostLegend, frostPainters, [8, 15]);
 
 export const wildlifeSprites: Record<string, SpriteDef> = {
-  bird: birdSprite, fox: foxSprite, firefly: fireflySprite, leaf: leafSprite, eyes: eyesSprite, rabbit: rabbitSprite, wolfTracks: wolfTracksSprite, gatherPop, smokePuff, spark,
+  bird: birdSprite, fox: foxSprite, wolf: wolfSprite, keepsake: keepsakeSprite, firefly: fireflySprite, leaf: leafSprite, eyes: eyesSprite, rabbit: rabbitSprite, wolfTracks: wolfTracksSprite, gatherPop, smokePuff, spark,
   windStreak, sleetFleck, rainStreak, puddle, cookSteam, shootingStar, morningFrost
 };

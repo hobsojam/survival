@@ -123,8 +123,8 @@ describe('ambient quarry eyes', () => {
     const { scene, of } = sceneWithImages();
     const life = new AmbientLife(scene as never);
     const eyes = of('eyes');
-    // The quarry's watchers, then the winter wolves.
-    expect(eyes).toHaveLength(EYE_SPOTS.length + WOLF_SPOTS.length);
+    // The quarry's eyes, the wolves', and the one trusting pair.
+    expect(eyes).toHaveLength(EYE_SPOTS.length + WOLF_SPOTS.length + 1);
     const state = createGame();
     state.timeOfDay = 200;
     for (let t = 0; t < 12000; t += 500) life.update(state, 0.5, t);
@@ -222,5 +222,49 @@ describe('spring rabbits at camp', () => {
     expect(rabbit.visible).toBe(false);
     for (let t = 1300; t <= 10500; t += 100) life.update(springDay, 0.1, t);
     expect(rabbit.visible).toBe(true);
+  });
+});
+
+describe('the camp friend', () => {
+  const base = createGame();
+  const befriended = (friend: 'bird' | 'fox' | 'wolf', changes: Partial<ReturnType<typeof createGame>['companion']> = {}) => ({
+    ...base, day: 1, timeOfDay: 60, player: { ...base.player, x: 22, y: 16 },
+    companion: { ...base.companion, friend, since: 1, ...changes }
+  });
+
+  it('is the fox itself, so the wild fox no longer comes by at dusk', () => {
+    const { scene, of } = sceneWithImages();
+    const life = new AmbientLife(scene as never);
+    const [wild, friend] = of('fox');
+    const state = befriended('fox');
+    for (let time = nightStart(1) - 20; time <= nightStart(1) + 50; time += 5) {
+      life.update({ ...state, timeOfDay: time }, 0.1, time * 1000);
+      expect(wild.visible).toBe(false);
+    }
+    expect(friend.visible).toBe(true);
+  });
+
+  it('shows the friend at camp, and a shed piece by the fire', () => {
+    const { scene, of } = sceneWithImages();
+    const life = new AmbientLife(scene as never);
+    life.update(befriended('wolf', { keepsakeLying: true }), 0.1, 100);
+    expect(of('wolf')[0].visible).toBe(true);
+    expect(of('keepsake')[0]).toMatchObject({ visible: true, texture: 'keepsake:fur' });
+    life.update(befriended('bird'), 0.1, 200);
+    expect(of('keepsake')[0].visible).toBe(false);
+    expect(of('wolf')[0].visible).toBe(false);
+  });
+
+  it('lets a trusting wolf watch from the edge of the firelight even with the fire lit', () => {
+    const { scene, of } = sceneWithImages();
+    const life = new AmbientLife(scene as never);
+    const night = { ...befriended('wolf'), companion: { ...base.companion, trust: { bird: 0, fox: 0, wolf: 1 } },
+      day: 12, timeOfDay: nightStart(12) + 40, fireFuel: 100, player: { ...base.player, x: 20, y: 15 } };
+    const seen = Array.from({ length: 40 }, (_, i) => { life.update(night, 0.25, i * 250); return of('eyes').some(image => image.visible); });
+    expect(seen).toContain(true);
+    const untrusted = sceneWithImages();
+    const wary = new AmbientLife(untrusted.scene as never);
+    const unseen = Array.from({ length: 40 }, (_, i) => { wary.update({ ...night, companion: base.companion }, 0.25, i * 250); return untrusted.of('eyes').some(image => image.visible); });
+    expect(unseen).not.toContain(true);
   });
 });

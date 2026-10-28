@@ -33,8 +33,8 @@ export function birdForageTarget(home: Point, nodes: ResourceNode[], chance: num
   return nearby[0] ?? null;
 }
 
-export const birdShouldLeave = (home: Point, player: Point, dark: number) =>
-  dark > 0.3 || distance(home, player) < BIRD_FLEE_RADIUS;
+export const birdShouldLeave = (home: Point, player: Point, dark: number, radius = BIRD_FLEE_RADIUS) =>
+  dark > 0.3 || distance(home, player) < radius;
 
 export const birdMayReturn = (home: Point, player: Point, dark: number) =>
   dark < 0.1 && distance(home, player) > BIRD_FLEE_RADIUS + 2;

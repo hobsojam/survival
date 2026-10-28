@@ -3,7 +3,7 @@ import { SITES, createGame, type GameState } from '../src/game/state';
 import { RABBIT_HOMES } from '../src/game/wildlife';
 import { advanceTime, applyAction, type GameAction } from '../src/game/rules';
 import { nightStart } from '../src/game/calendar';
-import { recordJournal, type JournalId } from '../src/game/journalEntries';
+import { journalEntry, recordJournal, type JournalId } from '../src/game/journalEntries';
 
 const base = createGame();
 const at = (day: number, timeOfDay: number, extra: Partial<GameState> = {}): GameState => ({ ...base, day, timeOfDay, ...extra });
@@ -102,5 +102,11 @@ describe('the year journal', () => {
     const found = act(basket, { type: 'visitSite', siteId: 'basket' });
     expect(found.state.inventory.food).toBe(2);
     expect(ids(found.state)).not.toContain('twoHandfuls');
+  });
+});
+
+describe('the fox line', () => {
+  it('hints at what the fox likes to eat', () => {
+    expect(journalEntry('fox')?.lines[0]).toBe('A fox nosed around the berry bushes at dusk.');
   });
 });

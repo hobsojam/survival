@@ -40,12 +40,23 @@ describe('fox', () => {
     const { arrive, leave } = foxWindow(visitDay);
     const start = foxAt(visitDay, arrive)!;
     expect(start).toMatchObject({ x: FOX.den.x, y: FOX.den.y, sitting: false });
-    const sitting = foxAt(visitDay, arrive + FOX.travel + 5)!;
+    const sitting = foxAt(visitDay, arrive + FOX.travel + 10)!;
     expect(sitting).toMatchObject({ x: FOX.seat.x, y: FOX.seat.y, sitting: true });
     expect(Math.sign(BALANCE.campX - sitting.x)).toBe(sitting.facing);
     const leaving = foxAt(visitDay, leave - FOX.travel / 2)!;
     expect(leaving.sitting).toBe(false);
     expect(Math.sign(FOX.den.x - FOX.seat.x)).toBe(leaving.facing);
+  });
+
+  it('noses at a berry bush on the way to its seat, and sits nearer the fire as it comes to trust you', () => {
+    const { arrive } = foxWindow(visitDay);
+    const nibbling = foxAt(visitDay, arrive + FOX.travel + 2)!;
+    expect(nibbling).toMatchObject({ x: FOX.bush.x, y: FOX.bush.y, nibbling: true, sitting: false });
+    const near = (trust: number) => {
+      const pose = foxAt(visitDay, arrive + FOX.travel + 10, trust)!;
+      return Math.hypot(pose.x - BALANCE.campX, pose.y - BALANCE.campY);
+    };
+    expect(near(0) - near(2)).toBeCloseTo(0.6);
   });
 
   it('sits close enough to the fire to be seen in its glow', () => {

@@ -27,7 +27,7 @@ interface PageEntry {
 export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
   autumn: [
     { id: 'leaves', icon: '🍂', lines: ['The first leaves came down over camp.'] },
-    { id: 'fox', icon: '🦊', lines: ['A fox came by the bushes at dusk.'] },
+    { id: 'fox', icon: '🦊', lines: ['A fox nosed around the berry bushes at dusk.'] },
     { id: 'coldFront', icon: '❄️', lines: ['The cold front came. I kept the fire through it.', 'The cold front came, and it got the better of me.',
       'A cold autumn night, and the fire kept me warm.'] },
     { id: 'driedBerries', icon: '🫐', lines: ['Dried berries for the winter.'] },

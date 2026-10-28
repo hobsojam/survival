@@ -34,7 +34,10 @@ const byBush = (state: GameState): boolean => state.nodes.some(node => node.kind
 
 /** Whether each animal is here and in the mood, and the survivor has what it likes. */
 const WILLING: Record<Friend, (state: GameState) => boolean> = {
-  fox: state => state.inventory.food > 0 && foxAt(state.day, state.timeOfDay)?.sitting === true,
+  fox: state => {
+    const fox = foxAt(state.day, state.timeOfDay);
+    return state.inventory.food > 0 && (fox?.sitting === true || fox?.nibbling === true);
+  },
   wolf: state => state.inventory.trailFood > 0 && isWinter(state.day) && night(state),
   bird: state => state.inventory.food > 0 && !isWinter(state.day) && !night(state) && byBush(state)
 };
@@ -81,7 +84,7 @@ export function findDue(day: number, lastDay: number, salt: number): boolean {
 /** Pieces of fur or feathers an item takes; the friend stops shedding while this many are held. */
 export const KEEPSAKES_NEEDED = 6;
 /** Where a shed piece lies, just beside the fire, and how near the survivor walks to pick it up. */
-export const KEEPSAKE_SPOT = { x: BALANCE.campX - 1, y: BALANCE.campY + 0.8 } as const;
+export const KEEPSAKE_SPOT = { x: BALANCE.campX - 0.6, y: BALANCE.campY - 0.9 } as const;
 const PICK_UP_RADIUS = 0.9;
 // Shedding and the fox's berry each roll their own dice, on sequences of their own.
 const SHED_SALT = 71;
