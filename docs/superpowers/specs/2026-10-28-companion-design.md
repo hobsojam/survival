@@ -95,17 +95,23 @@ All three stay at camp; none follows you to the quarry (my call, to keep the qua
 
 - **Wolf: it protects (user's choice).** On a winter night when the fire goes out, the wolf chases the wild wolves off, and nothing is taken: "Your wolf saw the others off into the dark." The visit still counts for that night's once-a-night limit, and paw prints still appear.
 - **Bird: it raises the alarm (user's choice; my reading of it).** If you're asleep on a winter night and the fire is about to go out, the bird wakes you at that moment: "Your bird woke you. The fire is nearly out." You can feed the fire and sleep again. In spring it sings at dawn for pleasure, as a short birdsong on the sound layer.
-- **Fox: it finds things (my call; the user wasn't sure).** Every few dawns (every third dawn) the fox brings a berry if your bag has room: "The fox left a berry by your bedroll." This also works in winter, when the bushes are bare. That makes it a gentle food help, about equal to the others' gifts.
+- **Fox: it finds things (my call; the user wasn't sure).** Now and then the fox brings a berry at dawn, on the same timing as shedding (see "Fur and feathers"), if your bag has room: "The fox left a berry by your bedroll." This also works in winter, when the bushes are bare. That makes it a gentle food help, about equal to the others' gifts.
 
 ### Fur and feathers
 
-- **Shedding:** every third dawn, a tuft of fur (from the fox or the wolf) or a feather (from the bird) lies by the fire. Pick it up with E or a tap.
+- **When (user's choice):** after a find, two dawns always pass quietly. From the third dawn on, each dawn has a 50% chance of another, so the average gap is about 4 nights. Six pieces take about 24 days, so the item arrives within the companion's first year, but you can't predict the night. The chance is worked out from the day number, like rain and the fox's visits, so it behaves the same after a reload and can be tested. The fox's berry gift uses the same timing, on its own sequence.
+- **Shedding:** on a shedding dawn, a tuft of fur (from the fox or the wolf) or a feather (from the bird) lies by the fire. Pick it up with E or a tap.
 - **Storage:** it goes into a small "Keepsakes" count, not the bag, so it never competes for bag space (my call).
 - **Making the item** at the toolshed, once each:
   - **Feather pillow:** 6 feathers, needs the bed. Sleeping in the bed restores 10 more energy. It shows on the bed.
   - **Fur cloak:** 6 fur. You lose a quarter less warmth on any night away from a lit fire, including cold-front and winter nights. The survivor wears it.
 - With one companion, only one of the two items can ever be made in a game. That's expected.
-- **Shedding continues after the item is made,** but it's capped at 12 stored, so nothing piles up.
+- **Shedding stops when there's nothing to collect for (user's choice).**
+  - Shedding stops while you hold the 6 pieces needed.
+  - Nothing more is collected once the item is made, so the count never goes past 6.
+  - The Keepsakes line in the bag disappears once the item is made.
+  - After that, a feather or tuft may still appear by the fire as scenery on a shedding dawn and drift away by the next dawn, with nothing to pick up.
+  - When later uses arrive (shelter decorations, more clothes), shedding can switch back on for them.
 
 ### Save
 
