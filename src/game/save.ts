@@ -1,8 +1,10 @@
 import { BALANCE, BUILDINGS, SITES, createGame, type GameState } from './state';
 import { bagCapacity, carriedCount } from './rules';
+import { season, yearOf } from './calendar';
+import { journalEntry, journalSeason, type JournalId } from './journalEntries';
 
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 13;
+const SAVE_VERSION = 14;
 export type SaveResult = { ok: true } | { ok: false; error: string };
 export type LoadResult = { kind: 'empty' } | { kind: 'loaded'; state: GameState } | { kind: 'invalid'; reason: string };
 
@@ -88,10 +90,25 @@ function validWolf({ lastWolf, day }: SaveShape): boolean {
   return object(lastWolf) && whole(lastWolf.day) && lastWolf.day >= 1 && lastWolf.day <= (day as number) && WOLF_TAKES.includes(lastWolf.took);
 }
 
-/** Checks a version 13 save: two areas, the toolshed's tools, the quarry's timers and the last wolf visit. */
+/** Each journal entry is a known moment, once a year, on a lived day in its own season, told by one of its lines. */
+function validJournal({ journal, day }: SaveShape): boolean {
+  if (!Array.isArray(journal)) return false;
+  const seen = new Set<string>();
+  return journal.every(entry => {
+    if (!object(entry) || typeof entry.id !== 'string' || !whole(entry.day) || !whole(entry.year) || !count(entry.variant)) return false;
+    const known = journalEntry(entry.id as JournalId);
+    const key = `${entry.year}:${entry.id}`;
+    if (!known || seen.has(key)) return false;
+    seen.add(key);
+    return entry.day >= 1 && entry.day <= (day as number) && yearOf(entry.day) === entry.year
+      && season(entry.day) === journalSeason(entry.id as JournalId) && entry.variant < known.lines.length;
+  });
+}
+
+/** Checks a version 14 save: two areas, the toolshed's tools, the quarry's timers, the last wolf visit and the year journal. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWorld, validWolf];
+  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWorld, validWolf, validJournal];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

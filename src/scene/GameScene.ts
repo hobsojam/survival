@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BALANCE, type GameState } from '../game/state';
 import { newsBetween } from '../game/news';
+import { recordJournal } from '../game/journalEntries';
 import { advanceTime, applyAction, isColdNight, type GameAction } from '../game/rules';
 import { TILE, worldX, worldY, drawTerrain } from './art';
 import { shownTerrainKey } from './map';
@@ -81,8 +82,9 @@ export class GameScene extends Phaser.Scene {
     const tapWalking = this.walkTowardTarget(dt);
     this.handleActionKeys();
     const beforeTick = this.state;
-    this.state = advanceTime(this.state, dt);
-    this.reportWeather(beforeTick, this.state);
+    const written = recordJournal(beforeTick, advanceTime(this.state, dt));
+    this.state = written.state;
+    this.reportWeather(beforeTick, this.state, written.messages);
     this.syncPlayerSprite(walking || tapWalking);
     this.paintObjects();
     this.ambient.update(this.state, dt, this.time.now);
@@ -156,12 +158,13 @@ export class GameScene extends Phaser.Scene {
     if (action.type !== 'move') this.walkTarget = nextWalk(this.walkTarget, { kind: 'action' });
     const before = this.state;
     const result = applyAction(before, action);
-    this.state = result.state;
+    const written = recordJournal(before, result.state, action);
+    this.state = written.state;
     this.showMorningFrost(before, this.state);
     if (result.state !== before) this.showActionDone(action, before);
     if (action.type === 'gather') this.noteBerryPicked(action.nodeId, before);
     const message = this.weatherMessage(before, this.state) ?? (announce ? result.message : '');
-    this.say(message, ...newsBetween(before, this.state), this.needsAlert());
+    this.say(message, ...newsBetween(before, this.state), ...written.messages, this.needsAlert());
     if (announce) {
       this.onStateChange(this.state, 'action');
       if (this.playerSprite) this.paintObjects();
@@ -293,9 +296,9 @@ export class GameScene extends Phaser.Scene {
     return null;
   }
 
-  private reportWeather(before: GameState, after: GameState): void {
+  private reportWeather(before: GameState, after: GameState, journal: string[] = []): void {
     this.showMorningFrost(before, after);
-    this.say(this.weatherMessage(before, after), ...newsBetween(before, after), this.needsAlert());
+    this.say(this.weatherMessage(before, after), ...newsBetween(before, after), ...journal, this.needsAlert());
   }
 
   /** The tired or hungry warning due now, if a meter just reached its line. */

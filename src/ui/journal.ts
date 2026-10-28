@@ -35,7 +35,8 @@ export function journalView(state: GameState): {
     locations.push({ id: 'quarry', label: state.progress.quarryFound ? 'Old quarry' : 'Unexplored west path',
       visited: state.progress.quarryFound, ...QUARRY_MARKER });
   }
-  const milestones = [
+  // Once the lookout stands, the year journal takes over and the checklist steps aside.
+  const milestones = state.progress.lookoutRepaired ? [] : [
     { label: 'Build a shelter', done: state.structures.shelter },
     { label: 'Weather the cold front', done: state.progress.hearthUnlocked },
     { label: 'Find the old quarry', done: state.progress.quarryFound },

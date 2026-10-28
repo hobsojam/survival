@@ -1,4 +1,4 @@
-import { isSummer, nightStart } from '../game/calendar';
+import { duskLength, isSummer, nightStart } from '../game/calendar';
 import type { GameState } from '../game/state';
 import { isFreezingNight } from '../game/rules';
 import { isRaining } from '../game/rain';
@@ -30,7 +30,7 @@ export function lightingTint(state: GameState): LightingTint {
   if (isRaining(state)) return { color: color(palette.storm), alpha: 0.18 };
   // Summer evenings glow gold, longer and a little stronger.
   const summer = isSummer(state.day);
-  const length = summer ? 45 : 30;
+  const length = duskLength(state.day);
   const duskStart = nightStart(state.day) - length;
   const alpha = time > duskStart ? (summer ? 0.16 : 0.12) * (time - duskStart) / length : 0;
   return { color: color(summer ? palette.golden : palette.dusk), alpha };

@@ -46,7 +46,7 @@ describe('local save', () => {
     state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
     state.nodes.find(node => node.kind === 'fiber')!.readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(13);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(14);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);
@@ -80,10 +80,10 @@ describe('local save', () => {
     const storage = new MemoryStorage();
     const state = createGame();
     state.trees[0].x += 1;
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 13, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 14, state }));
     expect(loadGame(storage).kind).toBe('invalid');
     state.trees[0] = { ...createGame().trees[0], readyDay: state.day + BALANCE.treeRegrowDays + 1 };
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 13, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 14, state }));
     expect(loadGame(storage).kind).toBe('invalid');
   });
 
@@ -117,7 +117,7 @@ describe('local save', () => {
     for (const change of [(s: typeof state) => { s.quarryReadyDay = 0; }, (s: typeof state) => { s.rubbleReadyDay = 0; }]) {
       const broken = structuredClone(state);
       change(broken);
-      storage.setItem(SAVE_KEY, JSON.stringify({ version: 13, state: broken }));
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 14, state: broken }));
       expect(loadGame(storage).kind).toBe('invalid');
     }
   });
@@ -145,7 +145,7 @@ describe('local save', () => {
     const storage = new MemoryStorage();
     const state = createGame();
     state.timeOfDay = 240;
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 13, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 14, state }));
     expect(loadGame(storage).kind).toBe('invalid');
   });
 
@@ -206,7 +206,7 @@ describe('local save', () => {
       const storage = new MemoryStorage();
       const state = createGame();
       change(state);
-      storage.setItem(SAVE_KEY, JSON.stringify({ version: 13, state }));
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 14, state }));
       expect(loadGame(storage).kind, `variant ${index}`).toBe('invalid');
     });
   });
@@ -235,7 +235,7 @@ describe('local save', () => {
       const storage = new MemoryStorage();
       const state = { ...createGame(), day: 13, lastWolf };
       state.progress.nextStormDay = 13;
-      storage.setItem(SAVE_KEY, JSON.stringify({ version: 13, state }));
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 14, state }));
       expect(loadGame(storage).kind, `visit ${index}`).toBe('invalid');
     });
   });
@@ -244,7 +244,7 @@ describe('local save', () => {
     const storage = new MemoryStorage();
     const state = createGame();
     state.inventory.stone = 5;
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 13, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 14, state }));
     expect(loadGame(storage).kind).toBe('invalid');
   });
 
@@ -261,7 +261,7 @@ describe('local save', () => {
       const storage = new MemoryStorage();
       const state = createGame();
       change(state);
-      storage.setItem(SAVE_KEY, JSON.stringify({ version: 13, state }));
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 14, state }));
       expect(loadGame(storage).kind, `variant ${index}`).toBe('invalid');
     });
   });
@@ -274,5 +274,49 @@ describe('autosave backoff', () => {
     expect(autosaveDelayMs(2)).toBe(30000);
     expect(autosaveDelayMs(3)).toBe(60000);
     expect(autosaveDelayMs(40)).toBe(60000);
+  });
+});
+
+describe('the year journal in the save', () => {
+  const store = (state: ReturnType<typeof createGame>, version = 14) => {
+    const storage = new MemoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
+    return loadGame(storage).kind;
+  };
+  /** A valid game on this day: the first cold front still due, or long weathered. */
+  const onDay = (day: number) => {
+    const state = { ...createGame(), day };
+    state.progress = day > 3 ? { ...state.progress, nextStormDay: null, hearthUnlocked: true } : state.progress;
+    return state;
+  };
+
+  it('round-trips journal entries and rejects version 13 saves', () => {
+    const storage = new MemoryStorage();
+    const state = { ...onDay(4), journal: [{ year: 1, id: 'leaves' as const, day: 1, variant: 0 }, { year: 1, id: 'coldFront' as const, day: 3, variant: 1 }] };
+    expect(saveGame(storage, state).ok).toBe(true);
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
+    expect(store(state, 13)).toBe('invalid');
+  });
+
+  it('rejects journals that could not have been written', () => {
+    const entries: unknown[][] = [
+      [{ year: 1, id: 'leaves', day: 1, variant: 0 }, { year: 1, id: 'leaves', day: 2, variant: 0 }],
+      [{ year: 1, id: 'dragons', day: 1, variant: 0 }],
+      [{ year: 2, id: 'coldFront', day: 15, variant: 0 }],
+      [{ year: 2, id: 'leaves', day: 5, variant: 0 }],
+      [{ year: 1, id: 'leaves', day: 9, variant: 0 }],
+      [{ year: 1, id: 'leaves', day: 1, variant: 1 }]
+    ];
+    entries.forEach((journal, index) => {
+      const state = { ...onDay(5), journal } as unknown as ReturnType<typeof createGame>;
+      expect(store(state), `case ${index}`).toBe('invalid');
+    });
+  });
+
+  it('loads a long game with ten years of entries', () => {
+    const ids = ['leaves', 'fox', 'coldFront', 'driedBerries', 'stars'] as const;
+    const journal = Array.from({ length: 10 }, (_, year) => ids.map((id, index) => ({ year: year + 1, id, day: year * 40 + index + 1, variant: 0 }))).flat();
+    expect(store(onDay(5))).toBe('loaded');
+    expect(store({ ...onDay(400), journal })).toBe('loaded');
   });
 });

@@ -1,3 +1,4 @@
+import type { JournalEntry } from './journalEntries';
 export type ResourceKind = 'branch' | 'berry' | 'fiber' | 'stone';
 
 export const BUILDINGS = {
@@ -14,6 +15,9 @@ export const BUILDINGS = {
 export type StructureId = keyof typeof BUILDINGS;
 
 export const PICKAXE = { cost: { wood: 2, fiber: 1, stone: 2 } } as const;
+
+/** Where the spring rabbits live: in the meadow beside the bushes at (16, 18), (25, 11) and (23, 17). */
+export const RABBIT_HOMES: readonly { x: number; y: number }[] = [{ x: 14.5, y: 17.5 }, { x: 26.5, y: 13.5 }, { x: 22.5, y: 20.5 }];
 
 export const LOOKOUT = { x: 30, y: 8, cost: { wood: 4, fiber: 2, stone: 2 } } as const;
 
@@ -77,6 +81,8 @@ export interface GameState {
   rubbleReadyDay: number;
   /** The last winter night a wolf came into the dark camp, and what it took. */
   lastWolf: { day: number; took: WolfTake } | null;
+  /** What the survivor has written in the year journal. */
+  journal: JournalEntry[];
 }
 
 export const BALANCE = {
@@ -197,6 +203,7 @@ export function createGame(): GameState {
     storedStone: 0,
     quarryReadyDay: 1,
     rubbleReadyDay: 1,
-    lastWolf: null
+    lastWolf: null,
+    journal: []
   };
 }
