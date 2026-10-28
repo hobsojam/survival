@@ -1,4 +1,5 @@
 import { isWinter, nightStart } from '../game/calendar';
+import { gardenPlotStage } from '../game/garden';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceNode } from '../game/state';
 import { isFreezingNight } from '../game/rules';
 import { wolfTracksShown } from '../game/wolves';
@@ -96,7 +97,7 @@ function addPuddles(state: GameState, add: AddVisual): void {
 }
 
 /** Small camp structures: where each stands from the fire, drawn as a flat site until built. */
-const CAMP_STRUCTURES = [['crate', 3, 1], ['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0]] as const;
+const CAMP_STRUCTURES = [['crate', 3, 1], ['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3]] as const;
 
 function addCamp(state: GameState, add: AddVisual): void {
   const { campX: x, campY: y } = BALANCE;
@@ -113,6 +114,12 @@ function addCamp(state: GameState, add: AddVisual): void {
   add('shelter', shelterTexture, x - 3, y - 2, structures.shelter ? undefined : GROUND_DECAL_DEPTH);
   for (const [id, dx, dy] of CAMP_STRUCTURES) {
     add(id, structures[id] ? `${id}:built` : `${id}Site:still`, x + dx, y + dy, structures[id] ? undefined : GROUND_DECAL_DEPTH);
+  }
+  if (structures.garden) {
+    state.gardenPlots.forEach((plot, index) => {
+      const stage = gardenPlotStage(state, plot);
+      if (stage !== 'empty') add(`garden-plant-${index}`, `gardenPlant:${stage}`, x - 7 + index, y + 3);
+    });
   }
   add('logSeat', 'logSeat:still', x - 1, y + 1);
   add('lookout', progress.lookoutRepaired ? 'lookout:restored' : 'lookout:damaged', LOOKOUT.x, LOOKOUT.y);

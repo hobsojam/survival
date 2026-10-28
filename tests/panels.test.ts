@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
-import { axeView, bagView, buildButtonView, cloakView, forecastView, keepsakeView, lookoutView, nightHint, pickaxeView, pillowView, startNote } from '../src/ui/panels';
+import { axeView, bagView, buildButtonView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightHint, pickaxeView, pillowView, startNote } from '../src/ui/panels';
 
 type Changes = { structures?: Partial<GameState['structures']>; progress?: Partial<GameState['progress']>; inventory?: Partial<GameState['inventory']> };
 
@@ -20,6 +20,39 @@ function game(changes: Changes = {}, extra: Partial<GameState> = {}): GameState 
 
 const supplies = { wood: 8, fiber: 5, stone: 4 };
 const afterColdNight = { hearthUnlocked: true, nextStormDay: null };
+
+describe('garden panel', () => {
+  it('shows planting and harvest availability with useful blockers', () => {
+    const unbuilt = gardenPanelView(game());
+    expect(unbuilt.shown).toBe(false);
+    expect(unbuilt.plots[0]).toMatchObject({ label: 'Empty plot', plantDisabled: true, plantTitle: 'Build a garden first.' });
+
+    const spring = gardenPanelView(game({ structures: { garden: true }, inventory: { food: 1 } }, { day: 21 }));
+    expect(spring.shown).toBe(true);
+    expect(spring.plots[0]).toMatchObject({ label: 'Empty plot', plantDisabled: false, harvestDisabled: true });
+    expect(gardenPlotMarkup(spring.plots[0], 0)).not.toContain('data-action="plantGarden" data-plot-index="0" disabled');
+
+    const ready = gardenPanelView(game({ structures: { garden: true }, inventory: { wood: 4, stone: 2 } }, {
+      day: 41,
+      gardenPlots: [{ plantedYear: 1, harvestedYear: null, harvestReady: true }, ...createGame().gardenPlots.slice(1)]
+    }));
+    expect(ready.plots[0]).toMatchObject({ label: 'Berries ready to pick', harvestDisabled: true });
+    expect(ready.plots[0].harvestTitle).toContain('room');
+
+    const harvestable = gardenPanelView(game({ structures: { garden: true } }, {
+      day: 41,
+      gardenPlots: [{ plantedYear: 1, harvestedYear: null, harvestReady: true }, ...createGame().gardenPlots.slice(1)]
+    }));
+    expect(harvestable.plots[0]).toMatchObject({ harvestDisabled: false, harvestTitle: 'Pick 2 berries.' });
+    expect(gardenPlotMarkup(harvestable.plots[0], 0)).not.toContain('data-action="harvestGarden" data-plot-index="0" disabled');
+  });
+
+  it('renders plot action hints in the button markup', () => {
+    const row = gardenPanelView(game({ structures: { garden: true } }, { day: 21 })).plots[0];
+    expect(gardenPlotMarkup(row, 0)).toContain('title="You need a berry to plant."');
+    expect(gardenPlotMarkup(row, 0)).toContain('title="Those berries are not ready yet."');
+  });
+});
 
 describe('lookout panel', () => {
   it('waits for the cold front, then asks for repairs, then celebrates', () => {

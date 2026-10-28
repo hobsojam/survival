@@ -12,6 +12,7 @@ export const BUILDINGS = {
   toolshed: { name: 'Toolshed', description: 'Make tools here', symbol: '⚒', cost: { wood: 5, fiber: 2 }, prerequisite: 'shelter' },
   hearth: { name: 'Stone hearth', description: 'Each log keeps the fire longer', symbol: '♨', cost: { wood: 2, fiber: 0, stone: 3 }, prerequisite: 'coldNight' },
   dryingRack: { name: 'Drying rack', description: 'Prepare rations; improve cooked berries', symbol: '☼', cost: { wood: 4, fiber: 0 }, prerequisite: null },
+  garden: { name: 'Garden', description: 'Plant berry bushes and gather a little each autumn', symbol: '♧', cost: { wood: 4, fiber: 2 }, prerequisite: null },
   stonePile: { name: 'Stone pile', description: 'Keep up to 12 stone at camp', symbol: '◆', cost: { wood: 3, fiber: 0 }, prerequisite: null },
   windbreak: { name: 'Windbreak', description: 'Stay warmer when the fire fades', symbol: '▥', cost: { wood: 5, fiber: 0 }, prerequisite: null }
 } as const;
@@ -44,6 +45,13 @@ export interface TreeNode {
   y: number;
   sprite: 'treeBroadleaf' | 'treePine';
   readyDay: number;
+}
+
+/** One perennial berry bush in a camp garden. */
+export interface GardenPlot {
+  plantedYear: number | null;
+  harvestedYear: number | null;
+  harvestReady: boolean;
 }
 
 /** Stone set down on the ground; it stays until picked back up. */
@@ -98,6 +106,7 @@ export interface GameState {
   nodes: ResourceNode[];
   trees: TreeNode[];
   stonePiles: StonePile[];
+  gardenPlots: GardenPlot[];
   /** Stone kept in the camp stone pile, outside the bag. */
   storedStone: number;
   /** First day the quarry face can be dug again. */
@@ -228,13 +237,14 @@ export function createGame(): GameState {
     player: { x: BALANCE.campX + 1, y: BALANCE.campY + 1, energy: 100, hunger: 100, warmth: 100 },
     inventory: { wood: 0, food: 0, fiber: 0, stone: 0, trailFood: 0 },
     fireFuel: 0,
-    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, crate: false, hearth: false, dryingRack: false, windbreak: false, stonePile: false, toolshed: false },
+    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, crate: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
       quarryFound: false, pickaxeCrafted: false,
       discoveries: { basket: false, spring: false, cairn: false } },
     nodes,
     trees,
     stonePiles: [],
+    gardenPlots: Array.from({ length: 3 }, () => ({ plantedYear: null, harvestedYear: null, harvestReady: false })),
     storedStone: 0,
     quarryReadyDay: 1,
     rubbleReadyDay: 1,

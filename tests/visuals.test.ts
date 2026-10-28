@@ -23,13 +23,38 @@ describe('native-size scene art', () => {
     expect(keys).toContain('lookout:damaged');
     expect(keys).toContain('firePit:unlit');
     expect(keys).not.toContain('hearthSite:still');
-    const sites = new Set(['shelter', 'crate', 'dryingRack', 'windbreak', 'stonePile', 'toolshed']);
+    const sites = new Set(['shelter', 'crate', 'dryingRack', 'garden', 'windbreak', 'stonePile', 'toolshed']);
     for (const item of visuals) {
       const [name, frame] = item.texture.split(':');
       expect(sprites[name]?.frames[frame], item.texture).toBeDefined();
       expect(Number.isInteger(item.x) && Number.isInteger(item.y)).toBe(true);
       expect(item.depth).toBe(sites.has(item.id) ? GROUND_DECAL_DEPTH : item.y);
     }
+  });
+
+  it('draws the garden bed and each seasonal plant frame', () => {
+    const state = createGame();
+    state.structures.garden = true;
+    state.day = 21;
+    state.gardenPlots = [
+      { plantedYear: 1, harvestedYear: null, harvestReady: false },
+      { plantedYear: 1, harvestedYear: null, harvestReady: true },
+      { plantedYear: 1, harvestedYear: 1, harvestReady: false }
+    ];
+    expect(sceneVisuals(state, 0).map(item => item.texture)).toContain('garden:built');
+    const thirdPlot = state.gardenPlots[2];
+    state.gardenPlots[2] = { plantedYear: null, harvestedYear: null, harvestReady: false };
+    expect(sceneVisuals(state, 0).some(item => item.id === 'garden-plant-2')).toBe(false);
+    state.gardenPlots[2] = thirdPlot;
+    expect(sceneVisuals(state, 0).filter(item => item.id.startsWith('garden-plant-')).map(item => item.texture))
+      .toEqual(['gardenPlant:seedling', 'gardenPlant:ripe', 'gardenPlant:dormant']);
+    state.day = 31;
+    expect(sceneVisuals(state, 0).find(item => item.id === 'garden-plant-0')?.texture).toBe('gardenPlant:growing');
+    state.day = 11;
+    state.gardenPlots[2].harvestedYear = null;
+    expect(sceneVisuals(state, 0).find(item => item.id === 'garden-plant-0')?.texture).toBe('gardenPlant:dormant');
+    expect(() => validateSprite(sprites.garden)).not.toThrow();
+    expect(() => validateSprite(sprites.gardenPlant)).not.toThrow();
   });
 
   it('restores the lookout art after repair', () => {

@@ -46,7 +46,7 @@ describe('local save', () => {
     state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
     state.nodes.find(node => node.kind === 'fiber')!.readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(16);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(17);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);
@@ -230,7 +230,7 @@ describe('local save', () => {
   });
 
   it('rejects every earlier version', () => {
-    for (let version = 1; version <= 15; version++) {
+    for (let version = 1; version <= 16; version++) {
       const storage = new MemoryStorage();
       storage.setItem(SAVE_KEY, JSON.stringify({ version, state: createGame() }));
       expect(loadGame(storage).kind, `version ${version}`).toBe('invalid');
@@ -295,8 +295,68 @@ describe('autosave backoff', () => {
   });
 });
 
+describe('garden plots in saves', () => {
+  const yearTwoGarden = () => {
+    const state = { ...createGame(), day: 51 };
+    state.structures.garden = true;
+    state.progress = { ...state.progress, nextStormDay: null, hearthUnlocked: true };
+    return state;
+  };
+  const accepts = (state: unknown) => saveGame(new MemoryStorage(), state as ReturnType<typeof createGame>).ok;
+
+  it('round-trips a ready perennial harvest through winter', () => {
+    const state = yearTwoGarden();
+    state.gardenPlots[0] = { plantedYear: 1, harvestedYear: null, harvestReady: true };
+    expect(accepts(state)).toBe(true);
+    const storage = new MemoryStorage();
+    saveGame(storage, state);
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
+  });
+
+  it('rejects a harvest that is marked ready before its planted year has cycled', () => {
+    const state = createGame();
+    state.structures.garden = true;
+    state.gardenPlots[0] = { plantedYear: 1, harvestedYear: null, harvestReady: true };
+    expect(accepts(state)).toBe(false);
+  });
+
+  it('rejects malformed plot history and plants without a garden', () => {
+    const malformed = yearTwoGarden();
+    malformed.gardenPlots.pop();
+    expect(accepts(malformed)).toBe(false);
+
+    const missingGarden = yearTwoGarden();
+    missingGarden.structures.garden = false;
+    missingGarden.gardenPlots[0] = { plantedYear: 1, harvestedYear: null, harvestReady: false };
+    expect(accepts(missingGarden)).toBe(false);
+
+    const missingPlant = yearTwoGarden();
+    missingPlant.gardenPlots[0] = { plantedYear: null, harvestedYear: 1, harvestReady: false };
+    expect(accepts(missingPlant)).toBe(false);
+
+    const malformedReady = yearTwoGarden();
+    (malformedReady.gardenPlots[0] as unknown as Record<string, unknown>).harvestReady = 'yes';
+    expect(accepts(malformedReady)).toBe(false);
+
+    const impossibleHistory: unknown[] = [
+      { plantedYear: 0, harvestedYear: null, harvestReady: false },
+      { plantedYear: 3, harvestedYear: null, harvestReady: false },
+      { plantedYear: 1, harvestedYear: 0, harvestReady: false },
+      { plantedYear: 1, harvestedYear: 3, harvestReady: false },
+      { plantedYear: 2, harvestedYear: 1, harvestReady: false },
+      { plantedYear: null, harvestedYear: null, harvestReady: true },
+      { plantedYear: 1, harvestedYear: 2, harvestReady: true }
+    ];
+    impossibleHistory.forEach(plot => {
+      const invalid = yearTwoGarden();
+      invalid.gardenPlots[0] = plot as typeof invalid.gardenPlots[number];
+      expect(accepts(invalid)).toBe(false);
+    });
+  });
+});
+
 describe('the year journal in the save', () => {
-  const store = (state: ReturnType<typeof createGame>, version = 16) => {
+  const store = (state: ReturnType<typeof createGame>, version = 17) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;
@@ -340,7 +400,7 @@ describe('the year journal in the save', () => {
 });
 
 describe('the companion in the save', () => {
-  const store = (state: unknown, version = 16) => {
+  const store = (state: unknown, version = 17) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;

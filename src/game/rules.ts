@@ -1,10 +1,11 @@
-import { SEASON_LENGTH, daysLeftInSeason, isSpring, isSummer, isWinter, nightStart } from './calendar';
+import { SEASON_LENGTH, daysLeftInSeason, isSpring, isSummer, isWinter, nightStart, yearOf } from './calendar';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } from './areas';
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
 import { bagCapacity, carriedCount, freeSpaces, isAtCamp, spaceFor } from './camp';
 import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
+import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
 import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
@@ -13,6 +14,8 @@ export type GameAction =
   | { type: 'visitSite'; siteId: SiteId }
   | { type: 'build'; structureId: StructureId }
   | { type: 'move'; dx: number; dy: number }
+  | { type: 'plantGarden'; plotIndex: number }
+  | { type: 'harvestGarden'; plotIndex: number }
   | { type: 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'befriend' | 'craftPillow' | 'craftCloak' }
   | { type: 'pickUpStone'; pileId: string };
 
@@ -217,6 +220,7 @@ function dawn(next: GameState, camp: boolean): void {
   const weathered = stormEnded && camp && next.structures.shelter && next.fireFuel > 0 && next.player.warmth > 20;
   next.day += 1;
   next.timeOfDay = 0;
+  next.gardenPlots = gardenDawn(next);
   // Rocks give their stone once; everything else grows back at dawn.
   next.nodes = next.nodes.map(node => node.kind !== 'stone' && node.readyDay <= next.day ? { ...node, amount: 1 } : node);
   companionDawn(next);
@@ -559,6 +563,61 @@ const repairLookout: ActionHandler<'repairLookout'> = state => {
   };
 };
 
+function gardenPlotIndexValid(plotIndex: number): boolean {
+  return Number.isInteger(plotIndex) && plotIndex >= 0 && plotIndex < GARDEN_PLOT_COUNT;
+}
+
+export function plantGardenBlocker(state: GameState, plotIndex: number): string | null {
+  if (!gardenPlotIndexValid(plotIndex)) return 'That garden plot is unavailable.';
+  if (!state.structures.garden) return 'Build a garden first.';
+  if (!isAtCamp(state)) return 'Return to camp to tend the garden.';
+  if (!isSpring(state.day)) return 'Plant berry bushes in spring.';
+  if (state.gardenPlots[plotIndex].plantedYear !== null) return 'That plot already has a berry bush.';
+  if (state.inventory.food < 1) return 'You need a berry to plant.';
+  if (isExhausted(state)) return TOO_TIRED_MESSAGE;
+  return null;
+}
+
+export function harvestGardenBlocker(state: GameState, plotIndex: number): string | null {
+  if (!gardenPlotIndexValid(plotIndex)) return 'That garden plot is unavailable.';
+  if (!state.structures.garden) return 'Build a garden first.';
+  if (!isAtCamp(state)) return 'Return to camp to tend the garden.';
+  if (!state.gardenPlots[plotIndex].harvestReady) return 'Those berries are not ready yet.';
+  if (freeSpaces(state) < 2) return 'Make room for 2 berries before harvesting.';
+  if (isExhausted(state)) return TOO_TIRED_MESSAGE;
+  return null;
+}
+
+const plantGarden: ActionHandler<'plantGarden'> = (state, action) => {
+  const blocker = plantGardenBlocker(state, action.plotIndex);
+  if (blocker) return refuse(state, blocker);
+  const gardenPlots = state.gardenPlots.map((plot, index) => index === action.plotIndex
+    ? { plantedYear: yearOf(state.day), harvestedYear: null, harvestReady: false }
+    : plot);
+  const planted = {
+    ...state,
+    inventory: { ...state.inventory, food: state.inventory.food - 1 },
+    gardenPlots,
+    player: tire(state, BALANCE.gatherEnergyCost)
+  };
+  return { state: advanceTime(planted, workSeconds(state, BALANCE.gatherSeconds), 'working'), message: 'Planted a berry bush.' };
+};
+
+const harvestGarden: ActionHandler<'harvestGarden'> = (state, action) => {
+  const blocker = harvestGardenBlocker(state, action.plotIndex);
+  if (blocker) return refuse(state, blocker);
+  const gardenPlots = state.gardenPlots.map((plot, index) => index === action.plotIndex
+    ? { ...plot, harvestedYear: yearOf(state.day), harvestReady: false }
+    : plot);
+  const harvested = {
+    ...state,
+    inventory: { ...state.inventory, food: state.inventory.food + 2 },
+    gardenPlots,
+    player: tire(state, BALANCE.gatherEnergyCost)
+  };
+  return { state: advanceTime(harvested, workSeconds(state, BALANCE.gatherSeconds), 'working'), message: 'Picked 2 berries from the garden.' };
+};
+
 function missingCost(state: GameState, cost: { wood: number; fiber: number; stone: number }): string | null {
   const needed = [
     state.inventory.wood < cost.wood ? `${cost.wood} wood` : null,
@@ -658,7 +717,7 @@ const craftCloak: ActionHandler<'craftCloak'> = state =>
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   move, cross, gather, craftAxe, craftPickaxe, gatherRubble, digQuarry, chopTree, visitSite,
   storeStone, takeStone, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, rest, sleep, befriend, craftPillow, craftCloak
+  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, rest, sleep, befriend, craftPillow, craftCloak
 };
 
 export function applyAction(state: GameState, action: GameAction): ActionResult {
