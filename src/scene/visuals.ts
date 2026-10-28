@@ -102,7 +102,14 @@ function addCamp(state: GameState, add: AddVisual): void {
   const { campX: x, campY: y } = BALANCE;
   const { structures, progress } = state;
   let shelterTexture = 'shelterSite:still';
-  if (structures.shelter) shelterTexture = structures.bed ? 'shelter:builtBed' : 'shelter:built';
+  if (structures.shelter) {
+    let stage = 'built';
+    if (structures.shelterThatched) stage = 'thatched';
+    if (structures.shelterStonework) stage = 'stonework';
+    if (structures.shelterPorch) stage = 'porch';
+    if (structures.shelterFinished) stage = 'finished';
+    shelterTexture = structures.bed ? `shelter:${stage}Bed` : `shelter:${stage}`;
+  }
   add('shelter', shelterTexture, x - 3, y - 2, structures.shelter ? undefined : GROUND_DECAL_DEPTH);
   for (const [id, dx, dy] of CAMP_STRUCTURES) {
     add(id, structures[id] ? `${id}:built` : `${id}Site:still`, x + dx, y + dy, structures[id] ? undefined : GROUND_DECAL_DEPTH);

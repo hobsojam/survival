@@ -153,15 +153,20 @@ export function buildButtonView(state: GameState, id: StructureId): BuildButtonV
   const definition = BUILDINGS[id];
   const cost = definition.cost;
   const stone = 'stone' in cost ? cost.stone : 0;
-  const price = [`${cost.wood} wood`, cost.fiber ? `${cost.fiber} fiber` : '', stone ? `${stone} stone` : ''].filter(Boolean).join(' · ');
-  const needsShelter = status === 'needsShelter';
+  const price = [cost.wood ? `${cost.wood} wood` : '', cost.fiber ? `${cost.fiber} fiber` : '', stone ? `${stone} stone` : ''].filter(Boolean).join(' · ');
+  const needsPrerequisite = status === 'needsPrerequisite' || status === 'needsShelter';
+  const prerequisite = definition.prerequisite;
+  const prerequisiteNames: string[] = [];
+  if (prerequisite && prerequisite !== 'coldNight') prerequisiteNames.push(BUILDINGS[prerequisite].name.toLowerCase());
+  if ('alsoRequires' in definition) prerequisiteNames.push(BUILDINGS[definition.alsoRequires].name.toLowerCase());
+  const prerequisiteDescription = prerequisiteNames.length ? `Requires ${prerequisiteNames.join(' and ')}` : 'Requires its previous shelter upgrade';
   const view = {
-    disabled: status === 'built' || status === 'locked' || needsShelter,
+    disabled: status === 'built' || status === 'locked' || needsPrerequisite,
     built: status === 'built',
-    locked: status === 'locked' || needsShelter,
+    locked: status === 'locked' || needsPrerequisite,
     ready: status === 'ready',
-    description: needsShelter ? 'Requires shelter' : definition.description,
-    verb: needsShelter ? 'Blocked' : 'Build',
+    description: needsPrerequisite ? prerequisiteDescription : definition.description,
+    verb: needsPrerequisite ? 'Blocked' : 'Build',
     price
   };
   if (status === 'built' || status === 'locked') {

@@ -5,7 +5,7 @@ import { journalEntry, journalSeason, type JournalId } from './journalEntries';
 import { KEEPSAKES_NEEDED, TRUST_TARGET } from './companion';
 
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 15;
+const SAVE_VERSION = 16;
 export type SaveResult = { ok: true } | { ok: false; error: string };
 export type LoadResult = { kind: 'empty' } | { kind: 'loaded'; state: GameState } | { kind: 'invalid'; reason: string };
 
@@ -39,6 +39,12 @@ function validSurvivor({ player, inventory, area }: SaveShape): boolean {
 /** Flags are booleans, and nothing is unlocked without what unlocks it. */
 function validProgress({ structures, progress, area }: SaveShape): boolean {
   if (!(Object.keys(BUILDINGS) as (keyof typeof BUILDINGS)[]).every(id => bool(structures[id]))) return false;
+  for (const id of Object.keys(BUILDINGS) as (keyof typeof BUILDINGS)[]) {
+    const prerequisite = BUILDINGS[id].prerequisite;
+    if (structures[id] && prerequisite && prerequisite !== 'coldNight' && prerequisite in BUILDINGS && !structures[prerequisite]) return false;
+    const definition = BUILDINGS[id];
+    if (structures[id] && 'alsoRequires' in definition && !structures[definition.alsoRequires]) return false;
+  }
   if (!(['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'pickaxeCrafted'] as const).every(key => bool(progress[key]))) return false;
   if ((area === 'quarry' || progress.quarryFound) && !structures.shelter) return false;
   if (progress.pickaxeCrafted && !(progress.quarryFound && structures.toolshed)) return false;
@@ -131,7 +137,7 @@ function validCompanion({ companion, day, structures }: SaveShape): boolean {
     && (!made || (keepsakes === 0 && !keepsakeLying));
 }
 
-/** Checks a version 15 save: two areas, the toolshed's tools, the quarry's timers, the last wolf visit, the year journal and the companion. */
+/** Checks a version 16 save: shelter upgrades, two areas, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
   const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWorld, validWolf, validJournal, validCompanion];

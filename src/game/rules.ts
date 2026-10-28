@@ -137,18 +137,30 @@ export function pickaxeBlocker(state: GameState): string | null {
   return null;
 }
 
-export type BuildStatus = 'built' | 'locked' | 'needsShelter' | 'ready' | 'unavailable';
+export type BuildStatus = 'built' | 'locked' | 'needsShelter' | 'needsPrerequisite' | 'ready' | 'unavailable';
 
 /** How a structure's build button should look: built, locked, blocked by a missing shelter, ready to build here, or not yet. */
 export function buildStatus(state: GameState, id: StructureId): BuildStatus {
   const definition = BUILDINGS[id];
   if (state.structures[id]) return 'built';
   if (definition.prerequisite === 'coldNight' && !state.progress.hearthUnlocked) return 'locked';
-  if (definition.prerequisite === 'shelter' && !state.structures.shelter) return 'needsShelter';
+  const missingPrerequisite = missingStructurePrerequisite(state, definition);
+  if (missingPrerequisite === 'shelter') return 'needsShelter';
+  if (missingPrerequisite) return 'needsPrerequisite';
   const cost = definition.cost;
   const stoneCost = 'stone' in cost ? cost.stone : 0;
   const affordable = state.inventory.wood >= cost.wood && state.inventory.fiber >= cost.fiber && availableStone(state) >= stoneCost;
   return affordable && isAtCamp(state) && !isExhausted(state) ? 'ready' : 'unavailable';
+}
+
+function isStructurePrerequisite(prerequisite: string | null): prerequisite is StructureId {
+  return prerequisite !== null && prerequisite !== 'coldNight' && Object.hasOwn(BUILDINGS, prerequisite);
+}
+
+function missingStructurePrerequisite(state: GameState, definition: (typeof BUILDINGS)[StructureId]): StructureId | null {
+  if (isStructurePrerequisite(definition.prerequisite) && !state.structures[definition.prerequisite]) return definition.prerequisite;
+  if ('alsoRequires' in definition && !state.structures[definition.alsoRequires]) return definition.alsoRequires;
+  return null;
 }
 
 export function advanceTime(state: GameState, seconds: number, activity: Activity = 'awake'): GameState {
@@ -210,7 +222,7 @@ function warmthChange(state: GameState, step: number, camp: boolean, coldNight: 
       ? BALANCE.coldNightShelteredWarmthLossPerSecond
       : BALANCE.coldNightOutdoorWarmthLossPerSecond);
   } else if (sheltered) {
-    change = -step / 4;
+    change = -step * (state.structures.shelterThatched ? BALANCE.thatchedShelteredWarmthLossPerSecond : 0.25);
   }
   if (camp && !lit && state.structures.windbreak) change *= 0.5;
   // A fur cloak keeps a quarter of the night's chill off, wherever the survivor is.
@@ -582,7 +594,8 @@ function buildBlocker(state: GameState, structureId: StructureId): string | null
   if (!definition) return 'That structure is unavailable.';
   if (definition.prerequisite === 'coldNight' && !state.progress.hearthUnlocked) return 'Weather the cold night to unlock the hearth.';
   if (state.structures[structureId]) return 'Already built.';
-  if (definition.prerequisite === 'shelter' && !state.structures.shelter) return 'Build a shelter first.';
+  const missingStructure = missingStructurePrerequisite(state, definition);
+  if (missingStructure) return `Build the ${BUILDINGS[missingStructure].name.toLowerCase()} first.`;
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   return missingCost(state, buildingCost(structureId));
 }
