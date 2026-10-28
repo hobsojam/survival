@@ -119,7 +119,7 @@ function validCompanion({ companion, day, structures }: SaveShape): boolean {
   const lived = (value: unknown): boolean => count(value) && value <= (day as number);
   const known = friend === null || FRIENDS.includes(friend as typeof FRIENDS[number]);
   if (!known || !bool(keepsakeLying) || !bool(pillow) || !bool(cloak) || !count(keepsakes) || keepsakes > KEEPSAKES_NEEDED) return false;
-  if (!(['lastFind', 'lastGift', 'alarmDay'] as const).every(key => lived(companion[key]))) return false;
+  if (!(['lastFind', 'lastGift', 'alarmDay', 'foxFled'] as const).every(key => lived(companion[key]))) return false;
   if (!FRIENDS.every(animal => count(trust[animal]) && trust[animal] <= TRUST_TARGET[animal] && lived(lastOffer[animal]))) return false;
   if (friend === null) {
     return since === null && FRIENDS.every(animal => (trust[animal] as number) < TRUST_TARGET[animal])

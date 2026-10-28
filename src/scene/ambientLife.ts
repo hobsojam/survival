@@ -250,7 +250,8 @@ export class AmbientLife {
     if (this.foxFledDay === state.day || state.companion.friend === 'fox') { this.fox.setVisible(false); return; }
     const pose = foxAt(state.day, state.timeOfDay, state.companion.trust.fox);
     if (!pose) { this.fox.setVisible(false); return; }
-    if (Math.hypot(pose.x - state.player.x, pose.y - state.player.y) < FOX.spookRadius) {
+    // The rules decide when the fox is startled, so the offering and the fox agree.
+    if (state.companion.foxFled === state.day) {
       this.foxFledDay = state.day;
       this.foxRun = { from: pose, to: FOX.den, elapsed: 0, duration: FOX_RUN_SECONDS };
       this.fox.setVisible(false);

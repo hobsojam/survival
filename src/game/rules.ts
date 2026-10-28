@@ -3,7 +3,7 @@ import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } 
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
-import { alarmAfter, cloakBlocker, companionDawn, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
+import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
 import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
@@ -172,6 +172,7 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
     next.timeOfDay += step;
     remaining -= step;
     wolfVisit(next);
+    startleFox(next);
     if (next.timeOfDay >= BALANCE.daySeconds - 0.000001) dawn(next, camp);
   }
   return next;

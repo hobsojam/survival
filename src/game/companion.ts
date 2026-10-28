@@ -2,7 +2,7 @@ import { isWinter, nightStart } from './calendar';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { freeSpaces, isAtCamp } from './rules';
 import { BALANCE, type Friend, type GameState } from './state';
-import { dayHash, foxAt } from './wildlife';
+import { dayHash, foxAt, foxSpookRadius } from './wildlife';
 
 // One wild animal can become the camp's friend, won over by small offerings it already likes:
 // the birds peck at berries, the fox noses at the bushes, and the winter wolves take rations.
@@ -36,7 +36,7 @@ const byBush = (state: GameState): boolean => state.nodes.some(node => node.kind
 const WILLING: Record<Friend, (state: GameState) => boolean> = {
   fox: state => {
     const fox = foxAt(state.day, state.timeOfDay);
-    return state.inventory.food > 0 && (fox?.sitting === true || fox?.nibbling === true);
+    return state.inventory.food > 0 && state.companion.foxFled !== state.day && (fox?.sitting === true || fox?.nibbling === true);
   },
   wolf: state => state.inventory.trailFood > 0 && isWinter(state.day) && night(state),
   bird: state => state.inventory.food > 0 && !isWinter(state.day) && !night(state) && byBush(state)
@@ -71,6 +71,16 @@ export function makeOffering(state: GameState): { state: GameState; message: str
     ...(stays ? { friend: animal, since: state.day, lastFind: state.day, lastGift: state.day } : {})
   };
   return { state: { ...state, inventory, lastWolf, companion }, message: stays ? STAYED[animal] : OFFERED[animal] };
+}
+
+/** The wild fox runs off for the evening if the survivor comes too close. Mutates advanceTime's working copy. */
+export function startleFox(next: GameState): void {
+  const { friend, trust, foxFled } = next.companion;
+  if (friend === 'fox' || foxFled === next.day || next.area !== 'camp') return;
+  const fox = foxAt(next.day, next.timeOfDay, trust.fox);
+  if (fox && Math.hypot(fox.x - next.player.x, fox.y - next.player.y) < foxSpookRadius(trust.fox)) {
+    next.companion = { ...next.companion, foxFled: next.day };
+  }
 }
 
 /**

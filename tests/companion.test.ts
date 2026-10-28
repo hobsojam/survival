@@ -4,7 +4,7 @@ import { BALANCE, createGame, type Friend, type GameState } from '../src/game/st
 import { advanceTime, applyAction } from '../src/game/rules';
 import { KEEPSAKE_SPOT, findDue, offerBlocker, offerFor, sceneryKeepsake } from '../src/game/companion';
 import { newsBetween } from '../src/game/news';
-import { foxAt } from '../src/game/wildlife';
+import { FOX, foxAt } from '../src/game/wildlife';
 import { wolfMessage } from '../src/game/wolves';
 
 const base = createGame();
@@ -186,5 +186,27 @@ describe('what a friend does', () => {
     expect(hungry(bed).player.energy).toBeLessThanOrEqual(BALANCE.hungrySleepCap);
     expect(hungry(made).player.energy).toBeGreaterThan(BALANCE.hungrySleepCap);
     expect(hungry(made).player.energy).toBeLessThanOrEqual(BALANCE.hungrySleepCap + 10);
+  });
+});
+
+describe('a startled fox', () => {
+  it('runs off for the evening when the survivor comes too close, and takes nothing', () => {
+    const time = nightStart(1) - 5;
+    const fox = foxAt(1, time)!;
+    const close = { ...camp(1, time, { food: 1 }), player: { ...base.player, x: fox.x + 1, y: fox.y + 0.5 } };
+    const startled = advanceTime(close, 0.1);
+    expect(startled.companion.foxFled).toBe(1);
+    expect(offerFor({ ...startled, player: { ...base.player, x: 21, y: 16 } })).toBeNull();
+    expect(offerFor(camp(1, time, { food: 1 }))).toBe('fox');
+  });
+
+  it('lets the survivor come a little closer once it trusts them', () => {
+    const time = nightStart(1) - 5;
+    const fox = foxAt(1, time)!;
+    const near = { ...camp(1, time, { food: 1 }), player: { ...base.player, x: fox.x + 1.5, y: fox.y } };
+    expect(advanceTime(near, 0.1).companion.foxFled).toBe(1);
+    const trusting = { ...near, companion: { ...near.companion, trust: { bird: 0, fox: 1, wolf: 0 } } };
+    expect(advanceTime(trusting, 0.1).companion.foxFled).toBe(0);
+    expect(FOX.spookRadius).toBeGreaterThan(1.5);
   });
 });

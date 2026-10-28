@@ -76,6 +76,8 @@ export interface Companion {
   cloak: boolean;
   /** The last winter night the bird woke the sleeper. */
   alarmDay: number;
+  /** The last evening the wild fox was startled away; it doesn't come back that evening. */
+  foxFled: number;
 }
 
 export interface GameState {
@@ -235,7 +237,7 @@ export function createGame(): GameState {
     journal: [],
     companion: {
       friend: null, since: null, trust: { bird: 0, fox: 0, wolf: 0 }, lastOffer: { bird: 0, fox: 0, wolf: 0 },
-      keepsakes: 0, keepsakeLying: false, lastFind: 0, lastGift: 0, pillow: false, cloak: false, alarmDay: 0
+      keepsakes: 0, keepsakeLying: false, lastFind: 0, lastGift: 0, pillow: false, cloak: false, alarmDay: 0, foxFled: 0
     }
   };
 }

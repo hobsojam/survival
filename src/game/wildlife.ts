@@ -26,6 +26,9 @@ export const FOX = {
   spookRadius: 2
 } as const;
 
+/** How near the survivor can come before the fox runs off; nearer once it has taken an offering. */
+export const foxSpookRadius = (trust: number): number => (trust > 0 ? 1.2 : FOX.spookRadius);
+
 /** Each offering the fox has taken brings its seat this much nearer the fire. */
 const TRUST_STEP = 0.3;
 
