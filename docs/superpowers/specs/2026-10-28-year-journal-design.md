@@ -18,7 +18,7 @@ It is a **keepsake of the camp's year**. The survivor writes down small moments 
 
 - **No game effect.** The journal is its own reward. There are no unlocks, decorations, bonuses or achievements (user's choice).
 - **No new mechanics or wildlife.** Every entry comes from something the game already has.
-- **No changes to the existing field journal.** Its map, milestones and next-step hint stay as they are.
+- **No other changes to the field journal.** Its map, places list and next-step hint stay. The changes to the Camp tab are listed under "Tidying the Camp tab".
 
 ## Anti-goals
 
@@ -46,6 +46,7 @@ It is a **keepsake of the camp's year**. The survivor writes down small moments 
 ### Writing an entry
 
 - **The moment itself:** a quiet line in the message area: "Written in your journal: <entry line>" (my call). There's no sound, pop-up or flourish.
+- **No doubled messages (user's choice).** If a message about the same moment has just shown, the journal line is skipped and the entry only appears on the page. This covers the season-change message ("Snow fell in the night. Winter has come.") with the first-snow entry, and "Rain is coming in." with the first-rain entry.
 - **Once per year:** each entry is written at most once per season page, so once a year. The day recorded is the first time it happened that year.
 
 ### What can be written (my call; the builder may tune the copy and conditions)
@@ -76,6 +77,16 @@ There are five entries per season. Each season mixes ones most players will meet
 | Summer | "Watched the land from the lookout on a long evening." | Stand at the restored lookout on a summer evening |
 
 Where a condition depends on something only the scene knows (where the rabbits sit, when the fox appears), the builder should pick a state-based condition with the same feel. For example, "near the rabbits' homes" means within a few tiles of where the rabbits live, rather than needing a rabbit on screen.
+
+### Tidying the Camp tab (user's choice)
+
+The journal adds a fifth panel to the Camp tab, so this release removes what would overlap:
+
+1. **Beyond camp panel:** drop the "Places found" line, because the field journal already lists and maps the places. The panel keeps its copy and the "Explore nearby place" button.
+2. **Forecast card:** hide it when nothing is coming. It shows only while a forecast cold front is pending or under way, or on a winter day or night. Once the front has been weathered, the "The cold night is behind you" card stops showing outside winter, and the journal now keeps that memory.
+3. **Year wheel:** move it from the field journal to the year journal panel, where it heads the current page. It keeps the season and the days left. The day pill in the top bar is unchanged.
+4. **Milestones checklist:** hide the field journal's "Camp milestones" list once the lookout is restored. Before then it stays as it is.
+5. **Doubled messages:** handled as described under "Writing an entry".
 
 ### Save
 
