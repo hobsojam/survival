@@ -94,7 +94,18 @@ const foxSprite = define(24, 16, foxLegend, foxPainters, [12, 15], {
 
 /** A young grey wolf, a little leggier than the fox: walking, sitting up, and stretched out by the fire. */
 const wolfLegend = { a: 'stone0', b: 'stone1', c: 'stone2', d: 'stone3', e: 'stone4', s: 'shadow' } as const;
-function wolf(g: Grid, pose: 'walk0' | 'walk1' | 'sit' | 'lie'): void {
+function wolf(g: Grid, pose: 'walk0' | 'walk1' | 'sit' | 'lie' | 'howl'): void {
+  if (pose === 'howl') {
+    // Lying as by the fire, with its head lifted and its muzzle to the sky.
+    box(g, 2, 15, 20, 1, 's');
+    box(g, 1, 12, 6, 2, 'b'); box(g, 1, 12, 3, 1, 'd');
+    box(g, 5, 10, 13, 5, 'b'); box(g, 6, 10, 11, 3, 'c'); box(g, 8, 10, 7, 1, 'd');
+    box(g, 16, 6, 4, 5, 'b'); box(g, 17, 6, 3, 4, 'c');
+    box(g, 16, 2, 5, 5, 'c'); box(g, 17, 3, 3, 3, 'd');
+    box(g, 16, 0, 2, 3, 'b');
+    line(g, 20, 3, 23, 0, 'e'); dot(g, 23, 0, 'a'); dot(g, 19, 3, 'a');
+    return;
+  }
   if (pose === 'lie') {
     box(g, 2, 15, 20, 1, 's');
     box(g, 1, 12, 6, 2, 'b'); box(g, 1, 12, 3, 1, 'd');
@@ -126,7 +137,7 @@ function wolf(g: Grid, pose: 'walk0' | 'walk1' | 'sit' | 'lie'): void {
   dot(g, 19, 4, 'a'); box(g, 20, 6, 3, 2, 'e'); dot(g, 23, 6, 'a');
 }
 const wolfSprite = define(24, 16, wolfLegend, {
-  walk0: g => wolf(g, 'walk0'), walk1: g => wolf(g, 'walk1'), sit: g => wolf(g, 'sit'), lie: g => wolf(g, 'lie')
+  walk0: g => wolf(g, 'walk0'), walk1: g => wolf(g, 'walk1'), sit: g => wolf(g, 'sit'), lie: g => wolf(g, 'lie'), howl: g => wolf(g, 'howl')
 }, [12, 15]);
 
 /** A friend's shed feather or tuft of fur, lying by the fire. */

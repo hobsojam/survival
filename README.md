@@ -83,9 +83,9 @@ Below the field journal in the Camp tab sits **the year so far**, a keepsake of 
 
 The birds, the fox and even the winter wolves can come to trust you, if you share what they like to eat. Watch what each of them nibbles at. When the moment is right, the hint line offers it (press **O**, or tap **Offer** among the buttons), and each animal takes one offering a day at most. Nothing is lost by waiting, and an animal shows it is warming to you before it stays. The first to be won over becomes your friend for good, and you only ever have one. The others stay wild and visit as before.
 
-- **A bird** wakes you once on a winter night if the fire is about to go out, and sings at spring dawns. It stays all winter.
+- **A bird** wakes you once on a winter night if the fire is about to go out, and sings at spring dawns. It stays all winter, flits between the trees and roofs near you, and lands on your shoulder when you stand still.
 - **The fox** now and then leaves a berry by your bedroll at dawn, if your bag has room.
-- **A young wolf** sees the wild wolves off when the fire goes out on a winter night, so nothing is taken.
+- **A young wolf** sees the wild wolves off when the fire goes out on a winter night, so nothing is taken. On winter nights it lifts its head and answers their howls.
 
 Every few days your friend leaves a feather or a tuft of fur by the fire; walk over to pick it up. These keepsakes don't take bag space. Six of them make one thing at the toolshed: a **feather pillow** for the bed (resting there restores 10 more energy) or a **fur cloak** (you lose a quarter less warmth at night, at camp or in the quarry). Your friend stops shedding while you hold six, and has nothing more to give once the item is made.
 

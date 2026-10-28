@@ -164,6 +164,14 @@ describe('the soundscape', () => {
     expect(context.created.oscillator - drone).toBe(5);
   });
 
+  it('plays a distant howl and a friendly wolf answering it', () => {
+    const { sound, context } = setup();
+    sound.start();
+    const before = context.created.oscillator;
+    sound.playCue('wolfChorus');
+    expect(context.created.oscillator - before).toBe(2);
+  });
+
   it('suspends while paused and ignores resume requests until unpaused', () => {
     const { sound, context } = setup();
     sound.start();

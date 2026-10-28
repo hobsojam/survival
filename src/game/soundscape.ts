@@ -6,7 +6,7 @@ import { BALANCE, type GameState } from './state';
 const MUTE_KEY = 'hearthwild.sound-muted';
 const MASTER_VOLUME = 0.34;
 
-export type SoundCue = 'gather' | 'build';
+export type SoundCue = 'gather' | 'build' | 'wolfChorus';
 
 /** The browser's audio, or nothing where there is none. */
 function browserAudioContext(): AudioContext | undefined {
@@ -94,6 +94,12 @@ export class Soundscape {
     const context = this.context;
     const master = this.master;
     if (!context || !master || this.muted || context.state !== 'running') return;
+    if (cue === 'wolfChorus') {
+      // A wild wolf far off, then the friend by the fire answering, higher and nearer.
+      this.playHowl({ peak: 0.035, pitch: 1, delay: 0, pan: Math.random() < 0.5 ? -0.8 : 0.8, output: master });
+      this.playHowl({ peak: 0.08, pitch: 1.25, delay: 1.4, pan: 0, output: master });
+      return;
+    }
     const notes = cue === 'gather' ? [620, 880] : [392, 523, 659];
     const now = context.currentTime;
     notes.forEach((frequency, index) => {
@@ -350,10 +356,13 @@ export class Soundscape {
     }, 12000 + Math.random() * 12000);
   }
 
-  /** A long, low howl that rises, holds and falls away. */
-  private playHowl(): void {
-    if (!this.context || !this.wolves || this.muted || this.context.state !== 'running') return;
-    const start = this.context.currentTime;
+  /** A long, low howl that rises, holds and falls away; quieter, higher, later or elsewhere as asked. */
+  private playHowl(voice: { peak?: number; pitch?: number; delay?: number; pan?: number; output?: AudioNode } = {}): void {
+    const output = voice.output ?? this.wolves;
+    if (!this.context || !output || this.muted || this.context.state !== 'running') return;
+    const start = this.context.currentTime + (voice.delay ?? 0);
+    const pitch = voice.pitch ?? 1;
+    const peak = voice.peak ?? 0.09;
     const oscillator = this.context.createOscillator();
     const envelope = this.context.createGain();
     const filter = this.context.createBiquadFilter();
@@ -361,16 +370,16 @@ export class Soundscape {
     filter.type = 'lowpass';
     filter.frequency.value = 900;
     oscillator.type = 'triangle';
-    oscillator.frequency.setValueAtTime(330, start);
-    oscillator.frequency.exponentialRampToValueAtTime(520, start + 0.6);
-    oscillator.frequency.setValueAtTime(520, start + 1.3);
-    oscillator.frequency.exponentialRampToValueAtTime(300, start + 2.2);
+    oscillator.frequency.setValueAtTime(330 * pitch, start);
+    oscillator.frequency.exponentialRampToValueAtTime(520 * pitch, start + 0.6);
+    oscillator.frequency.setValueAtTime(520 * pitch, start + 1.3);
+    oscillator.frequency.exponentialRampToValueAtTime(300 * pitch, start + 2.2);
     envelope.gain.setValueAtTime(0.0001, start);
-    envelope.gain.linearRampToValueAtTime(0.09, start + 0.4);
-    envelope.gain.setValueAtTime(0.09, start + 1.3);
+    envelope.gain.linearRampToValueAtTime(peak, start + 0.4);
+    envelope.gain.setValueAtTime(peak, start + 1.3);
     envelope.gain.exponentialRampToValueAtTime(0.0001, start + 2.3);
-    panner.pan.value = Math.random() * 1.4 - 0.7;
-    oscillator.connect(filter).connect(envelope).connect(panner).connect(this.wolves);
+    panner.pan.value = voice.pan ?? Math.random() * 1.4 - 0.7;
+    oscillator.connect(filter).connect(envelope).connect(panner).connect(output);
     oscillator.start(start);
     oscillator.stop(start + 2.35);
   }

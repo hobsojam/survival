@@ -54,7 +54,7 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     this.redrawTerrain();
-    this.ambient = new AmbientLife(this);
+    this.ambient = new AmbientLife(this, cue => this.onSound(cue));
     this.effects = new SceneEffects(this);
     const playerArt = sprites.survivor;
     this.playerSprite = this.add.image(Math.round(worldX(this.state.player.x)), Math.round(worldY(this.state.player.y)), 'survivor:idleDown0')
