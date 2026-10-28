@@ -46,7 +46,7 @@ describe('local save', () => {
     state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
     state.nodes.find(node => node.kind === 'fiber')!.readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(16);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(17);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);
@@ -230,7 +230,7 @@ describe('local save', () => {
   });
 
   it('rejects every earlier version', () => {
-    for (let version = 1; version <= 15; version++) {
+    for (let version = 1; version <= 16; version++) {
       const storage = new MemoryStorage();
       storage.setItem(SAVE_KEY, JSON.stringify({ version, state: createGame() }));
       expect(loadGame(storage).kind, `version ${version}`).toBe('invalid');
@@ -296,7 +296,7 @@ describe('autosave backoff', () => {
 });
 
 describe('the year journal in the save', () => {
-  const store = (state: ReturnType<typeof createGame>, version = 16) => {
+  const store = (state: ReturnType<typeof createGame>, version = 17) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;
@@ -340,7 +340,7 @@ describe('the year journal in the save', () => {
 });
 
 describe('the companion in the save', () => {
-  const store = (state: unknown, version = 16) => {
+  const store = (state: unknown, version = 17) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;

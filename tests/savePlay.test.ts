@@ -24,7 +24,8 @@ function seeded(seed: number): () => number {
   };
 }
 
-const structures = Object.keys(BUILDINGS) as StructureId[];
+// Keep this older random-play model focused on its original progression; the garden is optional and has its own seasonal loop.
+const structures = (Object.keys(BUILDINGS) as StructureId[]).filter(id => id !== 'garden');
 const simple = ['eat', 'stokeFire', 'rest', 'sleep', 'cook', 'stargaze', 'burnFiber', 'dropStone', 'storeStone', 'takeStone', 'craftAxe', 'craftPickaxe'] as const;
 const activities: Activity[] = ['awake', 'working', 'resting'];
 

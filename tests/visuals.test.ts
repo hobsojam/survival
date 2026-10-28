@@ -23,7 +23,7 @@ describe('native-size scene art', () => {
     expect(keys).toContain('lookout:damaged');
     expect(keys).toContain('firePit:unlit');
     expect(keys).not.toContain('hearthSite:still');
-    const sites = new Set(['shelter', 'crate', 'dryingRack', 'windbreak', 'stonePile', 'toolshed']);
+    const sites = new Set(['shelter', 'crate', 'dryingRack', 'garden', 'windbreak', 'stonePile', 'toolshed']);
     for (const item of visuals) {
       const [name, frame] = item.texture.split(':');
       expect(sprites[name]?.frames[frame], item.texture).toBeDefined();
