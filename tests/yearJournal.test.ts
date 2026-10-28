@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createGame, type GameState } from '../src/game/state';
 import type { JournalEntry } from '../src/game/journalEntries';
+import { journalIconUrl } from '../src/art/journalIcons';
 import { currentPage, journalPageView, renderJournalPage, turnPage, yearWords, type JournalNode } from '../src/ui/yearJournal';
 
 const on = (day: number, journal: JournalEntry[] = []): GameState => ({ ...createGame(), day, journal });
@@ -19,7 +20,7 @@ describe('the year journal pages', () => {
       { year: 1, id: 'leaves', day: 2, variant: 0 }
     ]), currentPage(6));
     expect(view.entries.map(entry => entry.day)).toEqual(['Day 2', 'Day 4']);
-    expect(view.entries[0]).toEqual({ icon: '🍂', day: 'Day 2', line: 'The first leaves came down over camp.' });
+    expect(view.entries[0]).toEqual({ icon: journalIconUrl('leaves'), day: 'Day 2', line: 'The first leaves came down over camp.' });
     expect(view.blanks).toBe(3);
   });
 
@@ -81,7 +82,8 @@ describe('turning and drawing journal pages', () => {
     const rows = elements['#year-journal-entries'].children as FakeNode[];
     expect(rows).toHaveLength(5);
     const [icon, text] = rows[0].children as FakeNode[];
-    expect(icon.textContent).toBe('🍂');
+    expect(icon.textContent).toBe('');
+    expect(icon.attributes.style).toBe(`background-image: url("${journalIconUrl('leaves')}")`);
     expect((text.children[0] as FakeNode).textContent).toBe('Day 2');
     expect(text.children[1]).toBe('The first leaves came down over camp.');
     expect(rows[0].classes.has('blank')).toBe(false);

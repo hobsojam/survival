@@ -1,4 +1,5 @@
 import { SEASON_LENGTH, YEAR_LENGTH, seasonName, type Season } from '../game/calendar';
+import { journalIconUrl } from '../art/journalIcons';
 import { JOURNAL_PAGES, journalEntry, journalSeason } from '../game/journalEntries';
 import type { GameState } from '../game/state';
 
@@ -14,6 +15,7 @@ export const yearWords = (year: number): string => WORDS[year - 1] ?? String(yea
 export interface JournalPageView {
   title: string;
   days: string;
+  /** Each written line, with its pixel picture as an image URL. */
   entries: { icon: string; day: string; line: string }[];
   blanks: number;
   hasPrevious: boolean;
@@ -36,7 +38,7 @@ export function journalPageView(state: GameState, page: number): JournalPageView
     days: `Days ${first}–${first + SEASON_LENGTH - 1}`,
     entries: written.map(entry => {
       const known = journalEntry(entry.id)!;
-      return { icon: known.icon, day: `Day ${entry.day}`, line: known.lines[entry.variant] ?? known.lines[0] };
+      return { icon: journalIconUrl(entry.id), day: `Day ${entry.day}`, line: known.lines[entry.variant] ?? known.lines[0] };
     }),
     blanks: JOURNAL_PAGES[s].length - written.length,
     hasPrevious: index > 0,
@@ -70,7 +72,9 @@ function row(make: JournalDocument, entry: JournalPageView['entries'][number] | 
   item.classList.toggle('blank', entry === null);
   const picture = element('span');
   picture.className = 'year-journal-icon';
-  picture.textContent = entry?.icon ?? '?';
+  // A written moment shows its pixel picture; a blank keeps its question mark.
+  picture.textContent = entry ? '' : '?';
+  if (entry) picture.setAttribute('style', `background-image: url("${entry.icon}")`);
   picture.setAttribute('aria-hidden', 'true');
   const text = element('span');
   text.className = 'year-journal-line';
