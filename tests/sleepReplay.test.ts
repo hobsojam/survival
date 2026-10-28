@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
-import { SLEEP_REPLAY_MS, SleepReplay, replayFrame, replaysSleep } from '../src/scene/sleepReplay';
+import { NightWatch, SLEEP_REPLAY_MS, SleepReplay, replayFrame, replaysSleep } from '../src/scene/sleepReplay';
 
 const base = createGame();
 const night: GameState = { ...base, day: 3, timeOfDay: nightStart(3) + 10, fireFuel: 120,
@@ -49,5 +49,39 @@ describe('a sleep replay playing out', () => {
     expect(middle.state.timeOfDay).toBeGreaterThan(night.timeOfDay);
     const morning = replay.step(1000 + SLEEP_REPLAY_MS);
     expect(morning).toEqual({ state: dawn, messages: ['Written in your journal: a line.'], done: true });
+  });
+});
+
+describe('the scene\'s night watch', () => {
+  const morning = { state: dawn, messages: ['A page for the journal.'] };
+  const tick = { state: { ...night, timeOfDay: night.timeOfDay + 1 }, messages: [] };
+
+  it('lets the ordinary tick run until a sleep through the cold night begins', () => {
+    const watch = new NightWatch();
+    expect(watch.tick(0, () => tick)).toBe(tick);
+    expect(watch.begin(night, { state: night, messages: [] }, { type: 'sleep' }, 0)).toBe(false);
+    expect(watch.running).toBe(false);
+  });
+
+  it('plays the night out in place of the tick, then hands over the morning and its journal', () => {
+    const watch = new NightWatch();
+    expect(watch.begin(night, morning, { type: 'sleep' }, 1000)).toBe(true);
+    expect(watch.running).toBe(true);
+    const during = watch.tick(1000 + SLEEP_REPLAY_MS / 2, () => tick);
+    expect(during.state.day).toBe(3);
+    expect(during.messages).toEqual([]);
+    expect(watch.tick(1000 + SLEEP_REPLAY_MS, () => tick)).toEqual(morning);
+    expect(watch.running).toBe(false);
+    expect(watch.tick(1000 + SLEEP_REPLAY_MS + 16, () => tick)).toBe(tick);
+  });
+
+  it('starts the sunrise when the fire held, and asks for frost when it did not', () => {
+    const watch = new NightWatch();
+    expect(watch.sunriseAgeMs(500)).toBe(Infinity);
+    expect(watch.dawn(night, dawn, 2000)).toBe(false);
+    expect(watch.sunriseAgeMs(2500)).toBe(500);
+    const failed = { ...dawn, progress: { ...dawn.progress, hearthUnlocked: false, nextStormDay: 6 } };
+    expect(new NightWatch().dawn(night, failed, 2000)).toBe(true);
+    expect(new NightWatch().dawn(dawn, dawn, 2000)).toBe(false);
   });
 });

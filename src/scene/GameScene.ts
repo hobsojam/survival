@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { BALANCE, type GameState } from '../game/state';
 import { newsBetween } from '../game/news';
-import { coldNightMessage, dawnEffect } from '../game/coldNight';
+import { coldNightMessage } from '../game/coldNight';
 import { recordJournal } from '../game/journalEntries';
 import { advanceTime, applyAction, type GameAction } from '../game/rules';
 import { TILE, worldX, worldY, drawTerrain } from './art';
@@ -15,7 +15,7 @@ import { seasonPalette } from '../art/seasonPalette';
 import { facingFromInput, selectSurvivorVisual, type Facing, type SurvivorAction } from './survivorVisual';
 import { SceneEffects } from './SceneEffects';
 import { SceneLighting } from './SceneLighting';
-import { SleepReplay, replaysSleep } from './sleepReplay';
+import { NightWatch } from './sleepReplay';
 import { hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from './tapTarget';
 import { palette } from '../art/palette';
 import type { SoundCue } from '../game/soundscape';
@@ -44,9 +44,7 @@ export class GameScene extends Phaser.Scene {
   private seasonPainted: Season | null = null;
   private areaShown = '';
   private needsArmed: ReadonlySet<NeedAlert> = new Set(ALL_NEED_ALERTS);
-  /** A sleep through the cold night being played out; input is ignored until it ends. */
-  private sleepReplay: SleepReplay | null = null;
-  private sunriseAtMs = -Infinity;
+  private readonly nightWatch = new NightWatch();
 
   constructor(state: GameState, onStateChange: (state: GameState, cause: 'action' | 'tick') => void, onFeedback: (message: string) => void, onSound: (cue: SoundCue) => void = () => undefined) {
     super({ key: 'GameScene' });
@@ -88,16 +86,14 @@ export class GameScene extends Phaser.Scene {
     this.handleActionKeys();
     const beforeTick = this.state;
     // While a sleep plays out, the replay sets the clock instead of the tick.
-    const replayed = this.sleepReplay?.step(this.time.now);
-    if (replayed?.done) this.sleepReplay = null;
-    const written = replayed ?? recordJournal(beforeTick, advanceTime(this.state, dt));
+    const written = this.nightWatch.tick(this.time.now, () => recordJournal(beforeTick, advanceTime(this.state, dt)));
     this.state = written.state;
     this.reportWeather(beforeTick, this.state, written.messages);
     this.syncPlayerSprite(walking || tapWalking);
     this.paintObjects();
     this.ambient.update(this.state, dt, this.time.now);
     this.effects.update(this.state, this.time.now);
-    this.lighting.update(this.state, this.time.now, this.time.now - this.sunriseAtMs);
+    this.lighting.update(this.state, this.time.now, this.nightWatch.sunriseAgeMs(this.time.now));
     this.hudElapsed += delta;
     if (this.hudElapsed >= 250) {
       this.onStateChange(this.state, 'tick');
@@ -162,13 +158,12 @@ export class GameScene extends Phaser.Scene {
 
   perform(action: GameAction, announce = true): void {
     // The sidebar's buttons still click while the game is paused; nothing should happen.
-    if (this.scene.isPaused() || this.sleepReplay) return;
+    if (this.scene.isPaused() || this.nightWatch.running) return;
     if (action.type !== 'move') this.walkTarget = nextWalk(this.walkTarget, { kind: 'action' });
     const before = this.state;
     const result = applyAction(before, action);
     const written = recordJournal(before, result.state, action);
-    if (replaysSleep(before, written.state, action)) {
-      this.sleepReplay = new SleepReplay(before, written.state, written.messages, this.time.now);
+    if (this.nightWatch.begin(before, written, action, this.time.now)) {
       this.onFeedback('You bed down by the fire as the cold night blows in…');
       return;
     }
@@ -319,8 +314,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   private showDawn(before: GameState, after: GameState): void {
-    const dawn = dawnEffect(before, after);
-    if (dawn === 'sunrise') this.sunriseAtMs = this.time.now;
-    if (dawn === 'frost') this.effects.trigger('frost', this.time.now, BALANCE.campX, BALANCE.campY);
+    if (this.nightWatch.dawn(before, after, this.time.now)) this.effects.trigger('frost', this.time.now, BALANCE.campX, BALANCE.campY);
   }
 }

@@ -21,7 +21,7 @@ export class SceneLighting {
   }
 
   /** Draws the tint for the state; a sunrise that began sunriseAgeMs ago warms it for a few seconds. */
-  update(state: GameState, timeMs: number, sunriseAgeMs = Infinity): void {
+  update(state: GameState, timeMs: number, sunriseAgeMs: number): void {
     const tint = withSunrise(lightingTint(state), sunriseAgeMs);
     if (tint.alpha <= 0) {
       this.layer.setVisible(false);
