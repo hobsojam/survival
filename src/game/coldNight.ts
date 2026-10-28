@@ -32,3 +32,9 @@ export function coldNightMessage(before: GameState, after: GameState): string | 
     ? 'The fire held through the cold night. The stone hearth is now unlocked.'
     : `The fire went out in the night. Rest today; another cold night comes on day ${after.progress.nextStormDay}.`;
 }
+
+/** What the morning after the cold night looks like: a warm sunrise if the fire held, frost if it went out. */
+export function dawnEffect(before: GameState, after: GameState): 'sunrise' | 'frost' | null {
+  if (!isColdNight(before) || isColdNight(after)) return null;
+  return after.progress.hearthUnlocked ? 'sunrise' : 'frost';
+}

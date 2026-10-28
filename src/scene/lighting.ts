@@ -46,7 +46,8 @@ export function lightingTint(state: GameState): LightingTint {
   const summer = isSummer(state.day);
   const length = duskLength(state.day);
   const duskStart = nightStart(state.day) - length;
-  const dusk = time > duskStart ? (summer ? 0.16 : 0.12) * (time - duskStart) / length : 0;
+  const duskStrength = summer ? 0.16 : 0.12;
+  const dusk = time > duskStart ? duskStrength * (time - duskStart) / length : 0;
   // On the cold night's day the afternoon greys and the dusk comes in icy rather than gold.
   const cold = coldNightApproach(state);
   // The blue takes over early, since halfway between gold and blue is only grey.

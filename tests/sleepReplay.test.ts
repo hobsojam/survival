@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
-import { SLEEP_REPLAY_MS, replayFrame, replaysSleep } from '../src/scene/sleepReplay';
+import { SLEEP_REPLAY_MS, SleepReplay, replayFrame, replaysSleep } from '../src/scene/sleepReplay';
 
 const base = createGame();
 const night: GameState = { ...base, day: 3, timeOfDay: nightStart(3) + 10, fireFuel: 120,
@@ -37,5 +37,17 @@ describe('sleeping through the cold night', () => {
   it('lets the fire go out partway when there was too little wood', () => {
     const short = { ...night, fireFuel: 20 };
     expect(replayFrame(short, { ...dawn, fireFuel: 0 }, SLEEP_REPLAY_MS).fireFuel).toBe(0);
+  });
+});
+
+describe('a sleep replay playing out', () => {
+  it('shows the night frame by frame, then hands over the real morning and its journal lines once', () => {
+    const replay = new SleepReplay(night, dawn, ['Written in your journal: a line.'], 1000);
+    const middle = replay.step(1000 + SLEEP_REPLAY_MS / 2);
+    expect(middle.done).toBe(false);
+    expect(middle.messages).toEqual([]);
+    expect(middle.state.timeOfDay).toBeGreaterThan(night.timeOfDay);
+    const morning = replay.step(1000 + SLEEP_REPLAY_MS);
+    expect(morning).toEqual({ state: dawn, messages: ['Written in your journal: a line.'], done: true });
   });
 });

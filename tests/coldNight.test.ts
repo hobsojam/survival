@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { afternoonStart, nightStart } from '../src/game/calendar';
-import { COLD_WARNING, coldNightApproach, coldNightMessage, coldNightWarning } from '../src/game/coldNight';
+import { COLD_WARNING, coldNightApproach, coldNightMessage, coldNightWarning, dawnEffect } from '../src/game/coldNight';
 import { createGame, type GameState } from '../src/game/state';
 
 const base = createGame();
@@ -44,5 +44,14 @@ describe('the cold night\'s messages', () => {
 
   it('says nothing on an ordinary evening', () => {
     expect(coldNightMessage(on(2, 100), on(2, 101))).toBeNull();
+  });
+});
+
+describe('the dawn after the cold night', () => {
+  it('breaks into a sunrise if the fire held, and frost if it went out', () => {
+    const night = on(3, 239);
+    expect(dawnEffect(night, on(4, 0, { nextStormDay: null, hearthUnlocked: true }))).toBe('sunrise');
+    expect(dawnEffect(night, on(4, 30, { nextStormDay: 6 }))).toBe('frost');
+    expect(dawnEffect(on(2, 239), on(3, 0))).toBeNull();
   });
 });

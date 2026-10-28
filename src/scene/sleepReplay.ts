@@ -25,3 +25,16 @@ export function replayFrame(before: GameState, after: GameState, elapsedMs: numb
     player: { ...before.player, warmth }
   };
 }
+
+/** One sleep through the cold night: each step shows the night as it stands, until the morning takes over. */
+export class SleepReplay {
+  constructor(private readonly before: GameState, private readonly after: GameState,
+    private readonly journal: string[], private readonly startedAtMs: number) {}
+
+  /** The state to show now; once the night has played out, the real morning with its journal lines, and done. */
+  step(nowMs: number): { state: GameState; messages: string[]; done: boolean } {
+    const elapsed = nowMs - this.startedAtMs;
+    if (elapsed < SLEEP_REPLAY_MS) return { state: replayFrame(this.before, this.after, elapsed), messages: [], done: false };
+    return { state: this.after, messages: this.journal, done: true };
+  }
+}
