@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { forecastFireCheck, logsForColdNight, stormReadiness } from '../src/game/forecast';
+import { rainWindow } from '../src/game/rain';
 
 const NIGHT_NEED = (BALANCE.daySeconds - nightStart(3)) * BALANCE.coldNightFireBurn;
 
@@ -13,6 +14,15 @@ function stormDay(timeOfDay: number): GameState {
 }
 
 describe('stormReadiness', () => {
+  it('counts a spring shower burning the fire faster before a pending front', () => {
+    const day = Array.from({ length: 10 }, (_, i) => 21 + i).find(d => rainWindow(d) !== null)!;
+    const { start, end } = rainWindow(day)!;
+    const state = { ...createGame(), day, timeOfDay: start - 10, fireFuel: 400 };
+    state.progress = { ...state.progress, nextStormDay: day };
+    const untilNight = nightStart(day) - state.timeOfDay + (end - start) * (BALANCE.rainFireBurn - 1);
+    expect(stormReadiness(state).fuel).toBeCloseTo(400 - untilNight);
+  });
+
   it('does not count a noon stoke that will burn away before nightfall', () => {
     const state = stormDay(100);
     state.fireFuel = 170;

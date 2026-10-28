@@ -1,8 +1,9 @@
-import { isSpring, isSummer, isWinter, nightStart } from './calendar';
+import { SEASON_LENGTH, daysLeftInSeason, isSpring, isSummer, isWinter, nightStart } from './calendar';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } from './areas';
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
+import { bagCapacity, carriedCount, freeSpaces, isAtCamp, spaceFor } from './camp';
 import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
 import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, type GameState, type SiteId, type StructureId } from './state';
 
@@ -27,30 +28,9 @@ function near(x1: number, y1: number, x2: number, y2: number, radius: number = B
   return Math.hypot(x1 - x2, y1 - y2) <= radius;
 }
 
-export function isAtCamp(state: GameState): boolean {
-  return state.area === 'camp' && Math.hypot(state.player.x - BALANCE.campX, state.player.y - BALANCE.campY) <= BALANCE.campRadius;
-}
-
 export const FULL_BAG_MESSAGE = 'Your bag is full. Eat, burn, or set something down at camp to make room.';
 
-/** Bag spaces one of this supply takes; stone is heavy. */
-export function spaceFor(resource: keyof GameState['inventory']): number {
-  return resource === 'stone' ? BALANCE.stoneSpaces : 1;
-}
-
-/** Bag spaces in use, counting stone at its weight. */
-export function carriedCount(state: GameState): number {
-  return (Object.keys(state.inventory) as (keyof GameState['inventory'])[])
-    .reduce((total, resource) => total + state.inventory[resource] * spaceFor(resource), 0);
-}
-
-export function bagCapacity(state: GameState): number {
-  return state.structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity;
-}
-
-export function freeSpaces(state: GameState): number {
-  return bagCapacity(state) - carriedCount(state);
-}
+export { bagCapacity, carriedCount, freeSpaces, isAtCamp, spaceFor };
 
 /** Stone a build can use: the bag plus the camp stone pile, which counts from anywhere. */
 export function availableStone(state: GameState): number {
@@ -197,9 +177,9 @@ function hungerLoss(state: GameState, step: number): number {
   return (step + hot * (BALANCE.summerHeatHunger - 1)) / 8;
 }
 
-/** The note when summer's midday heat begins, or null. */
+/** The note when summer's midday heat begins, on the first day of each summer only, or null. */
 export function heatMessage(before: GameState, after: GameState): string | null {
-  const began = before.day === after.day && isSummer(after.day)
+  const began = before.day === after.day && isSummer(after.day) && daysLeftInSeason(after.day) === SEASON_LENGTH
     && before.timeOfDay < BALANCE.summerHeatStart && after.timeOfDay >= BALANCE.summerHeatStart;
   return began ? 'The midday sun is hot. You will get hungry a little faster.' : null;
 }

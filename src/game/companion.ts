@@ -1,6 +1,6 @@
 import { isWinter, nightStart } from './calendar';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
-import { freeSpaces, isAtCamp } from './rules';
+import { freeSpaces, isAtCamp } from './camp';
 import { BALANCE, type Friend, type GameState } from './state';
 import { dayHash, foxAt, foxSpookRadius } from './wildlife';
 
@@ -115,7 +115,9 @@ export function companionDawn(next: GameState): void {
     if (itemMade(next)) changes = { lastFind: next.day };
     else if (!companion.keepsakeLying && companion.keepsakes < KEEPSAKES_NEEDED) changes = { lastFind: next.day, keepsakeLying: true };
   }
-  if (companion.friend === 'fox' && findDue(next.day, companion.lastGift, GIFT_SALT) && freeSpaces(next) >= 1) {
+  // The fox leaves its berry by the bedroll, so only on a dawn the survivor wakes at camp.
+  const home = next.area === 'camp';
+  if (companion.friend === 'fox' && home && findDue(next.day, companion.lastGift, GIFT_SALT) && freeSpaces(next) >= 1) {
     changes = { ...changes, lastGift: next.day };
     next.inventory = { ...next.inventory, food: next.inventory.food + 1 };
   }

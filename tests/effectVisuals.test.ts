@@ -102,5 +102,9 @@ describe('spring rain', () => {
     expect(visuals.some(visual => visual.id.startsWith('weather:sleet'))).toBe(false);
     expect(visuals.every(visual => !visual.id.startsWith('weather:rain:') || visual.texture === 'rainStreak:still')).toBe(true);
     expect(effectVisuals({ ...shower, timeOfDay: 80 }, 0, []).some(visual => visual.id.startsWith('weather:rain:'))).toBe(false);
+    // The streaks fade in with the shower's first seconds, and are bold once it's falling.
+    const streaks = (time: number) => effectVisuals({ ...shower, day: 22, timeOfDay: time }, 0, []).filter(visual => visual.id.startsWith('weather:rain:'));
+    expect(streaks(32)[0].alpha).toBeLessThan(streaks(50)[0].alpha);
+    expect(streaks(50)[0].alpha).toBeGreaterThanOrEqual(0.75);
   });
 });

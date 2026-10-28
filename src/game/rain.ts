@@ -20,6 +20,15 @@ export function isRaining(state: Pick<GameState, 'day' | 'timeOfDay'>): boolean 
   return window !== null && state.timeOfDay >= window.start && state.timeOfDay < window.end;
 }
 
+const RAIN_FADE_SECONDS = 4;
+
+/** How heavy the shower looks, 0–1: it builds over its first 4 s and eases off over its last 4 s. */
+export function rainFade(state: Pick<GameState, 'day' | 'timeOfDay'>): number {
+  const window = rainWindow(state.day);
+  if (!window || !isRaining(state)) return 0;
+  return Math.min(1, (state.timeOfDay - window.start) / RAIN_FADE_SECONDS, (window.end - state.timeOfDay) / RAIN_FADE_SECONDS);
+}
+
 /** The message as a shower begins, once. */
 export function rainMessage(before: GameState, after: GameState): string | null {
   return !isRaining(before) && isRaining(after) ? 'Rain is coming in.' : null;

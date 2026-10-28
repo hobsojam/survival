@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SITES, createGame, type GameState } from '../src/game/state';
+import { LOOKOUT, SITES, createGame, type GameState } from '../src/game/state';
 import { RABBIT_HOMES } from '../src/game/wildlife';
 import { advanceTime, applyAction, type GameAction } from '../src/game/rules';
 import { nightStart } from '../src/game/calendar';
@@ -44,11 +44,16 @@ describe('the year journal', () => {
     expect(rain.messages.some(text => text.includes('rain'))).toBe(false);
   });
 
-  it('notices a whole winter night by the fire', () => {
-    const night = at(12, 239.5, { fireFuel: 50 });
-    expect(ids(tick(night).state)).toContain('winterFire');
-    expect(ids(tick({ ...night, lastWolf: { day: 12, took: 'nothing' } }).state)).not.toContain('winterFire');
-    expect(ids(tick({ ...night, lastWolf: { day: 12, took: 'offered' } }).state)).toContain('winterFire');
+  it('notices a whole winter night slept by a fire that never went out', () => {
+    const night = sheltered(12, nightStart(12) + 5, 300);
+    const sleep: GameAction = { type: 'sleep' };
+    expect(ids(act(night, sleep).state)).toContain('winterFire');
+    expect(ids(act({ ...night, fireFuel: 50 }, sleep).state)).not.toContain('winterFire');
+    expect(ids(act({ ...night, lastWolf: { day: 12, took: 'nothing' } }, sleep).state)).not.toContain('winterFire');
+    expect(ids(act({ ...night, lastWolf: { day: 12, took: 'chased' } }, sleep).state)).not.toContain('winterFire');
+    expect(ids(act({ ...night, lastWolf: { day: 12, took: 'offered' } }, sleep).state)).toContain('winterFire');
+    // Walking in just before dawn, awake, isn't a night kept.
+    expect(ids(tick({ ...night, timeOfDay: 239.5 }).state)).not.toContain('winterFire');
   });
 
   it('writes summer evenings during a timed action', () => {
@@ -108,5 +113,52 @@ describe('the year journal', () => {
 describe('the fox line', () => {
   it('hints at what the fox likes to eat', () => {
     expect(journalEntry('fox')?.lines[0]).toBe('A fox nosed around the berry bushes at dusk.');
+  });
+});
+
+describe('each moment of the year', () => {
+  const withPlayer = (state: GameState, x: number, y: number): GameState => ({ ...state, player: { ...state.player, x, y } });
+  const written = (result: { state: GameState }, id: JournalId) => ids(result.state).includes(id);
+
+  it('notes a fox by the bushes at an autumn dusk, at camp', () => {
+    expect(written(tick(at(5, nightStart(5) - 10)), 'fox')).toBe(true);
+    expect(written(tick(withPlayer(at(5, nightStart(5) - 10), 5, 25)), 'fox')).toBe(false);
+  });
+
+  it('notes the berries dried and cooked, in their own seasons', () => {
+    const rack = { ...base.structures, dryingRack: true, shelter: true };
+    expect(written(act(at(5, 60, { structures: rack, inventory: { ...base.inventory, food: 1 } }), { type: 'prepareTrailFood' }), 'driedBerries')).toBe(true);
+    const cooking = at(12, nightStart(12) + 5, { fireFuel: 100, inventory: { ...base.inventory, food: 1 } });
+    expect(written(act(cooking, { type: 'cook' }), 'winterCooking')).toBe(true);
+    expect(written(act({ ...cooking, day: 5, timeOfDay: nightStart(5) + 5 }, { type: 'cook' }), 'winterCooking')).toBe(false);
+  });
+
+  it('notes paw prints quietly when a wolf comes to the dark camp', () => {
+    const dark = tick(at(12, nightStart(12) + 5, { fireFuel: 0 }));
+    expect(written(dark, 'wolfTracks')).toBe(true);
+    expect(dark.messages.some(text => text.includes('Paw prints'))).toBe(false);
+  });
+
+  it('notes the spring frozen in winter and a rest beside it in spring', () => {
+    const spring = (day: number) => withPlayer(at(day, 60), SITES.spring.x, SITES.spring.y);
+    const visit: GameAction = { type: 'visitSite', siteId: 'spring' };
+    expect(written(act(spring(12), visit), 'frozenSpring')).toBe(true);
+    expect(written(act(spring(22), visit), 'springRest')).toBe(true);
+    expect(written(act(spring(22), visit), 'frozenSpring')).toBe(false);
+  });
+
+  it('notes full bushes on a spring pick and a stump growing back at dawn', () => {
+    const picking = withPlayer(at(22, 60), 19, 14);
+    expect(written(act(picking, { type: 'gather', nodeId: 'berry-0' }), 'bushesFull')).toBe(true);
+    const regrowing = at(21, 239.5, { trees: base.trees.map((tree, index) => (index === 0 ? { ...tree, readyDay: 22 } : tree)) });
+    expect(written(tick(regrowing), 'stumpGrowing')).toBe(true);
+    expect(written(tick(at(21, 239.5)), 'stumpGrowing')).toBe(false);
+  });
+
+  it('notes a long summer evening at the restored lookout', () => {
+    const repaired = { ...base.progress, lookoutRepaired: true, hearthUnlocked: true, nextStormDay: null };
+    const evening = withPlayer(at(34, nightStart(34) - 10, { progress: repaired }), LOOKOUT.x, LOOKOUT.y + 1);
+    expect(written(tick(evening), 'lookoutEvening')).toBe(true);
+    expect(written(tick({ ...evening, progress: { ...repaired, lookoutRepaired: false } }), 'lookoutEvening')).toBe(false);
   });
 });

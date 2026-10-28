@@ -136,6 +136,8 @@ describe('what a friend does', () => {
     const full = dawnInto({ ...fox, inventory: { ...fox.inventory, wood: 8 } }, day).after;
     expect([full.inventory.food, full.companion.lastGift]).toEqual([0, day - 3]);
     expect(dawnInto(withFriend('wolf', { lastGift: day - 3, lastFind: day }), day).after.inventory.food).toBe(0);
+    const away = dawnInto({ ...fox, area: 'quarry', player: { ...fox.player, x: 20, y: 15 } }, day).after;
+    expect([away.inventory.food, away.companion.lastGift]).toEqual([0, day - 3]);
   });
 
   it('sheds one piece at a time, only while it is needed', () => {

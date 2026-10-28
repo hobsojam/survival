@@ -82,7 +82,7 @@ export function nightHint(state: GameState): string {
   return 'Optional comforts while the night passes.';
 }
 
-export interface ForecastView { active: boolean; weathered: boolean; title: string; copy: string; shelter: string; fire: string;
+export interface ForecastView { active: boolean; title: string; copy: string; shelter: string; fire: string;
   /** Shown only while a front is due or under way, or in winter: otherwise there is nothing to forecast. */
   shown: boolean }
 
@@ -93,7 +93,7 @@ const LOG_WORDS: Record<number, string> = { 2: 'two', 3: 'three' };
 function winterForecast(state: GameState): ForecastView {
   const active = isFreezingNight(state);
   return {
-    active, weathered: false, shown: true,
+    active, shown: true,
     title: active ? 'A bitter night' : 'Winter nights',
     copy: 'Winter nights are bitter. Keep the fire alive until dawn, or the wolves will come close.',
     shelter: state.structures.shelter ? '✓ Shelter ready' : '○ Shelter needed',
@@ -103,16 +103,14 @@ function winterForecast(state: GameState): ForecastView {
 
 export function forecastView(state: GameState): ForecastView {
   const storm = isColdNight(state);
-  const weathered = state.progress.hearthUnlocked;
-  if (weathered && isWinter(state.day)) return winterForecast(state);
-  if (weathered) {
-    return { active: storm, weathered, shown: storm, title: 'The cold night is behind you', copy: 'You kept your camp warm through dawn. The stone hearth is ready to build.',
-      shelter: '✓ Shelter held firm', fire: '✓ Hearth unlocked' };
+  if (state.progress.hearthUnlocked) {
+    // With the front weathered, only winter's nights are left to forecast.
+    return isWinter(state.day) ? winterForecast(state) : { active: false, shown: false, title: '', copy: '', shelter: '', fire: '' };
   }
   const day = state.progress.nextStormDay!;
   const sheltered = state.structures.shelter;
   return {
-    active: storm, weathered, shown: true,
+    active: storm, shown: true,
     title: storm ? 'The cold front is here' : `Cold front · day ${day} night`,
     copy: storm ? 'Stay at camp and keep the fire alive until dawn.' : `Build a shelter and bring ${LOG_WORDS[logsForColdNight(day)]} logs to camp before nightfall on day ${day}.`,
     shelter: sheltered ? '✓ Shelter ready' : '○ Shelter needed',

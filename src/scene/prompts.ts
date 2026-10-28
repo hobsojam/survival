@@ -94,6 +94,8 @@ export function promptFor(state: GameState): string {
   const gather = found ? gatherPrompt(found, isWinter(state.day)) : '';
   const parts = [gather, nearby, offer].filter(Boolean);
   if (gather && parts.length === 1 && !sleepBlocker(state)) return `${gather} · Z Sleep until morning`;
+  // An offering alone keeps the camp's own hints beside it.
+  if (parts.length === 1 && offer) return `${offer} · ${campPrompt(state)}`;
   return parts.length ? parts.join(' · ') : campPrompt(state);
 }
 
