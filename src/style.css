@@ -318,3 +318,9 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
 @media (max-width: 359px) and (orientation: portrait) {
   .save-status { display: none; }
 }
+
+.garden-panel .garden-hint { margin-bottom: .8rem; }
+.garden-plot { display: flex; align-items: center; gap: .35rem; padding: .55rem 0; border-top: 1px solid var(--line, #d9d2c3); }
+.garden-plot > span { display: grid; flex: 1; gap: .15rem; }
+.garden-plot small { opacity: .75; }
+.garden-plot button { padding: .35rem .5rem; }

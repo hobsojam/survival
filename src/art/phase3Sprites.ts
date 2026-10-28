@@ -338,6 +338,20 @@ function spring(g: Grid, frozen = false): void {
     box(g, x, y, 3, 3, 'n'); dot(g, x, y, 'q');
   }
 }
+function gardenBed(g: Grid): void {
+  oval(g, 24, 22, 22, 3, 's');
+  box(g, 3, 9, 42, 10, 'a'); box(g, 4, 10, 40, 8, 'b');
+  for (const x of [8, 21, 34]) { box(g, x, 12, 8, 4, 'A'); box(g, x + 1, 12, 6, 2, 'z'); }
+  box(g, 3, 9, 42, 2, 'c'); box(g, 3, 17, 42, 2, 'a');
+}
+function gardenPlant(g: Grid, stage: string): void {
+  oval(g, 8, 14, 7, 2, 's');
+  if (stage === 'dormant') { box(g, 7, 12, 3, 2, 'a'); dot(g, 8, 10, 'b'); return; }
+  if (stage === 'seedling') { box(g, 7, 10, 2, 4, 'a'); dot(g, 6, 9, 'h'); dot(g, 9, 8, 'i'); return; }
+  box(g, 7, 9, 2, 5, 'a'); oval(g, 8, 8, 5, 4, 'h'); oval(g, 5, 9, 3, 2, 'i'); oval(g, 11, 9, 3, 2, 'j');
+  if (stage === 'ripe') { for (const [x, y] of [[5, 8], [10, 7], [8, 10]]) { dot(g, x, y, 'm'); dot(g, x + 1, y, 'n'); } }
+}
+
 function cairn(g: Grid, full: boolean): void {
   oval(g, 8, 14, 6, 2, 's');
   for (const [x, y, w] of [[3, 10, 5], [8, 9, 5], [5, 6, 6]]) {
@@ -362,6 +376,9 @@ export const phase3Sprites: Record<string, SpriteDef> = {
     porch: g => shelter(g, false, 'porch'), porchBed: g => shelter(g, true, 'porch'),
     finished: g => shelter(g, false, 'finished'), finishedBed: g => shelter(g, true, 'finished')
   }),
+  gardenSite: define(48, 24, campLegend, { still: gardenBed }),
+  garden: define(48, 24, campLegend, { built: gardenBed }),
+  gardenPlant: define(16, 16, nodeLegend, { seedling: g => gardenPlant(g, 'seedling'), growing: g => gardenPlant(g, 'growing'), ripe: g => gardenPlant(g, 'ripe'), dormant: g => gardenPlant(g, 'dormant') }),
   crateSite: define(16, 16, campLegend, { still: crateSite }),
   crate: define(16, 16, campLegend, { built: crate }),
   dryingRackSite: define(32, 16, campLegend, { still: rackSite }),

@@ -3,7 +3,8 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type SiteId, typ
 import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
-import { cookBlocker, isAtCamp, sleepBlocker, stargazeBlocker } from '../game/rules';
+import { cookBlocker, harvestGardenBlocker, isAtCamp, plantGardenBlocker, sleepBlocker, stargazeBlocker } from '../game/rules';
+import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { offerBlocker } from '../game/companion';
 import { dayPillView, renderDayPill, renderYearWheel, yearWheelView, type CalendarRoot } from './calendarView';
 import { isLowMeter } from '../game/needs';
@@ -94,6 +95,7 @@ export class App {
                 <div><span class="supply-icon ration">◇</span><strong id="ration-count">0</strong><small>Rations</small><button type="button" class="supply-action" data-action="eatTrailFood" data-supply="trailFood" aria-label="Eat one trail ration">Eat</button></div>
                 <div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small>Carried</small></div>
               </div><p class="keepsake-line" id="keepsake-line" hidden></p><div class="fire-status" id="fire-status">The fire is unlit</div></section>
+              <section class="panel garden-panel" data-tab="camp"><p class="eyebrow">GROW WITH THE SEASONS</p><h2>Berry garden</h2><p class="garden-hint" id="garden-hint"></p><div id="garden-plots"></div></section>
               <section class="panel night-panel" data-tab="camp"><p class="eyebrow">AFTER DARK</p><h2>A little time for yourself</h2><p class="night-hint" id="night-hint">These small moments are waiting for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button></div></section>
               <section class="panel build-panel" data-tab="build"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand inside the marked camp circle to build.</p><div id="build-list">${buildMarkup}</div></section>
               <section class="panel phone-only" data-tab="camp"><p class="eyebrow">THIS CAMP</p><button type="button" id="phone-new-game" class="secondary-button">Start a new game</button></section>
@@ -112,6 +114,12 @@ export class App {
         const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone';
         this.scene?.perform({ type });
       });
+    });
+    this.root.addEventListener('click', event => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-action="plantGarden"], [data-action="harvestGarden"]');
+      if (!button) return;
+      const type = button.dataset.action as 'plantGarden' | 'harvestGarden';
+      this.scene?.perform({ type, plotIndex: Number(button.dataset.plotIndex) });
     });
     this.root.querySelector('#build-list')!.addEventListener('click', event => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-build]');
@@ -295,6 +303,7 @@ export class App {
     this.renderNight();
     this.renderForecast();
     this.renderBuild();
+    this.renderGarden();
   }
 
   private renderClock(): void {
@@ -459,6 +468,24 @@ export class App {
     this.setText('forecast-copy', view.copy);
     this.setText('forecast-shelter', view.shelter);
     this.setText('forecast-fire', view.fire);
+  }
+
+  private renderGarden(): void {
+    const plots = this.root.querySelector<HTMLElement>('#garden-plots');
+    if (!plots) return;
+    const built = this.state.structures.garden;
+    const panel = this.root.querySelector<HTMLElement>('.garden-panel');
+    if (panel) panel.hidden = !built;
+    this.setText('garden-hint', built ? 'Plant one berry in spring. Each bush bears berries every autumn and will wait safely until picked.' : 'Build a garden from the Build tab to plant berry bushes.');
+    plots.innerHTML = this.state.gardenPlots.map((plot, index) => {
+      const stage = gardenPlotStage(this.state, plot);
+      const label = gardenPlotLabel(stage, plot.harvestReady);
+      const plantBlocker = plantGardenBlocker(this.state, index);
+      const harvestBlocker = harvestGardenBlocker(this.state, index);
+      const plantDisabled = !built || plot.plantedYear !== null || Boolean(plantBlocker);
+      const harvestDisabled = !built || !plot.harvestReady || Boolean(harvestBlocker);
+      return `<div class="garden-plot"><span><strong>Plot ${index + 1}</strong><small>${label}</small></span><button type="button" data-action="plantGarden" data-plot-index="${index}"${plantDisabled ? ` disabled title="${plantBlocker ?? 'Already planted.'}"` : ''}>Plant</button><button type="button" data-action="harvestGarden" data-plot-index="${index}"${harvestDisabled ? ` disabled title="${harvestBlocker ?? 'No harvest is ready.'}"` : ''}>Pick</button></div>`;
+    }).join('');
   }
 
   private renderBuild(): void {

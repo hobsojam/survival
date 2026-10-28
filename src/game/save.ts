@@ -5,7 +5,7 @@ import { journalEntry, journalSeason, type JournalId } from './journalEntries';
 import { KEEPSAKES_NEEDED, TRUST_TARGET } from './companion';
 
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 16;
+const SAVE_VERSION = 17;
 export type SaveResult = { ok: true } | { ok: false; error: string };
 export type LoadResult = { kind: 'empty' } | { kind: 'loaded'; state: GameState } | { kind: 'invalid'; reason: string };
 
@@ -17,12 +17,12 @@ const whole = (value: unknown): value is number => Number.isInteger(value) && fi
 const count = (value: unknown): value is number => whole(value) && value >= 0;
 const onMap = (x: unknown, y: unknown): boolean => finite(x) && x >= 0 && x <= BALANCE.mapWidth - 1 && finite(y) && y >= 0 && y <= BALANCE.mapHeight - 1;
 
-type SaveShape = ObjectValue & { player: ObjectValue; inventory: ObjectValue; structures: ObjectValue; progress: ObjectValue; nodes: unknown[]; trees: unknown[]; stonePiles: unknown[] };
+type SaveShape = ObjectValue & { player: ObjectValue; inventory: ObjectValue; structures: ObjectValue; progress: ObjectValue; nodes: unknown[]; trees: unknown[]; stonePiles: unknown[]; gardenPlots: unknown[] };
 const bool = (value: unknown): value is boolean => typeof value === 'boolean';
 
 function hasShape(value: unknown): value is SaveShape {
   return object(value) && object(value.player) && object(value.inventory) && object(value.structures) && object(value.progress)
-    && Array.isArray(value.nodes) && Array.isArray(value.trees) && Array.isArray(value.stonePiles);
+    && Array.isArray(value.nodes) && Array.isArray(value.trees) && Array.isArray(value.stonePiles) && Array.isArray(value.gardenPlots);
 }
 
 function validClock(value: SaveShape): boolean {
@@ -69,6 +69,20 @@ function validStone({ structures, storedStone, quarryReadyDay, rubbleReadyDay, d
   const today = day as number;
   return count(storedStone) && storedStone <= BALANCE.stonePileCapacity && (structures.stonePile === true || storedStone === 0)
     && readyBy(quarryReadyDay, today + 1) && readyBy(rubbleReadyDay, today + BALANCE.rubbleRegrowDays);
+}
+
+function validGarden({ gardenPlots, structures, day }: SaveShape): boolean {
+  if (gardenPlots.length !== 3) return false;
+  return gardenPlots.every(plot => {
+    if (!object(plot) || !bool(plot.harvestReady)) return false;
+    const plantedYear = plot.plantedYear;
+    const harvestedYear = plot.harvestedYear;
+    if (plantedYear !== null && (!count(plantedYear) || plantedYear < 1 || plantedYear > yearOf(day as number))) return false;
+    if (harvestedYear !== null && (!count(harvestedYear) || plantedYear === null || harvestedYear < plantedYear || harvestedYear > yearOf(day as number))) return false;
+    if (plot.harvestReady && (plantedYear === null || harvestedYear === yearOf(day as number) || !structures.garden)) return false;
+    if (plantedYear !== null && !structures.garden) return false;
+    return true;
+  });
 }
 
 function validWorld({ nodes, trees, stonePiles, day }: SaveShape): boolean {
@@ -137,10 +151,10 @@ function validCompanion({ companion, day, structures }: SaveShape): boolean {
     && (!made || (keepsakes === 0 && !keepsakeLying));
 }
 
-/** Checks a version 16 save: shelter upgrades, two areas, tools, quarry timers, the year journal and companion. */
+/** Checks a version 17 save: shelter upgrades, garden plots, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWorld, validWolf, validJournal, validCompanion];
+  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validGarden, validWorld, validWolf, validJournal, validCompanion];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 
