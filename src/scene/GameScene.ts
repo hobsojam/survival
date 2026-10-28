@@ -289,10 +289,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private weatherMessage(before: GameState, after: GameState): string | null {
-    if (!isColdNight(before) && isColdNight(after)) return 'The cold front has arrived. Keep the fire alive until dawn.';
+    if (!isColdNight(before) && isColdNight(after)) return 'The cold night has arrived. Keep the fire alive until dawn.';
     if (isColdNight(before) && !isColdNight(after)) return after.progress.hearthUnlocked
       ? 'You weathered the cold night! The stone hearth is now unlocked.'
-      : `The fire did not last. Recover today; another cold front comes on day ${after.progress.nextStormDay}.`;
+      : `The fire did not last. Recover today; another cold night comes on day ${after.progress.nextStormDay}.`;
     return null;
   }
 

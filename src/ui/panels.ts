@@ -54,7 +54,7 @@ export function lookoutView(state: GameState): ActionPanelView {
   if (hearthUnlocked) {
     return { ...button, title: 'Restore the old lookout', copy: 'Follow the northeast path to the lookout. Bring the repair materials and stand beside it.', cost: '4 wood · 2 fiber · 2 stone' };
   }
-  return { ...button, title: 'The old lookout', copy: 'A damaged lookout waits along the northeast path. Weather the cold front before repairing it.', cost: 'Unlocks after the cold front' };
+  return { ...button, title: 'The old lookout', copy: 'A damaged lookout waits along the northeast path. Weather the cold night before repairing it.', cost: 'Unlocks after the cold night' };
 }
 
 export function axeView(state: GameState): ActionPanelView {
@@ -69,7 +69,7 @@ export function axeView(state: GameState): ActionPanelView {
       : 'Build a toolshed first.';
     return { ...button, title: 'Craft a stone axe', copy, cost: '1 wood · 1 fiber · 1 stone' };
   }
-  return { ...button, title: 'Stone axe', copy: 'Weather the cold front to learn how to make a useful forest tool.', cost: 'Unlocks after the cold front' };
+  return { ...button, title: 'Stone axe', copy: 'Weather the cold night to learn how to make a useful forest tool.', cost: 'Unlocks after the cold night' };
 }
 
 /** The pickaxe row only shows once the quarry is found. */
@@ -119,13 +119,13 @@ export function nightHint(state: GameState): string {
 }
 
 export interface ForecastView { active: boolean; title: string; copy: string; shelter: string; fire: string;
-  /** Shown only while a front is due or under way, or in winter: otherwise there is nothing to forecast. */
+  /** Shown only while a cold night is due or under way, or in winter: otherwise there is nothing to forecast. */
   shown: boolean }
 
 // A cold night always needs two to three logs: 132 s to 220 s of fuel at 90 s a log.
 const LOG_WORDS: Record<number, string> = { 2: 'two', 3: 'three' };
 
-/** Once the cold front is behind the survivor, winter's nights take over the forecast. */
+/** Once the cold night is behind the survivor, winter's nights take over the forecast. */
 function winterForecast(state: GameState): ForecastView {
   const active = isFreezingNight(state);
   return {
@@ -140,14 +140,14 @@ function winterForecast(state: GameState): ForecastView {
 export function forecastView(state: GameState): ForecastView {
   const storm = isColdNight(state);
   if (state.progress.hearthUnlocked) {
-    // With the front weathered, only winter's nights are left to forecast.
+    // With the cold night weathered, only winter's nights are left to forecast.
     return isWinter(state.day) ? winterForecast(state) : { active: false, shown: false, title: '', copy: '', shelter: '', fire: '' };
   }
   const day = state.progress.nextStormDay!;
   const sheltered = state.structures.shelter;
   return {
     active: storm, shown: true,
-    title: storm ? 'The cold front is here' : `Cold front · day ${day} night`,
+    title: storm ? 'The cold night is here' : `Cold night · day ${day}`,
     copy: storm ? 'Stay at camp and keep the fire alive until dawn.' : `Build a shelter and bring ${LOG_WORDS[logsForColdNight(day)]} logs to camp before nightfall on day ${day}.`,
     shelter: sheltered ? '✓ Shelter ready' : '○ Shelter needed',
     fire: forecastFireCheck(state)

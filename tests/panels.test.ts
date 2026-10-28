@@ -55,10 +55,10 @@ describe('garden panel', () => {
 });
 
 describe('lookout panel', () => {
-  it('waits for the cold front, then asks for repairs, then celebrates', () => {
+  it('waits for the cold night, then asks for repairs, then celebrates', () => {
     expect(lookoutView(game())).toEqual({ title: 'The old lookout',
-      copy: 'A damaged lookout waits along the northeast path. Weather the cold front before repairing it.',
-      cost: 'Unlocks after the cold front', disabled: true, ready: false });
+      copy: 'A damaged lookout waits along the northeast path. Weather the cold night before repairing it.',
+      cost: 'Unlocks after the cold night', disabled: true, ready: false });
     expect(lookoutView(game({ progress: afterColdNight }))).toMatchObject({ title: 'Restore the old lookout', cost: '4 wood · 2 fiber · 2 stone', disabled: false });
     expect(lookoutView(game({ progress: { ...afterColdNight, lookoutRepaired: true } }))).toMatchObject({ title: 'A place to call home', cost: 'Restored', disabled: true });
   });
@@ -71,9 +71,9 @@ describe('lookout panel', () => {
 });
 
 describe('axe panel', () => {
-  it('stays locked until the cold front is weathered', () => {
-    expect(axeView(game())).toEqual({ title: 'Stone axe', copy: 'Weather the cold front to learn how to make a useful forest tool.',
-      cost: 'Unlocks after the cold front', disabled: true, ready: false });
+  it('stays locked until the cold night is weathered', () => {
+    expect(axeView(game())).toEqual({ title: 'Stone axe', copy: 'Weather the cold night to learn how to make a useful forest tool.',
+      cost: 'Unlocks after the cold night', disabled: true, ready: false });
   });
 
   it('asks for the toolshed, then for materials at camp', () => {
@@ -127,10 +127,10 @@ describe('night hint', () => {
 });
 
 describe('forecast panel', () => {
-  it('names the cold front day ahead of time', () => {
+  it('names the cold night day ahead of time', () => {
     const view = forecastView(game());
     const day = createGame().progress.nextStormDay;
-    expect(view).toMatchObject({ active: false, title: `Cold front · day ${day} night`, shelter: '○ Shelter needed' });
+    expect(view).toMatchObject({ active: false, title: `Cold night · day ${day}`, shelter: '○ Shelter needed' });
     expect(view.copy).toBe(`Build a shelter and bring two logs to camp before nightfall on day ${day}.`);
     expect(forecastView(game({ structures: { shelter: true } })).shelter).toBe('✓ Shelter ready');
   });
@@ -145,7 +145,7 @@ describe('forecast panel', () => {
   it('calls the survivor home while the front is here', () => {
     const day = createGame().progress.nextStormDay!;
     expect(forecastView(game({}, { day, timeOfDay: nightStart(day) + 1 })))
-      .toMatchObject({ active: true, title: 'The cold front is here', copy: 'Stay at camp and keep the fire alive until dawn.' });
+      .toMatchObject({ active: true, title: 'The cold night is here', copy: 'Stay at camp and keep the fire alive until dawn.' });
   });
 
   it('warns of winter nights once the front is weathered', () => {
@@ -163,10 +163,10 @@ describe('forecast panel', () => {
     expect(forecastView(afternoon).fire).toBe('○ Fire: 64 / 208s for the night · add carried wood at nightfall');
   });
 
-  it('keeps the cold front card while a front is still pending in winter', () => {
+  it('keeps the cold night card while a front is still pending in winter', () => {
     const pending = game({}, { day: 12 });
     pending.progress.nextStormDay = 12;
-    expect(forecastView(pending).title).toBe('Cold front · day 12 night');
+    expect(forecastView(pending).title).toBe('Cold night · day 12');
   });
 
   it('has nothing to forecast once the front is weathered, outside winter', () => {
@@ -243,7 +243,7 @@ describe('exhaustion in the panels', () => {
 });
 
 describe('forecast card visibility', () => {
-  it('shows while a front is due or in winter, and steps aside otherwise', () => {
+  it('shows while a cold night is due or in winter, and steps aside otherwise', () => {
     expect(forecastView(game()).shown).toBe(true);
     expect(forecastView(game({ progress: afterColdNight }, { day: 14 })).shown).toBe(true);
     expect(forecastView(game({ progress: afterColdNight }, { day: 24 })).shown).toBe(false);

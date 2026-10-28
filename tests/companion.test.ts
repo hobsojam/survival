@@ -8,7 +8,7 @@ import { FOX, foxAt } from '../src/game/wildlife';
 import { wolfMessage } from '../src/game/wolves';
 
 const base = createGame();
-/** Beside the berry bush at (19, 13), inside the camp ring, with the cold front long behind. */
+/** Beside the berry bush at (19, 13), inside the camp ring, with the cold night long behind. */
 const camp = (day: number, timeOfDay: number, inventory: Partial<GameState['inventory']> = {}): GameState => ({
   ...base, day, timeOfDay,
   player: { ...base.player, x: 19, y: 14 },

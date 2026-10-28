@@ -28,7 +28,7 @@ describe('the year journal', () => {
     expect(act(night, { type: 'stargaze' }).state.journal).toEqual([]);
   });
 
-  it('records how the cold front went, even asleep', () => {
+  it('records how the cold night went, even asleep', () => {
     const kept = act(sheltered(3, nightStart(3) + 1, 300), { type: 'sleep' }).state;
     expect(kept.journal.find(entry => entry.id === 'coldFront')).toEqual({ year: 1, id: 'coldFront', day: 3, variant: 0 });
     const lost = act(sheltered(3, nightStart(3) + 1, 0), { type: 'sleep' }).state;
@@ -87,12 +87,12 @@ describe('the year journal', () => {
     expect(tick(at(41, 0), 0.05).state.journal).toEqual([]);
   });
 
-  it('adds no second line for the cold front or the wolf, which have their own messages', () => {
+  it('adds no second line for the cold night or the wolf, which have their own messages', () => {
     const front = act(sheltered(3, nightStart(3) + 1, 300), { type: 'sleep' });
     expect(ids(front.state)).toContain('coldFront');
     const wolf = tick(at(12, nightStart(12) + 1, { fireFuel: 0 }));
     expect(ids(wolf.state)).toContain('wolfTracks');
-    expect([...front.messages, ...wolf.messages].filter(text => /cold front|Paw prints/.test(text))).toEqual([]);
+    expect([...front.messages, ...wolf.messages].filter(text => /cold night|Paw prints/.test(text))).toEqual([]);
   });
 
   it('remembers a cold autumn night by the fire in the years after the front', () => {

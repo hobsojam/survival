@@ -17,7 +17,7 @@ describe('field journal', () => {
   it('reveals visits and advances the next hint through the main milestones', () => {
     const state = createGame();
     state.structures.shelter = true;
-    expect(journalView(state).nextHint).toMatch(/cold front/i);
+    expect(journalView(state).nextHint).toMatch(/cold night/i);
     state.progress.hearthUnlocked = true;
     state.structures.toolshed = true;
     state.progress.discoveries.basket = true;
@@ -36,7 +36,7 @@ describe('field journal', () => {
     expect(journalView(state).milestones).toEqual([]);
   });
 
-  it('uses the rescheduled cold front day after a missed storm', () => {
+  it('uses the rescheduled cold night day after a missed storm', () => {
     const state = createGame();
     state.day = 4;
     state.structures.shelter = true;
@@ -55,7 +55,7 @@ describe('field journal', () => {
     expect(journalView(state).milestones.find(item => item.label === 'Find the old quarry')?.done).toBe(true);
   });
 
-  it('the hint suggests the toolshed after the cold front', () => {
+  it('the hint suggests the toolshed after the cold night', () => {
     const state = createGame();
     state.structures.shelter = true;
     state.progress.hearthUnlocked = true;

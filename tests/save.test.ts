@@ -361,7 +361,7 @@ describe('the year journal in the save', () => {
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;
   };
-  /** A valid game on this day: the first cold front still due, or long weathered. */
+  /** A valid game on this day: the first cold night still due, or long weathered. */
   const onDay = (day: number) => {
     const state = { ...createGame(), day };
     state.progress = day > 3 ? { ...state.progress, nextStormDay: null, hearthUnlocked: true } : state.progress;

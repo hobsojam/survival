@@ -56,7 +56,7 @@ export function trailFoodBlocker(state: GameState): string | null {
 export function lookoutRepairBlocker(state: GameState): string | null {
   if (state.area !== 'camp') return 'There is nothing like that here.';
   if (state.progress.lookoutRepaired) return 'The lookout is already restored.';
-  if (!state.progress.hearthUnlocked) return 'Weather the cold front before repairing the lookout.';
+  if (!state.progress.hearthUnlocked) return 'Weather the cold night before repairing the lookout.';
   if (!near(state.player.x, state.player.y, LOOKOUT.x, LOOKOUT.y)) return 'Stand beside the lookout to repair it.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   const { wood, fiber, stone } = LOOKOUT.cost;
@@ -73,7 +73,7 @@ export function isColdNight(state: GameState): boolean {
   return state.progress.nextStormDay === state.day && state.timeOfDay >= nightStart(state.day);
 }
 
-/** The forecast front's night, or any winter night: the fire burns fast and the cold bites. */
+/** The forecast cold night, or any winter night: the fire burns fast and the cold bites. */
 export function isFreezingNight(state: GameState): boolean {
   return isColdNight(state) || (isWinter(state.day) && state.timeOfDay >= nightStart(state.day));
 }
@@ -210,7 +210,7 @@ function warmthChange(state: GameState, step: number, camp: boolean, coldNight: 
   if (camp && !lit && state.structures.windbreak) change *= 0.5;
   // A fur cloak keeps a quarter of the night's chill off, wherever the survivor is.
   if (state.companion.cloak && state.timeOfDay >= nightStart(state.day)) change *= BALANCE.cloakWarmthLoss;
-  // Summer nights are warm, except the forecast front's.
+  // Summer nights are warm, except the forecast cold night.
   return isSummer(state.day) && !coldNight ? Math.max(0, change) : change;
 }
 
@@ -313,7 +313,7 @@ const gather: ActionHandler<'gather'> = (state, action) => {
 
 export function axeBlocker(state: GameState): string | null {
   if (state.progress.axeCrafted) return 'You already have a stone axe.';
-  if (!state.progress.hearthUnlocked) return 'Weather the cold front before crafting an axe.';
+  if (!state.progress.hearthUnlocked) return 'Weather the cold night before crafting an axe.';
   if (!state.structures.toolshed) return 'Build a toolshed first.';
   if (!isAtCamp(state)) return 'Return to camp to craft the axe.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;

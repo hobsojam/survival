@@ -17,7 +17,7 @@ describe('time-of-day lighting', () => {
     expect(lightingTint({ ...state, timeOfDay: 160 })).toEqual({ color: rgb(palette.night), alpha: 0 });
   });
 
-  it('reaches 55% at ordinary night and 64% during a cold front', () => {
+  it('reaches 55% at ordinary night and 64% during a cold night', () => {
     expect(lightingTint({ ...state, timeOfDay: 190 })).toEqual({ color: rgb(palette.night), alpha: 0.55 });
     const storm = { ...state, day: 3, timeOfDay: 204, progress: { ...state.progress, nextStormDay: 3 } };
     expect(lightingTint(storm)).toEqual({ color: rgb(palette.storm), alpha: 0.64 });
@@ -80,7 +80,7 @@ describe('lighting through the year', () => {
 });
 
 describe('winter night tint', () => {
-  it('tints every winter night like the cold front, and autumn nights as plain night', () => {
+  it('tints every winter night like the cold night, and autumn nights as plain night', () => {
     const base = createGame();
     const winter = { ...base, day: 12, timeOfDay: nightStart(12) + 15, progress: { ...base.progress, hearthUnlocked: true, nextStormDay: null } };
     expect(lightingTint(winter)).toEqual({ color: rgb(palette.storm), alpha: darkness(12, nightStart(12) + 15) * 0.64 });

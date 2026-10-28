@@ -37,7 +37,7 @@ describe('phase 5 scene effects', () => {
     expect(effectVisuals(state, 3000, events).some(visual => visual.id.startsWith('event:'))).toBe(false);
   });
 
-  it('restricts wind and sleet to a cold front and keeps every position integral', () => {
+  it('restricts wind and sleet to a cold night and keeps every position integral', () => {
     const storm = { ...state, day: 3, timeOfDay: 190, progress: { ...state.progress, nextStormDay: 3 } };
     const visuals = effectVisuals(storm, 2000, []);
     expect(visuals.some(visual => visual.texture.startsWith('windStreak:'))).toBe(true);
@@ -62,7 +62,7 @@ describe('phase 5 scene effects', () => {
     expect(effectVisuals(quarry, 1000, [event('frost')]).some(visual => visual.texture.startsWith('morningFrost:'))).toBe(false);
   });
 
-  it('fades optional morning frost after a failed front without changing state', () => {
+  it('fades optional morning frost after a failed cold night without changing state', () => {
     const before = structuredClone(state);
     const frost = [event('frost')];
     expect(effectVisuals(state, 1000, frost).filter(visual => visual.texture.startsWith('morningFrost:'))).toHaveLength(3);

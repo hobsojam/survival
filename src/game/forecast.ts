@@ -14,7 +14,7 @@ export interface StormReadiness {
   storm: boolean;
 }
 
-/** Plain logs that last the cold front's whole night on that day at double burn. Nights lengthen toward winter. */
+/** Plain logs that last the whole cold night on that day at double burn. Nights lengthen toward winter. */
 export function logsForColdNight(day: number): number {
   return Math.ceil((BALANCE.daySeconds - nightStart(day)) * BALANCE.coldNightFireBurn / BALANCE.fireSecondsPerWood);
 }
@@ -22,7 +22,7 @@ export function logsForColdNight(day: number): number {
 export const secondsPerLog = (state: GameState) =>
   state.structures.hearth ? BALANCE.hearthFireSecondsPerWood : BALANCE.fireSecondsPerWood;
 
-/** The freezing night the forecast plans for: the cold front's while one is pending, otherwise tonight's. */
+/** The freezing night the forecast plans for: the cold night while one is pending, otherwise tonight's. */
 const plannedNight = (state: GameState): number => state.progress.nextStormDay ?? state.day;
 
 /** Fuel the fire burns from now until nightfall: a second a second, and half again for the part in a shower. */

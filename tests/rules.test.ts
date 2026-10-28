@@ -4,7 +4,7 @@ import { QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { FULL_BAG_MESSAGE, advanceTime, isAtCamp, isColdNight, isFreezingNight, applyAction, buildStatus, carriedCount, freeSpaces, lookoutRepairBlocker, pickaxeBlocker, sleepBlocker } from '../src/game/rules';
 import { nightStart, seasonMessage } from '../src/game/calendar';
 
-// Night falls at 181 s on day 1, and the day-three cold front's night starts at 174 s.
+// Night falls at 181 s on day 1, and the day-three cold night's night starts at 174 s.
 const NIGHT = nightStart(1);
 const STORM_NIGHT = nightStart(3);
 const STORM_LENGTH = BALANCE.daySeconds - STORM_NIGHT;
@@ -148,11 +148,11 @@ describe('lookout repair', () => {
     return state;
   };
 
-  it('requires a weathered cold front and proximity to the lookout', () => {
+  it('requires a weathered cold night and proximity to the lookout', () => {
     const state = readyCamp();
     const locked = applyAction(state, { type: 'repairLookout' });
     expect(locked.state).toBe(state);
-    expect(locked.message).toMatch(/cold front/i);
+    expect(locked.message).toMatch(/cold night/i);
     state.progress.hearthUnlocked = true;
     state.progress.nextStormDay = null;
     state.player.x = 20;
@@ -184,7 +184,7 @@ describe('lookout repair', () => {
 });
 
 describe('stone axe and tree chopping', () => {
-  it('crafts the axe at camp after the cold front using one of each material', () => {
+  it('crafts the axe at camp after the cold night using one of each material', () => {
     const state = createGame();
     state.inventory.wood = 1;
     state.inventory.fiber = 1;
@@ -635,7 +635,7 @@ describe('more camp structures', () => {
     expect(advanceTime(state, 4).player.warmth).toBe(78);
   });
 
-  it('halves warmth loss during a cold front without changing its retry rule', () => {
+  it('halves warmth loss during a cold night without changing its retry rule', () => {
     const state = createGame();
     state.day = 3;
     state.timeOfDay = STORM_NIGHT + 10;
@@ -648,7 +648,7 @@ describe('more camp structures', () => {
 });
 
 describe('forecast cold night', () => {
-  it('forecasts day three and starts the front only at nightfall', () => {
+  it('forecasts day three and starts the cold night only at nightfall', () => {
     const state = createGame();
     expect(state.progress).toMatchObject({ nextStormDay: 3, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false });
     state.day = 3;
@@ -1070,7 +1070,7 @@ describe('the second area', () => {
     expect(applyAction(state, { type: 'repairLookout' }).message).toBe('There is nothing like that here.');
   });
 
-  it('the cold front counts the quarry as away from camp', () => {
+  it('the cold night counts the quarry as away from camp', () => {
     const make = (area: 'camp' | 'quarry') => {
       const state = createGame();
       state.area = area;
@@ -1309,7 +1309,7 @@ describe('shelter upgrades', () => {
     expect(finished.inventory.fiber).toBe(0);
   });
 
-  it('reduces ordinary sheltered warmth loss but leaves cold-front and lit-fire warmth unchanged', () => {
+  it('reduces ordinary sheltered warmth loss but leaves cold-night and lit-fire warmth unchanged', () => {
     const state = createGame();
     state.timeOfDay = NIGHT + 10;
     state.player.warmth = 80;
@@ -1342,7 +1342,7 @@ describe('night through the year', () => {
     expect(sleepBlocker(sheltered(36, 160))).toMatch(/once night falls/);
   });
 
-  it('starts the day-three cold front at that day’s nightfall', () => {
+  it('starts the day-three cold night at that day’s nightfall', () => {
     expect(isColdNight(sheltered(3, 170))).toBe(false);
     expect(isColdNight(sheltered(3, 175))).toBe(true);
   });
@@ -1374,7 +1374,7 @@ describe('winter nights', () => {
     expect(away.player.warmth).toBeCloseTo(80 - 12.5);
   });
 
-  it('gives winter nights no penalty, but keeps the front\'s', () => {
+  it('gives winter nights no penalty, but keeps the cold night\'s', () => {
     const dawn = advanceTime({ ...winterNight, timeOfDay: 239, player: { ...winterNight.player, energy: 90 } }, 2);
     expect(dawn).toMatchObject({ day: 13, progress: { nextStormDay: null } });
     expect(dawn.timeOfDay).toBeCloseTo(1);
@@ -1439,7 +1439,7 @@ describe('summer', () => {
     expect(advanceTime(night(34, 60, false, { fireFuel: 50 }), 10).player.warmth).toBeCloseTo(65);
   });
 
-  it('keeps the forecast cold front cold, even in summer', () => {
+  it('keeps the forecast cold night cold, even in summer', () => {
     const front = night(33, 60, true, { progress: { ...base.progress, nextStormDay: 33 } });
     expect(advanceTime(front, 10).player.warmth).toBeLessThan(60);
   });
