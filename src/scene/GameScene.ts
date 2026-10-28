@@ -11,7 +11,6 @@ import { AmbientLife } from './ambientLife';
 import { registerSpriteTextures } from '../art/textures';
 import { season, type Season } from '../game/calendar';
 import { seasonPalette } from '../art/seasonPalette';
-import { LOGICAL_WIDTH, LOGICAL_HEIGHT } from './pixelScale';
 import { facingFromInput, selectSurvivorVisual, type Facing, type SurvivorAction } from './survivorVisual';
 import { SceneEffects } from './SceneEffects';
 import { SceneLighting } from './SceneLighting';
@@ -64,7 +63,8 @@ export class GameScene extends Phaser.Scene {
     this.areaShown = this.state.area;
     this.cameras.main.setZoom(1);
     this.cameras.main.roundPixels = true;
-    this.lighting = new SceneLighting(this, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+    // The phone viewport can be set before the scene boots, so take the size the game already has.
+    this.lighting = new SceneLighting(this, this.scale.gameSize.width, this.scale.gameSize.height);
     this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,T,P,C,G,Z,L,O,X,V') as Record<string, Phaser.Input.Keyboard.Key>;
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       // Right and middle clicks don't walk; touches report button 0.
