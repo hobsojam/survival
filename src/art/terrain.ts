@@ -1,7 +1,7 @@
 import type { SpriteDef } from './sprites';
 import type { PaletteKey } from './palette';
 import { BALANCE } from '../game/state';
-import { CAMP_OPEN_PATHS, CAMP_PATHS, pathDistance, type PathRoute } from '../scene/mapGeometry';
+import { CAMP_OPEN_PATHS, CAMP_PATHS, QUARRY_PATHS, pathDistance, type PathRoute } from '../scene/mapGeometry';
 
 type Grid = string[][];
 const blank = (w: number, h: number, fill = '.'): Grid => Array.from({ length: h }, () => Array.from({ length: w }, () => fill));
@@ -127,7 +127,7 @@ function pathSpriteFor(g: Grid): string {
   return name;
 }
 // Build every area's paths up front so their sprites are registered as textures with the rest.
-for (const routes of [CAMP_PATHS, CAMP_OPEN_PATHS]) pathTiles(routes);
+for (const routes of [CAMP_PATHS, CAMP_OPEN_PATHS, QUARRY_PATHS]) pathTiles(routes);
 
 export function pathTile(x: number, y: number, destinations: readonly PathRoute[]): string | undefined {
   return pathTiles(destinations).get(`${x},${y}`);
@@ -197,3 +197,52 @@ for (let i = 0; i < 2; i++) {
   rect(g, 4, 6, 3, 1, 'd'); dot(g, 5, 6, 'e');
   terrainSprites[`rock${i}`] = sprite(g, rockLegend);
 }
+
+const rows = (lines: readonly string[]): Grid => lines.map(line => [...line]);
+
+/** A signpost's board, arrow pointing east, with a little campfire painted beside it. */
+const SIGN_TO_CAMP = [
+  '................',
+  '.oooooooooooooo.',
+  '.oWWrWWWWWkWWWo.',
+  '.oWrOrWWWWkkWWo.',
+  '.oWrOrkkkkkkkWo.',
+  '.oWrYrWWWWkkWWo.',
+  '.oWdddWWWWkWWWo.',
+  '.oooooooooooooo.',
+  ...Array.from({ length: 7 }, () => '.......dD.......'),
+  '.....tdddDt.....',
+  '......tttt......'
+];
+const signLegend = { o: 'wood1', W: 'wood3', k: 'wood0', d: 'wood2', D: 'wood1', t: 'shadow' } as const;
+terrainSprites.signpostCamp = sprite(rows(SIGN_TO_CAMP), { ...signLegend, r: 'fire1', O: 'fire2', Y: 'fire3' });
+// At camp the board turns round to point west, and its picture is a heap of quarried stone.
+const SIGN_TO_QUARRY = SIGN_TO_CAMP.map((line, y) => (y < 8 ? [...line].reverse().join('').replace(/d/g, 's') : line));
+terrainSprites.signpostQuarry = sprite(rows(SIGN_TO_QUARRY), { ...signLegend, r: 'stone1', O: 'stone3', Y: 'stone2', s: 'stone0' });
+
+const boulderLegend = { k: 'stone0', L: 'stone3', M: 'stone2', D: 'stone1', t: 'shadow' } as const;
+/** A big boulder lit from the top left, and a pair of smaller rocks. */
+terrainSprites.boulder0 = sprite(rows([
+  '................',
+  '......kkkk......',
+  '....kkLLLLkk....',
+  '...kLLLLLLMMk...',
+  '..kLLLMMMMMMMk..',
+  '..kLMMMMMMMMDk..',
+  '.kMMMMMMMMMDDDk.',
+  '.kMMMMMMMDDDDDk.',
+  '.kDMMMMDDDDDDDk.',
+  '..kkDDDDDDDDkk..',
+  '..ttkkkkkkkktt..',
+  '....tttttttt....'
+]), boulderLegend);
+terrainSprites.boulder1 = sprite(rows([
+  '................',
+  '...kkk..........',
+  '..kLLMk...kkk...',
+  '.kLMMMDk.kLMMk..',
+  '.kMMMDDkkLMMDk..',
+  '.kDDDDDkkMDDDk..',
+  '..kkkkk..kkkk...',
+  '..ttttttttttt...'
+]), boulderLegend);

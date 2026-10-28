@@ -48,5 +48,6 @@ export function drawTerrain(scene: Phaser.Scene, state: GameState): Phaser.GameO
   // The camp's choppable trees are drawn as objects of their own.
   const chopTargets = camp ? state.trees : [];
   objects.push(...map.trees.filter(tree => !chopTargets.some(target => target.x === tree.x && target.y === tree.y)).map(standing));
+  objects.push(...map.signs.map(standing));
   return objects;
 }
