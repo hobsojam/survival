@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BALANCE, type GameState } from '../game/state';
 import { newsBetween } from '../game/news';
+import { coldNightMessage } from '../game/coldNight';
 import { recordJournal } from '../game/journalEntries';
 import { advanceTime, applyAction, isColdNight, type GameAction } from '../game/rules';
 import { TILE, worldX, worldY, drawTerrain } from './art';
@@ -14,6 +15,7 @@ import { seasonPalette } from '../art/seasonPalette';
 import { facingFromInput, selectSurvivorVisual, type Facing, type SurvivorAction } from './survivorVisual';
 import { SceneEffects } from './SceneEffects';
 import { SceneLighting } from './SceneLighting';
+import { SLEEP_REPLAY_MS, replayFrame, replaysSleep } from './sleepReplay';
 import { hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from './tapTarget';
 import { palette } from '../art/palette';
 import type { SoundCue } from '../game/soundscape';
@@ -42,6 +44,9 @@ export class GameScene extends Phaser.Scene {
   private seasonPainted: Season | null = null;
   private areaShown = '';
   private needsArmed: ReadonlySet<NeedAlert> = new Set(ALL_NEED_ALERTS);
+  /** A sleep through the cold night being played out, and the morning the rules already worked out for it. */
+  private sleepReplay: { before: GameState; after: GameState; message: string; journal: string[]; startedAtMs: number } | null = null;
+  private sunriseAtMs = -Infinity;
 
   constructor(state: GameState, onStateChange: (state: GameState, cause: 'action' | 'tick') => void, onFeedback: (message: string) => void, onSound: (cue: SoundCue) => void = () => undefined) {
     super({ key: 'GameScene' });
@@ -78,6 +83,12 @@ export class GameScene extends Phaser.Scene {
     if (document.hidden || !this.keys) return;
     if (shownTerrainKey(this.state) !== this.terrainShown) this.redrawTerrain();
     const dt = Math.min(delta / 1000, 0.05);
+    if (this.sleepReplay) {
+      // No input while the night plays out; the clock and the fire run on their own.
+      this.playSleep(this.sleepReplay);
+      this.paintScene(false, dt, delta);
+      return;
+    }
     const walking = this.walkFromKeys(dt);
     const tapWalking = this.walkTowardTarget(dt);
     this.handleActionKeys();
@@ -85,16 +96,35 @@ export class GameScene extends Phaser.Scene {
     const written = recordJournal(beforeTick, advanceTime(this.state, dt));
     this.state = written.state;
     this.reportWeather(beforeTick, this.state, written.messages);
-    this.syncPlayerSprite(walking || tapWalking);
+    this.paintScene(walking || tapWalking, dt, delta);
+  }
+
+  /** Draws the survivor, the camp, the wildlife, the effects and the light, and refreshes the HUD every quarter second. */
+  private paintScene(moving: boolean, dt: number, delta: number): void {
+    this.syncPlayerSprite(moving);
     this.paintObjects();
     this.ambient.update(this.state, dt, this.time.now);
     this.effects.update(this.state, this.time.now);
-    this.lighting.update(this.state, this.time.now);
+    this.lighting.update(this.state, this.time.now, this.time.now - this.sunriseAtMs);
     this.hudElapsed += delta;
     if (this.hudElapsed >= 250) {
       this.onStateChange(this.state, 'tick');
       this.hudElapsed = 0;
     }
+  }
+
+  /** Shows the next moment of a sleep through the cold night, and wakes to the real morning once it has played out. */
+  private playSleep(replay: NonNullable<GameScene['sleepReplay']>): void {
+    const elapsed = this.time.now - replay.startedAtMs;
+    if (elapsed < SLEEP_REPLAY_MS) {
+      this.state = replayFrame(replay.before, replay.after, elapsed);
+      return;
+    }
+    this.sleepReplay = null;
+    this.state = replay.after;
+    this.showDawn(replay.before, this.state);
+    this.say(coldNightMessage(replay.before, this.state) ?? replay.message, ...newsBetween(replay.before, this.state), ...replay.journal, this.needsAlert());
+    this.onStateChange(this.state, 'action');
   }
 
   /** Moves the survivor by the held arrow or WASD keys and reports whether any were held. */
@@ -154,16 +184,21 @@ export class GameScene extends Phaser.Scene {
 
   perform(action: GameAction, announce = true): void {
     // The sidebar's buttons still click while the game is paused; nothing should happen.
-    if (this.scene.isPaused()) return;
+    if (this.scene.isPaused() || this.sleepReplay) return;
     if (action.type !== 'move') this.walkTarget = nextWalk(this.walkTarget, { kind: 'action' });
     const before = this.state;
     const result = applyAction(before, action);
     const written = recordJournal(before, result.state, action);
+    if (replaysSleep(before, written.state, action)) {
+      this.sleepReplay = { before, after: written.state, message: result.message, journal: written.messages, startedAtMs: this.time.now };
+      this.onFeedback('You bed down by the fire as the cold night blows in…');
+      return;
+    }
     this.state = written.state;
-    this.showMorningFrost(before, this.state);
+    this.showDawn(before, this.state);
     if (result.state !== before) this.showActionDone(action, before);
     if (action.type === 'gather') this.noteBerryPicked(action.nodeId, before);
-    const message = this.weatherMessage(before, this.state) ?? (announce ? result.message : '');
+    const message = coldNightMessage(before, this.state) ?? (announce ? result.message : '');
     this.say(message, ...newsBetween(before, this.state), ...written.messages, this.needsAlert());
     if (announce) {
       this.onStateChange(this.state, 'action');
@@ -288,17 +323,9 @@ export class GameScene extends Phaser.Scene {
     for (const [id, image] of this.objects) if (!shown.has(id)) { image.destroy(); this.objects.delete(id); }
   }
 
-  private weatherMessage(before: GameState, after: GameState): string | null {
-    if (!isColdNight(before) && isColdNight(after)) return 'The cold night has arrived. Keep the fire alive until dawn.';
-    if (isColdNight(before) && !isColdNight(after)) return after.progress.hearthUnlocked
-      ? 'You weathered the cold night! The stone hearth is now unlocked.'
-      : `The fire did not last. Recover today; another cold night comes on day ${after.progress.nextStormDay}.`;
-    return null;
-  }
-
   private reportWeather(before: GameState, after: GameState, journal: string[] = []): void {
-    this.showMorningFrost(before, after);
-    this.say(this.weatherMessage(before, after), ...newsBetween(before, after), ...journal, this.needsAlert());
+    this.showDawn(before, after);
+    this.say(coldNightMessage(before, after), ...newsBetween(before, after), ...journal, this.needsAlert());
   }
 
   /** The tired or hungry warning due now, if a meter just reached its line. */
@@ -313,8 +340,10 @@ export class GameScene extends Phaser.Scene {
     if (text) this.onFeedback(text);
   }
 
-  private showMorningFrost(before: GameState, after: GameState): void {
-    if (isColdNight(before) && !isColdNight(after) && !after.progress.hearthUnlocked)
-      this.effects.trigger('frost', this.time.now, BALANCE.campX, BALANCE.campY);
+  /** The dawn after the cold night: a warm sunrise if the fire held, frost on the ground if it didn't. */
+  private showDawn(before: GameState, after: GameState): void {
+    if (!isColdNight(before) || isColdNight(after)) return;
+    if (after.progress.hearthUnlocked) this.sunriseAtMs = this.time.now;
+    else this.effects.trigger('frost', this.time.now, BALANCE.campX, BALANCE.campY);
   }
 }

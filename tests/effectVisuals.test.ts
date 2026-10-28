@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createGame } from '../src/game/state';
 import { effectVisuals, type EffectEvent } from '../src/scene/effectVisuals';
 import { sprites } from '../src/art/sprites';
-import { nightStart } from '../src/game/calendar';
+import { afternoonStart, nightStart } from '../src/game/calendar';
 
 const state = createGame();
 
@@ -37,11 +37,11 @@ describe('phase 5 scene effects', () => {
     expect(effectVisuals(state, 3000, events).some(visual => visual.id.startsWith('event:'))).toBe(false);
   });
 
-  it('restricts wind and sleet to a cold night and keeps every position integral', () => {
+  it('restricts wind and snow to a cold night and keeps every position integral', () => {
     const storm = { ...state, day: 3, timeOfDay: 190, progress: { ...state.progress, nextStormDay: 3 } };
     const visuals = effectVisuals(storm, 2000, []);
     expect(visuals.some(visual => visual.texture.startsWith('windStreak:'))).toBe(true);
-    expect(visuals.some(visual => visual.texture === 'sleetFleck:still')).toBe(true);
+    expect(visuals.some(visual => visual.texture.startsWith('snowFlake:'))).toBe(true);
     expect(effectVisuals(state, 2000, []).some(visual => visual.id.startsWith('weather:'))).toBe(false);
     for (const visual of visuals) {
       expect(Number.isInteger(visual.x), visual.id).toBe(true);
@@ -51,8 +51,34 @@ describe('phase 5 scene effects', () => {
       const visible = effectVisuals(storm, timeMs, []).filter(effect =>
         effect.x >= 80 && effect.x < 560 && effect.y >= 90 && effect.y < 390);
       expect(visible.filter(effect => effect.id.startsWith('weather:wind:')).length).toBeGreaterThanOrEqual(9);
-      expect(visible.filter(effect => effect.id.startsWith('weather:sleet:')).length).toBeGreaterThanOrEqual(18);
+      expect(visible.filter(effect => effect.id.startsWith('weather:snow:')).length).toBeGreaterThanOrEqual(25);
     }
+  });
+
+  it('blows snow thick and bold enough to see on the cold night', () => {
+    const storm = { ...state, day: 3, timeOfDay: 190, progress: { ...state.progress, nextStormDay: 3 } };
+    const snow = effectVisuals(storm, 2000, []).filter(effect => effect.id.startsWith('weather:snow:'));
+    expect(snow.length).toBeGreaterThanOrEqual(60);
+    expect(snow.every(effect => effect.alpha >= 0.8)).toBe(true);
+    expect(effectVisuals(storm, 2000, []).filter(effect => effect.id.startsWith('weather:wind:')).every(effect => effect.alpha >= 0.5)).toBe(true);
+  });
+
+  it('raises the wind through the cold night\'s afternoon, before any snow', () => {
+    const coldDay = (timeOfDay: number) => ({ ...state, day: 3, timeOfDay, progress: { ...state.progress, nextStormDay: 3 } });
+    const windAlpha = (timeOfDay: number) => Math.max(0, ...effectVisuals(coldDay(timeOfDay), 2000, [])
+      .filter(effect => effect.id.startsWith('weather:wind:')).map(effect => effect.alpha));
+    const from = afternoonStart(3), to = nightStart(3);
+    expect(windAlpha(from - 1)).toBe(0);
+    expect(windAlpha(from + (to - from) / 4)).toBeGreaterThan(0);
+    expect(windAlpha(from + (to - from) / 4)).toBeLessThan(windAlpha(to - 1));
+    expect(effectVisuals(coldDay(from + (to - from) / 4), 2000, []).some(effect => effect.id.startsWith('weather:snow:'))).toBe(false);
+  });
+
+  it('streams the fire\'s smoke sideways in the cold night\'s wind', () => {
+    const smoke = (s: typeof state) => effectVisuals({ ...s, fireFuel: 100 }, 500, []).filter(effect => effect.id.startsWith('fire:smoke:'));
+    const calm = smoke({ ...state, timeOfDay: 100 });
+    const windy = smoke({ ...state, day: 3, timeOfDay: 190, progress: { ...state.progress, nextStormDay: 3 } });
+    expect(windy[0].x - calm[0].x).toBeGreaterThanOrEqual(4);
   });
 
   it('keeps the camp fire effects and morning frost out of the quarry', () => {
@@ -85,7 +111,7 @@ describe('phase 5 scene effects', () => {
 });
 
 describe('winter weather', () => {
-  it('blows sleet across every winter night, and not across autumn nights', () => {
+  it('blows snow across every winter night, and not across autumn nights', () => {
     const weathered = { ...state.progress, hearthUnlocked: true, nextStormDay: null };
     const winter = { ...state, day: 12, timeOfDay: nightStart(12) + 5, progress: weathered };
     expect(effectVisuals(winter, 0, []).some(visual => visual.id.startsWith('weather:'))).toBe(true);
@@ -99,7 +125,7 @@ describe('spring rain', () => {
     const shower = { ...state, day: 22, timeOfDay: 40 };
     const visuals = effectVisuals(shower, 0, []);
     expect(visuals.filter(visual => visual.id.startsWith('weather:rain:'))).toHaveLength(40);
-    expect(visuals.some(visual => visual.id.startsWith('weather:sleet'))).toBe(false);
+    expect(visuals.some(visual => visual.id.startsWith('weather:snow'))).toBe(false);
     expect(visuals.every(visual => !visual.id.startsWith('weather:rain:') || visual.texture === 'rainStreak:still')).toBe(true);
     expect(effectVisuals({ ...shower, timeOfDay: 80 }, 0, []).some(visual => visual.id.startsWith('weather:rain:'))).toBe(false);
     // The streaks fade in with the shower's first seconds, and are bold once it's falling.

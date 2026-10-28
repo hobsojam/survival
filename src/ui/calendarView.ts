@@ -1,15 +1,21 @@
 import { BALANCE, type GameState } from '../game/state';
 import { YEAR_LENGTH, daysLeftInSeason, nightStart, season, seasonName, type Season } from '../game/calendar';
 import { dayPhase, formatClock, nextChange, type DayPhase } from '../game/clock';
+import { isColdNight, isFreezingNight } from '../game/rules';
+import { journalIconUrl } from '../art/journalIcons';
 
 const YEAR: readonly Season[] = ['autumn', 'winter', 'spring', 'summer'];
 
 export interface DayPillView {
   season: string;
   day: string;
-  phase: DayPhase;
+  phase: DayPhase | 'Cold night';
   countdown: string;
   night: boolean;
+  /** The autumn cold night: the pill names it and wears a snowflake. */
+  cold: boolean;
+  /** Any freezing night, the cold night or a bitter winter one: frost creeps in round the view. */
+  frosty: boolean;
   handPercent: number;
   nightPercent: number;
 }
@@ -17,12 +23,15 @@ export interface DayPillView {
 export function dayPillView(state: GameState): DayPillView {
   const phase = dayPhase(state.timeOfDay, state.day);
   const change = nextChange(state.timeOfDay, state.day);
+  const cold = isColdNight(state);
   return {
     season: seasonName(season(state.day)),
     day: `Day ${state.day}`,
-    phase,
+    phase: cold ? 'Cold night' : phase,
     countdown: `${change.event} in ${formatClock(change.seconds)}`,
     night: phase === 'Night',
+    cold,
+    frosty: isFreezingNight(state),
     handPercent: state.timeOfDay / BALANCE.daySeconds * 100,
     nightPercent: nightStart(state.day) / BALANCE.daySeconds * 100
   };
@@ -66,6 +75,10 @@ export function renderDayPill(root: CalendarRoot, view: DayPillView): void {
   setText(root, '#day-phase', view.phase);
   setText(root, '#day-countdown', view.countdown);
   root.querySelector('#day-pill')?.classList.toggle('night', view.night);
+  root.querySelector('#day-pill')?.classList.toggle('cold', view.cold);
+  root.querySelector('.game-frame')?.classList.toggle('frosty', view.frosty);
+  // The snowflake shows on phones too, where the phase's name is hidden for room.
+  if (view.cold) root.querySelector('#day-cold')?.setAttribute('style', `background-image: url("${journalIconUrl('coldFront')}")`);
   const hand = root.querySelector('#day-dial-hand');
   if (hand) hand.style.left = `${view.handPercent}%`;
   const night = root.querySelector('#day-dial-night');

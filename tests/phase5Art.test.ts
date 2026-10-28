@@ -10,7 +10,7 @@ const required: Record<string, { size: [number, number]; frames: string[] }> = {
   smokePuff: { size: [8, 8], frames: ['puff0', 'puff1', 'puff2'] },
   spark: { size: [1, 1], frames: ['still'] },
   windStreak: { size: [12, 3], frames: ['streak0', 'streak1', 'streak2'] },
-  sleetFleck: { size: [2, 1], frames: ['still'] },
+  snowFlake: { size: [3, 3], frames: ['big', 'small'] },
   cookSteam: { size: [4, 6], frames: ['steam0', 'steam1', 'steam2'] },
   shootingStar: { size: [6, 2], frames: ['star0', 'star1', 'star2'] },
   morningFrost: { size: [16, 16], frames: ['frost0', 'frost1', 'frost2'] }

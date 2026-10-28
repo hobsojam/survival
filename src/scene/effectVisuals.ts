@@ -1,6 +1,7 @@
 import { BALANCE, type GameState, type ResourceKind } from '../game/state';
 import { isFreezingNight } from '../game/rules';
 import { rainFade } from '../game/rain';
+import { coldNightApproach } from '../game/coldNight';
 import { TILE, worldX, worldY } from './art';
 import { GROUND_DECAL_DEPTH, LIGHT_DEPTH, WEATHER_DEPTH } from './visuals';
 
@@ -27,8 +28,11 @@ const visual = (id: string, texture: string, x: number, y: number, depth: number
 
 export function effectVisuals(state: GameState, timeMs: number, events: EffectEvent[]): EffectVisual[] {
   const results: EffectVisual[] = [];
-  if (state.area === 'camp' && state.fireFuel > 0) results.push(...fireVisuals(timeMs));
-  if (isFreezingNight(state)) results.push(...weatherVisuals(timeMs));
+  // The wind rises through the cold night's afternoon; once a freezing night falls the snow comes with it.
+  const freezing = isFreezingNight(state);
+  const wind = freezing ? 1 : coldNightApproach(state);
+  if (state.area === 'camp' && state.fireFuel > 0) results.push(...fireVisuals(timeMs, wind));
+  if (wind > 0) results.push(...weatherVisuals(timeMs, wind, freezing));
   const shower = rainFade(state);
   if (shower > 0) results.push(...rainVisuals(timeMs, shower));
   events.forEach((event, index) => {
@@ -38,8 +42,8 @@ export function effectVisuals(state: GameState, timeMs: number, events: EffectEv
   return results;
 }
 
-/** Smoke puffs and sparks rising from the camp fire. */
-function fireVisuals(timeMs: number): EffectVisual[] {
+/** Smoke puffs and sparks rising from the camp fire, streaming sideways as the wind gets up. */
+function fireVisuals(timeMs: number, wind: number): EffectVisual[] {
   const results: EffectVisual[] = [];
   const fireX = Math.round(worldX(BALANCE.campX));
   const fireY = Math.round(worldY(BALANCE.campY));
@@ -47,35 +51,38 @@ function fireVisuals(timeMs: number): EffectVisual[] {
     const age = wrap(timeMs + i * 700, 1400);
     if (age >= 1000) continue;
     const frame = Math.min(2, Math.floor(age / 334));
-    const x = fireX - 3 + i * 4 + Math.floor(age / 400);
+    const x = fireX - 3 + i * 4 + Math.floor(age / 400) + Math.round(wind * (4 + age / 60));
     const y = fireY - 11 - Math.floor(age / 110);
     results.push(visual(`fire:smoke:${i}`, `smokePuff:puff${frame}`, x, y, fireY + 1, (1 - age / 1300) * 0.65));
   }
   for (let i = 0; i < 2; i++) {
     const age = wrap(timeMs + i * 450, 900);
     if (age >= 350) continue;
-    const x = fireX - 3 + i * 5 + Math.floor(age / 140);
+    const x = fireX - 3 + i * 5 + Math.floor(age / 140) + Math.round(wind * age / 30);
     const y = fireY - 9 - Math.floor(age / 70);
     results.push(visual(`fire:spark:${i}`, 'spark:still', x, y, LIGHT_DEPTH + 0.2, 1 - age / 400));
   }
   return results;
 }
 
-/** Wind streaks and sleet blowing across the whole map on the cold night. */
-function weatherVisuals(timeMs: number): EffectVisual[] {
+/** Wind streaks across the whole map, as strong as the wind is, and on a freezing night thick snow blowing with them. */
+function weatherVisuals(timeMs: number, wind: number, snowing: boolean): EffectVisual[] {
   const results: EffectVisual[] = [];
   const width = BALANCE.mapWidth * TILE;
   const height = BALANCE.mapHeight * TILE;
-  for (let i = 0; i < 20; i++) {
-    const x = wrap(i * 83 - Math.floor(timeMs / 36), width);
+  for (let i = 0; i < 24; i++) {
+    const x = wrap(i * 83 - Math.floor(timeMs / 30), width);
     const y = wrap(i * 47 + Math.floor(timeMs / 300), height);
     const frame = Math.floor(timeMs / 125 + i) % 3;
-    results.push(visual(`weather:wind:${i}`, `windStreak:streak${frame}`, x, y, WEATHER_DEPTH, 0.32));
+    results.push(visual(`weather:wind:${i}`, `windStreak:streak${frame}`, x, y, WEATHER_DEPTH, 0.6 * wind));
   }
-  for (let i = 0; i < 40; i++) {
-    const x = wrap(i * 137 - Math.floor(timeMs / 20), width);
-    const y = wrap(i * 61 + Math.floor(timeMs / 10), height);
-    results.push(visual(`weather:sleet:${i}`, 'sleetFleck:still', x, y, WEATHER_DEPTH, 0.48));
+  if (!snowing) return results;
+  for (let i = 0; i < 90; i++) {
+    // Big flakes fall a little slower than small ones, so the snow has some depth.
+    const big = i % 3 === 0;
+    const x = wrap(i * 137 - Math.floor(timeMs / (big ? 24 : 16)), width);
+    const y = wrap(i * 61 + Math.floor(timeMs / (big ? 16 : 11)), height);
+    results.push(visual(`weather:snow:${i}`, `snowFlake:${big ? 'big' : 'small'}`, x, y, WEATHER_DEPTH, big ? 0.95 : 0.85));
   }
   return results;
 }
