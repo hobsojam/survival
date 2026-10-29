@@ -62,9 +62,9 @@ describe('terrain composition', () => {
   it('places fallen branches beside trees while keeping starter wood near camp', () => {
     const branches = nodes.filter(node => node.kind === 'branch');
     const trees = buildMap(nodes, 'camp').trees;
-    const nearTrees = branches.filter(branch => trees.some(tree => Math.hypot(tree.x - branch.x, tree.y - branch.y) <= 3.5));
-    const nearCamp = branches.filter(branch => Math.hypot(branch.x - BALANCE.campX, branch.y - BALANCE.campY) <= 5);
-    expect(nearTrees.length).toBeGreaterThanOrEqual(7);
+    // Every pile lies under a tree it could have dropped from, the starter piles round the clearing's edge.
+    for (const branch of branches) expect(trees.some(tree => Math.hypot(tree.x - branch.x, tree.y - branch.y) <= 2.5), branch.id).toBe(true);
+    const nearCamp = branches.filter(branch => Math.hypot(branch.x - BALANCE.campX, branch.y - BALANCE.campY) <= 6.5);
     expect(nearCamp.length).toBeGreaterThanOrEqual(4);
     expect(new Set(nodes.map(node => `${node.x},${node.y}`)).size).toBe(nodes.length);
   });
