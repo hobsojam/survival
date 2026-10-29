@@ -5,7 +5,7 @@ import { advanceTime, applyAction } from '../src/game/rules';
 import { wolfMessage, wolfTracksShown, wolvesClose } from '../src/game/wolves';
 
 const base = createGame();
-/** A winter night at camp with the fire out, the cold front long behind. */
+/** A winter night at camp with the fire out, the cold night long behind. */
 const dark: GameState = {
   ...base, day: 12, timeOfDay: nightStart(12) + 5, fireFuel: 0,
   structures: { ...base.structures, shelter: true },

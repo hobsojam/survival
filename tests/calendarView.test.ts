@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createGame } from '../src/game/state';
 import { nightStart } from '../src/game/calendar';
 import { dayPillView, renderDayPill, renderYearWheel, yearWheelView } from '../src/ui/calendarView';
+import { journalIconUrl } from '../src/art/journalIcons';
 
 const at = (day: number, timeOfDay: number) => ({ ...createGame(), day, timeOfDay });
 
@@ -16,6 +17,33 @@ describe('the day pill', () => {
     const view = dayPillView(at(16, 135));
     expect(view.night).toBe(true);
     expect(view.countdown).toMatch(/^Dawn in/);
+  });
+});
+
+describe('the day pill on the cold night', () => {
+  const coldNight = { ...at(3, nightStart(3) + 5), progress: { ...createGame().progress, nextStormDay: 3 } };
+
+  it('names the cold night and turns frosty', () => {
+    expect(dayPillView(coldNight)).toMatchObject({ phase: 'Cold night', night: true, cold: true, frosty: true });
+  });
+
+  it('frosts the view on a bitter winter night, but keeps the cold night\'s name for autumn', () => {
+    const winter = { ...at(16, 135), progress: { ...createGame().progress, nextStormDay: null, hearthUnlocked: true } };
+    expect(dayPillView(winter)).toMatchObject({ phase: 'Night', cold: false, frosty: true });
+    expect(dayPillView(at(6, 200))).toMatchObject({ phase: 'Night', cold: false, frosty: false });
+  });
+
+  it('draws the frost, the snowflake and the name, even where the phase is hidden', () => {
+    const root = fakeRoot();
+    renderDayPill(root, dayPillView(coldNight));
+    const get = (selector: string) => root.elements.get(selector)!;
+    expect(get('#day-phase').textContent).toBe('Cold night');
+    expect(get('#day-pill').classes.has('cold')).toBe(true);
+    expect(get('.game-frame').classes.has('frosty')).toBe(true);
+    expect(get('#day-cold').attributes.style).toBe(`background-image: url("${journalIconUrl('coldFront')}")`);
+    renderDayPill(root, dayPillView(at(6, 100)));
+    expect(get('#day-pill').classes.has('cold')).toBe(false);
+    expect(get('.game-frame').classes.has('frosty')).toBe(false);
   });
 });
 

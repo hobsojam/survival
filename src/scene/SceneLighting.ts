@@ -4,7 +4,7 @@ import { BALANCE } from '../game/state';
 import { FIREFLY_HOMES, fireflyGlow, fireflyOffset } from './ambient';
 import { firefliesOut } from '../game/calendar';
 import { worldX, worldY } from './art';
-import { fireGlow, lightMaskPixels, lightScreenPosition, lightingTint, type LightRadii } from './lighting';
+import { fireGlow, lightMaskPixels, lightScreenPosition, lightingTint, withSunrise, type LightRadii } from './lighting';
 import { NIGHT_DEPTH } from './visuals';
 
 /** One screen-sized tint with palette-aware, stepped light holes erased from it. */
@@ -20,8 +20,9 @@ export class SceneLighting {
     this.layer.resize(width, height, false);
   }
 
-  update(state: GameState, timeMs: number): void {
-    const tint = lightingTint(state);
+  /** Draws the tint for the state; a sunrise that began sunriseAgeMs ago warms it for a few seconds. */
+  update(state: GameState, timeMs: number, sunriseAgeMs: number): void {
+    const tint = withSunrise(lightingTint(state), sunriseAgeMs);
     if (tint.alpha <= 0) {
       this.layer.setVisible(false);
       return;

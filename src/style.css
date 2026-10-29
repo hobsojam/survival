@@ -48,6 +48,15 @@ button:focus-visible { outline: 3px solid #d69c5d; outline-offset: 3px; }
 .day-pill.night .day-dial-night { background: #6e88a8; }
 .day-dial-hand { position: absolute; top: -4px; width: 4px; height: 16px; margin-left: -2px; border-radius: 2px; background: #2e4a38; box-shadow: 0 0 0 1.5px #fffdf7; }
 .day-pill.night .day-dial-hand { background: #f6e7b8; box-shadow: 0 0 0 1.5px #2f4459; }
+.day-cold { display: none; width: 20px; height: 20px; flex: none; background-size: 20px 20px; image-rendering: pixelated; }
+.day-pill.cold { background: #dcebf0; color: #23405a; border-color: #a9c6d2; box-shadow: inset 0 1px #fff, 0 0 0 3px #d8eef088; }
+.day-pill.cold .day-cold { display: inline-block; }
+.day-pill.cold .day-dial-night { background: #8fb1c4; }
+.day-pill.cold .day-dial-hand { background: #23405a; box-shadow: 0 0 0 1.5px #dcebf0; }
+/* Frost creeps in round the edges of the view on a freezing night. */
+.game-frame::after { content: ''; position: absolute; z-index: 1; inset: 0; pointer-events: none; border-radius: inherit; opacity: 0; transition: opacity 4s;
+  background: radial-gradient(ellipse at center, transparent 58%, #d8eef055 80%, #eef8fbcc 100%); }
+.game-frame.frosty::after { opacity: 1; }
 .day-countdown { min-width: 86px; font-weight: 600; opacity: .85; }
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
 .game-panel, .panel { background: #fffdf7; border: 1px solid #e3e5d9; box-shadow: 0 10px 30px #38503c15, 0 2px 5px #38503c08; }
@@ -55,7 +64,7 @@ button:focus-visible { outline: 3px solid #d69c5d; outline-offset: 3px; }
 .game-frame { position: relative; width: 100%; aspect-ratio: 8 / 5; background: #426b52; border: 2px solid #304f3f; border-radius: 13px; overflow: hidden; box-shadow: inset 0 0 30px #17372866; }
 #game-canvas { width: 100%; height: 100%; display: flex; align-items: flex-start; justify-content: flex-start; }
 #game-canvas canvas { display: block; flex: none; image-rendering: pixelated; }
-.prompt { position: absolute; left: 16px; bottom: 15px; max-width: calc(100% - 32px); color: #fff9e9; background: #18382bc9; border: 1px solid #e3d7b55c; border-radius: 9px; padding: 9px 12px; font-size: 12px; font-weight: 700; line-height: 1.35; letter-spacing: .01em; pointer-events: none; box-shadow: 0 4px 12px #17302455; }
+.prompt { position: absolute; z-index: 2; left: 16px; bottom: 15px; max-width: calc(100% - 32px); color: #fff9e9; background: #18382bc9; border: 1px solid #e3d7b55c; border-radius: 9px; padding: 9px 12px; font-size: 12px; font-weight: 700; line-height: 1.35; letter-spacing: .01em; pointer-events: none; box-shadow: 0 4px 12px #17302455; }
 .message { min-height: 52px; display: flex; align-items: center; gap: 8px; padding: 10px 12px 4px; color: #536d55; font-size: 13px; font-weight: 600; }
 .message::before { content: '✦'; color: #c99962; font-size: 15px; }
 .shortcuts { display: flex; gap: 17px; flex-wrap: wrap; padding: 8px 11px 10px; border-top: 1px solid #eceee4; color: #77897b; font-size: 11px; }

@@ -103,7 +103,7 @@ function lookoutPrompt(state: GameState): string {
   if (!within(state, LOOKOUT)) return '';
   if (state.progress.lookoutRepaired) return 'The lookout stands again';
   if (state.progress.hearthUnlocked) return 'L  Repair lookout';
-  return 'Lookout · weather the cold front first';
+  return 'Lookout · weather the cold night first';
 }
 
 function treePrompt(state: GameState): string {

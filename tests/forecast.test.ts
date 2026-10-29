@@ -14,7 +14,7 @@ function stormDay(timeOfDay: number): GameState {
 }
 
 describe('stormReadiness', () => {
-  it('counts a spring shower burning the fire faster before a pending front', () => {
+  it('counts a spring shower burning the fire faster before a pending cold night', () => {
     const day = Array.from({ length: 10 }, (_, i) => 21 + i).find(d => rainWindow(d) !== null)!;
     const { start, end } = rainWindow(day)!;
     const state = { ...createGame(), day, timeOfDay: start - 10, fireFuel: 400 };

@@ -38,13 +38,13 @@ export function journalView(state: GameState): {
   // Once the lookout stands, the year journal takes over and the checklist steps aside.
   const milestones = state.progress.lookoutRepaired ? [] : [
     { label: 'Build a shelter', done: state.structures.shelter },
-    { label: 'Weather the cold front', done: state.progress.hearthUnlocked },
+    { label: 'Weather the cold night', done: state.progress.hearthUnlocked },
     { label: 'Find the old quarry', done: state.progress.quarryFound },
     { label: 'Restore the lookout', done: state.progress.lookoutRepaired }
   ];
   const sitesFound = Object.values(state.progress.discoveries).every(Boolean);
-  let nextHint = 'Build a shelter at camp before the cold front arrives.';
-  if (state.structures.shelter) nextHint = `Keep the fire burning through the cold front on day ${state.progress.nextStormDay}.`;
+  let nextHint = 'Build a shelter at camp before the cold night arrives.';
+  if (state.structures.shelter) nextHint = `Keep the fire burning through the cold night on day ${state.progress.nextStormDay}.`;
   if (state.progress.hearthUnlocked) nextHint = state.structures.toolshed
     ? 'Follow the northeast path and restore the old lookout.'
     : 'Build a toolshed at camp to make tools.';

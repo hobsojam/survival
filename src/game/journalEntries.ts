@@ -27,7 +27,7 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
   autumn: [
     { id: 'leaves', lines: ['The first leaves came down over camp.'] },
     { id: 'fox', lines: ['A fox nosed around the berry bushes at dusk.'] },
-    { id: 'coldFront', lines: ['The cold front came. I kept the fire through it.', 'The cold front came, and it got the better of me.',
+    { id: 'coldFront', lines: ['The cold night came. I kept the fire through it.', 'The cold night came, and it got the better of me.',
       'A cold autumn night, and the fire kept me warm.'] },
     { id: 'driedBerries', lines: ['Dried berries for the winter.'] },
     { id: 'stars', lines: ['Lay back and counted stars.'] }
@@ -83,7 +83,7 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   fox: m => onAfter(m, awake(m) && isAtCamp(m.after) && atDusk(m.after)),
   coldFront: m => {
     if (isColdNight(m.before) && !isColdNight(m.after)) return { day: m.before.day, variant: m.after.progress.hearthUnlocked ? 0 : 1, silent: true };
-    // Once the front is long weathered, any autumn night kept warm at camp fills its place in later years.
+    // Once the cold night is long weathered, any autumn night kept warm at camp fills its place in later years.
     const weathered = m.before.progress.hearthUnlocked && m.before.progress.nextStormDay === null;
     return dawn(m) && weathered && isAtCamp(m.before) && m.before.fireFuel > 0 ? { day: m.before.day, variant: 2 } : null;
   },

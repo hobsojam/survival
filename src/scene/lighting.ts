@@ -2,6 +2,7 @@ import { duskLength, isSummer, nightStart } from '../game/calendar';
 import type { GameState } from '../game/state';
 import { isFreezingNight } from '../game/rules';
 import { rainFade } from '../game/rain';
+import { coldNightApproach } from '../game/coldNight';
 import { palette } from '../art/palette';
 import { darkness } from './ambient';
 
@@ -14,6 +15,20 @@ const mixColor = (from: number, to: number, amount: number): number => {
   return (channel(16) << 16) | (channel(8) << 8) | channel(0);
 };
 
+/** Freezing nights take a deep icy blue, still dark but plainly bluer than an ordinary night. */
+export const ICY_NIGHT = mixColor(color(palette.storm), color(palette.flower4), 0.15);
+
+/** How long the warm sunrise lasts after the fire held through the cold night. */
+export const SUNRISE_MS = 6000;
+
+/** Lays a golden sunrise over the tint, fading out over SUNRISE_MS. */
+export function withSunrise(tint: LightingTint, ageMs: number): LightingTint {
+  const left = 1 - ageMs / SUNRISE_MS;
+  if (left <= 0) return tint;
+  const glow = 0.24 * left;
+  return { color: mixColor(tint.color, color(palette.golden), glow / (glow + tint.alpha)), alpha: Math.max(glow, tint.alpha) };
+}
+
 export function lightingTint(state: GameState): LightingTint {
   const time = state.timeOfDay;
   if (state.day > 1 && time < 25) {
@@ -25,14 +40,19 @@ export function lightingTint(state: GameState): LightingTint {
   }
   if (time >= nightStart(state.day)) {
     const storm = isFreezingNight(state);
-    return { color: color(storm ? palette.storm : palette.night), alpha: darkness(state.day, time) * (storm ? 0.64 : 0.55) };
+    return { color: storm ? ICY_NIGHT : color(palette.night), alpha: darkness(state.day, time) * (storm ? 0.64 : 0.55) };
   }
   // Summer evenings glow gold, longer and a little stronger.
   const summer = isSummer(state.day);
   const length = duskLength(state.day);
   const duskStart = nightStart(state.day) - length;
-  const alpha = time > duskStart ? (summer ? 0.16 : 0.12) * (time - duskStart) / length : 0;
-  const glow = color(summer ? palette.golden : palette.dusk);
+  const duskStrength = summer ? 0.16 : 0.12;
+  const dusk = time > duskStart ? duskStrength * (time - duskStart) / length : 0;
+  // On the cold night's day the afternoon greys and the dusk comes in icy rather than gold.
+  const cold = coldNightApproach(state);
+  // The blue takes over early, since halfway between gold and blue is only grey.
+  const glow = mixColor(color(summer ? palette.golden : palette.dusk), ICY_NIGHT, Math.min(1, cold * 3));
+  const alpha = Math.max(dusk, 0.34 * cold);
   // A shower greys the day as it builds and eases off; a late one shares the sky with the dusk glow.
   const rain = 0.18 * rainFade(state);
   if (rain <= 0) return { color: glow, alpha };

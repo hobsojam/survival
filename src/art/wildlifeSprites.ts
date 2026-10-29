@@ -221,7 +221,11 @@ const puddle = define(16, 6, { r: 'earth1', w: 'flower4', g: 'frost' }, {
   }
 }, [8, 3]);
 
-const sleetFleck = define(2, 1, { a: 'frost' }, { still: g => box(g, 0, 0, 2, 1, 'a') }, [0, 0]);
+/** A snowflake blowing in the cold night's wind: a bright core with a softer edge, big or small. */
+const snowFlake = define(3, 3, { a: 'frost', b: 'flower4' }, {
+  big: g => { box(g, 0, 1, 3, 1, 'b'); box(g, 1, 0, 1, 3, 'b'); dot(g, 1, 1, 'a'); },
+  small: g => { box(g, 1, 1, 2, 1, 'a'); dot(g, 1, 2, 'b'); }
+}, [1, 1]);
 const cookSteam = define(4, 6, { a: 'stone3', b: 'stone4' }, {
   steam0: g => { dot(g, 1, 5, 'a'); dot(g, 2, 4, 'b'); dot(g, 1, 3, 'a'); },
   steam1: g => { dot(g, 2, 5, 'a'); dot(g, 1, 3, 'b'); dot(g, 2, 2, 'a'); dot(g, 2, 1, 'b'); },
@@ -246,5 +250,5 @@ const morningFrost = define(16, 16, frostLegend, frostPainters, [8, 15]);
 
 export const wildlifeSprites: Record<string, SpriteDef> = {
   bird: birdSprite, fox: foxSprite, wolf: wolfSprite, keepsake: keepsakeSprite, firefly: fireflySprite, leaf: leafSprite, eyes: eyesSprite, rabbit: rabbitSprite, wolfTracks: wolfTracksSprite, gatherPop, smokePuff, spark,
-  windStreak, sleetFleck, rainStreak, puddle, cookSteam, shootingStar, morningFrost
+  windStreak, snowFlake, rainStreak, puddle, cookSteam, shootingStar, morningFrost
 };

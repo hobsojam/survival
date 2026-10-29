@@ -3,7 +3,8 @@ import { createGame } from '../src/game/state';
 import { palette } from '../src/art/palette';
 import { nightStart } from '../src/game/calendar';
 import { darkness } from '../src/scene/ambient';
-import { fireGlow, fireRadii, lightMaskPixels, lightScreenPosition, lightingTint } from '../src/scene/lighting';
+import { ICY_NIGHT, SUNRISE_MS, fireGlow, fireRadii, lightMaskPixels, lightScreenPosition, lightingTint, withSunrise } from '../src/scene/lighting';
+import { afternoonStart } from '../src/game/calendar';
 
 const rgb = (hex: string) => parseInt(hex.slice(1), 16);
 // Day 6 is mid-autumn, when night falls at 160 s.
@@ -17,10 +18,10 @@ describe('time-of-day lighting', () => {
     expect(lightingTint({ ...state, timeOfDay: 160 })).toEqual({ color: rgb(palette.night), alpha: 0 });
   });
 
-  it('reaches 55% at ordinary night and 64% during a cold front', () => {
+  it('reaches 55% at ordinary night and 64% during a cold night', () => {
     expect(lightingTint({ ...state, timeOfDay: 190 })).toEqual({ color: rgb(palette.night), alpha: 0.55 });
     const storm = { ...state, day: 3, timeOfDay: 204, progress: { ...state.progress, nextStormDay: 3 } };
-    expect(lightingTint(storm)).toEqual({ color: rgb(palette.storm), alpha: 0.64 });
+    expect(lightingTint(storm)).toEqual({ color: ICY_NIGHT, alpha: 0.64 });
   });
 
   it('passes through a 15% dawn tint and clears by second 25', () => {
@@ -72,7 +73,7 @@ describe('fire glow by area', () => {
 describe('lighting through the year', () => {
   it('darkens early in midwinter and holds the dusk late in midsummer', () => {
     // Night has fallen by 135 s in midwinter, and winter nights take the bitter tint.
-    expect(lightingTint({ ...state, day: 16, timeOfDay: 135 }).color).toBe(rgb(palette.storm));
+    expect(lightingTint({ ...state, day: 16, timeOfDay: 135 }).color).toBe(ICY_NIGHT);
     const summer = lightingTint({ ...state, day: 36, timeOfDay: 165 });
     expect(summer.color).toBe(rgb(palette.golden));
     expect(summer.alpha).toBeCloseTo(0.16 * 20 / 45);
@@ -80,12 +81,48 @@ describe('lighting through the year', () => {
 });
 
 describe('winter night tint', () => {
-  it('tints every winter night like the cold front, and autumn nights as plain night', () => {
+  it('tints every winter night like the cold night, and autumn nights as plain night', () => {
     const base = createGame();
     const winter = { ...base, day: 12, timeOfDay: nightStart(12) + 15, progress: { ...base.progress, hearthUnlocked: true, nextStormDay: null } };
-    expect(lightingTint(winter)).toEqual({ color: rgb(palette.storm), alpha: darkness(12, nightStart(12) + 15) * 0.64 });
+    expect(lightingTint(winter)).toEqual({ color: ICY_NIGHT, alpha: darkness(12, nightStart(12) + 15) * 0.64 });
     const autumn = { ...winter, day: 8, timeOfDay: nightStart(8) + 15 };
     expect(lightingTint(autumn)).toEqual({ color: rgb(palette.night), alpha: darkness(8, nightStart(8) + 15) * 0.55 });
+  });
+});
+
+describe('the cold night look', () => {
+  const channels = (value: number) => [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+  const base = createGame();
+  const coldDay = (timeOfDay: number) => ({ ...base, day: 3, timeOfDay, progress: { ...base.progress, nextStormDay: 3 } });
+
+  it('tints a freezing night a deep icy blue: still dark, but bluer than an ordinary night', () => {
+    const [r, g, b] = channels(ICY_NIGHT);
+    const [nr, , nb] = channels(rgb(palette.night));
+    expect(r + g + b).toBeLessThan(300);
+    expect(b - r).toBeGreaterThan(nb - nr + 20);
+  });
+
+  it('turns the dusk icy on the cold night\'s day instead of gold', () => {
+    const late = lightingTint(coldDay(nightStart(3) - 1));
+    expect(late.color).not.toBe(rgb(palette.dusk));
+    const [r, , b] = channels(late.color);
+    expect(b).toBeGreaterThan(r + 40);
+    // A third of the way in, it is already blue rather than a muddy grey.
+    const early = lightingTint(coldDay(afternoonStart(3) + (nightStart(3) - afternoonStart(3)) / 3));
+    expect(channels(early.color)[2]).toBeGreaterThan(channels(early.color)[0] + 40);
+    expect(late.alpha).toBeGreaterThanOrEqual(0.25);
+    // Before the afternoon turns, the day looks like any other.
+    expect(lightingTint(coldDay(afternoonStart(3) - 1))).toEqual(lightingTint({ ...base, day: 3, timeOfDay: afternoonStart(3) - 1 }));
+  });
+
+  it('warms the morning after the fire held, then fades back to the plain day', () => {
+    const day = { color: rgb(palette.dusk), alpha: 0 };
+    const fresh = withSunrise(day, 0);
+    expect(fresh.color).toBe(rgb(palette.golden));
+    expect(fresh.alpha).toBeGreaterThanOrEqual(0.2);
+    expect(withSunrise(day, SUNRISE_MS / 2).alpha).toBeGreaterThan(0);
+    expect(withSunrise(day, SUNRISE_MS / 2).alpha).toBeLessThan(fresh.alpha);
+    expect(withSunrise(day, SUNRISE_MS)).toEqual(day);
   });
 });
 

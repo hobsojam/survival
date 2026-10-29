@@ -60,7 +60,7 @@ describe('camp prompts', () => {
 
   it('walks the lookout through damaged, repairable and restored', () => {
     const damaged = bareCamp(LOOKOUT.x, LOOKOUT.y);
-    expect(promptFor(damaged)).toBe('Lookout · weather the cold front first');
+    expect(promptFor(damaged)).toBe('Lookout · weather the cold night first');
     const repairable = { ...damaged, progress: { ...damaged.progress, hearthUnlocked: true } };
     expect(promptFor(repairable)).toBe('L  Repair lookout');
     expect(promptFor({ ...repairable, progress: { ...repairable.progress, lookoutRepaired: true } })).toBe('The lookout stands again');
