@@ -15,13 +15,13 @@ The game is a cosy camp builder (see the README and the year journal), so these 
 - A woodpile at camp keeps wood out of the bag.
 - Nuts and rations become the winter food. The fox accepts a hazelnut as an offering in winter.
 
-## Non-goals
-
-- Reworking the bag or the storage crate. That's covered by `2026-10-30-pack-fibre-stack-design.md`, which comes after this one.
-
 ## Order and dependencies
 
 This project comes after **growing the clearing** (`2026-10-30-clearing-growth-design.md`). Plan and build it only once that's merged. The larder and woodpile go on their spots on the cleared ground, and "at camp" below means the zones that design defines.
+
+## Non-goals
+
+- Reworking the bag or the storage crate. That's covered by `2026-10-30-pack-fibre-stack-design.md`, which comes after this one.
 - Fishing, hunting, farming beyond the existing garden, or new meters.
 - Food quality grades, recipe timing, or exact ingredient amounts.
 - Changing how the existing companion, wolf or garden rules work, beyond what is listed here.
@@ -37,7 +37,7 @@ This project comes after **growing the clearing** (`2026-10-30-clearing-growth-d
 
 - Every new item takes one bag space. Stone stays at two.
 - Gathering uses the existing gather action (E, a tap, six seconds), with resource nodes that come back at dawn like branches and berries.
-- New structures use the existing build flow: build inside the camp circle, 12 seconds, 6 energy. They're visible in camp and drawn in Phaser in the game's palette, with no image assets.
+- New structures use the existing build flow: build anywhere in the clearing, 12 seconds, 6 energy. They're visible in camp and drawn in Phaser in the game's palette, with no image assets.
 - New tools are crafted in the Forest tools panel and need the toolshed.
 - Saved state changes, so `SAVE_VERSION` goes up. If save migrations exist by the time this lands, add one that turns each saved berry count into berries picked on the day of loading. Otherwise follow the current rule (old saves are rejected) and the README's "one open PR changes the save format at a time" rule.
 - The year journal stays a keepsake. Nothing it records changes the game.
