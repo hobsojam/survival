@@ -9,7 +9,7 @@ import { dayPillView, renderDayPill, renderYearWheel, yearWheelView, type Calend
 import { isLowMeter } from '../game/needs';
 import { gateTap, nextOpenTab, wireSidebarTabs, type DockTab } from './dock';
 import { createPause, wirePause, type PauseControl } from './pause';
-import { journalView, QUARRY_MARKER } from './journal';
+import { journalView, type RegionSummary } from './journal';
 import { currentPage, journalPageView, renderJournalPage, turnPage } from './yearJournal';
 import { axeView, bagView, buildButtonView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightHint, pickaxeView, pillowView, startNote, type ActionPanelView } from './panels';
 import { Soundscape } from '../game/soundscape';
@@ -53,11 +53,6 @@ export class App {
       if (id === 'stonePile') extraControls = `<div id="stone-pile-controls" class="stone-pile-controls" hidden><span id="stone-pile-stored">Stored stone 0/${BALANCE.stonePileCapacity}</span><button type="button" data-action="storeStone">Store 1</button><button type="button" data-action="takeStone">Take 1</button></div>`;
       return groupHeading + `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>` + extraControls;
     }).join('');
-    // The quarry marker is always in the markup and shown only once the west path opens.
-    const markerPlaces = [...journalView(this.state).locations.filter(place => place.id !== 'quarry'), { id: 'quarry', ...QUARRY_MARKER }];
-    const mapMarkers = markerPlaces.map(place =>
-      `<span id="map-${place.id}" class="map-point" style="left:${place.x / BALANCE.mapWidth * 100}%;top:${place.y / BALANCE.mapHeight * 100}%"${place.id === 'quarry' ? ' hidden' : ''}>?</span>`
-    ).join('');
     this.root.innerHTML = `
       <div class="shell">
         <header class="topbar">
@@ -84,7 +79,15 @@ export class App {
               <section class="panel axe-panel" data-tab="build"><p class="eyebrow">FOREST TOOLS</p><div class="tool-row"><h2 id="axe-title">Stone axe</h2><p id="axe-copy" class="lookout-copy"></p><button type="button" id="axe-button" data-action="craftAxe">Craft stone axe</button><small id="axe-cost">1 wood · 1 fiber · 1 stone</small></div><div id="pickaxe-row" class="tool-row" hidden><h2 id="pickaxe-title">Pickaxe</h2><p id="pickaxe-copy" class="lookout-copy"></p><button type="button" id="pickaxe-button" data-action="craftPickaxe">Craft pickaxe</button><small id="pickaxe-cost">2 wood · 1 fiber · 2 stone</small></div><div id="pillow-row" class="tool-row" hidden><h2 id="pillow-title">Feather pillow</h2><p id="pillow-copy" class="lookout-copy"></p><button type="button" id="pillow-button" data-action="craftPillow">Stitch a pillow</button><small id="pillow-cost">6 feathers</small></div><div id="cloak-row" class="tool-row" hidden><h2 id="cloak-title">Fur cloak</h2><p id="cloak-copy" class="lookout-copy"></p><button type="button" id="cloak-button" data-action="craftCloak">Make a cloak</button><small id="cloak-cost">6 fur</small></div></section>
               <section class="panel ration-panel" data-tab="bag"><p class="eyebrow">TRAIL FOOD</p><h2>Drying rack</h2><p class="lookout-copy">Dry a berry at camp for a ration you can eat anywhere. Each restores 45 hunger.</p><button type="button" id="prepare-button" data-action="prepareTrailFood">Prepare trail ration</button><small id="prepare-hint">Build a drying rack first.</small></section>
               <section class="panel sites-panel" data-tab="camp"><p class="eyebrow">BEYOND CAMP</p><h2>Follow the paths</h2><p class="lookout-copy">An old basket, a quiet spring, and a stone cairn wait beyond the clearing.</p><button type="button" id="site-button">Explore nearby place</button><small>Stand beside a place and press V</small></section>
-              <section class="panel journal-panel" data-tab="camp"><p class="eyebrow">YOUR FIELD JOURNAL</p><h2>Paths from camp</h2><p id="journal-hint" class="journal-hint"></p><details open><summary id="journal-summary">Map and milestones</summary><div class="journal-map" aria-hidden="true"><svg viewBox="0 0 40 30" preserveAspectRatio="none"><path d="M20 15 L8 8 M20 15 L30 8 M20 15 L10 20 M20 15 L31 21" /><path id="map-west-path" d="M20 15 L1 15" style="display:none" /></svg><span class="map-point camp" style="left:50%;top:50%">✦</span>${mapMarkers}<span id="map-player" class="map-player"></span></div><p class="map-key">✦ Camp &nbsp; ● You &nbsp; ? Unexplored</p><ul id="journal-places" class="journal-list"></ul><p id="journal-milestones-head" class="journal-subhead">Camp milestones</p><ul id="journal-milestones" class="journal-list"></ul></details></section>
+              <section class="panel journal-panel" data-tab="camp"><p class="eyebrow">YOUR FIELD JOURNAL</p><h2>Areas beyond camp</h2><p id="journal-hint" class="journal-hint"></p>
+                <details open><summary id="journal-summary">Areas and milestones</summary>
+                  <div class="region-overview" role="group" aria-label="Areas beyond camp">
+                    <div class="region-home"><span class="region-symbol">✦</span><div><strong>Camp</strong><small id="region-home-status">You are here</small></div></div>
+                    <div id="region-destinations" class="region-destinations"></div>
+                  </div>
+                  <p class="journal-subhead">Places along camp paths</p><ul id="journal-places" class="journal-list"></ul>
+                  <p id="journal-milestones-head" class="journal-subhead">Camp milestones</p><ul id="journal-milestones" class="journal-list"></ul>
+                </details></section>
               <section class="panel year-journal-panel" data-tab="camp"><p class="eyebrow">THE YEAR SO FAR</p><div class="year-wheel"><span class="year-dial" aria-hidden="true"><span id="year-hand" class="year-hand"></span></span><p id="year-label" class="year-label"></p><ul class="visually-hidden" aria-label="Seasons"><li id="year-season-0">Autumn</li><li id="year-season-1">Winter</li><li id="year-season-2">Spring</li><li id="year-season-3">Summer</li></ul></div><div class="year-journal-page"><div class="year-journal-head"><button type="button" id="year-journal-previous" class="year-journal-turn" aria-label="Earlier page">‹</button><div><h2 id="year-journal-title"></h2><p id="year-journal-days" class="year-journal-days"></p></div><button type="button" id="year-journal-next" class="year-journal-turn" aria-label="Later page">›</button></div><ul id="year-journal-entries" class="year-journal-entries"></ul></div></section>
               <section class="panel bag-panel" data-tab="bag"><p class="eyebrow">IN YOUR BAG</p><div class="supplies">
                 <div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small><button type="button" class="supply-action" data-action="stokeFire" data-supply="wood" aria-label="Burn one wood">Burn</button></div>
@@ -106,7 +109,7 @@ export class App {
           <div class="dock-tabs"><button type="button" data-tab-button="bag">🎒 Bag</button><button type="button" data-tab-button="build">🔨 Build</button><button type="button" data-tab-button="camp">🌙 Camp</button></div>
         </nav>
         <div id="start-screen" class="start-screen"><div class="start-card"><div class="start-mark">✦</div><p class="eyebrow">A SMALL SURVIVAL STORY</p><h1>Make a little place<br>feel like home.</h1><p class="start-copy">Gather what you need, keep a fire glowing, and build a refuge one day at a time.</p><p id="start-note" class="start-note"></p><div class="start-buttons"><button id="continue-game" class="primary-button" hidden>Continue your camp</button><button id="new-game" class="secondary-button">Start a new game</button></div><small>Single player · Saves in this browser</small></div></div>
-        <div id="lookout-ending" class="lookout-ending hidden" role="dialog" aria-modal="true" aria-labelledby="ending-title"><div class="start-card"><div class="start-mark">✦</div><p class="eyebrow">A VIEW FROM ABOVE</p><h1 id="ending-title">A place to call home.</h1><p class="start-copy">The lookout stands again. Below, your fire marks a warm clearing among the trees. There is still more to see whenever you are ready.</p><div class="start-buttons"><button id="continue-exploring" class="primary-button">Keep exploring</button></div></div></div>
+        <div id="lookout-ending" class="lookout-ending hidden" role="dialog" aria-modal="true" aria-labelledby="ending-title"><div class="start-card"><div class="start-mark">✦</div><p class="eyebrow">A VIEW FROM ABOVE</p><h1 id="ending-title">A place to call home.</h1><p class="start-copy">The lookout stands again. Beyond your camp, the old quarry lies to the west with stone among its rubble. Your field journal now shows the areas you can explore.</p><div class="start-buttons"><button id="continue-exploring" class="primary-button">Keep exploring</button></div></div></div>
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
@@ -380,7 +383,7 @@ export class App {
     }
     const milestonesHead = this.root.querySelector<HTMLElement>('#journal-milestones-head');
     if (milestonesHead) milestonesHead.hidden = journal.milestones.length === 0;
-    this.setText('journal-summary', journal.milestones.length ? 'Map and milestones' : 'Map');
+    this.setText('journal-summary', journal.milestones.length ? 'Areas and milestones' : 'Areas');
     const milestoneList = this.root.querySelector<HTMLElement>('#journal-milestones');
     if (milestoneList) milestoneList.hidden = journal.milestones.length === 0;
     if (milestoneList) {
@@ -391,33 +394,49 @@ export class App {
         return item;
       }));
     }
-    this.renderMap(journal.locations);
+    this.renderRegions(journal.regions);
   }
 
-  private renderMap(locations: ReturnType<typeof journalView>['locations']): void {
-    const { player } = this.state;
-    const quarryKnown = locations.some(place => place.id === 'quarry');
-    const quarryMarker = this.root.querySelector<HTMLElement>('#map-quarry');
-    if (quarryMarker) quarryMarker.hidden = !quarryKnown;
-    const westPath = this.root.querySelector<SVGPathElement>('#map-west-path');
-    if (westPath) westPath.style.display = quarryKnown ? '' : 'none';
-    for (const place of locations) {
-      const marker = this.root.querySelector(`#map-${place.id}`);
-      if (marker) {
-        let symbol = '?';
-        if (place.id === 'lookout') symbol = '⌂';
-        else if (place.visited) symbol = '✓';
-        marker.textContent = symbol;
-        marker.classList.toggle('found', place.visited);
+  private renderRegions(regions: RegionSummary[]): void {
+    this.setText('region-home-status', this.state.area === 'camp' ? 'You are here' : 'Home');
+    const destinations = this.root.querySelector<HTMLElement>('#region-destinations');
+    if (!destinations) return;
+    if (!regions.length) {
+      const note = document.createElement('p');
+      note.className = 'region-empty';
+      note.textContent = 'Build a shelter to open the west path.';
+      destinations.replaceChildren(note);
+      return;
+    }
+    destinations.replaceChildren(...regions.map(region => {
+      const route = document.createElement('div');
+      route.className = 'region-route';
+      const direction = document.createElement('span');
+      direction.className = 'region-direction';
+      direction.textContent = `${region.direction} path`;
+      const card = document.createElement('div');
+      card.className = 'region-card';
+      card.classList.toggle('unknown', region.status === 'unknown');
+      card.classList.toggle('current', region.current);
+      const heading = document.createElement('strong');
+      heading.textContent = region.label;
+      const status = document.createElement('small');
+      let statusText = 'Unexplored';
+      if (region.status === 'scouted') statusText = 'Seen from lookout';
+      if (region.status === 'visited') statusText = 'Visited';
+      if (region.current) statusText = 'You are here';
+      status.textContent = statusText;
+      card.append(heading, status);
+      if (region.resources.length) {
+        const resources = document.createElement('p');
+        resources.textContent = `Resources: ${region.resources.join(', ')}`;
+        const features = document.createElement('p');
+        features.textContent = `Places: ${region.features.join(', ')}`;
+        card.append(resources, features);
       }
-    }
-    const playerMarker = this.root.querySelector<HTMLElement>('#map-player');
-    if (playerMarker) {
-      // The camp map can't show the quarry area, so away there the survivor sits at the west path's end.
-      const mapPosition = this.state.area === 'camp' ? player : QUARRY_MARKER;
-      playerMarker.style.left = `${mapPosition.x / BALANCE.mapWidth * 100}%`;
-      playerMarker.style.top = `${mapPosition.y / BALANCE.mapHeight * 100}%`;
-    }
+      route.append(direction, card);
+      return route;
+    }));
   }
 
   /** Writes a one-button panel's view into the elements named after it, such as #axe-title and #axe-button. */

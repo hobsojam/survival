@@ -44,14 +44,29 @@ describe('field journal', () => {
     expect(journalView(state).nextHint).toContain('day 6');
   });
 
-  it('the journal lists the quarry once the path opens', () => {
+  it('shows an abstract area route and reveals what the lookout can see', () => {
     const state = createGame();
-    expect(journalView(state).locations.find(place => place.id === 'quarry')).toBeUndefined();
+    expect(journalView(state).regions).toEqual([]);
     state.structures.shelter = true;
-    expect(journalView(state).locations.find(place => place.id === 'quarry'))
-      .toEqual({ id: 'quarry', label: 'Unexplored west path', visited: false, x: 1, y: 15 });
+    expect(journalView(state).regions).toEqual([{
+      id: 'quarry', direction: 'West', label: 'Unexplored area', status: 'unknown',
+      resources: [], features: [], current: false
+    }]);
+    state.area = 'quarry';
+    expect(journalView(state).regions[0]).toMatchObject({
+      label: 'Old quarry', status: 'visited', resources: ['Stone'], current: true
+    });
+    state.area = 'camp';
+    state.progress.lookoutRepaired = true;
+    expect(journalView(state).regions).toEqual([{
+      id: 'quarry', direction: 'West', label: 'Old quarry', status: 'scouted',
+      resources: ['Stone'], features: ['Loose rubble', 'Quarry face'], current: false
+    }]);
+    state.progress.lookoutRepaired = false;
     state.progress.quarryFound = true;
-    expect(journalView(state).locations.find(place => place.id === 'quarry')).toMatchObject({ label: 'Old quarry', visited: true });
+    state.area = 'quarry';
+    expect(journalView(state).regions[0]).toMatchObject({ label: 'Old quarry', status: 'visited', current: true });
+    expect(journalView(state).locations.map(place => place.id)).not.toContain('quarry');
     expect(journalView(state).milestones.find(item => item.label === 'Find the old quarry')?.done).toBe(true);
   });
 
