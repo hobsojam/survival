@@ -49,10 +49,10 @@ export function lookoutView(state: GameState): ActionPanelView {
   const { hearthUnlocked, lookoutRepaired } = state.progress;
   const button = { disabled: !hearthUnlocked || lookoutRepaired, ready: !lookoutRepairBlocker(state) };
   if (lookoutRepaired) {
-    return { ...button, title: 'A place to call home', copy: 'The old lookout stands again. The paths are still yours to explore.', cost: 'Restored' };
+    return { ...button, title: 'A place to call home', copy: 'The old lookout stands again. Your journal surveys the areas beyond camp.', cost: 'Restored' };
   }
   if (hearthUnlocked) {
-    return { ...button, title: 'Restore the old lookout', copy: 'Follow the northeast path to the lookout. Bring the repair materials and stand beside it.', cost: '4 wood · 2 fiber · 2 stone' };
+    return { ...button, title: 'Restore the old lookout', copy: 'Repair it to survey the areas beyond camp. Follow the northeast path and stand beside it.', cost: '4 wood · 2 fiber · 2 stone' };
   }
   return { ...button, title: 'The old lookout', copy: 'A damaged lookout waits along the northeast path. Weather the cold night before repairing it.', cost: 'Unlocks after the cold night' };
 }

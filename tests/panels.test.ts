@@ -59,8 +59,8 @@ describe('lookout panel', () => {
     expect(lookoutView(game())).toEqual({ title: 'The old lookout',
       copy: 'A damaged lookout waits along the northeast path. Weather the cold night before repairing it.',
       cost: 'Unlocks after the cold night', disabled: true, ready: false });
-    expect(lookoutView(game({ progress: afterColdNight }))).toMatchObject({ title: 'Restore the old lookout', cost: '4 wood · 2 fiber · 2 stone', disabled: false });
-    expect(lookoutView(game({ progress: { ...afterColdNight, lookoutRepaired: true } }))).toMatchObject({ title: 'A place to call home', cost: 'Restored', disabled: true });
+    expect(lookoutView(game({ progress: afterColdNight }))).toMatchObject({ title: 'Restore the old lookout', cost: '4 wood · 2 fiber · 2 stone', disabled: false, copy: expect.stringMatching(/survey.*areas/i) });
+    expect(lookoutView(game({ progress: { ...afterColdNight, lookoutRepaired: true } }))).toMatchObject({ title: 'A place to call home', cost: 'Restored', disabled: true, copy: expect.stringMatching(/journal.*areas/i) });
   });
 
   it('is ready only beside the lookout with the materials', () => {

@@ -1,23 +1,59 @@
 import { pathOpen } from '../game/areas';
-import { LOOKOUT, SITES, type GameState, type SiteId } from '../game/state';
-
-/** The quarry is in another area, so the camp map marks the end of the west path instead. */
-export const QUARRY_MARKER = { x: 1, y: 15 };
+import { SITES, type AreaId, type GameState, type SiteId } from '../game/state';
 
 interface JournalLocation {
-  id: SiteId | 'lookout' | 'quarry';
+  id: SiteId | 'lookout';
   label: string;
   visited: boolean;
-  x: number;
-  y: number;
 }
 
 interface JournalMilestone { label: string; done: boolean }
+
+export interface RegionSummary {
+  id: Exclude<AreaId, 'camp'>;
+  direction: string;
+  label: string;
+  status: 'unknown' | 'scouted' | 'visited';
+  resources: string[];
+  features: string[];
+  current: boolean;
+}
+
+const REGION_DEFINITIONS = [{
+  id: 'quarry' as const,
+  direction: 'West',
+  label: 'Old quarry',
+  resources: ['Stone'],
+  features: ['Loose rubble', 'Quarry face'],
+  routeOpen: pathOpen,
+  visibleFromLookout: true,
+  visited: (state: GameState) => state.progress.quarryFound
+}];
+
+function regionSummaries(state: GameState): RegionSummary[] {
+  return REGION_DEFINITIONS.filter(region => region.routeOpen(state)).map(region => {
+    const visited = region.visited(state) || state.area === region.id;
+    const known = visited || (region.visibleFromLookout && state.progress.lookoutRepaired);
+    let status: RegionSummary['status'] = 'unknown';
+    if (visited) status = 'visited';
+    else if (known) status = 'scouted';
+    return {
+      id: region.id,
+      direction: region.direction,
+      label: known ? region.label : 'Unexplored area',
+      status,
+      resources: known ? [...region.resources] : [],
+      features: known ? [...region.features] : [],
+      current: state.area === region.id
+    };
+  });
+}
 
 export function journalView(state: GameState): {
   locations: JournalLocation[];
   milestones: JournalMilestone[];
   nextHint: string;
+  regions: RegionSummary[];
 } {
   const directions: Record<SiteId, string> = {
     basket: 'northwest', spring: 'southwest', cairn: 'southeast'
@@ -25,16 +61,10 @@ export function journalView(state: GameState): {
   const locations: JournalLocation[] = (Object.keys(SITES) as SiteId[]).map(id => ({
     id,
     label: state.progress.discoveries[id] ? SITES[id].name : `Unexplored ${directions[id]} path`,
-    visited: state.progress.discoveries[id],
-    x: SITES[id].x,
-    y: SITES[id].y
+    visited: state.progress.discoveries[id]
   }));
   locations.push({ id: 'lookout', label: state.progress.lookoutRepaired ? 'Restored lookout' : 'Old lookout',
-    visited: state.progress.lookoutRepaired, x: LOOKOUT.x, y: LOOKOUT.y });
-  if (pathOpen(state)) {
-    locations.push({ id: 'quarry', label: state.progress.quarryFound ? 'Old quarry' : 'Unexplored west path',
-      visited: state.progress.quarryFound, ...QUARRY_MARKER });
-  }
+    visited: state.progress.lookoutRepaired });
   // Once the lookout stands, the year journal takes over and the checklist steps aside.
   const milestones = state.progress.lookoutRepaired ? [] : [
     { label: 'Build a shelter', done: state.structures.shelter },
@@ -53,5 +83,5 @@ export function journalView(state: GameState): {
     else if (sitesFound) nextHint = 'Follow the west path out of camp to see what lies beyond.';
     else nextHint = 'Follow an unexplored path to find another quiet place.';
   }
-  return { locations, milestones, nextHint };
+  return { locations, milestones, nextHint, regions: regionSummaries(state) };
 }
