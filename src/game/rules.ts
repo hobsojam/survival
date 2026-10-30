@@ -5,14 +5,15 @@ import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
 import { bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
 import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
-import { CLEARING_STEPS, choppableTrees, markBlocker, type StepId } from './clearing';
+import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, markBlocker, placeBranches, roomLine, type StepId } from './clearing';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
-import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, type GameState, type SiteId, type StructureId } from './state';
+import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
   | { type: 'gather'; nodeId: string }
   | { type: 'chopTree'; treeId: string }
   | { type: 'markClearing'; step: StepId }
+  | { type: 'clearGround' }
   | { type: 'visitSite'; siteId: SiteId }
   | { type: 'build'; structureId: StructureId }
   | { type: 'move'; dx: number; dy: number }
@@ -417,6 +418,19 @@ const markClearing: ActionHandler<'markClearing'> = (state, action) => {
   };
 };
 
+const clearGround: ActionHandler<'clearGround'> = state => {
+  const blocker = clearGroundBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  const step = state.clearing.marked as StepId;
+  const cleared = [...state.clearing.cleared, step];
+  const placed = placeBranches(createGame().nodes, cleared);
+  const nodes = state.nodes.map((node, index) => ({ ...node, x: placed[index].x, y: placed[index].y }));
+  return {
+    state: payAndBuild(state, CLEARING_STEPS[step].cost, { nodes, clearing: { cleared, marked: null, felled: [] } }),
+    message: `The ${CLEARING_STEPS[step].side} side is open now.${roomLine(step, state.structures, id => Object.hasOwn(BUILDINGS, id))}`
+  };
+};
+
 function restAtSpring(state: GameState): ActionResult {
   if (isWinter(state.day)) return {
     state: { ...state, progress: { ...state.progress, discoveries: { ...state.progress.discoveries, spring: true } } },
@@ -738,7 +752,7 @@ const craftCloak: ActionHandler<'craftCloak'> = state =>
   craftKeepsake(state, 'cloak', cloakBlocker(state), 'You made a fur cloak. The nights will bite a little less.');
 
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
-  move, cross, gather, craftAxe, craftPickaxe, gatherRubble, digQuarry, chopTree, markClearing, visitSite,
+  move, cross, gather, craftAxe, craftPickaxe, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
   storeStone, takeStone, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
   cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, rest, sleep, befriend, craftPillow, craftCloak
 };

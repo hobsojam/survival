@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { CLEARING_STEPS, STEP_IDS, choppableTrees, clearingKey, clearingReach, inClearing, markBlocker, markedTrees, nextStep, sideAt, type StepId } from '../src/game/clearing';
+import { CLEARING_STEPS, STEP_IDS, choppableTrees, clearGroundBlocker, placeBranches, roomLine, clearingKey, clearingReach, inClearing, markBlocker, markedTrees, nextStep, sideAt, type StepId } from '../src/game/clearing';
 import { BALANCE, LOOKOUT, SITES, createGame } from '../src/game/state';
 import { applyAction } from '../src/game/rules';
+import { TOO_TIRED_MESSAGE } from '../src/game/needs';
 
 const FIRE = { x: BALANCE.campX, y: BALANCE.campY };
 const PATH_DESTINATIONS = [[9, 9], [30, 9], [10, 21], [30, 21]];
@@ -225,5 +226,105 @@ describe('marking a side and felling its trees', () => {
     const full = applyAction(state, { type: 'chopTree', treeId: 'mark-east-near-0' });
     expect(full.state).toBe(state);
     expect(full.message).toBe('Your bag needs two free spaces for wood.');
+  });
+});
+
+describe('clearing the ground', () => {
+  function felledState(step: StepId = 'north-near') {
+    const state = createGame();
+    state.progress.axeCrafted = true;
+    state.clearing = { cleared: [], marked: step, felled: [0, 1, 2, 3] };
+    state.inventory.wood = 4;
+    state.inventory.fiber = 2;
+    return state;
+  }
+
+  it('says why the ground cannot be cleared, in order', () => {
+    const state = createGame();
+    expect(clearGroundBlocker(state)).toBe('Choose a side to clear first.');
+    state.clearing = { cleared: [], marked: 'north-near', felled: [0] };
+    expect(clearGroundBlocker(state)).toBe('Fell the 3 marked trees left first.');
+    const ready = felledState();
+    const away = { ...ready, player: { ...ready.player, x: 5, y: 5 } };
+    expect(clearGroundBlocker(away)).toBe('Return to camp to clear land.');
+    const tired = { ...ready, player: { ...ready.player, energy: 0 } };
+    expect(clearGroundBlocker(tired)).toBe(TOO_TIRED_MESSAGE);
+    const short = { ...ready, inventory: { ...ready.inventory, wood: 3 } };
+    expect(clearGroundBlocker(short)).toBe('Need 4 wood and 2 fiber to clear this.');
+    expect(clearGroundBlocker(ready)).toBeNull();
+  });
+
+  it('opens the side, pays for it and moves the edge branches', () => {
+    const state = felledState();
+    const result = applyAction(state, { type: 'clearGround' });
+    const next = result.state;
+    expect(next.clearing).toEqual({ cleared: ['north-near'], marked: null, felled: [] });
+    expect(next.inventory.wood).toBe(0);
+    expect(next.inventory.fiber).toBe(0);
+    expect(next.timeOfDay).toBeGreaterThan(state.timeOfDay);
+    expect(next.player.energy).toBeLessThan(state.player.energy);
+    expect(result.message).toBe("The north side is open now. There's room for a larder now.");
+    const placed = placeBranches(createGame().nodes, ['north-near']);
+    next.nodes.forEach((node, index) => {
+      expect(node.x).toBe(placed[index].x);
+      expect(node.y).toBe(placed[index].y);
+      expect(node.amount).toBe(state.nodes[index].amount);
+      expect(node.readyDay).toBe(state.nodes[index].readyDay);
+    });
+    expect(next.nodes.some((node, index) => node.x !== state.nodes[index].x || node.y !== state.nodes[index].y)).toBe(true);
+  });
+
+  it('refuses when blocked', () => {
+    const state = createGame();
+    const result = applyAction(state, { type: 'clearGround' });
+    expect(result.state).toBe(state);
+    expect(result.message).toBe('Choose a side to clear first.');
+  });
+
+  it('names the room a cleared step makes', () => {
+    expect(roomLine('north-near', {}, id => id === 'larder')).toBe(" There's room for a larder now.");
+    expect(roomLine('east-near', {}, () => true)).toBe(" There's room for a woodpile and a fibre stack now.");
+    expect(roomLine('north-near', { larder: true }, () => true)).toBe('');
+    expect(roomLine('south-near', {}, () => true)).toBe('');
+  });
+});
+
+describe('moving the branches', () => {
+  const subsets = (): StepId[][] => {
+    const all: StepId[][] = [];
+    for (let mask = 0; mask < 256; mask++) {
+      const set = STEP_IDS.filter((_, i) => mask & (1 << i));
+      if (set.every(id => !id.endsWith('-far') || set.includes(id.replace('far', 'near') as StepId))) all.push(set);
+    }
+    return all;
+  };
+
+  it('keeps every branch on the map, outside the clearing and near its edge', () => {
+    const base = createGame().nodes;
+    for (const cleared of subsets()) {
+      const placed = placeBranches(base, cleared);
+      expect(placed).toHaveLength(base.length);
+      placed.forEach((node, index) => {
+        if (node.kind !== 'branch') return;
+        expect(node.x).toBeGreaterThanOrEqual(0);
+        expect(node.x).toBeLessThanOrEqual(BALANCE.mapWidth - 1);
+        expect(node.y).toBeGreaterThanOrEqual(0);
+        expect(node.y).toBeLessThanOrEqual(BALANCE.mapHeight - 1);
+        if (!inClearing(base[index].x, base[index].y, cleared)) {
+          expect([node.x, node.y]).toEqual([base[index].x, base[index].y]);
+          return;
+        }
+        expect(inClearing(node.x, node.y, cleared), `${cleared.join()} ${node.id}`).toBe(false);
+        const out = Math.hypot(node.x - FIRE.x, node.y - FIRE.y) - clearingReach(node.x, node.y, cleared);
+        expect(out).toBeLessThanOrEqual(3.25);
+      });
+    }
+  });
+
+  it('never stacks two nodes on one tile', () => {
+    for (const cleared of subsets()) {
+      const keys = placeBranches(createGame().nodes, cleared).map(node => `${node.x},${node.y}`);
+      expect(new Set(keys).size, cleared.join()).toBe(keys.length);
+    }
   });
 });

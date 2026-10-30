@@ -2,10 +2,12 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState } from './state';
 import { bagCapacity, carriedCount } from './rules';
 import { season, yearOf } from './calendar';
 import { journalEntry, journalSeason, type JournalId } from './journalEntries';
+import type { ClearingState, StepId } from './clearing';
+import { CLEARING_STEPS, STEP_IDS, placeBranches } from './clearing';
 import { KEEPSAKES_NEEDED, TRUST_TARGET } from './companion';
 
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 17;
+const SAVE_VERSION = 18;
 export type SaveResult = { ok: true } | { ok: false; error: string };
 export type LoadResult = { kind: 'empty' } | { kind: 'loaded'; state: GameState } | { kind: 'invalid'; reason: string };
 
@@ -85,11 +87,26 @@ function validGarden({ gardenPlots, structures, day }: SaveShape): boolean {
   });
 }
 
-function validWorld({ nodes, trees, stonePiles, day }: SaveShape): boolean {
+/** Cleared steps are real, once each, and a far step follows its near one; the marked step is still to do; felled trees are the marked step's own. */
+function validClearing({ clearing }: SaveShape): boolean {
+  if (!object(clearing) || !Array.isArray(clearing.cleared) || !Array.isArray(clearing.felled)) return false;
+  const { cleared, marked, felled } = clearing as ObjectValue & { cleared: unknown[]; felled: unknown[] };
+  const step = (value: unknown): value is StepId => typeof value === 'string' && (STEP_IDS as readonly string[]).includes(value);
+  if (!cleared.every(step) || new Set(cleared).size !== cleared.length) return false;
+  const nearDone = (id: StepId): boolean => !id.endsWith('-far') || cleared.includes(id.replace('-far', '-near') as StepId);
+  if (!cleared.every(nearDone)) return false;
+  if (marked === null) return felled.length === 0;
+  if (!step(marked) || cleared.includes(marked) || !nearDone(marked)) return false;
+  const trees = CLEARING_STEPS[marked].trees.length;
+  return felled.every(index => whole(index) && index >= 0 && index < trees) && new Set(felled).size === felled.length;
+}
+
+function validWorld({ nodes, trees, stonePiles, day, clearing }: SaveShape): boolean {
   const today = day as number;
   const fresh = createGame();
+  const placed = placeBranches(fresh.nodes, (clearing as ClearingState).cleared);
   const nodesMatch = nodes.length === fresh.nodes.length && nodes.every((node, index) => {
-    const base = fresh.nodes[index];
+    const base = placed[index];
     return object(node) && node.id === base.id && node.kind === base.kind && node.x === base.x && node.y === base.y
       && (node.amount === 0 || node.amount === 1) && readyBy(node.readyDay, today + 1);
   });
@@ -151,10 +168,10 @@ function validCompanion({ companion, day, structures }: SaveShape): boolean {
     && (!made || (keepsakes === 0 && !keepsakeLying));
 }
 
-/** Checks a version 17 save: shelter upgrades, garden plots, tools, quarry timers, the year journal and companion. */
+/** Checks a version 18 save: the clearing, shelter upgrades, garden plots, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validGarden, validWorld, validWolf, validJournal, validCompanion];
+  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validGarden, validClearing, validWorld, validWolf, validJournal, validCompanion];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

@@ -1,5 +1,6 @@
 import { isInClearing } from './camp';
-import { BALANCE, type GameState, type TreeNode } from './state';
+import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
+import { BALANCE, BUILDINGS, type GameState, type ResourceNode, type TreeNode } from './state';
 
 // The camp clearing starts as the ring round the fire and widens one side at a time. Each side has a near and a far step;
 // every step names the trees that stand in its way and the building the cleared ground makes room for.
@@ -178,4 +179,54 @@ export function markBlocker(state: GameState, step: StepId): string | null {
 /** The side's next step to clear, or null once the whole side is clear. */
 export function nextStep(state: GameState, side: Side): StepId | null {
   return STEP_IDS.find(id => CLEARING_STEPS[id].side === side && !state.clearing.cleared.includes(id)) ?? null;
+}
+
+/** Why the marked ground cannot be cleared yet, or null when it can. */
+export function clearGroundBlocker(state: GameState): string | null {
+  const { marked, felled } = state.clearing;
+  if (!marked) return 'Choose a side to clear first.';
+  const left = CLEARING_STEPS[marked].trees.length - felled.length;
+  if (left > 0) return `Fell the ${left} marked ${left === 1 ? 'tree' : 'trees'} left first.`;
+  if (!isInClearing(state)) return 'Return to camp to clear land.';
+  if (isExhausted(state)) return TOO_TIRED_MESSAGE;
+  const { wood, fiber } = CLEARING_STEPS[marked].cost;
+  if (state.inventory.wood < wood || state.inventory.fiber < fiber) return `Need ${wood} wood and ${fiber} fiber to clear this.`;
+  return null;
+}
+
+/** How far past the clearing's edge a branch pile is set down. */
+const BRANCH_MARGIN = 1.5;
+
+/**
+ * Takes the starting nodes and sets every branch pile that now lies inside the clearing just beyond its edge,
+ * along the line from the fire, on a whole tile that no other node holds.
+ */
+export function placeBranches(nodes: readonly ResourceNode[], cleared: readonly StepId[]): ResourceNode[] {
+  const taken = new Set(nodes.filter(node => node.kind !== 'branch' || !inClearing(node.x, node.y, cleared)).map(node => `${node.x},${node.y}`));
+  return nodes.map(node => {
+    if (node.kind !== 'branch' || !inClearing(node.x, node.y, cleared)) return node;
+    const angle = Math.atan2(node.y - BALANCE.campY, node.x - BALANCE.campX);
+    let distance = clearingReach(node.x, node.y, cleared) + BRANCH_MARGIN;
+    for (let attempt = 0; attempt < 8; attempt++, distance += 1) {
+      const x = Math.max(0, Math.min(BALANCE.mapWidth - 1, Math.round(BALANCE.campX + Math.cos(angle) * distance)));
+      const y = Math.max(0, Math.min(BALANCE.mapHeight - 1, Math.round(BALANCE.campY + Math.sin(angle) * distance)));
+      if (inClearing(x, y, cleared) || taken.has(`${x},${y}`)) continue;
+      taken.add(`${x},${y}`);
+      return { ...node, x, y };
+    }
+    return node;
+  });
+}
+
+/** A building's name as it reads in a sentence: its own name, or the id split into lower-case words. */
+function buildingName(id: string, known: (id: string) => boolean): string {
+  if (known(id) && Object.hasOwn(BUILDINGS, id)) return BUILDINGS[id as keyof typeof BUILDINGS].name.toLowerCase();
+  return id.replace(/([A-Z])/g, ' $1').toLowerCase();
+}
+
+/** The sentence about what a cleared step makes room for, leading space included, or nothing if it is built or has none. */
+export function roomLine(step: StepId, structures: Partial<Record<string, boolean>>, known: (id: string) => boolean): string {
+  const open = CLEARING_STEPS[step].room.filter(id => !structures[id]);
+  if (open.length === 0) return '';
+  return ` There's room for ${open.map(id => `a ${buildingName(id, known)}`).join(' and ')} now.`;
 }
