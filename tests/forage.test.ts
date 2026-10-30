@@ -7,6 +7,9 @@ import { advanceTime, applyAction } from '../src/game/rules';
 import { rainWindow } from '../src/game/rain';
 import { CAMP_STRUCTURES } from '../src/scene/visuals';
 import { PATH_DESTINATIONS, segmentDistance } from './placement';
+import { buildMap } from '../src/scene/map';
+import { sprites } from '../src/art/sprites';
+import { worldX, worldY } from '../src/scene/art';
 
 const AUTUMN = 1, WINTER = 11, SPRING = 21, SUMMER = 31;
 const SEASON_DAYS = { autumn: AUTUMN, winter: WINTER, spring: SPRING, summer: SUMMER } as const;
@@ -15,6 +18,31 @@ const isForage = (kind: string): kind is keyof typeof FORAGE => kind in FORAGE;
 const forage = game.nodes.filter(node => isForage(node.kind));
 const node = (id: string) => game.nodes.find(item => item.id === id)!;
 const distance = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
+
+const hazels = forage.filter(item => item.kind === 'hazel');
+const campMap = buildMap(game.nodes, 'camp');
+const fullyCleared = buildMap(game.nodes, 'camp', 'summer', { cleared: [...STEP_IDS], marked: null, felled: [] });
+/** The broadleaf a hazel grows by: a wild tree or one of the map's grove trees, within 1.6 tiles. */
+const hostOf = (hazel: { x: number; y: number }) =>
+  campMap.trees.find(tree => tree.sprite === 'treeBroadleaf' && distance(tree, hazel) <= 1.6);
+
+type Drawn = { x: number; y: number; sprite: string; frame: string };
+/** The non-shadow pixels a sprite covers on the map, as world-pixel keys. */
+function pixels({ x, y, sprite, frame }: Drawn): Set<string> {
+  const def = sprites[sprite];
+  const left = Math.round(worldX(x)) - def.anchor[0], top = Math.round(worldY(y)) - def.anchor[1];
+  const covered = new Set<string>();
+  def.frames[frame].forEach((row, py) => [...row].forEach((pixel, px) => {
+    if (pixel !== '.' && def.legend[pixel] !== 'shadow') covered.add(`${left + px},${top + py}`);
+  }));
+  return covered;
+}
+/** Whether the front thing, drawn after the back one because it stands further south, hides any of its pixels. */
+function overlaps(back: Drawn, front: Drawn): boolean {
+  if (Math.round(worldY(front.y)) <= Math.round(worldY(back.y))) return false;
+  const behind = pixels(back);
+  return [...pixels(front)].some(key => behind.has(key));
+}
 
 /** A spring day with a shower, and one without. */
 const SHOWER_DAY = Array.from({ length: 10 }, (_, i) => SPRING + i).find(day => rainWindow(day))!;
@@ -38,11 +66,20 @@ describe('where the forage grows', () => {
     expect(SHOWER_GREENS).toEqual(['greens-3', 'greens-4']);
   });
 
-  it('sets each hazel beside a wild broadleaf tree', () => {
-    for (const hazel of forage.filter(item => item.kind === 'hazel')) {
-      const host = game.trees.find(tree => tree.sprite === 'treeBroadleaf' && distance(tree, hazel) <= 1.6);
+  it('sets each hazel beside a broadleaf tree, wild or in a grove, that stands whatever ground is cleared', () => {
+    for (const hazel of hazels) {
+      const host = hostOf(hazel);
       expect(host, hazel.id).toBeDefined();
       expect(distance(host!, hazel), hazel.id).toBeGreaterThanOrEqual(0.75);
+      expect(fullyCleared.trees, hazel.id).toContainEqual(host);
+      for (const tree of campMap.trees.filter(item => item !== host)) expect(distance(tree, hazel), `${hazel.id} by a tree at ${tree.x},${tree.y}`).toBeGreaterThanOrEqual(1.5);
+    }
+  });
+
+  it('draws no tree over a hazel, wild, grove or marked for clearing', () => {
+    const stepTrees = STEP_IDS.flatMap(id => CLEARING_STEPS[id].trees);
+    for (const hazel of hazels) for (const tree of [...campMap.trees, ...fullyCleared.trees, ...stepTrees]) {
+      expect(overlaps({ ...hazel, sprite: 'hazelSpot', frame: 'ready' }, { ...tree, frame: 'still' }), `${hazel.id} under ${tree.sprite} at ${tree.x},${tree.y}`).toBe(false);
     }
   });
 
@@ -74,7 +111,8 @@ describe('where the forage grows', () => {
       for (const [dx, dy] of PATH_DESTINATIONS) expect(segmentDistance(spot.x + 0.5, spot.y + 0.5, dx, dy), spot.id).toBeGreaterThanOrEqual(1.35);
       if (spot.x < 16) expect(Math.abs(spot.y + 0.5 - 15), `${spot.id} by the west path`).toBeGreaterThanOrEqual(1.35);
       expect(inClearing(spot.x, spot.y, STEP_IDS), spot.id).toBe(false);
-      expect(distance(spot, { x: BALANCE.campX, y: BALANCE.campY }), spot.id).toBeLessThanOrEqual(11);
+      // A hazel by a grove tree may stand a little further out.
+      expect(distance(spot, { x: BALANCE.campX, y: BALANCE.campY }), spot.id).toBeLessThanOrEqual(spot.kind === 'hazel' ? 12.5 : 11);
     }
   });
 });
