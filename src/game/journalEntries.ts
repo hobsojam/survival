@@ -1,4 +1,5 @@
 import { duskLength, nightStart, season, seasonMessage, yearOf, type Season } from './calendar';
+import { defaultDish, type DishId } from './cooking';
 import { foodCount, type FoodItem } from './food';
 import { rainMessage } from './rain';
 import { isAtCamp, isColdNight, isInClearing, type GameAction } from './rules';
@@ -85,9 +86,9 @@ const berries = (state: GameState): number => foodCount(state.inventory.food, 'b
 /** A successful gather that brought more of one food into the bag. */
 const gathered = (m: Moment, item: FoodItem): boolean =>
   acted(m, 'gather') && foodCount(m.after.inventory.food, item) > foodCount(m.before.inventory.food, item);
-/** A successful cook that used up some of an ingredient, which tells the dish apart whether or not it was named. */
-const cookedWith = (m: Moment, item: FoodItem): boolean =>
-  acted(m, 'cook') && foodCount(m.after.inventory.food, item) < foodCount(m.before.inventory.food, item);
+/** A successful cook of this dish: the one named, or on a bare C press the one C picks, wherever its ingredients were kept. */
+const cooked = (m: Moment, dish: DishId): boolean =>
+  m.action?.type === 'cook' && done(m) && (m.action.dish ?? defaultDish(m.before)) === dish;
 const atSpring = (m: Moment): boolean => m.action?.type === 'visitSite' && m.action.siteId === 'spring' && done(m);
 
 const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
@@ -123,8 +124,8 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   lookoutEvening: m => onAfter(m, awake(m) && m.after.progress.lookoutRepaired && m.after.area === 'camp'
     && within(m.after, LOOKOUT, 2) && atDusk(m.after)),
   hazelnuts: m => onBefore(m, gathered(m, 'hazelnut')),
-  pineTea: m => onBefore(m, cookedWith(m, 'pineNeedles')),
-  salad: m => onBefore(m, cookedWith(m, 'greens')),
+  pineTea: m => onBefore(m, cooked(m, 'pineTea')),
+  salad: m => onBefore(m, cooked(m, 'salad')),
   wildHoney: m => onBefore(m, gathered(m, 'honey'))
 };
 

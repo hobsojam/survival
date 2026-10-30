@@ -207,6 +207,33 @@ describe('each moment of the year', () => {
       expect(written(act(evening(22, { greens: 1, berry: 1 }), { type: 'cook' }), 'salad')).toBe(false);
     });
 
+    /** The evening with the larder built and holding this food, picked on the day given. */
+    const withLarder = (state: GameState, food: Partial<Record<FoodItem, number>>, picked = state.day): GameState => ({
+      ...state,
+      structures: { ...state.structures, larder: true },
+      larder: (Object.entries(food) as [FoodItem, number][]).reduce((store, [item, n]) => addFood(store, item, n, picked), emptyFood())
+    });
+
+    it('writes pine tea brewed from larder needles, named or from a bare C press', () => {
+      for (const action of [{ type: 'cook' }, { type: 'cook', dish: 'pineTea' }] as const) {
+        const tea = act(withLarder(evening(12, {}), { pineNeedles: 1 }), action);
+        expect(tea.state.larder.pineNeedles).toBe(0);
+        expect(tea.state.journal).toContainEqual({ year: 1, id: 'pineTea', day: 12, variant: 0 });
+        expect(tea.state.journal).toContainEqual({ year: 1, id: 'winterCooking', day: 12, variant: 0 });
+      }
+    });
+
+    it('writes a salad whose greens or berry came from the larder', () => {
+      // The larder's greens are older than the bag's, so the salad takes them and leaves the bag's.
+      const olderGreens = act(withLarder(evening(22, { greens: 1, berry: 1 }), { greens: 1 }, 21), { type: 'cook', dish: 'salad' });
+      expect(olderGreens.state.inventory.food.greens).toHaveLength(1);
+      expect(written(olderGreens, 'salad')).toBe(true);
+      const allLarder = act(withLarder(evening(22, {}), { greens: 1, berry: 1 }), { type: 'cook', dish: 'salad' });
+      expect(written(allLarder, 'salad')).toBe(true);
+      // Toasting a larder berry with larder greens beside it is still no salad.
+      expect(written(act(withLarder(evening(22, {}), { greens: 1, berry: 1 }), { type: 'cook' }), 'salad')).toBe(false);
+    });
+
     it('keeps tea and salad to their own seasons and dishes', () => {
       expect(written(act(evening(2, { pineNeedles: 1 }), { type: 'cook' }), 'pineTea')).toBe(false);
       expect(written(act(evening(12, { greens: 1, berry: 1 }), { type: 'cook' }), 'salad')).toBe(false);
