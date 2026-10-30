@@ -5,12 +5,14 @@ import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
 import { bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
 import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
+import { CLEARING_STEPS, choppableTrees, markBlocker, type StepId } from './clearing';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
 import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
   | { type: 'gather'; nodeId: string }
   | { type: 'chopTree'; treeId: string }
+  | { type: 'markClearing'; step: StepId }
   | { type: 'visitSite'; siteId: SiteId }
   | { type: 'build'; structureId: StructureId }
   | { type: 'move'; dx: number; dy: number }
@@ -383,19 +385,35 @@ export function treeRegrowDays(day: number): number {
 
 const chopTree: ActionHandler<'chopTree'> = (state, action) => {
   if (!state.progress.axeCrafted) return refuse(state, 'Craft a stone axe before chopping trees.');
-  const tree = state.trees.find(item => item.id === action.treeId);
+  const tree = choppableTrees(state).find(item => item.id === action.treeId);
   if (!tree || state.area !== 'camp' || !near(state.player.x, state.player.y, tree.x, tree.y)) return refuse(state, 'Move closer to a mature tree.');
   if (tree.readyDay > state.day) return refuse(state, 'This stump needs more time to regrow.');
   if (isExhausted(state)) return refuse(state, TOO_TIRED_MESSAGE);
   if (freeSpaces(state) < 2 * spaceFor('wood')) return refuse(state, 'Your bag needs two free spaces for wood.');
+  const chopped = {
+    ...state,
+    player: tire(state, BALANCE.chopEnergyCost),
+    inventory: { ...state.inventory, wood: state.inventory.wood + 2 }
+  };
+  const marked = tree.id.startsWith('mark-');
+  const felledIndex = Number(tree.id.slice(tree.id.lastIndexOf('-') + 1));
+  const afterChop = marked
+    ? { ...chopped, clearing: { ...state.clearing, felled: [...state.clearing.felled, felledIndex] } }
+    : { ...chopped, trees: state.trees.map(item => item.id === tree.id ? { ...item, readyDay: state.day + treeRegrowDays(state.day) } : item) };
   return {
-    state: advanceTime({
-      ...state,
-      player: tire(state, BALANCE.chopEnergyCost),
-      inventory: { ...state.inventory, wood: state.inventory.wood + 2 },
-      trees: state.trees.map(item => item.id === tree.id ? { ...item, readyDay: state.day + treeRegrowDays(state.day) } : item)
-    }, workSeconds(state, BALANCE.chopSeconds), 'working'),
+    state: advanceTime(afterChop, workSeconds(state, BALANCE.chopSeconds), 'working'),
     message: 'Chopped the tree and collected two wood. A stump remains.'
+  };
+};
+
+const markClearing: ActionHandler<'markClearing'> = (state, action) => {
+  const blocker = markBlocker(state, action.step);
+  if (blocker) return refuse(state, blocker);
+  const { side, trees } = CLEARING_STEPS[action.step];
+  const felled = state.clearing.marked === action.step ? state.clearing.felled : [];
+  return {
+    state: { ...state, clearing: { ...state.clearing, marked: action.step, felled } },
+    message: `Tied pale fibre round ${trees.length} trees on the ${side} side.`
   };
 };
 
@@ -720,7 +738,7 @@ const craftCloak: ActionHandler<'craftCloak'> = state =>
   craftKeepsake(state, 'cloak', cloakBlocker(state), 'You made a fur cloak. The nights will bite a little less.');
 
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
-  move, cross, gather, craftAxe, craftPickaxe, gatherRubble, digQuarry, chopTree, visitSite,
+  move, cross, gather, craftAxe, craftPickaxe, gatherRubble, digQuarry, chopTree, markClearing, visitSite,
   storeStone, takeStone, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
   cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, rest, sleep, befriend, craftPillow, craftCloak
 };

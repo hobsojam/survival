@@ -1,4 +1,5 @@
-import { BALANCE } from './state';
+import { isInClearing } from './camp';
+import { BALANCE, type GameState, type TreeNode } from './state';
 
 // The camp clearing starts as the ring round the fire and widens one side at a time. Each side has a near and a far step;
 // every step names the trees that stand in its way and the building the cleared ground makes room for.
@@ -142,4 +143,39 @@ export function inClearing(x: number, y: number, cleared: readonly StepId[]): bo
 export function clearingKey(cleared: readonly StepId[]): string {
   const done = STEP_IDS.filter(id => cleared.includes(id));
   return done.length === 0 ? 'none' : done.join('+');
+}
+
+/** The trees of the marked step, as choppable trees; felled ones never regrow. */
+export function markedTrees(state: GameState): TreeNode[] {
+  const { marked, felled } = state.clearing;
+  if (!marked) return [];
+  return CLEARING_STEPS[marked].trees.map((tree, index) => ({
+    id: `mark-${marked}-${index}`,
+    x: tree.x,
+    y: tree.y,
+    sprite: tree.sprite,
+    readyDay: felled.includes(index) ? Number.MAX_SAFE_INTEGER : 1
+  }));
+}
+
+/** Every tree the axe can fell: the wild ones and those marked for clearing. */
+export function choppableTrees(state: GameState): TreeNode[] {
+  return [...state.trees, ...markedTrees(state)];
+}
+
+/** Why a step cannot be marked for felling right now, or null when it can. */
+export function markBlocker(state: GameState, step: StepId): string | null {
+  if (!state.progress.axeCrafted) return 'Craft a stone axe to clear land.';
+  if (!isInClearing(state)) return 'Return to camp to clear land.';
+  const { side } = CLEARING_STEPS[step];
+  if (step.endsWith('-far') && !state.clearing.cleared.includes(`${side}-near`)) return 'Clear the near ground on that side first.';
+  if (state.clearing.cleared.includes(step)) return 'That ground is already clear.';
+  const { marked, felled } = state.clearing;
+  if (marked && marked !== step && felled.length > 0) return `Finish clearing the ${CLEARING_STEPS[marked].side} side first.`;
+  return null;
+}
+
+/** The side's next step to clear, or null once the whole side is clear. */
+export function nextStep(state: GameState, side: Side): StepId | null {
+  return STEP_IDS.find(id => CLEARING_STEPS[id].side === side && !state.clearing.cleared.includes(id)) ?? null;
 }
