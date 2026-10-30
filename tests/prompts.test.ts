@@ -4,6 +4,7 @@ import { BALANCE, LOOKOUT, SITES, createGame, type GameState } from '../src/game
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { markedTrees } from '../src/game/clearing';
 import { KEY_ACTIONS, actionPose, closestSite, closestTree, gatherKeyAction, gatherSpot, promptFor } from '../src/scene/prompts';
+import { stock } from './stock';
 
 /** A camp with nothing to gather, chop or explore, so each test adds only what it checks. */
 function bareCamp(x: number = BALANCE.campX, y: number = BALANCE.campY): GameState {
@@ -217,14 +218,14 @@ describe('winter prompts', () => {
 
 describe('offering prompts', () => {
   it('offers the fox a berry with O while it sits at dusk', () => {
-    const dusk = { ...bareCamp(), timeOfDay: nightStart(1) - 5, inventory: { ...createGame().inventory, food: 1 } };
+    const dusk = { ...bareCamp(), timeOfDay: nightStart(1) - 5, inventory: { ...createGame().inventory, food: stock(1) } };
     expect(promptFor(dusk)).toBe('O  Leave a berry for the fox · At camp · F Fire · R Rest · Click an upgrade to build');
     expect(KEY_ACTIONS).toContainEqual(['O', { type: 'befriend' }]);
   });
 
   it('adds the offering beside a bush the birds visit', () => {
     const bush = createGame().nodes.find(node => node.id === 'berry-0')!;
-    const spring = { ...bareCamp(19, 14), day: 22, timeOfDay: 60, nodes: [bush], inventory: { ...createGame().inventory, food: 1 } };
+    const spring = { ...bareCamp(19, 14), day: 22, timeOfDay: 60, nodes: [bush], inventory: { ...createGame().inventory, food: stock(1) } };
     expect(promptFor(spring)).toBe('E  Pick berries · O  Scatter a berry for the birds');
   });
 });

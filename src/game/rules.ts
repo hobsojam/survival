@@ -6,6 +6,7 @@ import { wolfVisit } from './wolves';
 import { bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
 import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
 import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, type StepId } from './clearing';
+import { addFood, availableFood, spendFood } from './food';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
 import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
 
@@ -52,7 +53,7 @@ export function spendStone(state: GameState, amount: number): GameState {
 export function trailFoodBlocker(state: GameState): string | null {
   if (!state.structures.dryingRack) return 'Build a drying rack to prepare trail food.';
   if (!isAtCamp(state)) return 'Return to camp to use the drying rack.';
-  if (state.inventory.food <= 0) return 'Gather a berry to prepare trail food.';
+  if (availableFood(state, 'berry') <= 0) return 'Gather a berry to prepare trail food.';
   return null;
 }
 
@@ -99,7 +100,7 @@ export function cookBlocker(state: GameState): string | null {
   if (state.timeOfDay < nightStart(state.day)) return 'Cook berries after nightfall.';
   if (!isAtCamp(state)) return 'Return to camp to cook.';
   if (state.fireFuel <= 0) return 'Light the campfire before cooking.';
-  if (state.inventory.food <= 0) return 'Gather a berry to cook.';
+  if (availableFood(state, 'berry') <= 0) return 'Gather a berry to cook.';
   return null;
 }
 
@@ -293,10 +294,19 @@ const cross: ActionHandler<'cross'> = state => {
   };
 };
 
-const NODE_RESOURCE: Record<GameState['nodes'][number]['kind'], keyof GameState['inventory']> = { branch: 'wood', berry: 'food', fiber: 'fiber', stone: 'stone' };
-const GATHER_MESSAGE: Partial<Record<keyof GameState['inventory'], string>> = {
+type Supply = keyof GameState['inventory'];
+// Berries go into the food store.
+const NODE_RESOURCE: Record<GameState['nodes'][number]['kind'], Supply> = { branch: 'wood', berry: 'food', fiber: 'fiber', stone: 'stone' };
+const GATHER_MESSAGE: Partial<Record<Supply, string>> = {
   wood: 'Picked up fallen branches.', food: 'Picked berries.', fiber: 'Gathered fiber.', stone: 'Collected stone.'
 };
+
+/** The bag with n more of a supply; food found this way is berries, picked today. */
+function withSupply(state: GameState, resource: Supply, n: number): GameState['inventory'] {
+  const { inventory } = state;
+  if (resource === 'food') return { ...inventory, food: addFood(inventory.food, 'berry', n, state.day) };
+  return { ...inventory, [resource]: inventory[resource] + n };
+}
 
 const gather: ActionHandler<'gather'> = (state, action) => {
   const node = state.nodes.find(item => item.id === action.nodeId);
@@ -312,7 +322,7 @@ const gather: ActionHandler<'gather'> = (state, action) => {
     state: advanceTime({
       ...state,
       player: tire(state, BALANCE.gatherEnergyCost),
-      inventory: { ...state.inventory, [resource]: state.inventory[resource] + picked },
+      inventory: withSupply(state, resource, picked),
       nodes
     }, workSeconds(state, BALANCE.gatherSeconds), 'working'),
     message: picked > 1 ? 'Picked two handfuls of berries.' : GATHER_MESSAGE[resource] ?? ''
@@ -457,7 +467,7 @@ const visitSite: ActionHandler<'visitSite'> = (state, action) => {
   const found = advanceTime({
     ...state,
     player: tire(state, BALANCE.gatherEnergyCost),
-    inventory: { ...state.inventory, [resource]: state.inventory[resource] + 2 },
+    inventory: withSupply(state, resource, 2),
     progress: { ...state.progress, discoveries: { ...state.progress.discoveries, [action.siteId]: true } }
   }, workSeconds(state, BALANCE.gatherSeconds), 'working');
   return { state: found, message: action.siteId === 'basket' ? 'An old basket holds two berries.' : 'You find two useful stones tucked in the cairn.' };
@@ -519,34 +529,30 @@ const burnFiber: ActionHandler<'burnFiber'> = state => {
 };
 
 const eat: ActionHandler<'eat'> = state => {
-  if (state.inventory.food <= 0) return refuse(state, 'No food in your bag.');
+  const fed = spendFood(state, 'berry', 1);
+  if (!fed) return refuse(state, 'No food in your bag.');
   return {
-    state: {
-      ...state,
-      inventory: { ...state.inventory, food: state.inventory.food - 1 },
-      player: { ...state.player, hunger: Math.min(100, state.player.hunger + BALANCE.eatHungerGain) }
-    },
+    state: { ...fed, player: { ...fed.player, hunger: Math.min(100, fed.player.hunger + BALANCE.eatHungerGain) } },
     message: 'Ate some berries.'
   };
 };
 
 const eatTrailFood: ActionHandler<'eatTrailFood'> = state => {
-  if (state.inventory.trailFood <= 0) return refuse(state, 'No trail rations in your bag.');
+  const fed = spendFood(state, 'trailFood', 1);
+  if (!fed) return refuse(state, 'No trail rations in your bag.');
   return {
-    state: { ...state,
-      inventory: { ...state.inventory, trailFood: state.inventory.trailFood - 1 },
-      player: { ...state.player, hunger: Math.min(100, state.player.hunger + BALANCE.trailFoodHungerGain) }
-    },
+    state: { ...fed, player: { ...fed.player, hunger: Math.min(100, fed.player.hunger + BALANCE.trailFoodHungerGain) } },
     message: 'Ate a trail ration.'
   };
 };
 
 const prepareTrailFood: ActionHandler<'prepareTrailFood'> = state => {
   const blocker = trailFoodBlocker(state);
-  if (blocker) return refuse(state, blocker);
+  const spent = spendFood(state, 'berry', 1);
+  if (blocker || !spent) return refuse(state, blocker ?? 'No food in your bag.');
   return {
-    state: advanceTime({ ...state,
-      inventory: { ...state.inventory, food: state.inventory.food - 1, trailFood: state.inventory.trailFood + 1 },
+    state: advanceTime({ ...spent,
+      inventory: { ...spent.inventory, food: addFood(spent.inventory.food, 'trailFood', 1, state.day) },
       player: tire(state, BALANCE.gatherEnergyCost)
     }, workSeconds(state, BALANCE.trailFoodSeconds), 'working'),
     message: 'Dried a berry into one trail ration.'
@@ -555,8 +561,9 @@ const prepareTrailFood: ActionHandler<'prepareTrailFood'> = state => {
 
 const cook: ActionHandler<'cook'> = state => {
   const blocker = cookBlocker(state);
-  if (blocker) return refuse(state, blocker);
-  const cooked = advanceTime({ ...state, inventory: { ...state.inventory, food: state.inventory.food - 1 } }, BALANCE.cookSeconds, 'resting');
+  const spent = spendFood(state, 'berry', 1);
+  if (blocker || !spent) return refuse(state, blocker ?? 'No food in your bag.');
+  const cooked = advanceTime(spent, BALANCE.cookSeconds, 'resting');
   return {
     state: { ...cooked, player: { ...cooked.player,
       hunger: Math.min(100, cooked.player.hunger + (state.structures.dryingRack ? BALANCE.rackCookHungerGain : BALANCE.cookHungerGain)),
@@ -611,7 +618,7 @@ export function plantGardenBlocker(state: GameState, plotIndex: number): string 
   if (!isInClearing(state)) return 'Return to camp to tend the garden.';
   if (!isSpring(state.day)) return 'Plant berry bushes in spring.';
   if (state.gardenPlots[plotIndex].plantedYear !== null) return 'That plot already has a berry bush.';
-  if (state.inventory.food < 1) return 'You need a berry to plant.';
+  if (availableFood(state, 'berry') < 1) return 'You need a berry to plant.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   return null;
 }
@@ -628,13 +635,13 @@ export function harvestGardenBlocker(state: GameState, plotIndex: number): strin
 
 const plantGarden: ActionHandler<'plantGarden'> = (state, action) => {
   const blocker = plantGardenBlocker(state, action.plotIndex);
-  if (blocker) return refuse(state, blocker);
+  const spent = spendFood(state, 'berry', 1);
+  if (blocker || !spent) return refuse(state, blocker ?? 'No food in your bag.');
   const gardenPlots = state.gardenPlots.map((plot, index) => index === action.plotIndex
     ? { plantedYear: yearOf(state.day), harvestedYear: null, harvestReady: false }
     : plot);
   const planted = {
-    ...state,
-    inventory: { ...state.inventory, food: state.inventory.food - 1 },
+    ...spent,
     gardenPlots,
     player: tire(state, BALANCE.gatherEnergyCost)
   };
@@ -649,7 +656,7 @@ const harvestGarden: ActionHandler<'harvestGarden'> = (state, action) => {
     : plot);
   const harvested = {
     ...state,
-    inventory: { ...state.inventory, food: state.inventory.food + 2 },
+    inventory: { ...state.inventory, food: addFood(state.inventory.food, 'berry', 2, state.day) },
     gardenPlots,
     player: tire(state, BALANCE.gatherEnergyCost)
   };

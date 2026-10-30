@@ -1,6 +1,7 @@
 import { isWinter, nightStart } from './calendar';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { freeSpaces, isInClearing } from './camp';
+import { addFood, availableFood, spendFood } from './food';
 import { BALANCE, type Friend, type GameState } from './state';
 import { dayHash, foxAt, foxSpookRadius } from './wildlife';
 
@@ -36,10 +37,10 @@ const byBush = (state: GameState): boolean => state.nodes.some(node => node.kind
 const WILLING: Record<Friend, (state: GameState) => boolean> = {
   fox: state => {
     const fox = foxAt(state.day, state.timeOfDay);
-    return state.inventory.food > 0 && state.companion.foxFled !== state.day && (fox?.sitting === true || fox?.nibbling === true);
+    return availableFood(state, 'berry') > 0 && state.companion.foxFled !== state.day && (fox?.sitting === true || fox?.nibbling === true);
   },
-  wolf: state => state.inventory.trailFood > 0 && isWinter(state.day) && night(state),
-  bird: state => state.inventory.food > 0 && !isWinter(state.day) && !night(state) && byBush(state)
+  wolf: state => availableFood(state, 'trailFood') > 0 && isWinter(state.day) && night(state),
+  bird: state => availableFood(state, 'berry') > 0 && !isWinter(state.day) && !night(state) && byBush(state)
 };
 const ORDER: readonly Friend[] = ['fox', 'wolf', 'bird'];
 
@@ -58,19 +59,17 @@ export function offerBlocker(state: GameState): string | null {
 /** Leaves the offering out and counts it; the animal that reaches its count stays. Time passes in the caller. */
 export function makeOffering(state: GameState): { state: GameState; message: string } | null {
   const animal = offerFor(state);
-  if (!animal) return null;
+  const spent = animal && spendFood(state, animal === 'wolf' ? 'trailFood' : 'berry', 1);
+  if (!animal || !spent) return null;
   const trust = { ...state.companion.trust, [animal]: state.companion.trust[animal] + 1 };
   const stays = trust[animal] >= TRUST_TARGET[animal];
-  const inventory = animal === 'wolf'
-    ? { ...state.inventory, trailFood: state.inventory.trailFood - 1 }
-    : { ...state.inventory, food: state.inventory.food - 1 };
   // A ration left out is that night's wolf visit, so nothing more is taken.
   const lastWolf = animal === 'wolf' && state.lastWolf?.day !== state.day ? { day: state.day, took: 'offered' as const } : state.lastWolf;
   const companion = {
     ...state.companion, trust, lastOffer: { ...state.companion.lastOffer, [animal]: state.day },
     ...(stays ? { friend: animal, since: state.day, lastFind: state.day, lastGift: state.day } : {})
   };
-  return { state: { ...state, inventory, lastWolf, companion }, message: stays ? STAYED[animal] : OFFERED[animal] };
+  return { state: { ...spent, lastWolf, companion }, message: stays ? STAYED[animal] : OFFERED[animal] };
 }
 
 /** The wild fox runs off for the evening if the survivor comes too close. Mutates advanceTime's working copy. */
@@ -119,7 +118,7 @@ export function companionDawn(next: GameState): void {
   const home = next.area === 'camp';
   if (companion.friend === 'fox' && home && findDue(next.day, companion.lastGift, GIFT_SALT) && freeSpaces(next) >= 1) {
     changes = { ...changes, lastGift: next.day };
-    next.inventory = { ...next.inventory, food: next.inventory.food + 1 };
+    next.inventory = { ...next.inventory, food: addFood(next.inventory.food, 'berry', 1, next.day) };
   }
   next.companion = { ...companion, ...changes };
 }

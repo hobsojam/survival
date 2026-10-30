@@ -3,6 +3,7 @@ import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { CLEARING_STEPS } from '../src/game/clearing';
 import { axeView, clearingView, bagView, buildButtonView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightHint, pickaxeView, pillowView, startNote } from '../src/ui/panels';
+import { stock } from './stock';
 
 type Changes = { structures?: Partial<GameState['structures']>; progress?: Partial<GameState['progress']>; inventory?: Partial<GameState['inventory']> };
 
@@ -28,7 +29,7 @@ describe('garden panel', () => {
     expect(unbuilt.shown).toBe(false);
     expect(unbuilt.plots[0]).toMatchObject({ label: 'Empty plot', plantDisabled: true, plantTitle: 'Build a garden first.' });
 
-    const spring = gardenPanelView(game({ structures: { garden: true }, inventory: { food: 1 } }, { day: 21 }));
+    const spring = gardenPanelView(game({ structures: { garden: true }, inventory: { food: stock(1) } }, { day: 21 }));
     expect(spring.shown).toBe(true);
     expect(spring.plots[0]).toMatchObject({ label: 'Empty plot', plantDisabled: false, harvestDisabled: true });
     expect(gardenPlotMarkup(spring.plots[0], 0)).not.toContain('data-action="plantGarden" data-plot-index="0" disabled');
@@ -200,7 +201,7 @@ describe('bag panel', () => {
   });
 
   it('offers trail rations with a drying rack and a berry at camp', () => {
-    const view = bagView(game({ structures: { dryingRack: true }, inventory: { food: 1 } }));
+    const view = bagView(game({ structures: { dryingRack: true }, inventory: { food: stock(1) } }));
     expect(view).toMatchObject({ prepareReady: true, prepareHint: '1 berry · 12 seconds · 1 ration' });
   });
 });
@@ -238,7 +239,7 @@ describe('exhaustion in the panels', () => {
   });
 
   it('quotes the slower ration time when tired', () => {
-    const rack = game({ structures: { dryingRack: true }, inventory: { food: 1 } });
+    const rack = game({ structures: { dryingRack: true }, inventory: { food: stock(1) } });
     expect(bagView({ ...rack, player: { ...rack.player, energy: 15 } }).prepareHint).toBe('1 berry · 18 seconds · 1 ration');
   });
 });

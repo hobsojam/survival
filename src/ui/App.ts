@@ -6,6 +6,7 @@ import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/sa
 import { cookBlocker, isInClearing, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { nextStep, type Side } from '../game/clearing';
 import { offerBlocker } from '../game/companion';
+import { foodCount } from '../game/food';
 import { dayPillView, renderDayPill, renderYearWheel, yearWheelView, type CalendarRoot } from './calendarView';
 import { isLowMeter } from '../game/needs';
 import { gateTap, nextOpenTab, wireSidebarTabs, type DockTab } from './dock';
@@ -17,6 +18,15 @@ import { axeView, bagView, buildButtonView, clearingView, cloakView, forecastVie
 import { Soundscape } from '../game/soundscape';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
+/** What each bag button spends, as a count the survivor holds; berries and rations are read from the food store. */
+const SUPPLY_COUNTS: Record<string, (inventory: GameState['inventory']) => number> = {
+  wood: inventory => inventory.wood,
+  fiber: inventory => inventory.fiber,
+  stone: inventory => inventory.stone,
+  food: inventory => foodCount(inventory.food, 'berry'),
+  trailFood: inventory => foodCount(inventory.food, 'trailFood')
+};
+const supplyCount = (state: GameState, supply: string): number => SUPPLY_COUNTS[supply]?.(state.inventory) ?? 0;
 
 export class App {
   private state: GameState;
@@ -345,16 +355,16 @@ export class App {
     const { inventory } = this.state;
     const bag = bagView(this.state);
     this.setText('wood-count', String(inventory.wood));
-    this.setText('food-count', String(inventory.food));
+    this.setText('food-count', String(foodCount(inventory.food, 'berry')));
     this.setText('fiber-count', String(inventory.fiber));
     this.setText('stone-count', String(inventory.stone));
-    this.setText('ration-count', String(inventory.trailFood));
+    this.setText('ration-count', String(foodCount(inventory.food, 'trailFood')));
     this.setText('space-count', bag.spaces);
-    this.root.querySelector('#eat-ration-button')?.classList.toggle('ready', inventory.trailFood > 0);
+    this.root.querySelector('#eat-ration-button')?.classList.toggle('ready', foodCount(inventory.food, 'trailFood') > 0);
     this.root.querySelector('#prepare-button')?.classList.toggle('ready', bag.prepareReady);
     this.setText('prepare-hint', bag.prepareHint);
     this.root.querySelectorAll<HTMLButtonElement>('[data-supply]').forEach(button => {
-      button.disabled = inventory[button.dataset.supply as keyof GameState['inventory']] <= 0;
+      button.disabled = supplyCount(this.state, button.dataset.supply ?? '') <= 0;
     });
     this.setText('stone-stored', bag.storedAtCamp);
     const pileControls = this.root.querySelector<HTMLElement>('#stone-pile-controls');

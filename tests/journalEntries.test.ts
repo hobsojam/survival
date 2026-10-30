@@ -4,6 +4,7 @@ import { RABBIT_HOMES } from '../src/game/wildlife';
 import { advanceTime, applyAction, type GameAction } from '../src/game/rules';
 import { nightStart } from '../src/game/calendar';
 import { journalEntry, recordJournal, type JournalId } from '../src/game/journalEntries';
+import { stock } from './stock';
 
 const base = createGame();
 const at = (day: number, timeOfDay: number, extra: Partial<GameState> = {}): GameState => ({ ...base, day, timeOfDay, ...extra });
@@ -105,7 +106,7 @@ describe('the year journal', () => {
   it('writes two handfuls only from a bush, not from the old basket', () => {
     const basket = at(34, 60, { player: { ...base.player, x: SITES.basket.x, y: SITES.basket.y } });
     const found = act(basket, { type: 'visitSite', siteId: 'basket' });
-    expect(found.state.inventory.food).toBe(2);
+    expect(found.state.inventory.food.berry.length).toBe(2);
     expect(ids(found.state)).not.toContain('twoHandfuls');
   });
 });
@@ -127,8 +128,8 @@ describe('each moment of the year', () => {
 
   it('notes the berries dried and cooked, in their own seasons', () => {
     const rack = { ...base.structures, dryingRack: true, shelter: true };
-    expect(written(act(at(5, 60, { structures: rack, inventory: { ...base.inventory, food: 1 } }), { type: 'prepareTrailFood' }), 'driedBerries')).toBe(true);
-    const cooking = at(12, nightStart(12) + 5, { fireFuel: 100, inventory: { ...base.inventory, food: 1 } });
+    expect(written(act(at(5, 60, { structures: rack, inventory: { ...base.inventory, food: stock(1) } }), { type: 'prepareTrailFood' }), 'driedBerries')).toBe(true);
+    const cooking = at(12, nightStart(12) + 5, { fireFuel: 100, inventory: { ...base.inventory, food: stock(1) } });
     expect(written(act(cooking, { type: 'cook' }), 'winterCooking')).toBe(true);
     expect(written(act({ ...cooking, day: 5, timeOfDay: nightStart(5) + 5 }, { type: 'cook' }), 'winterCooking')).toBe(false);
   });

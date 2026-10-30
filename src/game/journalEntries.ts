@@ -1,4 +1,5 @@
 import { duskLength, nightStart, season, seasonMessage, yearOf, type Season } from './calendar';
+import { foodCount } from './food';
 import { rainMessage } from './rain';
 import { isAtCamp, isColdNight, isInClearing, type GameAction } from './rules';
 import { LOOKOUT, type GameState } from './state';
@@ -75,6 +76,7 @@ const within = (state: GameState, point: { x: number; y: number }, tiles: number
 const acted = (m: Moment, type: GameAction['type']): boolean => m.action?.type === type && done(m);
 const onAfter = (m: Moment, when: boolean): Noticed | null => (when ? { day: m.after.day } : null);
 const onBefore = (m: Moment, when: boolean): Noticed | null => (when ? { day: m.before.day } : null);
+const berries = (state: GameState): number => foodCount(state.inventory.food, 'berry');
 const atSpring = (m: Moment): boolean => m.action?.type === 'visitSite' && m.action.siteId === 'spring' && done(m);
 
 const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
@@ -99,11 +101,11 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   winterCooking: m => onBefore(m, acted(m, 'cook')),
   firstRain: m => onAfter(m, rainMessage(m.before, m.after) !== null),
   rabbits: m => onAfter(m, awake(m) && m.after.area === 'camp' && daylight(m.after) && RABBIT_HOMES.some(home => within(m.after, home, 4))),
-  bushesFull: m => onBefore(m, m.action?.type === 'gather' && done(m) && m.after.inventory.food > m.before.inventory.food),
+  bushesFull: m => onBefore(m, m.action?.type === 'gather' && done(m) && berries(m.after) > berries(m.before)),
   stumpGrowing: m => onAfter(m, dawn(m) && m.after.trees.some(tree => tree.readyDay === m.after.day && tree.readyDay > 1)),
   springRest: m => onBefore(m, atSpring(m)),
   fireflies: m => onAfter(m, awake(m) && isInClearing(m.after) && !daylight(m.after)),
-  twoHandfuls: m => onBefore(m, m.action?.type === 'gather' && m.after.inventory.food - m.before.inventory.food === 2),
+  twoHandfuls: m => onBefore(m, m.action?.type === 'gather' && berries(m.after) - berries(m.before) === 2),
   goldEvening: m => onAfter(m, awake(m) && isInClearing(m.after) && m.before.day === m.after.day
     && daylight(m.before) && !daylight(m.after)),
   warmSleep: m => onBefore(m, acted(m, 'sleep') && m.after.fireFuel === 0),

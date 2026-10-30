@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame } from '../src/game/state';
 import { buildStatus, cookBlocker, pickaxeBlocker, stargazeBlocker } from '../src/game/rules';
+import { stock } from './stock';
+import { emptyFood } from '../src/game/food';
 
 describe('build buttons', () => {
   it('locks the hearth until the cold night is weathered', () => {
     const state = createGame();
-    state.inventory = { wood: 9, food: 0, fiber: 0, stone: 3, trailFood: 0 };
+    state.inventory = { wood: 9, fiber: 0, stone: 3, food: emptyFood() };
     expect(buildStatus(state, 'hearth')).toBe('locked');
     state.progress = { nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false, axeCrafted: false, quarryFound: false, pickaxeCrafted: false,
       discoveries: { basket: false, spring: false, cairn: false } };
@@ -15,7 +17,7 @@ describe('build buttons', () => {
 
   it('blocks the bed until there is a shelter', () => {
     const state = createGame();
-    state.inventory = { wood: 6, food: 0, fiber: 2, stone: 0, trailFood: 0 };
+    state.inventory = { wood: 6, fiber: 2, stone: 0, food: emptyFood() };
     expect(buildStatus(state, 'bed')).toBe('needsShelter');
     state.structures.shelter = true;
     expect(buildStatus(state, 'bed')).toBe('ready');
@@ -43,9 +45,9 @@ describe('after-dark actions', () => {
     state.fireFuel = 0;
     expect(cookBlocker(state)).toMatch(/campfire/);
     state.fireFuel = 30;
-    state.inventory.food = 0;
+    state.inventory.food = stock(0);
     expect(cookBlocker(state)).toMatch(/berry/);
-    state.inventory.food = 1;
+    state.inventory.food = stock(1);
     expect(cookBlocker(state)).toBeNull();
     state.player.x = BALANCE.campX + BALANCE.campRadius + 1;
     expect(cookBlocker(state)).toMatch(/camp/);
@@ -56,7 +58,7 @@ describe('after-dark actions', () => {
 describe('pickaxe blocker', () => {
   it('names what is missing and clears when crafting is possible', () => {
     const state = createGame();
-    state.inventory = { wood: 2, food: 0, fiber: 1, stone: 2, trailFood: 0 };
+    state.inventory = { wood: 2, fiber: 1, stone: 2, food: emptyFood() };
     expect(pickaxeBlocker(state)).toBe('Find the quarry first.');
     state.progress.quarryFound = true;
     expect(pickaxeBlocker(state)).toBe('Build a toolshed first.');

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE, createGame } from '../src/game/state';
+import { BALANCE, createGame, type GameState } from '../src/game/state';
+import { addFood, emptyFood, type FoodStore } from '../src/game/food';
 import { placeBranches } from '../src/game/clearing';
 import { autosaveDelayMs, loadGame, saveGame, SAVE_KEY } from '../src/game/save';
+import { stock } from './stock';
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();
@@ -19,7 +21,7 @@ describe('local save', () => {
     const state = createGame();
     const old = [[22, 15], [18, 16], [21, 18], [16, 14], [24, 13], [13, 7]];
     const saved = { ...state, nodes: state.nodes.map((node, index) => index < old.length ? { ...node, x: old[index][0], y: old[index][1], amount: 0 } : node) };
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 18, state: saved }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 19, state: saved }));
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind !== 'loaded') return;
@@ -29,14 +31,38 @@ describe('local save', () => {
   it('round trips rations and rejects counts that overfill the bag', () => {
     const storage = new MemoryStorage();
     const state = createGame();
-    state.inventory.trailFood = 2;
+    state.inventory.food.trailFood = 2;
     expect(saveGame(storage, state).ok).toBe(true);
     expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
     state.inventory.wood = 7;
     expect(saveGame(storage, state).ok).toBe(false);
     state.inventory.wood = 0;
-    state.inventory.trailFood = -1;
+    state.inventory.food.trailFood = -1;
     expect(saveGame(storage, state).ok).toBe(false);
+  });
+
+  it('round-trips the day each berry was picked, and rejects food that could not be', () => {
+    const storage = new MemoryStorage();
+    const state = { ...createGame(), day: 3 };
+    state.inventory.food = addFood(addFood(emptyFood(), 'berry', 1, 1), 'berry', 1, 3);
+    expect(saveGame(storage, state).ok).toBe(true);
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
+    const saves = (food: unknown) => saveGame(new MemoryStorage(), { ...state, inventory: { ...state.inventory, food } as GameState['inventory'] }).ok;
+    expect(saves({ ...emptyFood(), berry: [4] })).toBe(false);
+    expect(saves({ ...emptyFood(), berry: [0] })).toBe(false);
+    expect(saves({ ...emptyFood(), greens: [2.5] })).toBe(false);
+    expect(saves({ ...emptyFood(), honey: 1.5 })).toBe(false);
+    expect(saves({ ...emptyFood(), berry: 2 })).toBe(false);
+    const partial: Partial<FoodStore> = emptyFood();
+    delete partial.pineNeedles;
+    expect(saves(partial)).toBe(false);
+    expect(saves(3)).toBe(false);
+  });
+
+  it('rejects a version 18 save, from before the food store', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 18, state: createGame() }));
+    expect(loadGame(storage).kind).toBe('invalid');
   });
 
   it('round-trips progression across a page reload', () => {
@@ -47,7 +73,7 @@ describe('local save', () => {
     state.player.x = 7.5;
     state.player.y = 11.25;
     state.inventory.wood = 5;
-    state.inventory.food = 2;
+    state.inventory.food = stock(2);
     state.inventory.fiber = 1;
     state.fireFuel = 43;
     state.structures.shelter = true;
@@ -59,7 +85,7 @@ describe('local save', () => {
     state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
     state.nodes.find(node => node.kind === 'fiber')!.readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(18);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(19);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);
@@ -369,7 +395,7 @@ describe('garden plots in saves', () => {
 });
 
 describe('the year journal in the save', () => {
-  const store = (state: ReturnType<typeof createGame>, version = 18) => {
+  const store = (state: ReturnType<typeof createGame>, version = 19) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;
@@ -413,7 +439,7 @@ describe('the year journal in the save', () => {
 });
 
 describe('the companion in the save', () => {
-  const store = (state: unknown, version = 18) => {
+  const store = (state: unknown, version = 19) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;
@@ -458,7 +484,7 @@ describe('the companion in the save', () => {
 });
 
 describe('the clearing in the save', () => {
-  const accepts = (state: unknown, version = 18) => {
+  const accepts = (state: unknown, version = 19) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind === 'loaded';

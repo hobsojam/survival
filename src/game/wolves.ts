@@ -1,4 +1,5 @@
 import { isWinter, nightStart } from './calendar';
+import { takeFromBag } from './food';
 import type { GameState, WolfTake } from './state';
 
 // Wolves come only on winter nights. A visit is saved as the day it happened and what was taken;
@@ -29,11 +30,10 @@ export function wolfVisit(next: GameState): void {
     next.lastWolf = { day: next.day, took: 'chased' };
     return;
   }
-  const { trailFood, food } = next.inventory;
-  let took: WolfTake = 'nothing';
-  if (trailFood > 0) took = 'ration';
-  else if (food > 0) took = 'berry';
-  next.inventory = { ...next.inventory, trailFood: took === 'ration' ? trailFood - 1 : trailFood, food: took === 'berry' ? food - 1 : food };
+  const ration = takeFromBag(next, 'trailFood', 1);
+  const berry = ration ? null : takeFromBag(next, 'berry', 1);
+  const took: WolfTake = ration ? 'ration' : berry ? 'berry' : 'nothing';
+  next.inventory = (ration ?? berry ?? next).inventory;
   next.lastWolf = { day: next.day, took };
 }
 

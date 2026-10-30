@@ -5,9 +5,10 @@ import { journalEntry, journalSeason, type JournalId } from './journalEntries';
 import type { ClearingState, StepId } from './clearing';
 import { CLEARING_STEPS, STEP_IDS, placeBranches } from './clearing';
 import { KEEPSAKES_NEEDED, TRUST_TARGET } from './companion';
+import { FOOD_ITEMS, isFresh } from './food';
 
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 18;
+const SAVE_VERSION = 19;
 export type SaveResult = { ok: true } | { ok: false; error: string };
 export type LoadResult = { kind: 'empty' } | { kind: 'loaded'; state: GameState } | { kind: 'invalid'; reason: string };
 
@@ -32,9 +33,17 @@ function validClock(value: SaveShape): boolean {
     && finite(value.fireFuel) && value.fireFuel >= 0;
 }
 
-function validSurvivor({ player, inventory, area }: SaveShape): boolean {
+/** Every item is there: fresh food as the whole days it was picked, from day 1 to today, and kept food as counts. */
+function validFood(store: unknown, day: unknown): boolean {
+  if (!object(store) || !whole(day)) return false;
+  return FOOD_ITEMS.every(item => (isFresh(item)
+    ? Array.isArray(store[item]) && store[item].every(picked => whole(picked) && picked >= 1 && picked <= day)
+    : count(store[item])));
+}
+
+function validSurvivor({ player, inventory, area, day }: SaveShape): boolean {
   return onMap(player.x, player.y) && meter(player.energy) && meter(player.hunger) && meter(player.warmth)
-    && (['wood', 'food', 'fiber', 'stone', 'trailFood'] as const).every(key => count(inventory[key]))
+    && (['wood', 'fiber', 'stone'] as const).every(key => count(inventory[key])) && validFood(inventory.food, day)
     && (area === 'camp' || area === 'quarry');
 }
 
@@ -168,7 +177,7 @@ function validCompanion({ companion, day, structures }: SaveShape): boolean {
     && (!made || (keepsakes === 0 && !keepsakeLying));
 }
 
-/** Checks a version 18 save: the clearing, shelter upgrades, garden plots, tools, quarry timers, the year journal and companion. */
+/** Checks a version 19 save: the clearing, shelter upgrades, garden plots, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
   const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validGarden, validClearing, validWorld, validWolf, validJournal, validCompanion];

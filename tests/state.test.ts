@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, BUILDINGS, createGame } from '../src/game/state';
+import { emptyFood } from '../src/game/food';
 
 describe('new game', () => {
   it('starts one survivor at a valid camp with renewable supplies', () => {
@@ -11,7 +12,7 @@ describe('new game', () => {
     expect(game.player.x).toBeLessThan(40);
     expect(game.player.y).toBeGreaterThanOrEqual(0);
     expect(game.player.y).toBeLessThan(30);
-    expect(game.inventory).toEqual({ wood: 0, food: 0, fiber: 0, stone: 0, trailFood: 0 });
+    expect(game.inventory).toEqual({ wood: 0, fiber: 0, stone: 0, food: emptyFood() });
     expect(game.structures).toEqual({ shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false,
       bed: false, crate: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false });
     expect(game.gardenPlots).toEqual(Array.from({ length: 3 }, () => ({ plantedYear: null, harvestedYear: null, harvestReady: false })));

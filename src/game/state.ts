@@ -1,5 +1,6 @@
 import type { JournalEntry } from './journalEntries';
 import type { ClearingState } from './clearing';
+import { emptyFood, type FoodStore } from './food';
 export type ResourceKind = 'branch' | 'berry' | 'fiber' | 'stone';
 
 export const BUILDINGS = {
@@ -98,7 +99,7 @@ export interface GameState {
   day: number;
   timeOfDay: number;
   player: { x: number; y: number; energy: number; hunger: number; warmth: number };
-  inventory: { wood: number; food: number; fiber: number; stone: number; trailFood: number };
+  inventory: { wood: number; fiber: number; stone: number; food: FoodStore };
   fireFuel: number;
   structures: Record<StructureId, boolean>;
   progress: { nextStormDay: number | null; hearthUnlocked: boolean; lookoutRepaired: boolean; axeCrafted: boolean;
@@ -241,7 +242,7 @@ export function createGame(): GameState {
     day: 1,
     timeOfDay: 0,
     player: { x: BALANCE.campX + 1, y: BALANCE.campY + 1, energy: 100, hunger: 100, warmth: 100 },
-    inventory: { wood: 0, food: 0, fiber: 0, stone: 0, trailFood: 0 },
+    inventory: { wood: 0, fiber: 0, stone: 0, food: emptyFood() },
     fireFuel: 0,
     structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, crate: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
