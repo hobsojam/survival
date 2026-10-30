@@ -31,4 +31,20 @@ describe('news of what happened while time passed', () => {
     expect(newsBetween(at(24, 55), at(24, 62))).toEqual([]);
     expect(newsBetween(at(31, 61), at(31, 70))).toEqual([]);
   });
+
+  it('warns of the thinning bushes on the dawn into autumn day 8 only, even through sleep', () => {
+    const base = createGame();
+    const at = (day: number, timeOfDay: number): GameState => ({ ...base, day, timeOfDay });
+    const warning = ["The bushes are thinning. Berries won't keep through the winter; dry some, and gather nuts."];
+    expect(newsBetween(at(7, 230), at(8, 2))).toEqual(warning);
+    expect(newsBetween(at(8, 2), at(8, 30))).toEqual([]);
+    expect(newsBetween(at(8, 230), at(9, 2))).toEqual([]);
+    expect(newsBetween(at(9, 230), at(10, 2))).toEqual([]);
+    expect(newsBetween(at(37, 230), at(38, 2))).toEqual([]);
+    const sleeper: GameState = { ...at(7, 200), player: { ...base.player, x: 19, y: 14 }, structures: { ...base.structures, shelter: true } };
+    const slept = applyAction(sleeper, { type: 'sleep' });
+    expect(slept.state.day).toBe(8);
+    expect(newsBetween(sleeper, slept.state)).toContain(warning[0]);
+  });
 });
+

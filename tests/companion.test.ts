@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame, type Friend, type GameState } from '../src/game/state';
 import { advanceTime, applyAction } from '../src/game/rules';
-import { KEEPSAKE_SPOT, findDue, offerBlocker, offerFor, sceneryKeepsake } from '../src/game/companion';
+import { KEEPSAKE_SPOT, findDue, offerBlocker, offerFor, offerPrompt, sceneryKeepsake } from '../src/game/companion';
 import { newsBetween } from '../src/game/news';
 import { FOX, foxAt } from '../src/game/wildlife';
 import { wolfMessage } from '../src/game/wolves';
 import { stock } from './stock';
+import { addFood, emptyFood } from '../src/game/food';
 
 const base = createGame();
 /** Beside the berry bush at (19, 13), inside the camp ring, with the cold night long behind. */
@@ -218,5 +219,55 @@ describe('a startled fox', () => {
     const trusting = { ...near, companion: { ...near.companion, trust: { bird: 0, fox: 1, wolf: 0 } } };
     expect(advanceTime(trusting, 0.1).companion.foxFled).toBe(0);
     expect(FOX.spookRadius).toBeGreaterThan(1.5);
+  });
+});
+
+describe("the fox's winter hazelnut", () => {
+  const nuts = (n: number) => addFood(emptyFood(), 'hazelnut', n, 1);
+  const winterDusk = (food: GameState['inventory']['food'], larder?: GameState['larder']): GameState => {
+    const state = camp(14, nightStart(14) - 5, { food });
+    return { ...state, ...(larder ? { larder, structures: { ...state.structures, larder: true } } : {}) };
+  };
+  const withFox = (state: GameState): GameState => ({ ...state, day: [14, 15, 16, 17, 18].find(d => foxAt(d, nightStart(d) - 5)?.nibbling || foxAt(d, nightStart(d) - 5)?.sitting)!, timeOfDay: nightStart(14) - 5 });
+
+  it('takes a hazelnut in winter, in place of a berry', () => {
+    const state = withFox(winterDusk(addFood(nuts(2), 'berry', 1, 14)));
+    state.timeOfDay = nightStart(state.day) - 5;
+    expect(offerFor(state)).toBe('fox');
+    expect(offerPrompt(state, 'fox')).toBe('Leave a hazelnut for the fox');
+    const result = offer(state);
+    expect(result.message).toBe('The fox takes the hazelnut, and watches you a while.');
+    expect(result.state.inventory.food.hazelnut).toBe(1);
+    expect(result.state.inventory.food.berry.length).toBe(1);
+  });
+
+  it('takes a hazelnut from the larder while the survivor is in the clearing', () => {
+    const state = withFox(winterDusk(emptyFood(), nuts(1)));
+    state.timeOfDay = nightStart(state.day) - 5;
+    const result = offer(state);
+    expect(result.message).toBe('The fox takes the hazelnut, and watches you a while.');
+    expect(result.state.larder.hazelnut).toBe(0);
+  });
+
+  it('falls back to a berry in winter with no hazelnut', () => {
+    const state = withFox(winterDusk(stock(1)));
+    state.timeOfDay = nightStart(state.day) - 5;
+    expect(offerPrompt(state, 'fox')).toBe('Leave a berry for the fox');
+    const result = offer(state);
+    expect(result.message).toBe('The fox takes the berry, and watches you a while.');
+    expect(result.state.inventory.food.berry.length).toBe(0);
+  });
+
+  it('always takes a berry outside winter, even with hazelnuts', () => {
+    const dusk = camp(1, nightStart(1) - 5, { food: addFood(stock(1), 'hazelnut', 2, 1) });
+    expect(offerPrompt(dusk, 'fox')).toBe('Leave a berry for the fox');
+    const result = offer(dusk);
+    expect(result.message).toBe('The fox takes the berry, and watches you a while.');
+    expect(result.state.inventory.food.hazelnut).toBe(2);
+  });
+
+  it('leaves the bird and wolf prompts as they were', () => {
+    expect(offerPrompt(base, 'bird')).toBe('Scatter a berry for the birds');
+    expect(offerPrompt(base, 'wolf')).toBe('Leave a ration out for the wolves');
   });
 });

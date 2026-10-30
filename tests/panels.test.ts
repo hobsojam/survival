@@ -173,6 +173,28 @@ describe('forecast panel', () => {
     expect(forecastView(pending).title).toBe('Cold night · day 12');
   });
 
+  it('warns of the bare bushes on autumn days 8 to 10 once no cold night is pending', () => {
+    for (const day of [8, 9, 10]) {
+      const view = forecastView(game({ progress: afterColdNight, inventory: { food: { ...emptyFood(), hazelnut: 2, honey: 1 } } }, { day }));
+      expect(view).toEqual({ active: false, shown: true, title: 'The bushes will soon be bare',
+        copy: 'Berries go soft in a few days, and the bushes stay bare all winter. Dry rations and gather hazelnuts before the snow comes.',
+        shelter: 'Food that keeps: 3', fire: '' });
+    }
+    expect(forecastView(game({ progress: afterColdNight }, { day: 7 })).shown).toBe(false);
+    expect(forecastView(game({ progress: afterColdNight }, { day: 38 })).shown).toBe(false);
+  });
+
+  it('counts the larder in the food that keeps, wherever the survivor stands', () => {
+    const away = game({ progress: afterColdNight }, { day: 9, larder: { ...emptyFood(), roastedHazelnuts: 4 }, area: 'quarry' });
+    expect(forecastView(away).shelter).toBe('Food that keeps: 4');
+  });
+
+  it('lets a pending cold night win over the bare-bushes card', () => {
+    const pending = game({}, { day: 9 });
+    pending.progress.nextStormDay = 9;
+    expect(forecastView(pending).title).toBe('Cold night · day 9');
+  });
+
   it('has nothing to forecast once the front is weathered, outside winter', () => {
     expect(forecastView(game({ progress: afterColdNight })).shown).toBe(false);
     expect('weathered' in forecastView(game({ progress: afterColdNight }))).toBe(false);

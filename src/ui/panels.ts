@@ -1,5 +1,5 @@
-import { isWinter, nightStart } from '../game/calendar';
-import { FOOD_ITEMS, availableFood, foodCount, goingSoft, storeTotal, type FoodItem } from '../game/food';
+import { daysLeftInSeason, isWinter, nightStart, season } from '../game/calendar';
+import { FOOD_ITEMS, availableFood, foodCount, goingSoft, keptFoodTotal, storeTotal, type FoodItem } from '../game/food';
 import { foodIconUrl } from '../art/foodIcons';
 import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
@@ -168,7 +168,22 @@ function winterForecast(state: GameState): ForecastView {
   };
 }
 
+/** Autumn's last three days, with no cold night to warn of instead: the bushes are about to go bare. */
+function lateAutumnForecast(state: GameState): ForecastView | null {
+  const coldNightDue = !state.progress.hearthUnlocked && state.progress.nextStormDay !== null;
+  if (coldNightDue || season(state.day) !== 'autumn' || daysLeftInSeason(state.day) > 3) return null;
+  return {
+    active: false, shown: true,
+    title: 'The bushes will soon be bare',
+    copy: 'Berries go soft in a few days, and the bushes stay bare all winter. Dry rations and gather hazelnuts before the snow comes.',
+    shelter: `Food that keeps: ${keptFoodTotal(state)}`,
+    fire: ''
+  };
+}
+
 export function forecastView(state: GameState): ForecastView {
+  const lateAutumn = lateAutumnForecast(state);
+  if (lateAutumn) return lateAutumn;
   const storm = isColdNight(state);
   if (state.progress.hearthUnlocked) {
     // With the cold night weathered, only winter's nights are left to forecast.

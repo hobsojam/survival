@@ -33,6 +33,13 @@ export function foodCount(store: FoodStore, item: FoodItem): number {
   return isFresh(item) ? store[item].length : store[item];
 }
 
+const KEPT_FOODS: readonly KeptFood[] = ['hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood'];
+
+/** Kept food held, bag and larder together, wherever the survivor is: hazelnuts, honey, pine needles, roasted hazelnuts, rations. */
+export function keptFoodTotal(state: GameState): number {
+  return KEPT_FOODS.reduce((total, item) => total + foodCount(state.inventory.food, item) + foodCount(state.larder, item), 0);
+}
+
 export function storeTotal(store: FoodStore): number {
   return FOOD_ITEMS.reduce((total, item) => total + foodCount(store, item), 0);
 }

@@ -1,7 +1,7 @@
 import { isWinter, nightStart } from './calendar';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { freeSpaces, isInClearing } from './camp';
-import { addFood, availableFood, spendFood } from './food';
+import { addFood, availableFood, spendFood, type FoodItem } from './food';
 import { BALANCE, type Friend, type GameState } from './state';
 import { dayHash, foxAt, foxSpookRadius } from './wildlife';
 
@@ -11,16 +11,26 @@ import { dayHash, foxAt, foxSpookRadius } from './wildlife';
 /** Offerings each animal takes before it stays. */
 export const TRUST_TARGET: Record<Friend, number> = { bird: 5, fox: 4, wolf: 3 };
 
-export const OFFER_PROMPT: Record<Friend, string> = {
-  bird: 'Scatter a berry for the birds',
-  fox: 'Leave a berry for the fox',
-  wolf: 'Leave a ration out for the wolves'
-};
+/** What the fox is offered: in winter a hazelnut if any is to hand, else a berry; null if there is neither. */
+function foxFood(state: GameState): 'hazelnut' | 'berry' | null {
+  if (isWinter(state.day) && availableFood(state, 'hazelnut') > 0) return 'hazelnut';
+  return availableFood(state, 'berry') > 0 ? 'berry' : null;
+}
 
-const OFFERED: Record<Friend, string> = {
-  bird: 'The birds peck at the berry. One lingers a moment longer.',
-  fox: 'The fox takes the berry, and watches you a while.',
-  wolf: 'Something takes the ration from the edge of the firelight.'
+/** What is spent on an offering to this animal. */
+const offeringFood = (state: GameState, animal: Friend): FoodItem =>
+  animal === 'wolf' ? 'trailFood' : animal === 'fox' ? foxFood(state) ?? 'berry' : 'berry';
+
+export function offerPrompt(state: GameState, animal: Friend): string {
+  if (animal === 'bird') return 'Scatter a berry for the birds';
+  if (animal === 'wolf') return 'Leave a ration out for the wolves';
+  return `Leave a ${offeringFood(state, 'fox') === 'hazelnut' ? 'hazelnut' : 'berry'} for the fox`;
+}
+
+const offeredMessage = (state: GameState, animal: Friend): string => {
+  if (animal === 'bird') return 'The birds peck at the berry. One lingers a moment longer.';
+  if (animal === 'wolf') return 'Something takes the ration from the edge of the firelight.';
+  return `The fox takes the ${offeringFood(state, 'fox') === 'hazelnut' ? 'hazelnut' : 'berry'}, and watches you a while.`;
 };
 
 const STAYED: Record<Friend, string> = {
@@ -37,7 +47,7 @@ const byBush = (state: GameState): boolean => state.nodes.some(node => node.kind
 const WILLING: Record<Friend, (state: GameState) => boolean> = {
   fox: state => {
     const fox = foxAt(state.day, state.timeOfDay);
-    return availableFood(state, 'berry') > 0 && state.companion.foxFled !== state.day && (fox?.sitting === true || fox?.nibbling === true);
+    return foxFood(state) !== null && state.companion.foxFled !== state.day && (fox?.sitting === true || fox?.nibbling === true);
   },
   wolf: state => availableFood(state, 'trailFood') > 0 && isWinter(state.day) && night(state),
   bird: state => availableFood(state, 'berry') > 0 && !isWinter(state.day) && !night(state) && byBush(state)
@@ -59,7 +69,7 @@ export function offerBlocker(state: GameState): string | null {
 /** Leaves the offering out and counts it; the animal that reaches its count stays. Time passes in the caller. */
 export function makeOffering(state: GameState): { state: GameState; message: string } | null {
   const animal = offerFor(state);
-  const spent = animal && spendFood(state, animal === 'wolf' ? 'trailFood' : 'berry', 1);
+  const spent = animal && spendFood(state, offeringFood(state, animal), 1);
   if (!animal || !spent) return null;
   const trust = { ...state.companion.trust, [animal]: state.companion.trust[animal] + 1 };
   const stays = trust[animal] >= TRUST_TARGET[animal];
@@ -69,7 +79,7 @@ export function makeOffering(state: GameState): { state: GameState; message: str
     ...state.companion, trust, lastOffer: { ...state.companion.lastOffer, [animal]: state.day },
     ...(stays ? { friend: animal, since: state.day, lastFind: state.day, lastGift: state.day } : {})
   };
-  return { state: { ...spent, lastWolf, companion }, message: stays ? STAYED[animal] : OFFERED[animal] };
+  return { state: { ...spent, lastWolf, companion }, message: stays ? STAYED[animal] : offeredMessage(state, animal) };
 }
 
 /** The wild fox runs off for the evening if the survivor comes too close. Mutates advanceTime's working copy. */

@@ -4,7 +4,7 @@ import { isAtCamp, isInClearing, sleepBlocker, type GameAction } from '../game/r
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 import { choppableTrees, isClearingStump } from '../game/clearing';
 import { sitePrompt } from '../game/sitePrompt';
-import { OFFER_PROMPT, offerFor } from '../game/companion';
+import { offerFor, offerPrompt } from '../game/companion';
 import { DISHES, defaultDish } from '../game/cooking';
 import { closestGatherable, type Gatherable } from './tapTarget';
 import type { SurvivorAction } from './survivorVisual';
@@ -93,7 +93,7 @@ export function promptFor(state: GameState): string {
   const site = closestSite(state);
   const nearby = lookoutPrompt(state) || (site ? sitePrompt(state, site.id) : '') || treePrompt(state);
   const animal = offerFor(state);
-  const offer = animal ? `O  ${OFFER_PROMPT[animal]}` : '';
+  const offer = animal ? `O  ${offerPrompt(state, animal)}` : '';
   const gather = found ? gatherPrompt(found, isWinter(state.day)) : '';
   const parts = [gather, nearby, offer].filter(Boolean);
   if (gather && parts.length === 1 && !sleepBlocker(state)) return `${gather} · Z Sleep until morning`;
