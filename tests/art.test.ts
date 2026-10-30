@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { palette } from '../src/art/palette';
+import { createGame } from '../src/game/state';
+import { buildMap } from '../src/scene/map';
 import { sprites, type SpriteDef } from '../src/art/sprites';
 import { animationConfigs, rasterizeFrame, validateSprite } from '../src/art/textures';
 
@@ -126,6 +128,29 @@ describe('sprite pipeline', () => {
       const b = sprites[`transition${right}`].frames.still;
       for (let y = 0; y < 16; y++) expect(a[y][15]).toBe(b[y][0]);
     }
+  });
+
+  it('draws the marked frame of each big tree with a pale fibre band, and shows it on the contact sheet', () => {
+    for (const name of ['treeBroadleaf', 'treePine']) {
+      const def = sprites[name];
+      expect(() => validateSprite(def)).not.toThrow();
+      const plain = def.frames.still, marked = def.frames.marked;
+      expect(marked, name).toBeDefined();
+      expect(marked).not.toEqual(plain);
+      const changed = marked.flatMap((row, y) => [...row].map((symbol, x) => (symbol !== plain[y][x] ? def.legend[symbol] : null)).filter(Boolean));
+      expect(changed.length).toBeGreaterThanOrEqual(14);
+      expect(changed).toContain('wood4');
+    }
+    // The contact sheet draws every frame of every sprite in this table.
+    expect(Object.keys(sprites.treePine.frames)).toContain('marked');
+  });
+
+  it('adds grown clearing edges to the sprite table as they are made', () => {
+    const before = Object.keys(sprites).length;
+    const name = buildMap(createGame().nodes, 'camp', 'summer', { cleared: ['west-far', 'west-near', 'south-near'], marked: null, felled: [] }).campEdges.at(-1)!.sprite;
+    expect(sprites[name]).toBeDefined();
+    expect(Object.keys(sprites).length).toBeGreaterThanOrEqual(before);
+    expect(() => validateSprite(sprites[name])).not.toThrow();
   });
 
   it('rejects animations that refer to missing frames', () => {

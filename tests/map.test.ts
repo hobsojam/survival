@@ -3,7 +3,8 @@ import { BALANCE, SITES, createGame } from '../src/game/state';
 import { terrainSprites } from '../src/art/terrain';
 import { buildMap, shownTerrainKey, terrainKey, type TerrainMap } from '../src/scene/map';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
-import { CAMP_OPEN_PATHS, CAMP_SIGN, QUARRY_PATHS, QUARRY_SIGN, pathDistance as routeDistance } from '../src/scene/mapGeometry';
+import { CLEARING_STEPS, STEP_IDS, clearingReach, inClearing, type ClearingState, type StepId } from '../src/game/clearing';
+import { CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_OPEN_PATHS, CAMP_SIGN, QUARRY_PATHS, QUARRY_SIGN, pathDistance as routeDistance } from '../src/scene/mapGeometry';
 
 function visibleGround(map: TerrainMap, x: number, y: number, pixelX = 8, pixelY = 8): string | undefined {
   const base = terrainSprites[map.ground[y][x]];
@@ -45,7 +46,10 @@ describe('terrain composition', () => {
 
   it('is deterministic and leaves the camp and nodes clear of tree trunks', () => {
     const map = buildMap(nodes, 'camp');
+    // The scene draws the choppable trees itself, so the map only needs to hold them where it leaves room for a step's trees.
+    const stepSpots = STEP_IDS.flatMap(id => CLEARING_STEPS[id].trees);
     for (const target of createGame().trees) {
+      if (stepSpots.some(spot => Math.hypot(spot.x - target.x, spot.y - target.y) < 1.2)) continue;
       expect(map.trees).toContainEqual({ x: target.x, y: target.y, sprite: target.sprite });
     }
     for (const site of Object.values(SITES)) {
@@ -54,6 +58,7 @@ describe('terrain composition', () => {
     expect(buildMap(nodes, 'camp')).toEqual(map);
     expect(map.trees.length).toBeGreaterThan(50);
     for (const tree of map.trees) {
+      if (stepSpots.some(spot => spot.x === tree.x && spot.y === tree.y)) continue; // these stand just past the old edge, where the steps put them
       expect(Math.hypot(tree.x - BALANCE.campX, tree.y - BALANCE.campY)).toBeGreaterThan(BALANCE.campRadius + 1);
       expect(nodes.every(node => Math.hypot(tree.x - node.x, tree.y - node.y) >= (node.kind === 'branch' ? 1.5 : 3.5))).toBe(true);
     }
@@ -200,7 +205,9 @@ describe('terrain composition', () => {
     expect(westOnRow(open).length).toBeGreaterThan(0);
     const centerX = BALANCE.campX + .5, centerY = BALANCE.campY + .5;
     const endX = CAMP_EXIT.x + .5, endY = CAMP_EXIT.y + .5;
-    for (const tree of open.trees) {
+    // The trees set for clearing stand where the steps put them; only the wild ones keep clear of the path.
+    const stepSpots = STEP_IDS.flatMap(id => CLEARING_STEPS[id].trees);
+    for (const tree of open.trees.filter(item => !stepSpots.some(spot => spot.x === item.x && spot.y === item.y))) {
       const x = tree.x + .5, y = tree.y + .5, dx = endX - centerX, dy = endY - centerY;
       const t = Math.max(0, Math.min(1, ((x - centerX) * dx + (y - centerY) * dy) / (dx * dx + dy * dy)));
       expect(Math.hypot(x - centerX - t * dx, y - centerY - t * dy), `tree at ${tree.x},${tree.y}`).toBeGreaterThanOrEqual(1.35);
@@ -289,8 +296,110 @@ describe('the quarry scenery', () => {
 
 describe('the shown terrain through the year', () => {
   it('is redrawn for each season as well as each area', () => {
-    expect(shownTerrainKey(createGame())).toBe('camp-autumn');
-    expect(shownTerrainKey({ ...createGame(), day: 11, area: 'quarry' })).toBe('quarry-winter');
+    expect(shownTerrainKey(createGame())).toBe('camp-none-unmarked-autumn');
+    expect(shownTerrainKey({ ...createGame(), day: 11, area: 'quarry' })).toBe('quarry-none-unmarked-winter');
+  });
+
+  it('is redrawn when ground is cleared or a side is marked', () => {
+    const state = createGame();
+    const keys = [
+      shownTerrainKey(state),
+      shownTerrainKey({ ...state, clearing: { ...state.clearing, marked: 'north-near' } }),
+      shownTerrainKey({ ...state, clearing: { ...state.clearing, marked: 'east-near' } }),
+      shownTerrainKey({ ...state, clearing: { cleared: ['north-near'], marked: null, felled: [] } }),
+      shownTerrainKey({ ...state, clearing: { cleared: ['north-near', 'north-far'], marked: null, felled: [] } })
+    ];
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+});
+
+describe('the grown clearing', () => {
+  const nodes = createGame().nodes;
+  const none: ClearingState = { cleared: [], marked: null, felled: [] };
+  const grown = (cleared: StepId[], marked: StepId | null = null): ClearingState => ({ cleared, marked, felled: [] });
+  const farCleared = [...STEP_IDS];
+
+  /** The camp circle as it was drawn before the clearing could grow, pixel by pixel. */
+  function oldCircle(dx: number, dy: number): string[] | 'full' | null {
+    const radius = BALANCE.campRadius * 16;
+    const rows = Array.from({ length: 16 }, () => Array.from({ length: 16 }, () => '.'));
+    let filled = 0;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const distanceSquared = (dx * 16 + x - 8) ** 2 + (dy * 16 + y - 8) ** 2;
+      if (distanceSquared > radius ** 2) continue;
+      rows[y][x] = distanceSquared >= (radius - 2) ** 2 ? 'e' : 'g';
+      filled++;
+    }
+    if (filled === 0) return null;
+    return filled === 256 ? 'full' : rows.map(row => row.join(''));
+  }
+
+  it('looks just as it did when nothing is cleared', () => {
+    const map = buildMap(nodes, 'camp', 'summer', none);
+    const edges = new Map(map.campEdges.map(edge => [`${edge.x},${edge.y}`, terrainSprites[edge.sprite].frames.still]));
+    let expectedEdges = 0;
+    for (let y = 0; y < BALANCE.mapHeight; y++) for (let x = 0; x < BALANCE.mapWidth; x++) {
+      const old = oldCircle(x - BALANCE.campX, y - BALANCE.campY);
+      expect(map.ground[y][x].startsWith('earth'), `ground at ${x},${y}`).toBe(old === 'full');
+      if (old === null || old === 'full') { expect(edges.has(`${x},${y}`), `edge at ${x},${y}`).toBe(false); continue; }
+      expectedEdges++;
+      expect(edges.get(`${x},${y}`), `edge at ${x},${y}`).toEqual(old);
+    }
+    expect(edges.size).toBe(expectedEdges);
+    const radius = BALANCE.campRadius;
+    const oldStones = Array.from({ length: 26 }, (_, i) => ({ x: CAMP_CENTER_X + Math.cos(i * Math.PI * 2 / 26) * radius, y: CAMP_CENTER_Y + Math.sin(i * Math.PI * 2 / 26) * radius, sprite: `rimStone${i % 2}` }));
+    expect(map.rimStones.every(stone => oldStones.some(old => old.x === stone.x && old.y === stone.y && old.sprite === stone.sprite))).toBe(true);
+    expect(map.rimStones).toHaveLength(20);
+    expect(buildMap(nodes, 'camp')).toEqual(map);
+  });
+
+  it('makes the ground earth where the north near step reaches', () => {
+    const map = buildMap(nodes, 'camp', 'summer', grown(['north-near']));
+    // Row 9 is an edge tile: its ground is grass with the earth edge laid over it.
+    expect(visibleGround(map, 20, 9)).toMatch(/^earth/);
+    expect(visibleGround(buildMap(nodes, 'camp'), 20, 9)).not.toMatch(/^earth/);
+    expect(visibleGround(map, BALANCE.campX + 6, BALANCE.campY)).not.toMatch(/^earth/);
+    expect(map.campEdges.length).toBeGreaterThan(0);
+  });
+
+  it('shares one sprite between identical edge tiles', () => {
+    const map = buildMap(nodes, 'camp', 'summer', grown(farCleared));
+    const names = new Set(map.campEdges.map(edge => edge.sprite));
+    expect(names.size).toBeLessThan(map.campEdges.length);
+    for (const name of names) expect(terrainSprites[name]).toBeDefined();
+  });
+
+  it('rings the grown edge with rim stones', () => {
+    for (const cleared of [['north-near'], ['north-near', 'north-far', 'east-near'], farCleared] as StepId[][]) {
+      const stones = buildMap(nodes, 'camp', 'summer', grown(cleared)).rimStones;
+      expect(stones.length).toBeGreaterThanOrEqual(16);
+      for (const stone of stones) {
+        const dx = stone.x - CAMP_CENTER_X, dy = stone.y - CAMP_CENTER_Y;
+        const reach = clearingReach(BALANCE.campX + dx, BALANCE.campY + dy, cleared);
+        expect(Math.abs(Math.hypot(dx, dy) - reach)).toBeLessThan(.6);
+      }
+    }
+  });
+
+  it('keeps grove trees out of the clearing and off the trees still to fell', () => {
+    for (const cleared of [[], ['north-near'], ['east-near', 'east-far'], farCleared] as StepId[][]) {
+      const map = buildMap(nodes, 'camp', 'summer', grown(cleared));
+      const standing = STEP_IDS.filter(id => !cleared.includes(id)).flatMap(id => CLEARING_STEPS[id].trees);
+      for (const tree of map.groves.flat()) {
+        expect(inClearing(tree.x, tree.y, cleared), `grove tree at ${tree.x},${tree.y}`).toBe(false);
+        for (const marked of standing) expect(Math.hypot(tree.x - marked.x, tree.y - marked.y)).toBeGreaterThanOrEqual(1.2);
+      }
+    }
+  });
+
+  it('plants the trees of every step not yet cleared, but leaves out the marked step', () => {
+    const map = buildMap(nodes, 'camp', 'summer', grown(['north-near'], 'east-near'));
+    for (const id of STEP_IDS) {
+      if (id === 'north-near' || id === 'east-near') continue;
+      for (const tree of CLEARING_STEPS[id].trees) expect(map.trees, `${id} tree`).toContainEqual({ x: tree.x, y: tree.y, sprite: tree.sprite });
+    }
+    for (const tree of CLEARING_STEPS['east-near'].trees) expect(map.trees.some(item => item.x === tree.x && item.y === tree.y)).toBe(false);
+    for (const tree of CLEARING_STEPS['north-near'].trees) expect(map.trees.some(item => item.x === tree.x && item.y === tree.y)).toBe(false);
   });
 });
 

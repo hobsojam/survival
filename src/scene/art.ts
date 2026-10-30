@@ -3,6 +3,9 @@ import { BALANCE, type GameState } from '../game/state';
 import { buildMap, shownTerrainKey, terrainKey, type MapItem } from './map';
 import { season } from '../game/calendar';
 import { sprites } from '../art/sprites';
+import { registerSpriteTexture } from '../art/textures';
+import { seasonPalette } from '../art/seasonPalette';
+import { choppableTrees } from '../game/clearing';
 
 export const TILE = 16;
 export const worldX = (x: number) => (x + 0.5) * TILE;
@@ -12,7 +15,7 @@ export const worldY = (y: number) => (y + 0.5) * TILE;
 export function drawTerrain(scene: Phaser.Scene, state: GameState): Phaser.GameObjects.GameObject[] {
   const key = terrainKey(state);
   const camp = key !== 'quarry';
-  const map = buildMap(camp ? state.nodes : [], key, season(state.day));
+  const map = buildMap(camp ? state.nodes : [], key, season(state.day), state.clearing);
   const canvas = document.createElement('canvas');
   canvas.width = BALANCE.mapWidth * TILE;
   canvas.height = BALANCE.mapHeight * TILE;
@@ -20,6 +23,8 @@ export function drawTerrain(scene: Phaser.Scene, state: GameState): Phaser.GameO
   if (!context) throw new Error('Terrain canvas is unavailable.');
   context.imageSmoothingEnabled = false;
   const stamp = (name: string, x: number, y: number) => {
+    // A grown clearing's edge tiles are made when first needed, so they have no texture until now.
+    if (!scene.textures.exists(`${name}:still`)) registerSpriteTexture(scene, name, seasonPalette(season(state.day)));
     const source = scene.textures.get(`${name}:still`).getSourceImage() as CanvasImageSource;
     context.drawImage(source, x, y);
   };
@@ -46,7 +51,7 @@ export function drawTerrain(scene: Phaser.Scene, state: GameState): Phaser.GameO
       .setDepth(Math.round(worldY(item.y)));
   };
   // The camp's choppable trees are drawn as objects of their own.
-  const chopTargets = camp ? state.trees : [];
+  const chopTargets = camp ? choppableTrees(state) : [];
   objects.push(...map.trees.filter(tree => !chopTargets.some(target => target.x === tree.x && target.y === tree.y)).map(standing));
   objects.push(...map.signs.map(standing));
   return objects;
