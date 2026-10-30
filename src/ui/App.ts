@@ -466,8 +466,9 @@ export class App {
 
   private renderBuild(): void {
     this.setText('prompt', this.scene?.getPrompt() ?? 'WASD / arrows  Move');
-    this.setText('build-hint', isInClearing(this.state) ? 'At camp — click an upgrade to build.' : 'Stand anywhere in the clearing to build.');
+    this.setText('build-hint', isInClearing(this.state) ? 'In the clearing — click an upgrade to build.' : 'Stand anywhere in the clearing to build.');
     for (const id of buildOptions) this.renderBuildButton(id);
+    this.renderClearing();
     const buildReady = Boolean(this.root.querySelector('[data-tab="build"] .ready'));
     this.root.querySelectorAll('[data-tab-button="build"], [data-sidebar-button="build"]').forEach(tab => tab.classList.toggle('has-dot', buildReady));
   }
