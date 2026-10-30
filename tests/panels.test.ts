@@ -3,6 +3,7 @@ import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { CLEARING_STEPS } from '../src/game/clearing';
 import { axeView, clearingView, bagView, buildButtonView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightHint, pickaxeView, pillowView, startNote } from '../src/ui/panels';
+import { emptyFood } from '../src/game/food';
 import { stock } from './stock';
 
 type Changes = { structures?: Partial<GameState['structures']>; progress?: Partial<GameState['progress']>; inventory?: Partial<GameState['inventory']> };
@@ -188,6 +189,12 @@ describe('start note', () => {
 });
 
 describe('bag panel', () => {
+  it('says how many berries go soft at the next dawn', () => {
+    const berries = (picked: number[]) => game({ inventory: { food: { ...emptyFood(), berry: picked } } }, { day: 3 });
+    expect(bagView(berries([1, 2, 3])).berries).toBe('Berries 3 (1 going soft)');
+    expect(bagView(berries([2, 3, 3])).berries).toBe('Berries 3');
+  });
+
   it('counts spaces and describes the fire and trail rations', () => {
     const view = bagView(game({ inventory: { wood: 2, stone: 1 } }, { fireFuel: 12.2 }));
     expect(view).toMatchObject({ spaces: '4/8', fire: 'Fire burning · 13s of warmth', pileShown: false, storedAtCamp: '' });

@@ -1,4 +1,5 @@
 import { isWinter, nightStart } from '../game/calendar';
+import { foodCount, goingSoft } from '../game/food';
 import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { workSeconds } from '../game/needs';
@@ -163,12 +164,14 @@ export function startNote(save: LoadResult, storageAvailable: boolean): string {
   return 'A fresh camp is ready whenever you are.';
 }
 
-export interface BagView { spaces: string; prepareReady: boolean; prepareHint: string; pileShown: boolean; storedAtCamp: string; pileStored: string; fire: string }
+export interface BagView { berries: string; spaces: string; prepareReady: boolean; prepareHint: string; pileShown: boolean; storedAtCamp: string; pileStored: string; fire: string }
 
 export function bagView(state: GameState): BagView {
   const prepareBlocker = trailFoodBlocker(state);
   const pile = state.structures.stonePile;
+  const soft = goingSoft(state.inventory.food, 'berry', state.day, BALANCE.bagFreshDays);
   return {
+    berries: `Berries ${foodCount(state.inventory.food, 'berry')}${soft ? ` (${soft} going soft)` : ''}`,
     spaces: `${carriedCount(state)}/${bagCapacity(state)}`,
     prepareReady: !prepareBlocker,
     prepareHint: prepareBlocker ?? `1 berry · ${workSeconds(state, BALANCE.trailFoodSeconds)} seconds · 1 ration`,

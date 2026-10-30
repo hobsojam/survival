@@ -104,7 +104,7 @@ export class App {
               <section class="panel year-journal-panel" data-tab="camp"><p class="eyebrow">THE YEAR SO FAR</p><div class="year-wheel"><span class="year-dial" aria-hidden="true"><span id="year-hand" class="year-hand"></span></span><p id="year-label" class="year-label"></p><ul class="visually-hidden" aria-label="Seasons"><li id="year-season-0">Autumn</li><li id="year-season-1">Winter</li><li id="year-season-2">Spring</li><li id="year-season-3">Summer</li></ul></div><div class="year-journal-page"><div class="year-journal-head"><button type="button" id="year-journal-previous" class="year-journal-turn" aria-label="Earlier page">‹</button><div><h2 id="year-journal-title"></h2><p id="year-journal-days" class="year-journal-days"></p></div><button type="button" id="year-journal-next" class="year-journal-turn" aria-label="Later page">›</button></div><ul id="year-journal-entries" class="year-journal-entries"></ul></div></section>
               <section class="panel bag-panel" data-tab="bag"><p class="eyebrow">IN YOUR BAG</p><div class="supplies">
                 <div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small><button type="button" class="supply-action" data-action="stokeFire" data-supply="wood" aria-label="Burn one wood">Burn</button></div>
-                <div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small><button type="button" class="supply-action" data-action="eat" data-supply="food" aria-label="Eat one berry">Eat</button></div>
+                <div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small><small id="berry-line" class="stone-stored"></small><button type="button" class="supply-action" data-action="eat" data-supply="food" aria-label="Eat one berry">Eat</button></div>
                 <div><span class="supply-icon fiber">≋</span><strong id="fiber-count">0</strong><small>Fiber</small><button type="button" class="supply-action" data-action="burnFiber" data-supply="fiber" aria-label="Burn one fiber">Burn</button></div>
                 <div><span class="supply-icon stone">◆</span><strong id="stone-count">0</strong><small>Stone</small><small id="stone-stored" class="stone-stored"></small><button type="button" class="supply-action" data-action="dropStone" data-supply="stone" aria-label="Drop one stone">Drop</button></div>
                 <div><span class="supply-icon ration">◇</span><strong id="ration-count">0</strong><small>Rations</small><button type="button" class="supply-action" data-action="eatTrailFood" data-supply="trailFood" aria-label="Eat one trail ration">Eat</button></div>
@@ -356,6 +356,7 @@ export class App {
     const bag = bagView(this.state);
     this.setText('wood-count', String(inventory.wood));
     this.setText('food-count', String(foodCount(inventory.food, 'berry')));
+    this.setText('berry-line', bag.berries);
     this.setText('fiber-count', String(inventory.fiber));
     this.setText('stone-count', String(inventory.stone));
     this.setText('ration-count', String(foodCount(inventory.food, 'trailFood')));

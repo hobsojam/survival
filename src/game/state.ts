@@ -117,6 +117,8 @@ export interface GameState {
   rubbleReadyDay: number;
   /** The last winter night a wolf came into the dark camp, and what it took. */
   lastWolf: { day: number; took: WolfTake } | null;
+  /** The last dawn that threw out food gone soft, and how much. */
+  lastSpoiled: { day: number; berry: number; greens: number } | null;
   /** What the survivor has written in the year journal. */
   journal: JournalEntry[];
   companion: Companion;
@@ -149,6 +151,9 @@ export const BALANCE = {
   eatHungerGain: 25,
   trailFoodHungerGain: 45,
   trailFoodSeconds: 12,
+  /** Days a fresh berry keeps in the bag, and in the larder. */
+  bagFreshDays: 3,
+  larderFreshDays: 5,
   cookSeconds: 8,
   cookHungerGain: 35,
   rackCookHungerGain: 50,
@@ -256,6 +261,7 @@ export function createGame(): GameState {
     quarryReadyDay: 1,
     rubbleReadyDay: 1,
     lastWolf: null,
+    lastSpoiled: null,
     journal: [],
     clearing: { cleared: [], marked: null, felled: [] },
     companion: {

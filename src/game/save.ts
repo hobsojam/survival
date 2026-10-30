@@ -132,6 +132,13 @@ function validWorld({ nodes, trees, stonePiles, day, clearing }: SaveShape): boo
 const WOLF_TAKES: readonly unknown[] = ['ration', 'berry', 'nothing', 'offered', 'chased'];
 
 /** No wolf yet, or one that came on a day already lived, taking something it could take. */
+/** The last spoiled dawn was a lived day, and something really was thrown out. */
+function validSpoiled({ lastSpoiled, day }: SaveShape): boolean {
+  if (lastSpoiled === null) return true;
+  return object(lastSpoiled) && whole(lastSpoiled.day) && lastSpoiled.day >= 1 && lastSpoiled.day <= (day as number)
+    && count(lastSpoiled.berry) && count(lastSpoiled.greens) && (lastSpoiled.berry as number) + (lastSpoiled.greens as number) >= 1;
+}
+
 function validWolf({ lastWolf, day }: SaveShape): boolean {
   if (lastWolf === null) return true;
   return object(lastWolf) && whole(lastWolf.day) && lastWolf.day >= 1 && lastWolf.day <= (day as number) && WOLF_TAKES.includes(lastWolf.took);
@@ -180,7 +187,7 @@ function validCompanion({ companion, day, structures }: SaveShape): boolean {
 /** Checks a version 19 save: the clearing, shelter upgrades, garden plots, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validGarden, validClearing, validWorld, validWolf, validJournal, validCompanion];
+  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validGarden, validClearing, validWorld, validWolf, validSpoiled, validJournal, validCompanion];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

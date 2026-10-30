@@ -483,6 +483,25 @@ describe('the companion in the save', () => {
   });
 });
 
+describe('the spoiled-food note in the save', () => {
+  const accepts = (lastSpoiled: unknown) => {
+    const storage = new MemoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 19, state: { ...createGame(), day: 6, lastSpoiled, progress: { ...createGame().progress, nextStormDay: null, hearthUnlocked: true } } }));
+    return loadGame(storage).kind === 'loaded';
+  };
+
+  it('accepts none, or a lived day with something thrown out', () => {
+    expect(accepts(null)).toBe(true);
+    expect(accepts({ day: 6, berry: 1, greens: 0 })).toBe(true);
+    expect(accepts({ day: 4, berry: 0, greens: 2 })).toBe(true);
+  });
+
+  it('refuses a future day, an empty loss or odd counts', () => {
+    [{ day: 7, berry: 1, greens: 0 }, { day: 0, berry: 1, greens: 0 }, { day: 5, berry: 0, greens: 0 }, { day: 5, berry: -1, greens: 2 },
+      { day: 5, berry: 1.5, greens: 0 }, { day: 5, berry: 1 }, 'soft', undefined].forEach(bad => expect(accepts(bad), JSON.stringify(bad)).toBe(false));
+  });
+});
+
 describe('the clearing in the save', () => {
   const accepts = (state: unknown, version = 19) => {
     const storage = new MemoryStorage();

@@ -6,7 +6,7 @@ import { wolfVisit } from './wolves';
 import { bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
 import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
 import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, type StepId } from './clearing';
-import { addFood, availableFood, spendFood } from './food';
+import { addFood, availableFood, spendFood, spoil } from './food';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
 import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
 
@@ -233,6 +233,9 @@ function dawn(next: GameState, camp: boolean): void {
   // Rocks give their stone once; everything else grows back at dawn.
   next.nodes = next.nodes.map(node => node.kind !== 'stone' && node.readyDay <= next.day ? { ...node, amount: 1 } : node);
   companionDawn(next);
+  const spoiled = spoil(next.inventory.food, next.day, BALANCE.bagFreshDays);
+  next.inventory = { ...next.inventory, food: spoiled.store };
+  if (spoiled.lost.berry + spoiled.lost.greens > 0) next.lastSpoiled = { day: next.day, ...spoiled.lost };
   if (!stormEnded) return;
   if (weathered) {
     next.progress = { ...next.progress, nextStormDay: null, hearthUnlocked: true };
