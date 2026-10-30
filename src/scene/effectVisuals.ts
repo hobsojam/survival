@@ -98,7 +98,8 @@ function rainVisuals(timeMs: number, heaviness: number): EffectVisual[] {
   });
 }
 
-const POP_RESOURCES: ReadonlySet<string> = new Set(['berry', 'fiber', 'stone']);
+/** Resources with a pop of their own; branches (and anything else) pop a stick. */
+const POP_RESOURCES: ReadonlySet<string> = new Set(['berry', 'fiber', 'stone', 'hazel', 'pine', 'greens', 'honey']);
 
 function eventVisuals(state: GameState, event: EffectEvent, index: number, age: number): EffectVisual[] {
   const x = Math.round(worldX(event.x));

@@ -568,6 +568,20 @@ describe('forage regrowth in the save', () => {
     expect(saved('honey-0', 36)).toBe('invalid');
   });
 
+  it('saves and loads gathered honey and greens in the bag', () => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    state.day = 32;
+    state.progress.hearthUnlocked = true;
+    state.progress.nextStormDay = null;
+    const honey = state.nodes.find(item => item.id === 'honey-0')!;
+    honey.amount = 0;
+    honey.readyDay = state.day + BALANCE.honeyRegrowDays;
+    state.inventory.food = addFood(addFood(emptyFood(), 'honey', 1, 32), 'greens', 2, 30);
+    expect(saveGame(storage, state).ok).toBe(true);
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
+  });
+
   it('keeps every other spot to the next day', () => {
     expect(saved('hazel-0', 33)).toBe('loaded');
     expect(saved('hazel-0', 34)).toBe('invalid');

@@ -170,12 +170,17 @@ const wolfTracksSprite = define(40, 24, { k: 'stone1', l: 'stone2' }, {
   }
 }, [20, 12]);
 
-const gatherLegend = { a: 'wood1', b: 'wood3', c: 'berry2', d: 'berry4', e: 'canvas2', f: 'canvas4', g: 'stone1', h: 'stone3' } as const;
+const gatherLegend = { a: 'wood1', b: 'wood3', c: 'berry2', d: 'berry4', e: 'canvas2', f: 'canvas4', g: 'stone1', h: 'stone3',
+  i: 'leaf2', j: 'leaf3', k: 'leaf4', m: 'wood2', n: 'scarf2', o: 'scarf3', p: 'scarf4' } as const;
 const gatherPop = define(8, 8, gatherLegend, {
   wood: g => { line(g, 1, 6, 6, 2, 'a'); line(g, 1, 5, 6, 1, 'b'); dot(g, 1, 5, 'f'); },
   berry: g => { box(g, 2, 2, 4, 4, 'c'); box(g, 3, 2, 2, 2, 'd'); dot(g, 2, 3, 'd'); dot(g, 4, 1, 'e'); },
   fiber: g => { box(g, 2, 2, 4, 5, 'e'); box(g, 3, 1, 2, 5, 'f'); line(g, 2, 5, 5, 2, 'a'); },
-  stone: g => { box(g, 1, 4, 6, 3, 'g'); box(g, 2, 2, 4, 3, 'h'); dot(g, 2, 2, 'f'); }
+  stone: g => { box(g, 1, 4, 6, 3, 'g'); box(g, 2, 2, 4, 3, 'h'); dot(g, 2, 2, 'f'); },
+  hazel: g => { box(g, 2, 3, 4, 4, 'm'); box(g, 3, 3, 2, 2, 'b'); box(g, 2, 2, 4, 1, 'j'); dot(g, 3, 1, 'k'); },
+  pine: g => { line(g, 4, 7, 4, 1, 'a'); for (const y of [2, 4, 6]) { line(g, 1, y - 1, 3, y, 'i'); line(g, 5, y, 7, y - 1, 'j'); } },
+  greens: g => { line(g, 1, 2, 4, 6, 'i'); line(g, 6, 1, 4, 6, 'j'); box(g, 3, 2, 2, 4, 'j'); dot(g, 1, 2, 'k'); dot(g, 6, 1, 'k'); },
+  honey: g => { box(g, 2, 3, 4, 4, 'n'); box(g, 2, 2, 4, 3, 'o'); dot(g, 3, 3, 'p'); box(g, 3, 1, 2, 1, 'f'); }
 }, [4, 7]);
 const smokePuff = define(8, 8, { a: 'stone3', b: 'stone4' }, {
   puff0: g => { box(g, 3, 4, 3, 3, 'a'); box(g, 4, 3, 2, 2, 'b'); },
