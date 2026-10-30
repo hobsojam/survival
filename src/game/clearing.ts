@@ -84,8 +84,8 @@ export const CLEARING_STEPS: Record<StepId, ClearingStep> = {
   'west-near': {
     side: 'west', reach: NEAR_REACH, cost: NEAR_COST, room: ['vegetableBeds'],
     trees: [
-      { x: 14.75, y: 13.5, sprite: 'treeBroadleaf' }, { x: 13.5, y: 14.5, sprite: 'treePine' },
-      { x: 15.5, y: 15.25, sprite: 'treeBroadleaf' }, { x: 13.5, y: 13, sprite: 'treePine' }
+      // Only two fit: the west path and the diagonals leave this wedge narrow.
+      { x: 14.75, y: 13.5, sprite: 'treeBroadleaf' }, { x: 13.5, y: 13, sprite: 'treePine' }
     ]
   },
   'west-far': {

@@ -99,7 +99,8 @@ describe('clearing steps', () => {
   it('prices near and far steps', () => {
     for (const id of STEP_IDS) {
       const far = id.endsWith('far');
-      expect(CLEARING_STEPS[id].trees).toHaveLength(far ? 6 : 4);
+      // The west wedge is narrow and split by the quarry path, so west-near has room for only two.
+      expect(CLEARING_STEPS[id].trees).toHaveLength(id === 'west-near' ? 2 : far ? 6 : 4);
       expect(CLEARING_STEPS[id].cost).toEqual(far ? { wood: 6, fiber: 3, stone: 0 } : { wood: 4, fiber: 2, stone: 0 });
     }
   });
@@ -167,6 +168,10 @@ describe('marking a side and felling its trees', () => {
     expect(result.state.timeOfDay).toBe(state.timeOfDay);
     expect(result.state.inventory).toEqual(state.inventory);
     expect(result.message).toBe('Tied pale fibre round 4 trees on the east side.');
+  });
+
+  it('counts the two west-near trees in the mark message', () => {
+    expect(applyAction(ready(), { type: 'markClearing', step: 'west-near' }).message).toBe('Tied pale fibre round 2 trees on the west side.');
   });
 
   it('replaces a mark that has no trees down, but not one that has', () => {

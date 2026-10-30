@@ -204,9 +204,7 @@ describe('terrain composition', () => {
     expect(westOnRow(open).length).toBeGreaterThan(0);
     const centerX = BALANCE.campX + .5, centerY = BALANCE.campY + .5;
     const endX = CAMP_EXIT.x + .5, endY = CAMP_EXIT.y + .5;
-    // Two west-near trees cannot clear the path: the fiber, berries and diagonal paths leave the near ring no room for four.
-    const crowded = CLEARING_STEPS['west-near'].trees.slice(1, 3);
-    for (const tree of open.trees.filter(item => !crowded.some(spot => spot.x === item.x && spot.y === item.y))) {
+    for (const tree of open.trees) {
       const x = tree.x + .5, y = tree.y + .5, dx = endX - centerX, dy = endY - centerY;
       const t = Math.max(0, Math.min(1, ((x - centerX) * dx + (y - centerY) * dy) / (dx * dx + dy * dy)));
       expect(Math.hypot(x - centerX - t * dx, y - centerY - t * dy), `tree at ${tree.x},${tree.y}`).toBeGreaterThanOrEqual(1.35);
