@@ -7,20 +7,20 @@ import { ICY_NIGHT, SUNRISE_MS, fireGlow, fireRadii, lightMaskPixels, lightScree
 import { afternoonStart } from '../src/game/calendar';
 
 const rgb = (hex: string) => parseInt(hex.slice(1), 16);
-// Day 6 is mid-autumn, when night falls at 160 s.
+// Day 6 is mid-autumn, when night falls at 167 game seconds.
 const state = { ...createGame(), day: 6 };
 
 describe('time-of-day lighting', () => {
   it('has no day tint and warms the last thirty seconds before night', () => {
     expect(lightingTint({ ...state, timeOfDay: 60 })).toEqual({ color: rgb(palette.dusk), alpha: 0 });
-    expect(lightingTint({ ...state, timeOfDay: 145 }).color).toBe(rgb(palette.dusk));
-    expect(lightingTint({ ...state, timeOfDay: 145 }).alpha).toBeCloseTo(0.06);
-    expect(lightingTint({ ...state, timeOfDay: 160 })).toEqual({ color: rgb(palette.night), alpha: 0 });
+    expect(lightingTint({ ...state, timeOfDay: 152 }).color).toBe(rgb(palette.dusk));
+    expect(lightingTint({ ...state, timeOfDay: 152 }).alpha).toBeCloseTo(0.06);
+    expect(lightingTint({ ...state, timeOfDay: 167 })).toEqual({ color: rgb(palette.night), alpha: 0 });
   });
 
   it('reaches 55% at ordinary night and 64% during a cold night', () => {
-    expect(lightingTint({ ...state, timeOfDay: 190 })).toEqual({ color: rgb(palette.night), alpha: 0.55 });
-    const storm = { ...state, day: 3, timeOfDay: 204, progress: { ...state.progress, nextStormDay: 3 } };
+    expect(lightingTint({ ...state, timeOfDay: 197 })).toEqual({ color: rgb(palette.night), alpha: 0.55 });
+    const storm = { ...state, day: 3, timeOfDay: 205, progress: { ...state.progress, nextStormDay: 3 } };
     expect(lightingTint(storm)).toEqual({ color: ICY_NIGHT, alpha: 0.64 });
   });
 
@@ -72,11 +72,11 @@ describe('fire glow by area', () => {
 
 describe('lighting through the year', () => {
   it('darkens early in midwinter and holds the dusk late in midsummer', () => {
-    // Night has fallen by 135 s in midwinter, and winter nights take the bitter tint.
-    expect(lightingTint({ ...state, day: 16, timeOfDay: 135 }).color).toBe(ICY_NIGHT);
+    // Night has fallen by 155 s in midwinter, and winter nights take the bitter tint.
+    expect(lightingTint({ ...state, day: 16, timeOfDay: 155 }).color).toBe(ICY_NIGHT);
     const summer = lightingTint({ ...state, day: 36, timeOfDay: 165 });
     expect(summer.color).toBe(rgb(palette.golden));
-    expect(summer.alpha).toBeCloseTo(0.16 * 20 / 45);
+    expect(summer.alpha).toBeCloseTo(0.16 * 25 / 45);
   });
 });
 
@@ -140,12 +140,12 @@ describe('rain tint', () => {
     expect(lightingTint({ ...base, day: 22, timeOfDay: 29 }).alpha).toBe(0);
   });
 
-  it('lets a late shower give way to the dusk glow', () => {
-    // Day 61's shower runs from 63 s to 118 s, and its dusk begins at 109 s.
+  it('lets a late shower clear before the dusk glow', () => {
+    // Day 61's shower runs from 63 s to 118 s, and its dusk begins at 124 s.
     const dusk = (time: number) => lightingTint({ ...base, day: 61, timeOfDay: time });
-    expect(dusk(112).alpha).toBeGreaterThan(0.12 * 3 / 30);
-    expect(dusk(112).color).not.toBe(rgb(palette.storm));
+    expect(dusk(112).color).toBe(rgb(palette.storm));
     expect(dusk(118.01).color).toBe(rgb(palette.dusk));
+    expect(dusk(125).alpha).toBeGreaterThan(0);
     expect(Math.abs(dusk(117.9).alpha - dusk(118.01).alpha)).toBeLessThan(0.01);
   });
 });

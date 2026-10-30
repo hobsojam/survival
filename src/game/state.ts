@@ -126,6 +126,8 @@ export const BALANCE = {
   campX: 20,
   campY: 15,
   daySeconds: 240,
+  /** Game seconds advanced per real second while the player is awake. */
+  clockRate: 8 / 11,
   baseCapacity: 8,
   crateCapacity: 16,
   gatherEnergyCost: 4,

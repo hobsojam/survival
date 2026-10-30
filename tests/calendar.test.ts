@@ -15,16 +15,16 @@ describe('the seasonal calendar', () => {
   });
 
   it('lets night fall earliest in midwinter and latest in midsummer', () => {
-    expect([1, 6, 11, 16, 26, 36, 76].map(nightStart)).toEqual([181, 160, 139, 130, 160, 190, 190]);
+    expect([1, 6, 11, 16, 26, 36, 76].map(nightStart)).toEqual([180, 167, 154, 149, 167, 185, 185]);
     for (let day = 1; day <= 40; day++) {
-      expect(nightStart(day)).toBeGreaterThanOrEqual(130);
-      expect(nightStart(day)).toBeLessThanOrEqual(190);
+      expect(nightStart(day)).toBeGreaterThanOrEqual(149);
+      expect(nightStart(day)).toBeLessThanOrEqual(185);
       expect(Math.abs(nightStart(day + 1) - nightStart(day))).toBeLessThanOrEqual(5);
     }
   });
 
   it('starts the afternoon in proportion to the daylight', () => {
-    expect(afternoonStart(6)).toBe(110);
+    expect(afternoonStart(6)).toBe(115);
     for (let day = 1; day <= 40; day++) expect(afternoonStart(day)).toBeLessThan(nightStart(day));
   });
 

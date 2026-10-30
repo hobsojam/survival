@@ -27,9 +27,9 @@ export function daysLeftInSeason(day: number): number {
   return SEASON_LENGTH - (day - 1) % SEASON_LENGTH;
 }
 
-/** Seconds into the day when night falls: 130 in midwinter, 190 in midsummer, changing a little each dawn. */
+/** Game seconds into the day when night falls: 149 in midwinter, 185 in midsummer. */
 export function nightStart(day: number): number {
-  return Math.round(160 + 30 * Math.cos(2 * Math.PI * (day - MIDSUMMER) / YEAR_LENGTH));
+  return Math.round(167 + 18 * Math.cos(2 * Math.PI * (day - MIDSUMMER) / YEAR_LENGTH));
 }
 
 /** The afternoon keeps the same share of the daylight all year. */
