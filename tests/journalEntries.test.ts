@@ -5,6 +5,7 @@ import { advanceTime, applyAction, type GameAction } from '../src/game/rules';
 import { nightStart } from '../src/game/calendar';
 import { journalEntry, recordJournal, type JournalId } from '../src/game/journalEntries';
 import { stock } from './stock';
+import { addFood, emptyFood, type FoodItem } from '../src/game/food';
 
 const base = createGame();
 const at = (day: number, timeOfDay: number, extra: Partial<GameState> = {}): GameState => ({ ...base, day, timeOfDay, ...extra });
@@ -161,5 +162,58 @@ describe('each moment of the year', () => {
     const evening = withPlayer(at(34, nightStart(34) - 10, { progress: repaired }), LOOKOUT.x, LOOKOUT.y + 1);
     expect(written(tick(evening), 'lookoutEvening')).toBe(true);
     expect(written(tick({ ...evening, progress: { ...repaired, lookoutRepaired: false } }), 'lookoutEvening')).toBe(false);
+  });
+
+  describe('foraging and cooking', () => {
+    const beside = (nodeId: string, day: number): GameState => {
+      const node = base.nodes.find(item => item.id === nodeId)!;
+      return withPlayer(at(day, 60), node.x, node.y);
+    };
+    const evening = (day: number, food: Partial<Record<FoodItem, number>>): GameState => {
+      let store = emptyFood();
+      for (const [item, n] of Object.entries(food) as [FoodItem, number][]) store = addFood(store, item, n, day);
+      return at(day, nightStart(day) + 5, {
+        fireFuel: 100, structures: { ...base.structures, shelter: true, toolshed: true },
+        progress: { ...base.progress, potCrafted: true },
+        inventory: { ...base.inventory, food: store }
+      });
+    };
+
+    it('writes hazelnuts, and wild honey, on the first gather of each', () => {
+      const hazel = act(beside('hazel-0', 2), { type: 'gather', nodeId: 'hazel-0' });
+      expect(hazel.state.journal).toContainEqual({ year: 1, id: 'hazelnuts', day: 2, variant: 0 });
+      expect(hazel.messages).toContain('Written in your journal: Found hazelnuts in the leaf litter.');
+      expect(written(act(beside('honey-0', 34), { type: 'gather', nodeId: 'honey-0' }), 'wildHoney')).toBe(true);
+      // Out of season the spot isn't there, so nothing is gathered or written.
+      expect(written(act(beside('hazel-0', 12), { type: 'gather', nodeId: 'hazel-0' }), 'hazelnuts')).toBe(false);
+    });
+
+    it('writes each gather only once a year', () => {
+      const first = act(beside('hazel-0', 2), { type: 'gather', nodeId: 'hazel-0' });
+      const second = recordJournal(first.state, first.state, { type: 'gather', nodeId: 'hazel-0' });
+      expect(second.state).toBe(first.state);
+      const nextYear = act(beside('hazel-0', 42), { type: 'gather', nodeId: 'hazel-0' });
+      expect(nextYear.state.journal).toContainEqual({ year: 2, id: 'hazelnuts', day: 42, variant: 0 });
+    });
+
+    it('writes pine tea from a bare C press in winter, and salad when it is the dish cooked in spring', () => {
+      const tea = act(evening(12, { pineNeedles: 1 }), { type: 'cook' });
+      expect(tea.state.journal).toContainEqual({ year: 1, id: 'pineTea', day: 12, variant: 0 });
+      expect(tea.messages).toContain('Written in your journal: Pine needle tea, hot in the snow.');
+      const salad = act(evening(22, { greens: 1, berry: 1 }), { type: 'cook', dish: 'salad' });
+      expect(salad.state.journal).toContainEqual({ year: 1, id: 'salad', day: 22, variant: 0 });
+      expect(salad.messages).toContain('Written in your journal: Greens and berries, the first salad of spring.');
+      // A bare press with a berry in hand toasts the berry, so no salad was cooked.
+      expect(written(act(evening(22, { greens: 1, berry: 1 }), { type: 'cook' }), 'salad')).toBe(false);
+    });
+
+    it('keeps tea and salad to their own seasons and dishes', () => {
+      expect(written(act(evening(2, { pineNeedles: 1 }), { type: 'cook' }), 'pineTea')).toBe(false);
+      expect(written(act(evening(12, { greens: 1, berry: 1 }), { type: 'cook' }), 'salad')).toBe(false);
+      expect(written(act(evening(12, { berry: 1 }), { type: 'cook' }), 'pineTea')).toBe(false);
+      expect(written(act(evening(22, { pineNeedles: 1 }), { type: 'cook' }), 'salad')).toBe(false);
+      // Nothing to cook with: no change, no entry.
+      expect(written(act(evening(12, {}), { type: 'cook' }), 'pineTea')).toBe(false);
+    });
   });
 });

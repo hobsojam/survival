@@ -251,6 +251,54 @@ export const JOURNAL_ICONS: Record<JournalId, JournalIcon> = {
     '..d...dd..',
     '.dd....dd.',
     '..........'
+  ] },
+  hazelnuts: { legend: { n: 'wood3', N: 'wood1', l: 'fire1', L: 'fire2' }, rows: [
+    '..........',
+    '...N......',
+    '..nnn.....',
+    '.nnnnn.l..',
+    '.nnNnn.Ll.',
+    '..nnn.lLl.',
+    '..........',
+    '.l.nn..L..',
+    '..nnnn.l..',
+    '...nn.....'
+  ] },
+  pineTea: { legend: { g: 'leaf3', G: 'leaf2', k: 'stone0', t: 'wood3', s: 'stone3' }, rows: [
+    '..s...s...',
+    '...s......',
+    '..G.G.G...',
+    '.kkkkkkk..',
+    '.ktttttkk.',
+    '.kttttttk.',
+    '.kgGgGgk.k',
+    '..kttttk.k',
+    '...kkkkkk.',
+    '..........'
+  ] },
+  salad: { legend: { g: 'leaf4', G: 'leaf3', b: 'berry3', B: 'berry2', w: 'wood3' }, rows: [
+    '..........',
+    '..........',
+    '..gG.gG...',
+    '.gGbGgGBg.',
+    '.GgGGbGgG.',
+    'wwwwwwwwww',
+    '.wwwwwwww.',
+    '..wwwwww..',
+    '...wwww...',
+    '..........'
+  ] },
+  wildHoney: { legend: { h: 'wood4', H: 'fire3', o: 'fire2', w: 'wood2', d: 'wood1' }, rows: [
+    '...dddd...',
+    '..dwwwwd..',
+    '..dwddwd..',
+    '..dwddwd..',
+    '..dwwwwd..',
+    '...hHh....',
+    '...HoH....',
+    '...hoh....',
+    '....H.....',
+    '....h.....'
   ] }
 };
 

@@ -1,5 +1,5 @@
 import { duskLength, nightStart, season, seasonMessage, yearOf, type Season } from './calendar';
-import { foodCount } from './food';
+import { foodCount, type FoodItem } from './food';
 import { rainMessage } from './rain';
 import { isAtCamp, isColdNight, isInClearing, type GameAction } from './rules';
 import { LOOKOUT, type GameState } from './state';
@@ -13,7 +13,8 @@ export type JournalId =
   | 'leaves' | 'fox' | 'coldFront' | 'driedBerries' | 'stars'
   | 'firstSnow' | 'wolfTracks' | 'frozenSpring' | 'winterFire' | 'winterCooking'
   | 'firstRain' | 'rabbits' | 'bushesFull' | 'stumpGrowing' | 'springRest'
-  | 'fireflies' | 'twoHandfuls' | 'goldEvening' | 'warmSleep' | 'lookoutEvening';
+  | 'fireflies' | 'twoHandfuls' | 'goldEvening' | 'warmSleep' | 'lookoutEvening'
+  | 'hazelnuts' | 'pineTea' | 'salad' | 'wildHoney';
 
 export interface JournalEntry { year: number; id: JournalId; day: number; variant: number }
 
@@ -31,28 +32,32 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'coldFront', lines: ['The cold night came. I kept the fire through it.', 'The cold night came, and it got the better of me.',
       'A cold autumn night, and the fire kept me warm.'] },
     { id: 'driedBerries', lines: ['Dried berries for the winter.'] },
-    { id: 'stars', lines: ['Lay back and counted stars.'] }
+    { id: 'stars', lines: ['Lay back and counted stars.'] },
+    { id: 'hazelnuts', lines: ['Found hazelnuts in the leaf litter.'] }
   ],
   winter: [
     { id: 'firstSnow', lines: ['Snow fell in the night.'], silent: true },
     { id: 'wolfTracks', lines: ['Paw prints round the fire this morning.'], silent: true },
     { id: 'frozenSpring', lines: ['The quiet spring had frozen over.'] },
     { id: 'winterFire', lines: ['Kept the fire alive through a whole winter night.'] },
-    { id: 'winterCooking', lines: ['Cooked berries by the fire, with the snow coming down.'] }
+    { id: 'winterCooking', lines: ['Cooked berries by the fire, with the snow coming down.'] },
+    { id: 'pineTea', lines: ['Pine needle tea, hot in the snow.'] }
   ],
   spring: [
     { id: 'firstRain', lines: ['The first rain of spring.'], silent: true },
     { id: 'rabbits', lines: ['Rabbits in the meadow.'] },
     { id: 'bushesFull', lines: ['The bushes are full again.'] },
     { id: 'stumpGrowing', lines: ['A stump I cut is growing back already.'] },
-    { id: 'springRest', lines: ['Sat a while at the spring, now that it\'s thawed.'] }
+    { id: 'springRest', lines: ['Sat a while at the spring, now that it\'s thawed.'] },
+    { id: 'salad', lines: ['Greens and berries, the first salad of spring.'] }
   ],
   summer: [
     { id: 'fireflies', lines: ['Fireflies over camp.'] },
     { id: 'twoHandfuls', lines: ['Two handfuls from one bush.'] },
     { id: 'goldEvening', lines: ['The evening went gold.'] },
     { id: 'warmSleep', lines: ['Slept out without a fire, and it was warm.'] },
-    { id: 'lookoutEvening', lines: ['Watched the land from the lookout on a long evening.'] }
+    { id: 'lookoutEvening', lines: ['Watched the land from the lookout on a long evening.'] },
+    { id: 'wildHoney', lines: ['Wild honey from the hollow tree.'] }
   ]
 };
 
@@ -77,6 +82,12 @@ const acted = (m: Moment, type: GameAction['type']): boolean => m.action?.type =
 const onAfter = (m: Moment, when: boolean): Noticed | null => (when ? { day: m.after.day } : null);
 const onBefore = (m: Moment, when: boolean): Noticed | null => (when ? { day: m.before.day } : null);
 const berries = (state: GameState): number => foodCount(state.inventory.food, 'berry');
+/** A successful gather that brought more of one food into the bag. */
+const gathered = (m: Moment, item: FoodItem): boolean =>
+  acted(m, 'gather') && foodCount(m.after.inventory.food, item) > foodCount(m.before.inventory.food, item);
+/** A successful cook that used up some of an ingredient, which tells the dish apart whether or not it was named. */
+const cookedWith = (m: Moment, item: FoodItem): boolean =>
+  acted(m, 'cook') && foodCount(m.after.inventory.food, item) < foodCount(m.before.inventory.food, item);
 const atSpring = (m: Moment): boolean => m.action?.type === 'visitSite' && m.action.siteId === 'spring' && done(m);
 
 const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
@@ -110,7 +121,11 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
     && daylight(m.before) && !daylight(m.after)),
   warmSleep: m => onBefore(m, acted(m, 'sleep') && m.after.fireFuel === 0),
   lookoutEvening: m => onAfter(m, awake(m) && m.after.progress.lookoutRepaired && m.after.area === 'camp'
-    && within(m.after, LOOKOUT, 2) && atDusk(m.after))
+    && within(m.after, LOOKOUT, 2) && atDusk(m.after)),
+  hazelnuts: m => onBefore(m, gathered(m, 'hazelnut')),
+  pineTea: m => onBefore(m, cookedWith(m, 'pineNeedles')),
+  salad: m => onBefore(m, cookedWith(m, 'greens')),
+  wildHoney: m => onBefore(m, gathered(m, 'honey'))
 };
 
 /**
