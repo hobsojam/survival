@@ -90,6 +90,12 @@ describe('clearing steps', () => {
     });
   });
 
+  it('keeps the marked trees off the wild trees', () => {
+    for (const id of STEP_IDS) for (const tree of CLEARING_STEPS[id].trees) {
+      for (const wild of game.trees) expect(Math.hypot(tree.x - wild.x, tree.y - wild.y), `${id} tree at ${tree.x},${tree.y} by ${wild.id}`).toBeGreaterThanOrEqual(1.2);
+    }
+  });
+
   it('prices near and far steps', () => {
     for (const id of STEP_IDS) {
       const far = id.endsWith('far');

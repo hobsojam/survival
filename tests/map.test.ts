@@ -49,7 +49,6 @@ describe('terrain composition', () => {
     // The scene draws the choppable trees itself, so the map only needs to hold them where it leaves room for a step's trees.
     const stepSpots = STEP_IDS.flatMap(id => CLEARING_STEPS[id].trees);
     for (const target of createGame().trees) {
-      if (stepSpots.some(spot => Math.hypot(spot.x - target.x, spot.y - target.y) < 1.2)) continue;
       expect(map.trees).toContainEqual({ x: target.x, y: target.y, sprite: target.sprite });
     }
     for (const site of Object.values(SITES)) {
@@ -205,9 +204,9 @@ describe('terrain composition', () => {
     expect(westOnRow(open).length).toBeGreaterThan(0);
     const centerX = BALANCE.campX + .5, centerY = BALANCE.campY + .5;
     const endX = CAMP_EXIT.x + .5, endY = CAMP_EXIT.y + .5;
-    // The trees set for clearing stand where the steps put them; only the wild ones keep clear of the path.
-    const stepSpots = STEP_IDS.flatMap(id => CLEARING_STEPS[id].trees);
-    for (const tree of open.trees.filter(item => !stepSpots.some(spot => spot.x === item.x && spot.y === item.y))) {
+    // Two west-near trees cannot clear the path: the fiber, berries and diagonal paths leave the near ring no room for four.
+    const crowded = CLEARING_STEPS['west-near'].trees.slice(1, 3);
+    for (const tree of open.trees.filter(item => !crowded.some(spot => spot.x === item.x && spot.y === item.y))) {
       const x = tree.x + .5, y = tree.y + .5, dx = endX - centerX, dy = endY - centerY;
       const t = Math.max(0, Math.min(1, ((x - centerX) * dx + (y - centerY) * dy) / (dx * dx + dy * dy)));
       expect(Math.hypot(x - centerX - t * dx, y - centerY - t * dy), `tree at ${tree.x},${tree.y}`).toBeGreaterThanOrEqual(1.35);

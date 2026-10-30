@@ -2,7 +2,7 @@ import { isWinter, nightStart } from '../game/calendar';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceKind, type SiteId, type TreeNode } from '../game/state';
 import { isAtCamp, isInClearing, sleepBlocker, type GameAction } from '../game/rules';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
-import { choppableTrees } from '../game/clearing';
+import { choppableTrees, isClearingStump } from '../game/clearing';
 import { sitePrompt } from '../game/sitePrompt';
 import { OFFER_PROMPT, offerFor } from '../game/companion';
 import { closestGatherable, type Gatherable } from './tapTarget';
@@ -110,7 +110,7 @@ function lookoutPrompt(state: GameState): string {
 function treePrompt(state: GameState): string {
   const tree = closestTree(state);
   if (!tree) return '';
-  if (tree.readyDay === Number.MAX_SAFE_INTEGER) return 'Stump · this ground is being cleared';
+  if (isClearingStump(tree)) return 'Stump · this ground is being cleared';
   if (tree.readyDay > state.day) return `Stump · regrows day ${tree.readyDay}`;
   if (state.progress.axeCrafted) return 'X  Chop mature tree';
   return 'Mature tree · craft an axe at camp';

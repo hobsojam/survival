@@ -146,10 +146,8 @@ describe('sprite pipeline', () => {
   });
 
   it('adds grown clearing edges to the sprite table as they are made', () => {
-    const before = Object.keys(sprites).length;
     const name = buildMap(createGame().nodes, 'camp', 'summer', { cleared: ['west-far', 'west-near', 'south-near'], marked: null, felled: [] }).campEdges.at(-1)!.sprite;
     expect(sprites[name]).toBeDefined();
-    expect(Object.keys(sprites).length).toBeGreaterThanOrEqual(before);
     expect(() => validateSprite(sprites[name])).not.toThrow();
   });
 

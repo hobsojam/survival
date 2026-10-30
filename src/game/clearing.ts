@@ -39,16 +39,16 @@ export const CLEARING_STEPS: Record<StepId, ClearingStep> = {
   'north-near': {
     side: 'north', reach: NEAR_REACH, cost: NEAR_COST, room: ['larder'],
     trees: [
-      { x: 22, y: 10.25, sprite: 'treeBroadleaf' }, { x: 16.5, y: 9.25, sprite: 'treePine' },
+      { x: 22, y: 10.25, sprite: 'treeBroadleaf' }, { x: 16, y: 9.75, sprite: 'treePine' },
       { x: 19.25, y: 10, sprite: 'treeBroadleaf' }, { x: 18.5, y: 8.75, sprite: 'treePine' }
     ]
   },
   'north-far': {
     side: 'north', reach: 8, cost: FAR_COST, room: ['house'],
     trees: [
-      { x: 22.75, y: 8.25, sprite: 'treeBroadleaf' }, { x: 19.5, y: 7.5, sprite: 'treePine' },
+      { x: 22.75, y: 8.25, sprite: 'treeBroadleaf' }, { x: 18.75, y: 7.5, sprite: 'treePine' },
       { x: 13.75, y: 9.75, sprite: 'treeBroadleaf' }, { x: 15, y: 8.75, sprite: 'treePine' },
-      { x: 17.5, y: 7.25, sprite: 'treeBroadleaf' }, { x: 21, y: 6.75, sprite: 'treePine' }
+      { x: 17.5, y: 7.25, sprite: 'treeBroadleaf' }, { x: 21.25, y: 6.75, sprite: 'treePine' }
     ]
   },
   'east-near': {
@@ -84,7 +84,7 @@ export const CLEARING_STEPS: Record<StepId, ClearingStep> = {
   'west-near': {
     side: 'west', reach: NEAR_REACH, cost: NEAR_COST, room: ['vegetableBeds'],
     trees: [
-      { x: 14.5, y: 13.75, sprite: 'treeBroadleaf' }, { x: 13.5, y: 14.5, sprite: 'treePine' },
+      { x: 14.75, y: 13.5, sprite: 'treeBroadleaf' }, { x: 13.5, y: 14.5, sprite: 'treePine' },
       { x: 15.5, y: 15.25, sprite: 'treeBroadleaf' }, { x: 13.5, y: 13, sprite: 'treePine' }
     ]
   },
@@ -92,7 +92,7 @@ export const CLEARING_STEPS: Record<StepId, ClearingStep> = {
     side: 'west', reach: 9, cost: FAR_COST, room: ['well'],
     trees: [
       { x: 12.5, y: 12.25, sprite: 'treeBroadleaf' }, { x: 12.5, y: 16.5, sprite: 'treePine' },
-      { x: 10.75, y: 16, sprite: 'treeBroadleaf' }, { x: 11.75, y: 13.5, sprite: 'treePine' },
+      { x: 10.75, y: 16.5, sprite: 'treeBroadleaf' }, { x: 11.75, y: 13.5, sprite: 'treePine' },
       { x: 11.25, y: 12.25, sprite: 'treeBroadleaf' }, { x: 11.25, y: 17.75, sprite: 'treePine' }
     ]
   }
@@ -157,6 +157,11 @@ export function markedTrees(state: GameState): TreeNode[] {
     sprite: tree.sprite,
     readyDay: felled.includes(index) ? Number.MAX_SAFE_INTEGER : 1
   }));
+}
+
+/** Whether a tree is the stump of a marked tree already felled, which stays until its ground is cleared. */
+export function isClearingStump(tree: TreeNode): boolean {
+  return tree.readyDay === Number.MAX_SAFE_INTEGER;
 }
 
 /** Every tree the axe can fell: the wild ones and those marked for clearing. */
