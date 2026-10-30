@@ -268,7 +268,7 @@ describe('clearing the ground', () => {
     expect(next.inventory.fiber).toBe(0);
     expect(next.timeOfDay).toBeGreaterThan(state.timeOfDay);
     expect(next.player.energy).toBeLessThan(state.player.energy);
-    expect(result.message).toBe('The north side is open now.');
+    expect(result.message).toBe("The north side is open now. There's room for a larder now.");
     const placed = placeBranches(createGame().nodes, ['north-near']);
     next.nodes.forEach((node, index) => {
       expect(node.x).toBe(placed[index].x);

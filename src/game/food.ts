@@ -1,8 +1,9 @@
+import { isInClearing } from './camp';
 import { BALANCE, type GameState } from './state';
 
 
 // Food the survivor carries. Fresh food remembers the day each piece was picked, so it can spoil;
-// kept food is just a count. Every eater goes through availableFood and spendFood.
+// kept food is just a count. Every eater goes through availableFood and spendFood, which reach into the larder at camp.
 
 export type FreshFood = 'berry' | 'greens';
 export type KeptFood = 'hazelnut' | 'honey' | 'pineNeedles' | 'roastedHazelnuts' | 'trailFood';
@@ -49,14 +50,43 @@ function takeFrom(store: FoodStore, item: FoodItem, n: number): FoodStore | null
   return { ...store, [item]: store[item] - n };
 }
 
-/** The food the survivor can reach: the bag only, until a larder is within reach. */
+/** The larder when it is built and the survivor stands in the clearing, else null. */
+export function reachableLarder(state: GameState): FoodStore | null {
+  return state.structures.larder && isInClearing(state) ? state.larder : null;
+}
+
+/** The stores the survivor can eat from: the bag, and the larder when it is within reach. */
+function reachableStores(state: GameState): FoodStore[] {
+  const larder = reachableLarder(state);
+  return larder ? [state.inventory.food, larder] : [state.inventory.food];
+}
+
+/** The food the survivor can reach: the bag, plus the larder in the clearing. */
 export function availableFood(state: GameState, item: FoodItem): number {
-  return foodCount(state.inventory.food, item);
+  return reachableStores(state).reduce((total, store) => total + foodCount(store, item), 0);
+}
+
+/** How many of n come from the bag: kept food bag-first, fresh food oldest-first across both, a tie going to the bag. */
+function bagShare(bag: FoodStore, larder: FoodStore, item: FoodItem, n: number): number {
+  if (!isFresh(item)) return Math.min(n, bag[item]);
+  const fromBag = [...bag[item]].sort((a, b) => a - b), fromLarder = [...larder[item]].sort((a, b) => a - b);
+  let b = 0, l = 0;
+  while (b + l < n) {
+    if (l >= fromLarder.length || (b < fromBag.length && fromBag[b] <= fromLarder[l])) b++;
+    else l++;
+  }
+  return b;
 }
 
 /** Spends n of an item from reachable food: fresh oldest-first, kept bag-first. Null if there isn't enough. */
 export function spendFood(state: GameState, item: FoodItem, n: number): GameState | null {
-  return takeFromBag(state, item, n);
+  const larder = reachableLarder(state);
+  if (!larder) return takeFromBag(state, item, n);
+  if (availableFood(state, item) < n) return null;
+  const fromBag = bagShare(state.inventory.food, larder, item, n);
+  const food = takeFrom(state.inventory.food, item, fromBag);
+  const kept = takeFrom(larder, item, n - fromBag);
+  return food && kept && { ...state, inventory: { ...state.inventory, food }, larder: kept };
 }
 
 /** Takes from the bag alone, oldest-first: for the wolf. */
@@ -83,13 +113,22 @@ export function eatEffect(item: EdibleFood): { hunger: number; energy: number; m
   return { hunger: BALANCE[hunger], energy: energy ? BALANCE[energy] : 0, message };
 }
 
-/** The day the oldest piece of a fresh item in the bag was picked, or Infinity if there is none. */
-const oldestPick = (state: GameState, item: FreshFood): number => availableFood(state, item) > 0 ? Math.min(...state.inventory.food[item]) : Infinity;
+/** The days each reachable piece of a fresh item was picked, from the bag and the larder in reach. */
+function reachablePicks(state: GameState, item: FreshFood): number[] {
+  return reachableStores(state).flatMap(store => store[item]);
+}
+
+/** The day the oldest reachable piece of a fresh item was picked, or null if there is none. */
+function oldestPick(state: GameState, item: FreshFood): number | null {
+  const picks = reachablePicks(state, item);
+  return picks.length > 0 ? Math.min(...picks) : null;
+}
 
 /** What Q eats: the fresh item nearest to going soft (berry wins a tie), then hazelnut, honey, roasted hazelnuts. Never pine needles or rations. */
 export function quickEatItem(state: GameState): FoodItem | null {
   const berry = oldestPick(state, 'berry'), greens = oldestPick(state, 'greens');
-  if (berry !== Infinity || greens !== Infinity) return berry <= greens ? 'berry' : 'greens';
+  if (berry !== null && (greens === null || berry <= greens)) return 'berry';
+  if (greens !== null) return 'greens';
   return (['hazelnut', 'honey', 'roastedHazelnuts'] as const).find(item => availableFood(state, item) > 0) ?? null;
 }
 

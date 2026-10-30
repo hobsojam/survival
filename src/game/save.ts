@@ -1,11 +1,11 @@
-import { BALANCE, BUILDINGS, SITES, createGame, type GameState } from './state';
+import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type StructureId } from './state';
 import { bagCapacity, carriedCount } from './rules';
 import { season, yearOf } from './calendar';
 import { journalEntry, journalSeason, type JournalId } from './journalEntries';
 import type { ClearingState, StepId } from './clearing';
 import { CLEARING_STEPS, STEP_IDS, placeBranches } from './clearing';
 import { KEEPSAKES_NEEDED, TRUST_TARGET } from './companion';
-import { FOOD_ITEMS, isFresh } from './food';
+import { FOOD_ITEMS, isFresh, storeTotal, type FoodStore } from './food';
 import { FORAGE, isForage } from './forage';
 
 export const SAVE_KEY = 'hearthwild.save';
@@ -111,6 +111,18 @@ function validClearing({ clearing }: SaveShape): boolean {
   return felled.every(index => whole(index) && index >= 0 && index < trees) && new Set(felled).size === felled.length;
 }
 
+/** Buildings on cleared ground stand only where it is cleared; the larder holds real food, no more than fits, and only once built. */
+function validLarder({ larder, structures, day, clearing }: SaveShape): boolean {
+  const { cleared } = clearing as ClearingState;
+  const grounded = (Object.keys(BUILDINGS) as StructureId[]).every(id => {
+    const definition = BUILDINGS[id];
+    return !structures[id] || !('ground' in definition) || cleared.includes(definition.ground);
+  });
+  if (!grounded || !validFood(larder, day)) return false;
+  const stored = storeTotal(larder as FoodStore);
+  return stored <= BALANCE.larderCapacity && (structures.larder === true || stored === 0);
+}
+
 function validWorld({ nodes, trees, stonePiles, day, clearing }: SaveShape): boolean {
   const today = day as number;
   const fresh = createGame();
@@ -185,10 +197,10 @@ function validCompanion({ companion, day, structures }: SaveShape): boolean {
     && (!made || (keepsakes === 0 && !keepsakeLying));
 }
 
-/** Checks a version 19 save: the clearing, shelter upgrades, garden plots, tools, quarry timers, the year journal and companion. */
+/** Checks a version 19 save: the clearing and the larder, shelter upgrades, garden plots, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validGarden, validClearing, validWorld, validWolf, validSpoiled, validJournal, validCompanion];
+  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validGarden, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

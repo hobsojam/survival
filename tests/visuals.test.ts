@@ -7,6 +7,7 @@ import { worldX, worldY } from '../src/scene/art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { CLEARING_STEPS } from '../src/game/clearing';
 import { validateSprite } from '../src/art/textures';
+import { stock } from './stock';
 
 describe('native-size scene art', () => {
   it('selects pixel textures for every resource and camp site', () => {
@@ -387,5 +388,29 @@ describe('the quarry area', () => {
     expect(sceneVisuals(state, 600).find(item => item.id === 'potTripod')!.texture).toBe('potTripod:steaming1');
     expect(() => validateSprite(sprites.potTripod)).not.toThrow();
     for (const frame of ['still', 'steaming0', 'steaming1']) expect(sprites.potTripod.frames[frame], frame).toBeDefined();
+  });
+});
+
+describe('the larder', () => {
+  const north = { cleared: ['north-near' as const], marked: null, felled: [] };
+  const larder = (state: ReturnType<typeof createGame>) => sceneVisuals(state, 0).find(item => item.id === 'larder');
+
+  it('is not drawn until the north side\'s near ground is cleared', () => {
+    expect(larder(createGame())).toBeUndefined();
+    const built = createGame();
+    built.structures.larder = true;
+    expect(larder(built)).toBeUndefined();
+  });
+
+  it('draws a flat site on the cleared ground, then the raised cache showing what it keeps', () => {
+    const state = { ...createGame(), clearing: north };
+    expect(larder(state)).toMatchObject({ texture: 'larderSite:still', depth: GROUND_DECAL_DEPTH });
+    state.structures.larder = true;
+    expect(larder(state)!.texture).toBe('larder:empty');
+    expect(larder(state)!.depth).toBe(larder(state)!.y);
+    const kept = (berries: number) => larder({ ...state, larder: stock(berries) })!.texture;
+    expect([kept(1), kept(6), kept(7), kept(10)]).toEqual(['larder:some', 'larder:some', 'larder:full', 'larder:full']);
+    for (const name of ['larder', 'larderSite']) expect(() => validateSprite(sprites[name])).not.toThrow();
+    for (const frame of ['empty', 'some', 'full']) expect(sprites.larder.frames[frame], frame).toBeDefined();
   });
 });

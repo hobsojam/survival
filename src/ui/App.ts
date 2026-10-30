@@ -15,7 +15,7 @@ import { createPause, wirePause, type PauseControl } from './pause';
 import { journalView } from './journal';
 import { renderRegionOverview } from './regionOverview';
 import { currentPage, journalPageView, renderJournalPage, turnPage } from './yearJournal';
-import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, clearingView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, pickaxeView, pillowView, potView, startNote, type ActionPanelView } from './panels';
+import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, larderMarkup, larderView, clearingView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, pickaxeView, pillowView, potView, startNote, type ActionPanelView } from './panels';
 import { Soundscape } from '../game/soundscape';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
@@ -65,6 +65,7 @@ export class App {
       const groupHeading = id === 'shelterThatched' ? '<h3 class="build-group-heading">Shelter upgrades</h3>' : '';
       let extraControls = '';
       if (id === 'stonePile') extraControls = `<div id="stone-pile-controls" class="stone-pile-controls" hidden><span id="stone-pile-stored">Stored stone 0/${BALANCE.stonePileCapacity}</span><button type="button" data-action="storeStone">Store 1</button><button type="button" data-action="takeStone">Take 1</button></div>`;
+      if (id === 'larder') extraControls = larderMarkup();
       return groupHeading + `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>` + extraControls;
     }).join('');
     const clearingMarkup = (['north', 'east', 'south', 'west'] as const).map(side => `<button type="button" class="build-item" data-clear-side="${side}"><span class="build-copy"><strong></strong><small></small></span></button>`).join('');
@@ -128,10 +129,12 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone';
+        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'storeFood' | 'takeFood';
         const item = button.dataset.item as FoodItem | undefined;
         const dish = button.dataset.dish as DishId | undefined;
-        if (type === 'cook' && dish) this.scene?.perform({ type, dish });
+        if (type === 'storeFood' || type === 'takeFood') {
+          if (item) this.scene?.perform({ type, item });
+        } else if (type === 'cook' && dish) this.scene?.perform({ type, dish });
         else this.scene?.perform(type === 'eat' && item ? { type, item } : { type });
       });
     });
@@ -381,11 +384,32 @@ export class App {
     const pileControls = this.root.querySelector<HTMLElement>('#stone-pile-controls');
     if (pileControls) pileControls.hidden = !bag.pileShown;
     this.setText('stone-pile-stored', bag.pileStored);
+    this.renderLarder();
     this.setText('fire-status', bag.fire);
     const keepsakes = keepsakeView(this.state);
     const keepsakeLine = this.root.querySelector<HTMLElement>('#keepsake-line');
     if (keepsakeLine) keepsakeLine.hidden = !keepsakes.shown;
     this.setText('keepsake-line', `Keepsakes · ${keepsakes.text}`);
+  }
+
+  private renderLarder(): void {
+    const larder = larderView(this.state);
+    const controls = this.root.querySelector<HTMLElement>('#larder-controls');
+    if (controls) controls.hidden = !larder.shown;
+    this.setText('larder-stored', larder.stored);
+    // Rows hide again once both the bag and the larder are out of an item.
+    this.root.querySelectorAll<HTMLElement>('[data-larder-item]').forEach(row => { row.hidden = true; });
+    for (const row of larder.rows) {
+      const element = this.root.querySelector<HTMLElement>(`[data-larder-item="${row.item}"]`);
+      if (!element) continue;
+      element.hidden = false;
+      this.setText(`larder-${row.item}-count`, String(row.kept));
+      const store = element.querySelector<HTMLButtonElement>('[data-action="storeFood"]')!, take = element.querySelector<HTMLButtonElement>('[data-action="takeFood"]')!;
+      store.disabled = row.storeDisabled;
+      store.title = row.storeTitle;
+      take.disabled = row.takeDisabled;
+      take.title = row.takeTitle;
+    }
   }
 
   private turnJournalPage(step: number): void {

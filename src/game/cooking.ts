@@ -45,11 +45,14 @@ const FOOD_WORDS: Record<FoodItem, [string, string]> = {
   pineNeedles: ['pine needles', 'pine needles'], roastedHazelnuts: ['roasted hazelnuts', 'roasted hazelnuts'], trailFood: ['ration', 'rations']
 };
 
+/** An item's name for a count of it: "berry" or "berries". */
+export const foodWord = (item: FoodItem, n: number): string => FOOD_WORDS[item][n === 1 ? 0 : 1];
+
 const recipe = (dish: DishId): [FoodItem, number][] => Object.entries(DISHES[dish].ingredients) as [FoodItem, number][];
 
 /** "1 greens and 1 berry", or "1 honey, 1 hazelnut and 1 berry". */
 export function ingredientList(dish: DishId): string {
-  const parts = recipe(dish).map(([item, n]) => `${n} ${FOOD_WORDS[item][n === 1 ? 0 : 1]}`);
+  const parts = recipe(dish).map(([item, n]) => `${n} ${foodWord(item, n)}`);
   return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0];
 }
 

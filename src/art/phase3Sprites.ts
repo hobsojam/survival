@@ -381,6 +381,32 @@ function toolshed(g: Grid): void {
   line(g, 23, 3, 23, 8, 'b'); box(g, 0, 9, 24, 1, 'b'); box(g, 0, 10, 24, 1, 'a');
   box(g, 2, 25, 20, 1, 'a');
 }
+function larderSite(g: Grid): void {
+  for (const [x, y] of [[3, 6], [19, 6], [3, 11], [19, 11]]) stake(g, x, y);
+  line(g, 5, 7, 19, 7, 'h'); line(g, 5, 12, 19, 12, 'h');
+  line(g, 10, 9, 14, 9, 'z');
+}
+/** A raised cache on four legs with a little ladder: a plank box under a lit roof, its open front showing what is kept. */
+function larder(g: Grid, stock: 'empty' | 'some' | 'full'): void {
+  oval(g, 12, 26, 10, 2, 's');
+  for (const x of [7, 17]) box(g, x, 13, 1, 11, 'a');
+  for (const x of [3, 19]) { box(g, x, 13, 2, 14, 'b'); line(g, x, 13, x, 25, 'd'); }
+  box(g, 2, 11, 20, 2, 'a'); line(g, 2, 11, 21, 11, 'c');
+  box(g, 3, 4, 18, 7, 'c'); for (const x of [7, 17]) line(g, x, 4, x, 10, 'b');
+  box(g, 9, 5, 7, 5, 'a');
+  box(g, 1, 1, 22, 3, 'd'); box(g, 2, 1, 10, 1, 'e'); line(g, 1, 3, 22, 3, 'b');
+  // The ladder leans from the platform's front edge down to the ground, its rails drifting two pixels left.
+  const rail = (top: number, y: number): number => Math.round(top - 2 * (y - 13) / 13);
+  line(g, 13, 13, 11, 26, 'd'); line(g, 16, 13, 14, 26, 'c');
+  for (const y of [16, 19, 22, 25]) line(g, rail(13, y) + 1, y, rail(16, y) - 1, y, 'e');
+  if (stock === 'empty') return;
+  box(g, 10, 8, 2, 2, 'k'); dot(g, 10, 8, 'l');
+  box(g, 13, 7, 2, 3, 'h'); dot(g, 13, 7, 'j');
+  if (stock === 'some') return;
+  box(g, 10, 5, 2, 3, 'h'); dot(g, 10, 5, 'j');
+  box(g, 12, 8, 1, 2, 'k'); dot(g, 14, 5, 'k'); dot(g, 15, 6, 'l');
+  box(g, 14, 8, 2, 2, 'B');
+}
 const DIGITS: Record<string, string[]> = {
   2: ['###', '..#', '###', '#..', '###'], 3: ['###', '..#', '.##', '..#', '###'], 4: ['#.#', '#.#', '###', '..#', '..#'],
   5: ['###', '#..', '###', '..#', '###'], 6: ['###', '#..', '###', '#.#', '###'], 7: ['###', '..#', '.#.', '.#.', '.#.'],
@@ -482,6 +508,8 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   rubble: define(24, 16, campLegend, { ready: g => rubble(g, true), gathered: g => rubble(g, false) }),
   toolshedSite: define(24, 16, campLegend, { still: toolshedSite }),
   toolshed: define(24, 28, campLegend, { built: toolshed }),
+  larderSite: define(24, 16, campLegend, { still: larderSite }),
+  larder: define(24, 28, campLegend, { empty: g => larder(g, 'empty'), some: g => larder(g, 'some'), full: g => larder(g, 'full') }),
   pileCount: define(13, 7, countLegend, {
     ...Object.fromEntries([2, 3, 4, 5, 6, 7, 8, 9].map(n => [`n${n}`, (g: Grid) => pileCount(g, [String(n)])])),
     lots: g => pileCount(g, ['9', '+'])

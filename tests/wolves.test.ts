@@ -74,3 +74,26 @@ describe('wolves in the dark camp', () => {
     expect(wolfTracksShown({ ...dark, lastWolf: null })).toBe(false);
   });
 });
+
+describe('wolves and the larder', () => {
+  const withLarder = (larder: ReturnType<typeof stock>): GameState => ({
+    ...dark,
+    clearing: { cleared: ['north-near'], marked: null, felled: [] },
+    structures: { ...dark.structures, larder: true },
+    player: { ...dark.player, x: 20, y: 15 },
+    larder
+  });
+
+  it('takes nothing from the larder, even with the bag empty', () => {
+    const state = withLarder(stock(2, 1));
+    const next = advanceTime(state, 1);
+    expect(next.lastWolf).toEqual({ day: 12, took: 'nothing' });
+    expect(next.larder).toEqual(state.larder);
+  });
+
+  it('takes a larder ration left out as an offering, as the night\'s visit', () => {
+    const offered = applyAction(withLarder(stock(0, 1)), { type: 'befriend' }).state;
+    expect(offered.larder.trailFood).toBe(0);
+    expect(offered.lastWolf).toEqual({ day: 12, took: 'offered' });
+  });
+});

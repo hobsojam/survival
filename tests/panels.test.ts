@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { CLEARING_STEPS } from '../src/game/clearing';
-import { BAG_FOODS, bagFoodMarkup, axeView, clearingView, bagView, buildButtonView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishesView, nightHint, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
+import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishesView, nightHint, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
 import { dishBlocker } from '../src/game/cooking';
 import { addFood, emptyFood } from '../src/game/food';
 import { stock } from './stock';
@@ -318,7 +318,7 @@ describe('clearing panel', () => {
   it('lists each side with its next step, its trees and its cost', () => {
     const { sides } = clearingView(withAxe());
     expect(sides.map(side => side.label)).toEqual(['North · near', 'East · near', 'South · near', 'West · near']);
-    expect(sides[0]).toMatchObject({ detail: '4 trees, then 4 wood and 2 fiber', disabled: false, done: false });
+    expect(sides[0]).toMatchObject({ detail: "4 trees, then 4 wood and 2 fiber. There's room for a larder now.", disabled: false, done: false });
     expect(sides[3].detail).toBe('2 trees, then 4 wood and 2 fiber');
   });
 
@@ -383,5 +383,46 @@ describe('the pot dishes after dark', () => {
     }
     expect(dishes[0]).toMatchObject({ name: 'Pine needle tea', disabled: false });
     expect(dishes[1]).toMatchObject({ disabled: true, title: 'You need 1 greens and 1 berry for greens and berry salad.' });
+  });
+});
+
+describe('larder controls', () => {
+  const north = { cleared: ['north-near' as const], marked: null, felled: [] };
+  const stocked = (built: boolean, bag = emptyFood(), larder = emptyFood()) =>
+    game({ structures: { larder: built }, inventory: { food: bag } }, { clearing: north, larder });
+
+  it('is hidden until the larder is built', () => {
+    expect(larderView(stocked(false)).shown).toBe(false);
+    expect(larderView(stocked(true))).toMatchObject({ shown: true, stored: 'Stored food 0/10', rows: [] });
+  });
+
+  it('shows a row for each item in the bag or the larder, with what each button would do', () => {
+    const view = larderView(stocked(true, stock(2), addFood(emptyFood(), 'honey', 3, 1)));
+    expect(view.stored).toBe('Stored food 3/10');
+    expect(view.rows).toEqual([
+      { item: 'berry', label: 'Berries', kept: 0, storeDisabled: false, storeTitle: 'Store 1 berry.', takeDisabled: true, takeTitle: 'The larder has no berries.' },
+      { item: 'honey', label: 'Honey', kept: 3, storeDisabled: true, storeTitle: 'You have no honey to store.', takeDisabled: false, takeTitle: 'Take 1 honey.' }
+    ]);
+  });
+
+  it('greys out both ways away from camp', () => {
+    const away = { ...stocked(true, stock(1), stock(1)), player: { ...createGame().player, x: 5, y: 5 } };
+    expect(larderView(away).rows[0]).toMatchObject({ storeDisabled: true, takeDisabled: true, storeTitle: 'Return to camp to use the larder.' });
+  });
+
+  it('draws a hidden row with Store 1 and Take 1 for every food', () => {
+    const markup = larderMarkup();
+    expect(markup).toContain('id="larder-controls"');
+    expect(markup).toContain('id="larder-stored">Stored food 0/10');
+    for (const item of ['berry', 'greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood']) {
+      expect(markup).toContain(`data-action="storeFood" data-item="${item}"`);
+      expect(markup).toContain(`data-action="takeFood" data-item="${item}"`);
+      expect(markup).toContain(`data-larder-item="${item}" hidden`);
+    }
+  });
+
+  it('blocks the larder\'s build button until the north side\'s near ground is cleared', () => {
+    expect(buildButtonView(game({ inventory: supplies }), 'larder')).toMatchObject({ disabled: true, locked: true, verb: 'Blocked', description: "Clear the north side's near ground first", price: '5 wood · 2 fiber · 2 stone' });
+    expect(buildButtonView(game({ inventory: supplies }, { clearing: north }), 'larder')).toMatchObject({ disabled: false, ready: true, verb: 'Build', description: 'Keep up to 10 food raised off the ground' });
   });
 });

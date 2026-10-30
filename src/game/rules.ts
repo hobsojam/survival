@@ -4,10 +4,10 @@ import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSec
 import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
 import { availableStone, bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
-import { POT_COST, cookBlocker, defaultDish, dishBlocker, potBlocker, serveDish, spendIngredients, type DishId } from './cooking';
+import { POT_COST, cookBlocker, defaultDish, dishBlocker, foodWord, potBlocker, serveDish, spendIngredients, type DishId } from './cooking';
 import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
 import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, type StepId } from './clearing';
-import { addFood, availableFood, eatEffect, quickEatItem, spendFood, spoil, type FoodItem } from './food';
+import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
 import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
 import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
@@ -23,6 +23,8 @@ export type GameAction =
   | { type: 'plantGarden'; plotIndex: number }
   | { type: 'harvestGarden'; plotIndex: number }
   | { type: 'eat'; item?: FoodItem }
+  | { type: 'storeFood'; item: FoodItem }
+  | { type: 'takeFood'; item: FoodItem }
   | { type: 'cook'; dish?: DishId }
   | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'befriend' | 'craftPillow' | 'craftCloak' }
   | { type: 'pickUpStone'; pileId: string };
@@ -114,9 +116,17 @@ export function pickaxeBlocker(state: GameState): string | null {
   return null;
 }
 
-export type BuildStatus = 'built' | 'locked' | 'needsShelter' | 'needsPrerequisite' | 'ready' | 'unavailable';
+export type BuildStatus = 'built' | 'locked' | 'needsShelter' | 'needsPrerequisite' | 'needsGround' | 'ready' | 'unavailable';
 
-/** How a structure's build button should look: built, locked, blocked by a missing shelter, ready to build here, or not yet. */
+/** Why a building can't go up until its ground is cleared, naming the side and step, or null if it needs none or it is clear. */
+export function groundBlocker(state: GameState, id: StructureId): string | null {
+  const definition = BUILDINGS[id];
+  if (!('ground' in definition) || state.clearing.cleared.includes(definition.ground)) return null;
+  const step = definition.ground;
+  return `Clear the ${CLEARING_STEPS[step].side} side's ${step.endsWith('-far') ? 'far' : 'near'} ground first.`;
+}
+
+/** How a structure's build button should look: built, locked, blocked by a missing shelter or uncleared ground, ready to build here, or not yet. */
 export function buildStatus(state: GameState, id: StructureId): BuildStatus {
   const definition = BUILDINGS[id];
   if (state.structures[id]) return 'built';
@@ -124,6 +134,7 @@ export function buildStatus(state: GameState, id: StructureId): BuildStatus {
   const missingPrerequisite = missingStructurePrerequisite(state, definition);
   if (missingPrerequisite === 'shelter') return 'needsShelter';
   if (missingPrerequisite) return 'needsPrerequisite';
+  if (groundBlocker(state, id)) return 'needsGround';
   const cost = definition.cost;
   const stoneCost = 'stone' in cost ? cost.stone : 0;
   const affordable = state.inventory.wood >= cost.wood && state.inventory.fiber >= cost.fiber && availableStone(state) >= stoneCost;
@@ -223,9 +234,13 @@ function dawn(next: GameState, camp: boolean): void {
   // Rocks give their stone once; everything else grows back at dawn.
   next.nodes = next.nodes.map(node => node.kind !== 'stone' && node.readyDay <= next.day ? { ...node, amount: 1 } : node);
   companionDawn(next);
-  const spoiled = spoil(next.inventory.food, next.day, BALANCE.bagFreshDays);
-  next.inventory = { ...next.inventory, food: spoiled.store };
-  if (spoiled.lost.berry + spoiled.lost.greens > 0) next.lastSpoiled = { day: next.day, ...spoiled.lost };
+  // The bag and the larder both throw out what has gone soft, wherever the survivor is; one note covers both.
+  const bag = spoil(next.inventory.food, next.day, BALANCE.bagFreshDays);
+  const larder = spoil(next.larder, next.day, BALANCE.larderFreshDays);
+  next.inventory = { ...next.inventory, food: bag.store };
+  next.larder = larder.store;
+  const lost = { berry: bag.lost.berry + larder.lost.berry, greens: bag.lost.greens + larder.lost.greens };
+  if (lost.berry + lost.greens > 0) next.lastSpoiled = { day: next.day, ...lost };
   if (!stormEnded) return;
   if (weathered) {
     next.progress = { ...next.progress, nextStormDay: null, hearthUnlocked: true };
@@ -502,6 +517,54 @@ const takeStone: ActionHandler<'takeStone'> = state => {
   return { state: { ...state, inventory: { ...state.inventory, stone: state.inventory.stone + 1 }, storedStone: state.storedStone - 1 }, message: 'Took a stone from the pile.' };
 };
 
+function larderBlocker(state: GameState): string | null {
+  if (!state.structures.larder) return 'Build a larder first.';
+  if (!isInClearing(state)) return 'Return to camp to use the larder.';
+  return null;
+}
+
+/** Moves one of an item between stores: fresh food keeps the day it was picked; `pick` chooses which piece. */
+function moveOne(from: FoodStore, to: FoodStore, item: FoodItem, pick: (days: number[]) => number): { from: FoodStore; to: FoodStore } {
+  if (!isFresh(item)) return { from: { ...from, [item]: from[item] - 1 }, to: { ...to, [item]: to[item] + 1 } };
+  const day = pick(from[item]);
+  const index = from[item].indexOf(day);
+  return { from: { ...from, [item]: from[item].filter((_, i) => i !== index) }, to: addFood(to, item, 1, day) };
+}
+
+/** Why one of an item can't go into the larder now, or null. */
+export function storeFoodBlocker(state: GameState, item: FoodItem): string | null {
+  const blocker = larderBlocker(state);
+  if (blocker) return blocker;
+  if (foodCount(state.inventory.food, item) < 1) return `You have no ${foodWord(item, 2)} to store.`;
+  if (storeTotal(state.larder) >= BALANCE.larderCapacity) return 'The larder is full.';
+  return null;
+}
+
+/** Why one of an item can't come out of the larder now, or null. */
+export function takeFoodBlocker(state: GameState, item: FoodItem): string | null {
+  const blocker = larderBlocker(state);
+  if (blocker) return blocker;
+  if (foodCount(state.larder, item) < 1) return `The larder has no ${foodWord(item, 2)}.`;
+  if (freeSpaces(state) < 1) return FULL_BAG_MESSAGE;
+  return null;
+}
+
+/** Puts the bag's oldest piece of an item in the larder, where it keeps longer. */
+const storeFood: ActionHandler<'storeFood'> = (state, action) => {
+  const blocker = storeFoodBlocker(state, action.item);
+  if (blocker) return refuse(state, blocker);
+  const moved = moveOne(state.inventory.food, state.larder, action.item, days => Math.min(...days));
+  return { state: { ...state, inventory: { ...state.inventory, food: moved.from }, larder: moved.to }, message: `Stored 1 ${foodWord(action.item, 1)} in the larder.` };
+};
+
+/** Takes the larder's freshest piece of an item into the bag. */
+const takeFood: ActionHandler<'takeFood'> = (state, action) => {
+  const blocker = takeFoodBlocker(state, action.item);
+  if (blocker) return refuse(state, blocker);
+  const moved = moveOne(state.larder, state.inventory.food, action.item, days => Math.max(...days));
+  return { state: { ...state, inventory: { ...state.inventory, food: moved.to }, larder: moved.from }, message: `Took 1 ${foodWord(action.item, 1)} from the larder.` };
+};
+
 const dropStone: ActionHandler<'dropStone'> = state => {
   if (state.inventory.stone < 1) return refuse(state, 'You have no stone to set down.');
   const { x, y } = state.player;
@@ -690,6 +753,8 @@ function buildBlocker(state: GameState, structureId: StructureId): string | null
   if (!definition) return 'That structure is unavailable.';
   if (definition.prerequisite === 'coldNight' && !state.progress.hearthUnlocked) return 'Weather the cold night to unlock the hearth.';
   if (state.structures[structureId]) return 'Already built.';
+  const ground = groundBlocker(state, structureId);
+  if (ground) return ground;
   const missingStructure = missingStructurePrerequisite(state, definition);
   if (missingStructure) return `Build the ${BUILDINGS[missingStructure].name.toLowerCase()} first.`;
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
@@ -773,7 +838,7 @@ const craftCloak: ActionHandler<'craftCloak'> = state =>
 
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   move, cross, gather, craftAxe, craftPickaxe, craftPot, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
-  storeStone, takeStone, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
+  storeStone, takeStone, storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
   cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, rest, sleep, befriend, craftPillow, craftCloak
 };
 

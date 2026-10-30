@@ -25,8 +25,9 @@ function seeded(seed: number): () => number {
   };
 }
 
-// Keep this older random-play model focused on its original progression; the garden is optional and has its own seasonal loop.
-const structures = (Object.keys(BUILDINGS) as StructureId[]).filter(id => id !== 'garden');
+// Keep this older random-play model focused on its original progression; the garden is optional and has its own seasonal loop,
+// and buildings on cleared ground wait for clearing, which these runs never do.
+const structures = (Object.keys(BUILDINGS) as StructureId[]).filter(id => id !== 'garden' && !('ground' in BUILDINGS[id]));
 const simple = ['eat', 'stokeFire', 'rest', 'sleep', 'cook', 'stargaze', 'burnFiber', 'dropStone', 'storeStone', 'takeStone', 'craftAxe', 'craftPickaxe'] as const;
 const activities: Activity[] = ['awake', 'working', 'resting'];
 

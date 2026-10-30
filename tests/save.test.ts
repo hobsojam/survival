@@ -3,6 +3,7 @@ import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { addFood, emptyFood, type FoodStore } from '../src/game/food';
 import { placeBranches } from '../src/game/clearing';
 import { autosaveDelayMs, loadGame, saveGame, SAVE_KEY } from '../src/game/save';
+import { carriedCount } from '../src/game/rules';
 import { stock } from './stock';
 
 class MemoryStorage implements Storage {
@@ -608,5 +609,57 @@ describe('the cooking pot in the save', () => {
     expect(accepts(state => { delete (state.progress as any).potCrafted; })).toBe(false);
     expect(accepts(state => { (state as any).cakeBonus = 1; })).toBe(false);
     expect(accepts(state => { delete (state as any).cakeBonus; })).toBe(false);
+  });
+});
+
+describe('the larder in the save', () => {
+  const accepts = (change: (state: GameState) => void) => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    state.day = 6;
+    state.progress = { ...state.progress, nextStormDay: null, hearthUnlocked: true };
+    const placed = placeBranches(state.nodes, ['north-near']);
+    state.nodes = state.nodes.map((node, i) => ({ ...node, x: placed[i].x, y: placed[i].y }));
+    state.clearing = { cleared: ['north-near'], marked: null, felled: [] };
+    change(state);
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 19, state }));
+    return loadGame(storage).kind === 'loaded';
+  };
+
+  it('round-trips a stocked larder', () => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    const placed = placeBranches(state.nodes, ['north-near']);
+    state.nodes = state.nodes.map((node, i) => ({ ...node, x: placed[i].x, y: placed[i].y }));
+    state.clearing = { cleared: ['north-near'], marked: null, felled: [] };
+    state.structures.larder = true;
+    state.larder = addFood(addFood(emptyFood(), 'berry', 2, 1), 'honey', 1, 1);
+    expect(saveGame(storage, state).ok).toBe(true);
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
+  });
+
+  it('holds real food, at most 10, and only once built', () => {
+    expect(accepts(state => { state.structures.larder = true; state.larder = addFood(stock(4), 'hazelnut', 6, 1); })).toBe(true);
+    expect(accepts(state => { state.structures.larder = true; state.larder = addFood(stock(5), 'hazelnut', 6, 1); })).toBe(false);
+    expect(accepts(state => { state.larder = stock(1); })).toBe(false);
+    expect(accepts(state => { state.structures.larder = true; state.larder = { ...emptyFood(), berry: [7] }; })).toBe(false);
+    expect(accepts(state => { state.structures.larder = true; (state.larder as any).honey = -1; })).toBe(false);
+    expect(accepts(state => { delete (state as any).larder; })).toBe(false);
+  });
+
+  it('stands only on cleared north ground', () => {
+    expect(accepts(state => { state.structures.larder = true; })).toBe(true);
+    expect(accepts(state => {
+      state.structures.larder = true;
+      state.clearing = { cleared: [], marked: null, felled: [] };
+      state.nodes = createGame().nodes;
+    })).toBe(false);
+  });
+
+  it('leaves the larder out of the bag\'s count', () => {
+    const state = createGame();
+    state.inventory.food = stock(3);
+    expect(carriedCount({ ...state, larder: stock(10) })).toBe(3);
+    expect(accepts(state => { state.structures.larder = true; state.inventory.food = stock(8); state.larder = stock(10); })).toBe(true);
   });
 });

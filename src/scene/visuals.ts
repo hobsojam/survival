@@ -1,7 +1,8 @@
 import { isWinter, nightStart } from '../game/calendar';
 import { gardenPlotStage } from '../game/garden';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceNode } from '../game/state';
-import { isFreezingNight } from '../game/rules';
+import { groundBlocker, isFreezingNight } from '../game/rules';
+import { storeTotal } from '../game/food';
 import { wolfTracksShown } from '../game/wolves';
 import { rainWindow } from '../game/rain';
 import { TILE, worldX, worldY } from './art';
@@ -110,8 +111,18 @@ function addPuddles(state: GameState, add: AddVisual): void {
   PUDDLE_SPOTS.forEach((spot, index) => add(`puddle-${index}`, 'puddle:still', spot.x, spot.y, GROUND_DECAL_DEPTH));
 }
 
-/** Small camp structures: where each stands from the fire, drawn as a flat site until built. */
-export const CAMP_STRUCTURES = [['crate', 3, 1], ['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3]] as const;
+/** Small camp structures: where each stands from the fire, drawn as a flat site until built; one on cleared ground only once it is clear. */
+export const CAMP_STRUCTURES = [['crate', 3, 1], ['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3], ['larder', 2.5, -4.5]] as const;
+
+/** The larder shows what it keeps: nothing, a little (1 to 6) or plenty (7 to 10). */
+export function larderFrame(stored: number): 'empty' | 'some' | 'full' {
+  if (stored === 0) return 'empty';
+  return stored <= 6 ? 'some' : 'full';
+}
+
+function builtTexture(state: GameState, id: (typeof CAMP_STRUCTURES)[number][0]): string {
+  return id === 'larder' ? `larder:${larderFrame(storeTotal(state.larder))}` : `${id}:built`;
+}
 
 function addCamp(state: GameState, add: AddVisual): void {
   const { campX: x, campY: y } = BALANCE;
@@ -127,7 +138,8 @@ function addCamp(state: GameState, add: AddVisual): void {
   }
   add('shelter', shelterTexture, x - 3, y - 2, structures.shelter ? undefined : GROUND_DECAL_DEPTH);
   for (const [id, dx, dy] of CAMP_STRUCTURES) {
-    add(id, structures[id] ? `${id}:built` : `${id}Site:still`, x + dx, y + dy, structures[id] ? undefined : GROUND_DECAL_DEPTH);
+    if (groundBlocker(state, id)) continue;
+    add(id, structures[id] ? builtTexture(state, id) : `${id}Site:still`, x + dx, y + dy, structures[id] ? undefined : GROUND_DECAL_DEPTH);
   }
   if (structures.garden) {
     state.gardenPlots.forEach((plot, index) => {
