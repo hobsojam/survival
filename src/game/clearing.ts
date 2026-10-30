@@ -207,26 +207,31 @@ export function placeBranches(nodes: readonly ResourceNode[], cleared: readonly 
     if (node.kind !== 'branch' || !inClearing(node.x, node.y, cleared)) return node;
     const angle = Math.atan2(node.y - BALANCE.campY, node.x - BALANCE.campX);
     let distance = clearingReach(node.x, node.y, cleared) + BRANCH_MARGIN;
+    let outside: { x: number; y: number } | null = null;
     for (let attempt = 0; attempt < 8; attempt++, distance += 1) {
       const x = Math.max(0, Math.min(BALANCE.mapWidth - 1, Math.round(BALANCE.campX + Math.cos(angle) * distance)));
       const y = Math.max(0, Math.min(BALANCE.mapHeight - 1, Math.round(BALANCE.campY + Math.sin(angle) * distance)));
-      if (inClearing(x, y, cleared) || taken.has(`${x},${y}`)) continue;
+      if (inClearing(x, y, cleared)) continue;
+      outside = { x, y };
+      if (taken.has(`${x},${y}`)) continue;
       taken.add(`${x},${y}`);
       return { ...node, x, y };
     }
-    return node;
+    if (!outside) return node;
+    taken.add(`${outside.x},${outside.y}`);
+    return { ...node, ...outside };
   });
 }
 
 /** A building's name as it reads in a sentence: its own name, or the id split into lower-case words. */
-function buildingName(id: string, known: (id: string) => boolean): string {
-  if (known(id) && Object.hasOwn(BUILDINGS, id)) return BUILDINGS[id as keyof typeof BUILDINGS].name.toLowerCase();
+function buildingName(id: string): string {
+  if (Object.hasOwn(BUILDINGS, id)) return BUILDINGS[id as keyof typeof BUILDINGS].name.toLowerCase();
   return id.replace(/([A-Z])/g, ' $1').toLowerCase();
 }
 
 /** The sentence about what a cleared step makes room for, leading space included, or nothing if it is built or has none. */
 export function roomLine(step: StepId, structures: Partial<Record<string, boolean>>, known: (id: string) => boolean): string {
-  const open = CLEARING_STEPS[step].room.filter(id => !structures[id]);
+  const open = CLEARING_STEPS[step].room.filter(id => known(id) && !structures[id]);
   if (open.length === 0) return '';
-  return ` There's room for ${open.map(id => `a ${buildingName(id, known)}`).join(' and ')} now.`;
+  return ` There's room for ${open.map(id => `a ${buildingName(id)}`).join(' and ')} now.`;
 }
