@@ -123,7 +123,7 @@ describe('night hint', () => {
     expect(nightHint(game())).toBe('These small moments are waiting for nightfall.');
     const night = game({}, { timeOfDay: nightStart(1) + 1 });
     expect(nightHint(night)).toBe('Optional comforts while the night passes.');
-    expect(nightHint({ ...night, player: { ...night.player, x: 5, y: 25 } })).toBe('Return to the camp circle for a quiet evening.');
+    expect(nightHint({ ...night, player: { ...night.player, x: 5, y: 25 } })).toBe('Return to the clearing for a quiet evening.');
   });
 });
 

@@ -515,7 +515,7 @@ describe('tiredness and sleep', () => {
     expect(applyAction(day, { type: 'sleep' })).toMatchObject({ state: day, message: expect.stringMatching(/night/i) });
     const away = nightAtCamp();
     away.player.x = 0;
-    expect(applyAction(away, { type: 'sleep' })).toMatchObject({ state: away, message: expect.stringMatching(/camp/i) });
+    expect(applyAction(away, { type: 'sleep' })).toMatchObject({ state: away, message: expect.stringMatching(/closer to the fire/i) });
     const unsheltered = nightAtCamp();
     unsheltered.structures.shelter = false;
     expect(applyAction(unsheltered, { type: 'sleep' })).toMatchObject({ state: unsheltered, message: expect.stringMatching(/shelter/i) });
@@ -1062,7 +1062,7 @@ describe('the second area', () => {
     for (const action of [{ type: 'stokeFire' }, { type: 'sleep' }, { type: 'build', structureId: 'bed' }] as const) {
       const result = applyAction(state, action);
       expect(result.state).toBe(state);
-      expect(result.message).toMatch(/^Return to/);
+      expect(result.message).toMatch(/^(Return to|Move closer to the fire)/);
     }
   });
 
@@ -1515,7 +1515,7 @@ describe('the grown clearing', () => {
     expect(applyAction(state, { type: 'rest' }).state).toBe(state);
     state.timeOfDay = NIGHT;
     state.structures.shelter = true;
-    expect(sleepBlocker(state)).toBe('Return to the marked camp area to sleep.');
+    expect(sleepBlocker(state)).toBe('Move closer to the fire to sleep.');
   });
 
   it('gives no warmth on new ground', () => {

@@ -219,7 +219,7 @@ describe('marking a side and felling its trees', () => {
     expect(cut.trees).toEqual(state.trees);
     const again = applyAction(cut, { type: 'chopTree', treeId: 'mark-east-near-2' });
     expect(again.state).toBe(cut);
-    expect(again.message).toBe('This stump needs more time to regrow.');
+    expect(again.message).toBe('This stump stays until the ground is cleared.');
     const later = { ...cut, day: cut.day + 1000 };
     expect(markedTrees(later)[2].readyDay).toBeGreaterThan(later.day);
   });
@@ -330,6 +330,17 @@ describe('moving the branches', () => {
         const out = Math.hypot(node.x - FIRE.x, node.y - FIRE.y) - clearingReach(node.x, node.y, cleared);
         expect(out).toBeLessThanOrEqual(3.25);
       });
+    }
+  });
+
+  it('leaves every unchosen step tree outside the ground its neighbours clear', () => {
+    for (const cleared of subsets()) {
+      for (const id of STEP_IDS.filter(step => !cleared.includes(step))) {
+        CLEARING_STEPS[id].trees.forEach((tree, index) => {
+          const distance = Math.hypot(tree.x - FIRE.x, tree.y - FIRE.y);
+          expect(distance, `${id} tree ${index} with [${cleared.join()}]`).toBeGreaterThan(clearingReach(tree.x, tree.y, cleared) + 0.5);
+        });
+      }
     }
   });
 

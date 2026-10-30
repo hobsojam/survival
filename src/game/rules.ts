@@ -5,7 +5,7 @@ import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
 import { bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
 import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
-import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, markBlocker, placeBranches, roomLine, type StepId } from './clearing';
+import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, type StepId } from './clearing';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
 import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
 
@@ -89,7 +89,7 @@ export function movementFactor(state: GameState): number {
 /** Why the survivor can't sleep right now, or null if they can. */
 export function sleepBlocker(state: GameState): string | null {
   if (state.timeOfDay < nightStart(state.day)) return 'You can sleep once night falls. Rest (R) for a short break.';
-  if (!isAtCamp(state)) return 'Return to the marked camp area to sleep.';
+  if (!isAtCamp(state)) return 'Move closer to the fire to sleep.';
   if (!state.structures.shelter) return 'Build a shelter to sleep through the night.';
   return null;
 }
@@ -388,6 +388,7 @@ const chopTree: ActionHandler<'chopTree'> = (state, action) => {
   if (!state.progress.axeCrafted) return refuse(state, 'Craft a stone axe before chopping trees.');
   const tree = choppableTrees(state).find(item => item.id === action.treeId);
   if (!tree || state.area !== 'camp' || !near(state.player.x, state.player.y, tree.x, tree.y)) return refuse(state, 'Move closer to a mature tree.');
+  if (isClearingStump(tree)) return refuse(state, 'This stump stays until the ground is cleared.');
   if (tree.readyDay > state.day) return refuse(state, 'This stump needs more time to regrow.');
   if (isExhausted(state)) return refuse(state, TOO_TIRED_MESSAGE);
   if (freeSpaces(state) < 2 * spaceFor('wood')) return refuse(state, 'Your bag needs two free spaces for wood.');
@@ -509,7 +510,7 @@ const pickUpStone: ActionHandler<'pickUpStone'> = (state, action) => {
 };
 
 const burnFiber: ActionHandler<'burnFiber'> = state => {
-  if (!isAtCamp(state)) return refuse(state, 'Return to the marked camp area to tend the fire.');
+  if (!isAtCamp(state)) return refuse(state, 'Move closer to the fire to tend it.');
   if (state.inventory.fiber < 1) return refuse(state, 'You have no fiber to burn.');
   return {
     state: { ...state, inventory: { ...state.inventory, fiber: state.inventory.fiber - 1 }, fireFuel: state.fireFuel + BALANCE.fiberFireSeconds },
@@ -582,7 +583,7 @@ const stargaze: ActionHandler<'stargaze'> = state => {
 };
 
 const stokeFire: ActionHandler<'stokeFire'> = state => {
-  if (!isAtCamp(state)) return refuse(state, 'Return to the marked camp area to tend the fire.');
+  if (!isAtCamp(state)) return refuse(state, 'Move closer to the fire to tend it.');
   if (state.inventory.wood < 1) return refuse(state, 'You need wood for the fire.');
   return {
     state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood - 1 }, fireFuel: state.fireFuel + (state.structures.hearth ? BALANCE.hearthFireSecondsPerWood : BALANCE.fireSecondsPerWood) },
@@ -691,7 +692,7 @@ const build: ActionHandler<'build'> = (state, action) => {
 };
 
 const rest: ActionHandler<'rest'> = state => {
-  if (!isAtCamp(state)) return refuse(state, 'Return to the marked camp area to rest.');
+  if (!isAtCamp(state)) return refuse(state, 'Move closer to the fire to rest.');
   const rested = advanceTime(state, BALANCE.restSeconds, 'resting');
   const bedGain = BALANCE.bedRestEnergyGain + (state.companion.pillow ? BALANCE.pillowEnergyGain : 0);
   const gain = recovery(state, rested.structures.bed ? bedGain : BALANCE.restEnergyGain);

@@ -2,7 +2,7 @@ import { isWinter, nightStart } from '../game/calendar';
 import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { workSeconds } from '../game/needs';
-import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, harvestGardenBlocker, isAtCamp, isColdNight, isFreezingNight, lookoutRepairBlocker, plantGardenBlocker, pickaxeBlocker, trailFoodBlocker } from '../game/rules';
+import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, plantGardenBlocker, pickaxeBlocker, trailFoodBlocker } from '../game/rules';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
 import { CLEARING_STEPS, clearGroundBlocker, markBlocker, nextStep, roomLine, type Side } from '../game/clearing';
@@ -115,7 +115,7 @@ export function cloakView(state: GameState): ActionPanelView & { shown: boolean 
 /** The places along the paths found so far, for the Follow the paths panel. */
 export function nightHint(state: GameState): string {
   if (state.timeOfDay < nightStart(state.day)) return 'These small moments are waiting for nightfall.';
-  if (!isAtCamp(state)) return 'Return to the camp circle for a quiet evening.';
+  if (!isInClearing(state)) return 'Return to the clearing for a quiet evening.';
   return 'Optional comforts while the night passes.';
 }
 

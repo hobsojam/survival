@@ -18,6 +18,11 @@ describe('camp prompts', () => {
     expect(promptFor(bareCamp())).toBe('At camp · F Fire · R Rest · Click an upgrade to build');
   });
 
+  it('offers only clearing comforts on grown ground away from the fire', () => {
+    const state = { ...createGame(), nodes: [], trees: [], clearing: { cleared: ['east-near' as const], marked: null, felled: [] } };
+    expect(promptFor(at(state, BALANCE.campX + 6, BALANCE.campY))).toBe('In the clearing · G Stargaze · Click an upgrade to build');
+  });
+
   it('offers night comforts at camp after dark', () => {
     expect(promptFor({ ...bareCamp(), timeOfDay: nightStart(1) + 1 })).toBe('At camp · C Cook · G Stargaze · F Fire · R Rest');
   });
