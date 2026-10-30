@@ -9,7 +9,8 @@ import { dayPillView, renderDayPill, renderYearWheel, yearWheelView, type Calend
 import { isLowMeter } from '../game/needs';
 import { gateTap, nextOpenTab, wireSidebarTabs, type DockTab } from './dock';
 import { createPause, wirePause, type PauseControl } from './pause';
-import { journalView, type RegionSummary } from './journal';
+import { journalView } from './journal';
+import { renderRegionOverview } from './regionOverview';
 import { currentPage, journalPageView, renderJournalPage, turnPage } from './yearJournal';
 import { axeView, bagView, buildButtonView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightHint, pickaxeView, pillowView, startNote, type ActionPanelView } from './panels';
 import { Soundscape } from '../game/soundscape';
@@ -394,49 +395,7 @@ export class App {
         return item;
       }));
     }
-    this.renderRegions(journal.regions);
-  }
-
-  private renderRegions(regions: RegionSummary[]): void {
-    this.setText('region-home-status', this.state.area === 'camp' ? 'You are here' : 'Home');
-    const destinations = this.root.querySelector<HTMLElement>('#region-destinations');
-    if (!destinations) return;
-    if (!regions.length) {
-      const note = document.createElement('p');
-      note.className = 'region-empty';
-      note.textContent = 'Build a shelter to open the west path.';
-      destinations.replaceChildren(note);
-      return;
-    }
-    destinations.replaceChildren(...regions.map(region => {
-      const route = document.createElement('div');
-      route.className = 'region-route';
-      const direction = document.createElement('span');
-      direction.className = 'region-direction';
-      direction.textContent = `${region.direction} path`;
-      const card = document.createElement('div');
-      card.className = 'region-card';
-      card.classList.toggle('unknown', region.status === 'unknown');
-      card.classList.toggle('current', region.current);
-      const heading = document.createElement('strong');
-      heading.textContent = region.label;
-      const status = document.createElement('small');
-      let statusText = 'Unexplored';
-      if (region.status === 'scouted') statusText = 'Seen from lookout';
-      if (region.status === 'visited') statusText = 'Visited';
-      if (region.current) statusText = 'You are here';
-      status.textContent = statusText;
-      card.append(heading, status);
-      if (region.resources.length) {
-        const resources = document.createElement('p');
-        resources.textContent = `Resources: ${region.resources.join(', ')}`;
-        const features = document.createElement('p');
-        features.textContent = `Places: ${region.features.join(', ')}`;
-        card.append(resources, features);
-      }
-      route.append(direction, card);
-      return route;
-    }));
+    renderRegionOverview(this.root, document, journal.regions, this.state.area);
   }
 
   /** Writes a one-button panel's view into the elements named after it, such as #axe-title and #axe-button. */
