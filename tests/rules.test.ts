@@ -1343,7 +1343,7 @@ describe('night through the year', () => {
   };
 
   it('lets you sleep early on a winter evening but not on a summer one', () => {
-    expect(sleepBlocker(sheltered(16, 131))).toBeNull();
+    expect(sleepBlocker(sheltered(16, 150))).toBeNull();
     expect(sleepBlocker(sheltered(36, 160))).toMatch(/once night falls/);
   });
 
@@ -1353,7 +1353,7 @@ describe('night through the year', () => {
   });
 
   it('sleeps across the edge of winter into its first morning', () => {
-    const state = sheltered(10, 150);
+    const state = sheltered(10, 160);
     state.progress.nextStormDay = null;
     const woke = applyAction(state, { type: 'sleep' }).state;
     expect([woke.day, woke.timeOfDay]).toEqual([11, 0]);

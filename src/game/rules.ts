@@ -173,6 +173,11 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
   return next;
 }
 
+/** Advance the live world clock; actions and sleep continue to spend game seconds. */
+export function advanceLiveTime(state: GameState, realSeconds: number): GameState {
+  return advanceTime(state, realSeconds * BALANCE.clockRate);
+}
+
 /** Hunger lost over one step: an eighth a second, faster for the part of the step in summer's midday heat. */
 function hungerLoss(state: GameState, step: number): number {
   if (!isSummer(state.day)) return step / 8;

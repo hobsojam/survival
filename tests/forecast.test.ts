@@ -74,15 +74,15 @@ describe('stormReadiness', () => {
 });
 
 describe('the forecast with the autumn day length', () => {
-  it('needs enough fire for day three’s night, which starts at 174', () => {
-    expect(stormReadiness(stormDay(100)).needed).toBe((240 - 174) * 2);
+  it('needs enough fire for day three’s night, which starts at 175', () => {
+    expect(stormReadiness(stormDay(100)).needed).toBe((240 - 175) * 2);
   });
 });
 
 describe('logs for a cold night', () => {
-  it('asks for two logs on day three and three once nights lengthen', () => {
+  it('asks for two logs on day three and three in midwinter', () => {
     expect(logsForColdNight(3)).toBe(2);
-    expect(logsForColdNight(9)).toBe(3);
+    expect(logsForColdNight(16)).toBe(3);
     for (let day = 1; day <= 40; day++) expect([2, 3]).toContain(logsForColdNight(day));
   });
 });

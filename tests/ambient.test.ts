@@ -171,12 +171,12 @@ describe('quarry eyes', () => {
 
 describe('evening life through the year', () => {
   it('darkens from each day’s own nightfall', () => {
-    expect(darkness(16, 145)).toBeCloseTo(0.5);
-    expect(darkness(36, 145)).toBe(0);
+    expect(darkness(16, 164)).toBeCloseTo(0.5);
+    expect(darkness(36, 164)).toBe(0);
   });
 
   it('brings the fox by earlier on winter evenings', () => {
-    expect(foxWindow(16)).toEqual({ arrive: 110, leave: 180 });
+    expect(foxWindow(16)).toEqual({ arrive: 129, leave: 199 });
     const winterVisit = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20].find(foxVisits)!;
     const { arrive, leave } = foxWindow(winterVisit);
     expect(foxAt(winterVisit, arrive + 5)).not.toBeNull();

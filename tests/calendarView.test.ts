@@ -9,12 +9,12 @@ const at = (day: number, timeOfDay: number) => ({ ...createGame(), day, timeOfDa
 describe('the day pill', () => {
   it('names the season, the day and the part of the day', () => {
     const view = dayPillView(at(14, 0));
-    expect(view).toMatchObject({ season: 'Winter', day: 'Day 14', phase: 'Morning', night: false, countdown: 'Night in 2:11', handPercent: 0 });
+    expect(view).toMatchObject({ season: 'Winter', day: 'Day 14', phase: 'Morning', night: false, countdown: 'Night in 3:27', handPercent: 0 });
     expect(view.nightPercent).toBeCloseTo(nightStart(14) / 240 * 100);
   });
 
   it('counts down to dawn on a winter evening', () => {
-    const view = dayPillView(at(16, 135));
+    const view = dayPillView(at(16, 155));
     expect(view.night).toBe(true);
     expect(view.countdown).toMatch(/^Dawn in/);
   });
@@ -28,7 +28,7 @@ describe('the day pill on the cold night', () => {
   });
 
   it('frosts the view on a bitter winter night, but keeps the cold night\'s name for autumn', () => {
-    const winter = { ...at(16, 135), progress: { ...createGame().progress, nextStormDay: null, hearthUnlocked: true } };
+    const winter = { ...at(16, 155), progress: { ...createGame().progress, nextStormDay: null, hearthUnlocked: true } };
     expect(dayPillView(winter)).toMatchObject({ phase: 'Night', cold: false, frosty: true });
     expect(dayPillView(at(6, 200))).toMatchObject({ phase: 'Night', cold: false, frosty: false });
   });
@@ -88,13 +88,13 @@ function fakeRoot() {
 describe('drawing the calendar', () => {
   it('fills the day pill and moves its hand and night marker', () => {
     const root = fakeRoot();
-    renderDayPill(root, dayPillView(at(16, 135)));
+    renderDayPill(root, dayPillView(at(16, 155)));
     const get = (selector: string) => root.elements.get(selector)!;
     expect([get('#day-season').textContent, get('#day-number').textContent, get('#day-phase').textContent]).toEqual(['Winter', 'Day 16', 'Night']);
-    expect(get('#day-countdown').textContent).toBe('Dawn in 1:45');
+    expect(get('#day-countdown').textContent).toBe('Dawn in 1:57');
     expect(get('#day-pill').classes.has('night')).toBe(true);
-    expect(get('#day-dial-hand').style.left).toBe(`${135 / 240 * 100}%`);
-    expect(get('#day-dial-night').style.left).toBe(`${130 / 240 * 100}%`);
+    expect(get('#day-dial-hand').style.left).toBe(`${155 / 240 * 100}%`);
+    expect(get('#day-dial-night').style.left).toBe(`${149 / 240 * 100}%`);
   });
 
   it('turns the wheel and marks the current season', () => {

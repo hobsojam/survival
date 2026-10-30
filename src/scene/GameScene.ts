@@ -3,7 +3,7 @@ import { BALANCE, type GameState } from '../game/state';
 import { newsBetween } from '../game/news';
 import { coldNightMessage } from '../game/coldNight';
 import { recordJournal } from '../game/journalEntries';
-import { advanceTime, applyAction, type GameAction } from '../game/rules';
+import { advanceLiveTime, applyAction, type GameAction } from '../game/rules';
 import { TILE, worldX, worldY, drawTerrain } from './art';
 import { shownTerrainKey } from './map';
 import { sceneVisuals, playerVisualDepth, WEATHER_DEPTH } from './visuals';
@@ -86,7 +86,7 @@ export class GameScene extends Phaser.Scene {
     this.handleActionKeys();
     const beforeTick = this.state;
     // While a sleep plays out, the replay sets the clock instead of the tick.
-    const written = this.nightWatch.tick(this.time.now, () => recordJournal(beforeTick, advanceTime(this.state, dt)));
+    const written = this.nightWatch.tick(this.time.now, () => recordJournal(beforeTick, advanceLiveTime(this.state, dt)));
     this.state = written.state;
     this.reportWeather(beforeTick, this.state, written.messages);
     this.syncPlayerSprite(walking || tapWalking);
