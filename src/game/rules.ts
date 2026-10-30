@@ -3,7 +3,8 @@ import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } 
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
-import { bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
+import { availableStone, bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
+import { POT_COST, cookBlocker, defaultDish, dishBlocker, potBlocker, serveDish, spendIngredients, type DishId } from './cooking';
 import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
 import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, type StepId } from './clearing';
 import { addFood, availableFood, eatEffect, quickEatItem, spendFood, spoil, type FoodItem } from './food';
@@ -22,7 +23,8 @@ export type GameAction =
   | { type: 'plantGarden'; plotIndex: number }
   | { type: 'harvestGarden'; plotIndex: number }
   | { type: 'eat'; item?: FoodItem }
-  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'befriend' | 'craftPillow' | 'craftCloak' }
+  | { type: 'cook'; dish?: DishId }
+  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'befriend' | 'craftPillow' | 'craftCloak' }
   | { type: 'pickUpStone'; pileId: string };
 
 /** Awake time tires the survivor; work already costs energy, and resting doesn't. */
@@ -39,12 +41,7 @@ function near(x1: number, y1: number, x2: number, y2: number, radius: number = B
 
 export const FULL_BAG_MESSAGE = 'Your bag is full. Eat, burn, or set something down at camp to make room.';
 
-export { bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor };
-
-/** Stone a build can use: the bag plus the camp stone pile, which counts from anywhere. */
-export function availableStone(state: GameState): number {
-  return state.inventory.stone + state.storedStone;
-}
+export { availableStone, bagCapacity, carriedCount, cookBlocker, freeSpaces, isAtCamp, isInClearing, spaceFor };
 
 /** Pays stone from the bag first, then from the camp pile. */
 export function spendStone(state: GameState, amount: number): GameState {
@@ -94,15 +91,6 @@ export function sleepBlocker(state: GameState): string | null {
   if (state.timeOfDay < nightStart(state.day)) return 'You can sleep once night falls. Rest (R) for a short break.';
   if (!isAtCamp(state)) return 'Move closer to the fire to sleep.';
   if (!state.structures.shelter) return 'Build a shelter to sleep through the night.';
-  return null;
-}
-
-/** Why the survivor can't cook right now, or null if they can. */
-export function cookBlocker(state: GameState): string | null {
-  if (state.timeOfDay < nightStart(state.day)) return 'Cook berries after nightfall.';
-  if (!isAtCamp(state)) return 'Return to camp to cook.';
-  if (state.fireFuel <= 0) return 'Light the campfire before cooking.';
-  if (availableFood(state, 'berry') <= 0) return 'Gather a berry to cook.';
   return null;
 }
 
@@ -367,6 +355,15 @@ const craftPickaxe: ActionHandler<'craftPickaxe'> = state => {
   };
 };
 
+const craftPot: ActionHandler<'craftPot'> = state => {
+  const blocker = potBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  return {
+    state: payAndBuild(state, POT_COST, { progress: { ...state.progress, potCrafted: true } }),
+    message: 'Made a cooking pot. It hangs over the fire on a little tripod.'
+  };
+};
+
 const gatherRubble: ActionHandler<'gatherRubble'> = state => {
   if (state.area !== 'quarry' || !near(state.player.x, state.player.y, RUBBLE_SITE.x, RUBBLE_SITE.y)) return refuse(state, 'Move closer to the rubble.');
   if (state.rubbleReadyDay > state.day) return refuse(state, 'The rubble is picked over. More will loosen in a few days.');
@@ -576,19 +573,17 @@ const prepareTrailFood: ActionHandler<'prepareTrailFood'> = state => {
   };
 };
 
-const cook: ActionHandler<'cook'> = state => {
-  const blocker = cookBlocker(state);
-  const spent = spendFood(state, 'berry', 1);
+/** Cooks the dish named, or what C would pick; with nothing to cook, the berry's refusal explains why. */
+const cook: ActionHandler<'cook'> = (state, action) => {
+  const dish = action.dish ?? defaultDish(state) ?? 'berries';
+  const blocker = dishBlocker(state, dish);
+  const spent = spendIngredients(state, dish);
   if (blocker || !spent) return refuse(state, blocker ?? 'No food in your bag.');
-  const cooked = advanceTime(spent, BALANCE.cookSeconds, 'resting');
-  return {
-    state: { ...cooked, player: { ...cooked.player,
-      hunger: Math.min(100, cooked.player.hunger + (state.structures.dryingRack ? BALANCE.rackCookHungerGain : BALANCE.cookHungerGain)),
-      warmth: Math.min(100, cooked.player.warmth + BALANCE.cookWarmthGain)
-    } },
-    message: 'You toast a berry by the fire. A warm little meal.'
-  };
+  return serveDish(advanceTime(spent, BALANCE.cookSeconds, 'resting'), dish, state.structures.dryingRack);
 };
+
+/** A honey cake's extra energy for this rest or sleep, if one was eaten. */
+const cakeEnergy = (state: GameState): number => state.cakeBonus ? BALANCE.honeyCakeRestBonus : 0;
 
 const STARGAZE_THOUGHTS = [
   'The stars shine between the trees.',
@@ -719,9 +714,9 @@ const rest: ActionHandler<'rest'> = state => {
   if (!isAtCamp(state)) return refuse(state, 'Move closer to the fire to rest.');
   const rested = advanceTime(state, BALANCE.restSeconds, 'resting');
   const bedGain = BALANCE.bedRestEnergyGain + (state.companion.pillow ? BALANCE.pillowEnergyGain : 0);
-  const gain = recovery(state, rested.structures.bed ? bedGain : BALANCE.restEnergyGain);
+  const gain = recovery(state, rested.structures.bed ? bedGain : BALANCE.restEnergyGain) + cakeEnergy(state);
   return {
-    state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + gain) } },
+    state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + gain) }, cakeBonus: false },
     message: 'You take a short rest.'
   };
 };
@@ -744,11 +739,11 @@ const sleep: ActionHandler<'sleep'> = state => {
   const alarm = alarmAfter(state);
   if (alarm !== null && alarm < night) {
     // Woken early, the survivor gets the share of the night's rest they slept.
-    const energy = state.player.energy + (sleptEnergy(state) - state.player.energy) * alarm / night;
-    const woken = advanceTime({ ...state, player: { ...state.player, energy } }, alarm, 'resting');
+    const energy = Math.min(100, state.player.energy + (sleptEnergy(state) - state.player.energy) * alarm / night + cakeEnergy(state));
+    const woken = advanceTime({ ...state, player: { ...state.player, energy }, cakeBonus: false }, alarm, 'resting');
     return { state: { ...woken, companion: { ...woken.companion, alarmDay: state.day } }, message: ALARM_MESSAGE };
   }
-  const slept = advanceTime({ ...state, player: { ...state.player, energy: sleptEnergy(state) } }, night, 'resting');
+  const slept = advanceTime({ ...state, player: { ...state.player, energy: Math.min(100, sleptEnergy(state) + cakeEnergy(state)) }, cakeBonus: false }, night, 'resting');
   const fireDied = state.fireFuel > 0 && slept.fireFuel <= 0;
   return {
     state: slept,
@@ -777,7 +772,7 @@ const craftCloak: ActionHandler<'craftCloak'> = state =>
   craftKeepsake(state, 'cloak', cloakBlocker(state), 'You made a fur cloak. The nights will bite a little less.');
 
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
-  move, cross, gather, craftAxe, craftPickaxe, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
+  move, cross, gather, craftAxe, craftPickaxe, craftPot, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
   storeStone, takeStone, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
   cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, rest, sleep, befriend, craftPillow, craftCloak
 };

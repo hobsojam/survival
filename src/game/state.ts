@@ -103,7 +103,7 @@ export interface GameState {
   fireFuel: number;
   structures: Record<StructureId, boolean>;
   progress: { nextStormDay: number | null; hearthUnlocked: boolean; lookoutRepaired: boolean; axeCrafted: boolean;
-    quarryFound: boolean; pickaxeCrafted: boolean;
+    quarryFound: boolean; pickaxeCrafted: boolean; potCrafted: boolean;
     discoveries: Record<SiteId, boolean> };
   nodes: ResourceNode[];
   trees: TreeNode[];
@@ -119,6 +119,8 @@ export interface GameState {
   lastWolf: { day: number; took: WolfTake } | null;
   /** The last dawn that threw out food gone soft, and how much. */
   lastSpoiled: { day: number; berry: number; greens: number } | null;
+  /** A honey cake eaten: the next rest or sleep at camp restores a little more energy. */
+  cakeBonus: boolean;
   /** What the survivor has written in the year journal. */
   journal: JournalEntry[];
   companion: Companion;
@@ -166,6 +168,13 @@ export const BALANCE = {
   cookHungerGain: 35,
   rackCookHungerGain: 50,
   cookWarmthGain: 10,
+  /** Pot dishes, cooked like berries; none should beat rest and shelter as the way to recover. */
+  teaWarmthGain: 20,
+  teaEnergyGain: 5,
+  saladHungerGain: 40,
+  saladEnergyGain: 10,
+  honeyCakeHungerGain: 60,
+  honeyCakeRestBonus: 10,
   stargazeSeconds: 12,
   /** Leaving an offering out for a wild animal. */
   offerSeconds: 3,
@@ -269,7 +278,7 @@ export function createGame(): GameState {
     fireFuel: 0,
     structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, crate: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
-      quarryFound: false, pickaxeCrafted: false,
+      quarryFound: false, pickaxeCrafted: false, potCrafted: false,
       discoveries: { basket: false, spring: false, cairn: false } },
     nodes,
     trees,
@@ -280,6 +289,7 @@ export function createGame(): GameState {
     rubbleReadyDay: 1,
     lastWolf: null,
     lastSpoiled: null,
+    cakeBonus: false,
     journal: [],
     clearing: { cleared: [], marked: null, felled: [] },
     companion: {

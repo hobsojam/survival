@@ -265,6 +265,19 @@ function flameOverlay(hearth: boolean): SpriteDef {
     frames[`${mode}${i}`] = g => flames(g, hearth, mode, i);
   return define(16, hearth ? 24 : 20, campLegend, frames, [8, hearth ? 16 : 12]);
 }
+/** Three poles lashed at the top, a dark pot hung on a cord beneath; steam curls up while the fire burns. */
+function potTripod(g: Grid, steam: number | null): void {
+  line(g, 12, 3, 2, 23, 'a'); line(g, 12, 3, 3, 23, 'c');
+  line(g, 12, 3, 22, 23, 'a'); line(g, 12, 3, 21, 23, 'b');
+  line(g, 12, 3, 13, 21, 'b');
+  box(g, 11, 2, 3, 2, 'h'); dot(g, 12, 2, 'j');
+  line(g, 12, 4, 12, 9, 'h');
+  line(g, 9, 10, 15, 10, 'n');
+  oval(g, 12, 13, 5, 3.5, 'm'); box(g, 7, 10, 11, 2, 'n'); box(g, 8, 10, 9, 1, 'o');
+  dot(g, 9, 12, 'n'); dot(g, 9, 13, 'n');
+  if (steam === null) return;
+  for (const [x, y] of steam ? [[11, 8], [13, 6], [12, 4]] : [[13, 8], [11, 6], [12, 5]]) { dot(g, x, y, 'q'); dot(g, x, y - 1, 'p'); }
+}
 function hearthSite(g: Grid): void {
   line(g, 2, 9, 21, 9, 'q'); line(g, 4, 3, 4, 9, 'q'); line(g, 21, 4, 21, 9, 'q');
   for (const [x, y] of [[7, 5], [12, 4], [17, 6]]) {
@@ -439,6 +452,7 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   }, [12, 30], { buzz: { frames: ['ready', 'bees0', 'ready', 'bees1'], frameRate: 2, repeat: -1 } }),
   firePit: fireFrames(false), hearth: fireFrames(true), flame: flameOverlay(false), hearthFlame: flameOverlay(true),
   hearthSite: define(24, 12, campLegend, { still: hearthSite }),
+  potTripod: define(24, 28, campLegend, { still: g => potTripod(g, null), steaming0: g => potTripod(g, 0), steaming1: g => potTripod(g, 1) }, [12, 20]),
   shelterSite: define(48, 32, campLegend, { still: shelterSite }),
   shelter: define(48, 40, campLegend, {
     built: g => shelter(g, false), builtBed: g => shelter(g, true),

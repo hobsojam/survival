@@ -10,7 +10,7 @@ describe('build buttons', () => {
     const state = createGame();
     state.inventory = { wood: 9, fiber: 0, stone: 3, food: emptyFood() };
     expect(buildStatus(state, 'hearth')).toBe('locked');
-    state.progress = { nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false, axeCrafted: false, quarryFound: false, pickaxeCrafted: false,
+    state.progress = { nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false, axeCrafted: false, quarryFound: false, pickaxeCrafted: false, potCrafted: false,
       discoveries: { basket: false, spring: false, cairn: false } };
     expect(buildStatus(state, 'hearth')).toBe('ready');
   });

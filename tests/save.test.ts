@@ -588,3 +588,25 @@ describe('forage regrowth in the save', () => {
     expect(saved('greens-3', 34)).toBe('invalid');
   });
 });
+
+describe('the cooking pot in the save', () => {
+  const accepts = (change: (state: GameState) => void) => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    change(state);
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 19, state }));
+    return loadGame(storage).kind === 'loaded';
+  };
+
+  it('keeps a pot made in the toolshed, and a honey cake\'s bonus', () => {
+    expect(accepts(state => { state.structures.shelter = true; state.structures.toolshed = true; state.progress.potCrafted = true; state.cakeBonus = true; })).toBe(true);
+  });
+
+  it('refuses a pot without a toolshed, or odd flags', () => {
+    expect(accepts(state => { state.progress.potCrafted = true; })).toBe(false);
+    expect(accepts(state => { (state.progress as any).potCrafted = 'yes'; })).toBe(false);
+    expect(accepts(state => { delete (state.progress as any).potCrafted; })).toBe(false);
+    expect(accepts(state => { (state as any).cakeBonus = 1; })).toBe(false);
+    expect(accepts(state => { delete (state as any).cakeBonus; })).toBe(false);
+  });
+});

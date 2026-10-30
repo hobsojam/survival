@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { CLEARING_STEPS } from '../src/game/clearing';
-import { BAG_FOODS, bagFoodMarkup, axeView, clearingView, bagView, buildButtonView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightHint, pickaxeView, pillowView, startNote } from '../src/ui/panels';
+import { BAG_FOODS, bagFoodMarkup, axeView, clearingView, bagView, buildButtonView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishesView, nightHint, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
+import { dishBlocker } from '../src/game/cooking';
 import { addFood, emptyFood } from '../src/game/food';
 import { stock } from './stock';
 
@@ -347,5 +348,40 @@ describe('clearing panel', () => {
     const stocked = { wood: 4, fiber: 2 };
     const ready = clearingView(withAxe({ marked: 'north-near', felled: [0, 1, 2, 3] }, stocked)).clear;
     expect(ready).toMatchObject({ copy: 'Ready to clear the north side.', cost: '4 wood · 2 fiber', disabled: false, ready: true });
+  });
+});
+
+describe('cooking pot panel', () => {
+  it('asks for the toolshed, then is ready with wood and stone at camp, then reads as made', () => {
+    expect(potView(game({ inventory: supplies }))).toMatchObject({ title: 'Cooking pot', copy: 'Build a toolshed first.', cost: '1 wood · 2 stone', ready: false });
+    const shed = game({ structures: { shelter: true, toolshed: true }, inventory: supplies });
+    expect(potView(shed)).toMatchObject({ title: 'Cooking pot', cost: '1 wood · 2 stone', ready: true, disabled: false });
+    expect(potView({ ...shed, progress: { ...shed.progress, potCrafted: true } })).toMatchObject({ title: 'Cooking pot', cost: 'Made', disabled: true, ready: false });
+  });
+});
+
+describe('the pot dishes after dark', () => {
+  const night = (potCrafted: boolean) => {
+    const base = game({ structures: { shelter: true, toolshed: true }, progress: { potCrafted },
+      inventory: { food: addFood(emptyFood(), 'pineNeedles', 1, 1) } });
+    return { ...base, timeOfDay: nightStart(1) + 5, fireFuel: 30 };
+  };
+
+  it('lists nothing until the pot is made', () => {
+    expect(nightDishesView(night(false))).toEqual([]);
+  });
+
+  it('lists each pot dish with its blocker', () => {
+    const state = night(true);
+    const dishes = nightDishesView(state);
+    expect(dishes.map(entry => entry.dish)).toEqual(['pineTea', 'salad', 'roastedHazelnuts', 'honeyCake']);
+    for (const entry of dishes) {
+      const blocker = dishBlocker(state, entry.dish);
+      expect(entry.disabled, entry.dish).toBe(Boolean(blocker));
+      if (blocker) expect(entry.title).toBe(blocker);
+      expect(entry.icon).toMatch(/^data:image\//);
+    }
+    expect(dishes[0]).toMatchObject({ name: 'Pine needle tea', disabled: false });
+    expect(dishes[1]).toMatchObject({ disabled: true, title: 'You need 1 greens and 1 berry for greens and berry salad.' });
   });
 });

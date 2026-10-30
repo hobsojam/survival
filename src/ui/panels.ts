@@ -9,6 +9,7 @@ import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
 import { CLEARING_STEPS, clearGroundBlocker, markBlocker, nextStep, roomLine, type Side } from '../game/clearing';
 import { KEEPSAKES_NEEDED, cloakBlocker, keepsakeKind, pillowBlocker } from '../game/companion';
+import { DISHES, DISH_ORDER, dishBlocker, ingredientList, potBlocker, type DishId } from '../game/cooking';
 
 export interface GardenPlotPanelView {
   label: string;
@@ -84,6 +85,33 @@ export function pickaxeView(state: GameState): ActionPanelView & { shown: boolea
     return { ...button, title: 'Pickaxe ready', copy: 'Tap the quarry face, or stand at it and press E, to dig a stone. It is ready again each dawn.', cost: 'Crafted' };
   }
   return { ...button, title: 'Craft a pickaxe', copy: blocker ?? 'Your toolshed is ready. Craft a pickaxe to work the quarry face.', cost: '2 wood · 1 fiber · 2 stone' };
+}
+
+export function potView(state: GameState): ActionPanelView {
+  if (state.progress.potCrafted) {
+    return { title: 'Cooking pot', copy: 'It hangs over the fire. Cook tea, salad, roasted nuts and honey cake after dark.', cost: 'Made', disabled: true, ready: false };
+  }
+  const blocker = potBlocker(state);
+  return { title: 'Cooking pot', copy: blocker ?? 'A pot on a little tripod, for tea, salad, roasted nuts and honey cake.', cost: '1 wood · 2 stone', disabled: false, ready: !blocker };
+}
+
+export interface DishView { dish: Exclude<DishId, 'berries'>; name: string; icon: string; cost: string; disabled: boolean; title: string }
+
+/** The After dark panel's pot dishes, once the pot is made: each says why it can't be cooked yet. */
+export function nightDishesView(state: GameState): DishView[] {
+  if (!state.progress.potCrafted) return [];
+  return DISH_ORDER.filter((dish): dish is DishView['dish'] => DISHES[dish].potOnly).map(dish => {
+    const blocker = dishBlocker(state, dish);
+    const name = capitalised(DISHES[dish].name);
+    return { dish, name, icon: foodIconUrl(dish), cost: `${ingredientList(dish)} · ${BALANCE.cookSeconds} seconds`, disabled: Boolean(blocker), title: blocker ?? `Cook ${DISHES[dish].name}.` };
+  });
+}
+
+/** A hidden button for each pot dish in the After dark panel, shown once the pot is made. */
+export function nightDishMarkup(): string {
+  return DISH_ORDER.filter(dish => DISHES[dish].potOnly).map(dish =>
+    `<button type="button" data-action="cook" data-dish="${dish}" id="dish-${dish}" hidden><img class="food-icon" src="${foodIconUrl(dish as DishView['dish'])}" alt=""><strong>${capitalised(DISHES[dish].name)}</strong><small>${ingredientList(dish)} · ${BALANCE.cookSeconds} seconds</small></button>`
+  ).join('');
 }
 
 /** The fur or feathers gathered toward the friend's one item; gone once it is made. */

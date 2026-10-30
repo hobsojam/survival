@@ -373,4 +373,19 @@ describe('the quarry area', () => {
     state.fireFuel = 20;
     expect(playerVisualDepth(state)).toBe((state.player.y + 0.5) * 16);
   });
+
+  it('hangs the pot on its tripod over the fire once made, steaming while the fire burns', () => {
+    const state = createGame();
+    expect(sceneVisuals(state, 0).some(item => item.id === 'potTripod')).toBe(false);
+    state.progress.potCrafted = true;
+    const fire = sceneVisuals(state, 0).find(item => item.id === 'fire')!;
+    const still = sceneVisuals(state, 0).find(item => item.id === 'potTripod')!;
+    expect(still).toMatchObject({ texture: 'potTripod:still', x: fire.x, y: fire.y });
+    expect(still.depth).toBeGreaterThan(fire.depth);
+    state.fireFuel = 40;
+    expect(sceneVisuals(state, 0).find(item => item.id === 'potTripod')!.texture).toBe('potTripod:steaming0');
+    expect(sceneVisuals(state, 600).find(item => item.id === 'potTripod')!.texture).toBe('potTripod:steaming1');
+    expect(() => validateSprite(sprites.potTripod)).not.toThrow();
+    for (const frame of ['still', 'steaming0', 'steaming1']) expect(sprites.potTripod.frames[frame], frame).toBeDefined();
+  });
 });

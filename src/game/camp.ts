@@ -31,3 +31,8 @@ export function bagCapacity(state: GameState): number {
 export function freeSpaces(state: GameState): number {
   return bagCapacity(state) - carriedCount(state);
 }
+
+/** Stone a build can use: the bag plus the camp stone pile, which counts from anywhere. */
+export function availableStone(state: GameState): number {
+  return state.inventory.stone + state.storedStone;
+}

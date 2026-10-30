@@ -159,6 +159,11 @@ function addFire(state: GameState, timeMs: number, visuals: SceneVisual[], add: 
   if (wolfTracksShown(state)) add('wolfTracks', 'wolfTracks:still', x, y, GROUND_DECAL_DEPTH);
   const frame = mode === 'unlit' ? mode : mode + phase;
   add('fire', `${fire}:${frame}`, x, y);
+  // The pot hangs over the fire, steaming while it burns.
+  if (state.progress.potCrafted) {
+    const fireDepth = visuals.at(-1)!.depth;
+    add('potTripod', state.fireFuel > 0 ? `potTripod:steaming${Math.floor(timeMs / 500) % 2}` : 'potTripod:still', x, y, fireDepth + 1);
+  }
   if (state.fireFuel > 0 && state.timeOfDay >= nightStart(state.day)) visuals.push({
     id: 'flame', texture: `${state.structures.hearth ? 'hearthFlame' : 'flame'}:${mode}${phase}`,
     x: Math.round(worldX(x)), y: Math.round(worldY(y)), depth: LIGHT_DEPTH

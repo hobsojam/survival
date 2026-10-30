@@ -5,6 +5,7 @@ import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/ar
 import { markedTrees } from '../src/game/clearing';
 import { KEY_ACTIONS, actionPose, closestSite, closestTree, gatherKeyAction, gatherSpot, promptFor } from '../src/scene/prompts';
 import { stock } from './stock';
+import { addFood, emptyFood } from '../src/game/food';
 
 /** A camp with nothing to gather, chop or explore, so each test adds only what it checks. */
 function bareCamp(x: number = BALANCE.campX, y: number = BALANCE.campY): GameState {
@@ -31,6 +32,16 @@ describe('camp prompts', () => {
   it('offers sleep at camp once sleep is allowed', () => {
     const state = { ...bareCamp(), timeOfDay: nightStart(1) + 1, structures: { ...createGame().structures, shelter: true } };
     expect(promptFor(state)).toBe('At camp · C Cook · G Stargaze · Z Sleep · F Fire');
+  });
+
+  it('names the dish C would cook after dark', () => {
+    // Every animal has had its offering today, so the berry is left for the pot.
+    const camp = bareCamp();
+    const night = { ...camp, timeOfDay: nightStart(1) + 1, fireFuel: 30, companion: { ...camp.companion, lastOffer: { bird: 1, fox: 1, wolf: 1 } } };
+    expect(promptFor({ ...night, inventory: { ...night.inventory, food: stock(1) } })).toBe('C  Cook a berry · G Stargaze · F Fire · R Rest');
+    const tea = { ...night, progress: { ...night.progress, potCrafted: true },
+      inventory: { ...night.inventory, food: addFood(emptyFood(), 'pineNeedles', 1, 1) } };
+    expect(promptFor(tea)).toBe('C  Cook pine needle tea · G Stargaze · F Fire · R Rest');
   });
 
   it('shows movement help away from camp with nothing nearby', () => {

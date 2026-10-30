@@ -5,6 +5,7 @@ import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../g
 import { choppableTrees, isClearingStump } from '../game/clearing';
 import { sitePrompt } from '../game/sitePrompt';
 import { OFFER_PROMPT, offerFor } from '../game/companion';
+import { DISHES, defaultDish } from '../game/cooking';
 import { closestGatherable, type Gatherable } from './tapTarget';
 import type { SurvivorAction } from './survivorVisual';
 
@@ -121,9 +122,11 @@ function campPrompt(state: GameState): string {
   if (pathOpen(state) && within(state, CAMP_EXIT)) return 'Walk west to leave camp';
   if (!isInClearing(state)) return 'WASD / arrows  Move';
   if (!isAtCamp(state)) return 'In the clearing · G Stargaze · Click an upgrade to build';
-  if (!sleepBlocker(state)) return 'At camp · C Cook · G Stargaze · Z Sleep · F Fire';
-  if (state.timeOfDay >= nightStart(state.day)) return 'At camp · C Cook · G Stargaze · F Fire · R Rest';
-  return 'At camp · F Fire · R Rest · Click an upgrade to build';
+  if (sleepBlocker(state) && state.timeOfDay < nightStart(state.day)) return 'At camp · F Fire · R Rest · Click an upgrade to build';
+  const evening = sleepBlocker(state) ? 'G Stargaze · F Fire · R Rest' : 'G Stargaze · Z Sleep · F Fire';
+  // Once there is something to cook, C names it.
+  const dish = defaultDish(state);
+  return dish ? `C  Cook ${DISHES[dish].name} · ${evening}` : `At camp · C Cook · ${evening}`;
 }
 
 function quarryPrompt(state: GameState, found: Gatherable | undefined): string {

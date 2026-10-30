@@ -42,8 +42,8 @@ function validFood(store: unknown, day: unknown): boolean {
     : count(store[item])));
 }
 
-function validSurvivor({ player, inventory, area, day }: SaveShape): boolean {
-  return onMap(player.x, player.y) && meter(player.energy) && meter(player.hunger) && meter(player.warmth)
+function validSurvivor({ player, inventory, area, day, cakeBonus }: SaveShape): boolean {
+  return bool(cakeBonus) && onMap(player.x, player.y) && meter(player.energy) && meter(player.hunger) && meter(player.warmth)
     && (['wood', 'fiber', 'stone'] as const).every(key => count(inventory[key])) && validFood(inventory.food, day)
     && (area === 'camp' || area === 'quarry');
 }
@@ -57,10 +57,10 @@ function validProgress({ structures, progress, area }: SaveShape): boolean {
     const definition = BUILDINGS[id];
     if (structures[id] && 'alsoRequires' in definition && !structures[definition.alsoRequires]) return false;
   }
-  if (!(['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'pickaxeCrafted'] as const).every(key => bool(progress[key]))) return false;
+  if (!(['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'pickaxeCrafted', 'potCrafted'] as const).every(key => bool(progress[key]))) return false;
   if ((area === 'quarry' || progress.quarryFound) && !structures.shelter) return false;
   if (progress.pickaxeCrafted && !(progress.quarryFound && structures.toolshed)) return false;
-  if (progress.axeCrafted && !structures.toolshed) return false;
+  if ((progress.axeCrafted || progress.potCrafted) && !structures.toolshed) return false;
   const needsColdNight = [structures.hearth, progress.lookoutRepaired, progress.axeCrafted].includes(true);
   return progress.hearthUnlocked === true || !needsColdNight;
 }
