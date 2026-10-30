@@ -17,7 +17,11 @@ The game is a cosy camp builder (see the README and the year journal), so these 
 
 ## Non-goals
 
-- Reworking the bag or the storage crate. That's the next design, kept separate on purpose.
+- Reworking the bag or the storage crate. That's covered by `2026-10-30-pack-fibre-stack-design.md`, which comes after this one.
+
+## Order and dependencies
+
+This project comes after **growing the clearing** (`2026-10-30-clearing-growth-design.md`). Plan and build it only once that's merged. The larder and woodpile go on their spots on the cleared ground, and "at camp" below means the zones that design defines.
 - Fishing, hunting, farming beyond the existing garden, or new meters.
 - Food quality grades, recipe timing, or exact ingredient amounts.
 - Changing how the existing companion, wolf or garden rules work, beyond what is listed here.
@@ -98,16 +102,16 @@ The numbers are starting points for balance, set so that no dish beats rest and 
 ## Camp stores
 
 ### Larder
-- A raised food cache on legs beside the shelter. It costs 5 wood, 2 fiber and 2 stone, and needs the shelter.
+- A raised food cache on legs, built on its spot on the **north near step**, close to the shelter, once that ground is cleared. It costs 5 wood, 2 fiber and 2 stone.
 - It holds **10 food items** of any kind: berries, greens, hazelnuts, honey, pine needles, rations and roasted hazelnuts.
 - Store 1 and Take 1 for each kind, beside it in the build list, the same pattern as the stone pile.
-- At camp, eating, cooking, drying rations, planting and offerings can use food from the larder. Food in the bag is used first, the same rule as stone from the stone pile.
+- Anywhere in the clearing, eating, cooking, drying rations, planting and offerings can use food from the larder. You can't eat from it out in the forest or the quarry. Food in the bag is used first, the same rule as stone from the stone pile.
 - **Wolves can't reach the larder.** The winter wolf takes only from the bag, as it does now (a ration first, then a berry). The new foods don't become things the wolf takes. Leaving a ration out for a wolf is the player's own choice, so **that offering can use a ration from the larder (my call)**. It still counts as that night's wolf visit.
 
 ### Woodpile
 - Split logs under a little roof. It costs 3 wood and 1 fiber, with nothing needed first.
 - It holds **12 wood**, with Store 1 and Take 1.
-- At camp, feeding the fire, Burn, builds and crafting can use wood from the woodpile, with bag wood used first. The cold-night forecast's log count includes wood in the woodpile.
+- Feeding the fire, Burn, builds and crafting can use wood from the woodpile, with bag wood used first. As with stone from the stone pile, wood used as a building material counts from anywhere (for example, for the lookout repair). The woodpile goes on its spot on the **east near step**. The cold-night forecast's log count includes wood in the woodpile.
 
 ## Companion
 
