@@ -199,7 +199,8 @@ const BRANCH_MARGIN = 1.5;
 
 /**
  * Takes the starting nodes and sets every branch pile that now lies inside the clearing just beyond its edge,
- * along the line from the fire, on a whole tile that no other node holds.
+ * along the line from the fire, on an outside tile that no other node holds. If eight tries find no free tile it takes
+ * the last outside tile, and if none was outside it stays put; neither happens for any valid set of cleared steps.
  */
 export function placeBranches(nodes: readonly ResourceNode[], cleared: readonly StepId[]): ResourceNode[] {
   const taken = new Set(nodes.filter(node => node.kind !== 'branch' || !inClearing(node.x, node.y, cleared)).map(node => `${node.x},${node.y}`));
@@ -217,7 +218,7 @@ export function placeBranches(nodes: readonly ResourceNode[], cleared: readonly 
       taken.add(`${x},${y}`);
       return { ...node, x, y };
     }
-    if (!outside) return node;
+    if (!outside) return node; // only if every try fell inside the clearing; no valid set of steps does
     taken.add(`${outside.x},${outside.y}`);
     return { ...node, ...outside };
   });
