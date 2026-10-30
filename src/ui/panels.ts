@@ -1,5 +1,5 @@
 import { daysLeftInSeason, isWinter, nightStart, season } from '../game/calendar';
-import { FOOD_ITEMS, availableFood, foodCount, goingSoft, keptFoodTotal, storeTotal, type FoodItem } from '../game/food';
+import { FOOD_ITEMS, availableFood, foodCount, goingSoft, isFresh, keptFoodTotal, storeTotal, type FoodItem } from '../game/food';
 import { foodIconUrl } from '../art/foodIcons';
 import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
@@ -218,11 +218,12 @@ export const BAG_FOODS = [
 ] as const;
 export type BagFood = (typeof BAG_FOODS)[number]['item'];
 
-/** Every forage cell, hidden until the bag panel shows it. */
+/** Every forage cell, hidden until the bag panel shows it; fresh food has a line for what is going soft. */
 export function bagFoodMarkup(): string {
   return BAG_FOODS.map(({ item, label, eat }) => {
     const button = eat ? `<button type="button" class="supply-action" data-action="eat" data-item="${item}" data-supply="${item}" aria-label="${eat}">Eat</button>` : '';
-    return `<div data-food="${item}" hidden><img class="food-icon" src="${foodIconUrl(item)}" alt=""><strong id="${item}-count">0</strong><small>${label}</small>${button}</div>`;
+    const note = isFresh(item) ? `<small id="${item}-note" class="supply-note"></small>` : '';
+    return `<div data-food="${item}" hidden><img class="food-icon" src="${foodIconUrl(item)}" alt=""><strong id="${item}-count">0</strong><small>${label}</small>${note}${button}</div>`;
   }).join('');
 }
 
@@ -230,22 +231,26 @@ export function bagFoodMarkup(): string {
 export const EATABLE_FOODS = ['berry', 'trailFood', ...BAG_FOODS.filter(cell => cell.eat).map(cell => cell.item)] as const satisfies readonly FoodItem[];
 export type EatableFood = (typeof EATABLE_FOODS)[number];
 
-export interface BagView { foods: Record<BagFood, { count: number; shown: boolean }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; prepareReady: boolean; prepareHint: string; pileShown: boolean; storedAtCamp: string; pileStored: string; woodShown: boolean; woodAtCamp: string; woodStored: string; fire: string }
+export interface BagView { foods: Record<BagFood, { count: number; shown: boolean; note: string }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; prepareReady: boolean; prepareHint: string; pileShown: boolean; storedAtCamp: string; pileStored: string; woodShown: boolean; woodAtCamp: string; woodStored: string; fire: string }
 
 export function bagView(state: GameState): BagView {
   const prepareBlocker = trailFoodBlocker(state);
   const pile = state.structures.stonePile;
-  const soft = goingSoft(state.inventory.food, 'berry', state.day, BALANCE.bagFreshDays);
+  /** "(2 going soft)" for the bag's fresh pieces gone at the next dawn, or nothing. */
+  const softNote = (item: FoodItem): string => {
+    const soft = isFresh(item) ? goingSoft(state.inventory.food, item, state.day, BALANCE.bagFreshDays) : 0;
+    return soft ? ` (${soft} going soft)` : '';
+  };
   // Eat reaches the larder in the clearing, so a cell shows with its button while there is any to eat, even with none in the bag.
   const eatable = Object.fromEntries(EATABLE_FOODS.map(item => [item, availableFood(state, item) > 0])) as BagView['eatable'];
   const foods = Object.fromEntries(BAG_FOODS.map(({ item, eat }) => {
     const count = foodCount(state.inventory.food, item);
-    return [item, { count, shown: count > 0 || (eat !== null && availableFood(state, item) > 0) }];
+    return [item, { count, shown: count > 0 || (eat !== null && availableFood(state, item) > 0), note: softNote(item).trim() }];
   })) as BagView['foods'];
   return {
     foods,
     eatable,
-    berries: `Berries ${foodCount(state.inventory.food, 'berry')}${soft ? ` (${soft} going soft)` : ''}`,
+    berries: `Berries ${foodCount(state.inventory.food, 'berry')}${softNote('berry')}`,
     spaces: `${carriedCount(state)}/${bagCapacity(state)}`,
     prepareReady: !prepareBlocker,
     prepareHint: prepareBlocker ?? `1 berry · ${workSeconds(state, BALANCE.trailFoodSeconds)} seconds · 1 ration`,

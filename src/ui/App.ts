@@ -372,6 +372,7 @@ export class App {
       const cell = this.root.querySelector<HTMLElement>(`[data-food="${item}"]`);
       if (cell) cell.hidden = !bag.foods[item].shown;
       this.setText(`${item}-count`, String(bag.foods[item].count));
+      this.setText(`${item}-note`, bag.foods[item].note);
     }
     this.setText('space-count', bag.spaces);
     this.root.querySelector('#eat-ration-button')?.classList.toggle('ready', foodCount(inventory.food, 'trailFood') > 0);

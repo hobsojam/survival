@@ -218,12 +218,22 @@ describe('bag panel', () => {
     expect(bagView(berries([2, 3, 3])).berries).toBe('Berries 3');
   });
 
+  it('says how many greens go soft at the next dawn, in the greens cell', () => {
+    const greens = (picked: number[]) => game({ inventory: { food: { ...emptyFood(), greens: picked } } }, { day: 3 });
+    expect(bagView(greens([1, 1, 3])).foods.greens).toEqual({ count: 3, shown: true, note: '(2 going soft)' });
+    expect(bagView(greens([2, 3])).foods.greens.note).toBe('');
+    expect(bagView(greens([1])).foods.hazelnut.note).toBe('');
+    const cell = bagFoodMarkup().split('</div>').find(part => part.includes('data-food="greens"'))!;
+    expect(cell).toContain('id="greens-note" class="supply-note"');
+    expect(bagFoodMarkup()).not.toContain('id="hazelnut-note"');
+  });
+
   it('shows a forage cell only while the bag holds some', () => {
     const food = addFood(addFood(emptyFood(), 'hazelnut', 2, 1), 'greens', 1, 1);
     const { foods } = bagView(game({ inventory: { food } }));
-    expect(foods.hazelnut).toEqual({ count: 2, shown: true });
-    expect(foods.greens).toEqual({ count: 1, shown: true });
-    expect(foods.honey).toEqual({ count: 0, shown: false });
+    expect(foods.hazelnut).toEqual({ count: 2, shown: true, note: '' });
+    expect(foods.greens).toEqual({ count: 1, shown: true, note: '' });
+    expect(foods.honey).toEqual({ count: 0, shown: false, note: '' });
     expect(foods.pineNeedles.shown).toBe(false);
     expect(foods.roastedHazelnuts.shown).toBe(false);
   });
@@ -416,7 +426,7 @@ describe('eating from the bag panel with a larder', () => {
   it('enables Eat for food within reach, the larder included in the clearing', () => {
     const view = bagView(atCamp);
     expect(view.eatable).toEqual({ berry: true, trailFood: true, greens: false, hazelnut: true, honey: false, roastedHazelnuts: false });
-    expect(view.foods.hazelnut).toEqual({ count: 0, shown: true });
+    expect(view.foods.hazelnut).toEqual({ count: 0, shown: true, note: '' });
     expect(view.foods.pineNeedles.shown).toBe(false);
   });
 
