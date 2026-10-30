@@ -386,6 +386,26 @@ describe('the pot dishes after dark', () => {
   });
 });
 
+describe('eating from the bag panel with a larder', () => {
+  const north = { cleared: ['north-near' as const], marked: null, felled: [] };
+  const kept = addFood(addFood(stock(1, 1), 'hazelnut', 2, 1), 'pineNeedles', 1, 1);
+  const atCamp = game({ structures: { larder: true } }, { clearing: north, larder: kept });
+
+  it('enables Eat for food within reach, the larder included in the clearing', () => {
+    const view = bagView(atCamp);
+    expect(view.eatable).toEqual({ berry: true, trailFood: true, greens: false, hazelnut: true, honey: false, roastedHazelnuts: false });
+    expect(view.foods.hazelnut).toEqual({ count: 0, shown: true });
+    expect(view.foods.pineNeedles.shown).toBe(false);
+  });
+
+  it('follows the bag alone away from camp', () => {
+    const away = { ...atCamp, player: { ...atCamp.player, x: 5, y: 5 }, inventory: { ...atCamp.inventory, food: addFood(emptyFood(), 'honey', 1, 1) } };
+    const view = bagView(away);
+    expect(view.eatable).toEqual({ berry: false, trailFood: false, greens: false, hazelnut: false, honey: true, roastedHazelnuts: false });
+    expect(view.foods.hazelnut.shown).toBe(false);
+  });
+});
+
 describe('larder controls', () => {
   const north = { cleared: ['north-near' as const], marked: null, felled: [] };
   const stocked = (built: boolean, bag = emptyFood(), larder = emptyFood()) =>

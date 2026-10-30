@@ -3,7 +3,7 @@ import { nightStart } from '../src/game/calendar';
 import { BALANCE, BUILDINGS, createGame, type GameState } from '../src/game/state';
 import { CLEARING_STEPS, STEP_IDS, inClearing, placeBranches } from '../src/game/clearing';
 import { addFood, availableFood, emptyFood, quickEatItem, reachableLarder, spendFood, spoilMessage, type FoodStore } from '../src/game/food';
-import { FULL_BAG_MESSAGE, advanceTime, applyAction, buildStatus, groundBlocker } from '../src/game/rules';
+import { FULL_BAG_MESSAGE, advanceTime, applyAction, buildStatus, carriedCount, groundBlocker, trailFoodBlocker } from '../src/game/rules';
 import { offerFor } from '../src/game/companion';
 import { buildButtonView } from '../src/ui/panels';
 import { CAMP_STRUCTURES } from '../src/scene/visuals';
@@ -189,7 +189,7 @@ describe('eating from the bag and the larder', () => {
       expect(applyAction(out, { type: 'eatTrailFood' }).state).toEqual(out);
       expect(applyAction(out, { type: 'prepareTrailFood' }).state).toEqual(out);
       expect(applyAction(out, { type: 'cook', dish: 'salad' }).state).toEqual(out);
-      expect(applyAction({ ...out, day: 21 }, { type: 'plantGarden', plotIndex: 0 }).state).toEqual({ ...out, day: 21 });
+      expect(applyAction({ ...out, day: 21 }, { type: 'plantGarden', plotIndex: 0 })).toEqual({ state: { ...out, day: 21 }, message: 'Return to camp to tend the garden.' });
       expect(offerFor({ ...out, day: 12, timeOfDay: nightStart(12) + 5 })).toBeNull();
     }
   });
@@ -203,6 +203,36 @@ describe('eating from the bag and the larder', () => {
     }), emptyFood(), food([['berry', 3, 5], ['greens', 1, 5]]));
     expect(applyAction(state, { type: 'cook', dish: 'salad' }).state.larder).toMatchObject({ berry: [5, 5], greens: [] });
     expect(applyAction(state, { type: 'prepareTrailFood' }).state).toMatchObject({ larder: { berry: [5, 5] }, inventory: { food: { trailFood: 1 } } });
+  });
+
+  it('plants a larder berry in spring with an empty bag, and ignores an unbuilt larder', () => {
+    const spring = withStores(camp(true, { day: 21, structures: { ...createGame().structures, larder: true, garden: true } }), emptyFood(), food([['berry', 2, 20]]));
+    const planted = applyAction(spring, { type: 'plantGarden', plotIndex: 0 });
+    expect(planted.message).toBe('Planted a berry bush.');
+    expect(planted.state.larder.berry).toEqual([20]);
+    expect(planted.state.gardenPlots[0].plantedYear).toBe(1);
+    const unbuilt = { ...spring, structures: { ...spring.structures, larder: false } };
+    expect(applyAction(unbuilt, { type: 'plantGarden', plotIndex: 0 })).toEqual({ state: unbuilt, message: 'You need a berry to plant.' });
+  });
+
+  it('dries a ration only with room for it in the bag', () => {
+    const rack = (bag: FoodStore, larder: FoodStore, wood: number) => {
+      const state = withStores(camp(true, { structures: { ...createGame().structures, larder: true, dryingRack: true } }), bag, larder);
+      return { ...state, inventory: { ...state.inventory, wood } };
+    };
+    // A full bag and only larder berries: the berry leaves the larder, so the ration has nowhere to go.
+    const full = rack(emptyFood(), food([['berry', 2, 5]]), 8);
+    expect(trailFoodBlocker(full)).toBe('Make room in your bag for the ration.');
+    expect(applyAction(full, { type: 'prepareTrailFood' })).toEqual({ state: full, message: 'Make room in your bag for the ration.' });
+    // With a bag berry too, oldest-first takes the larder's older one, so a full bag still has no room.
+    const olderInLarder = rack(food([['berry', 1, 5]]), food([['berry', 1, 4]]), 7);
+    expect(trailFoodBlocker(olderInLarder)).toBe('Make room in your bag for the ration.');
+    // A full bag drying its own berry swaps the berry for the ration.
+    const swap = rack(food([['berry', 1, 4]]), food([['berry', 1, 5]]), 7);
+    expect(trailFoodBlocker(swap)).toBeNull();
+    const dried = applyAction(swap, { type: 'prepareTrailFood' }).state;
+    expect(dried.inventory.food).toMatchObject({ berry: [], trailFood: 1 });
+    expect(carriedCount(dried)).toBe(8);
   });
 });
 

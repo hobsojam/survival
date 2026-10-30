@@ -15,18 +15,15 @@ import { createPause, wirePause, type PauseControl } from './pause';
 import { journalView } from './journal';
 import { renderRegionOverview } from './regionOverview';
 import { currentPage, journalPageView, renderJournalPage, turnPage } from './yearJournal';
-import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, larderMarkup, larderView, clearingView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, pickaxeView, pillowView, potView, startNote, type ActionPanelView } from './panels';
+import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, type EatableFood, larderMarkup, larderView, clearingView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, pickaxeView, pillowView, potView, startNote, type ActionPanelView } from './panels';
 import { Soundscape } from '../game/soundscape';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
-/** What each bag button spends, as a count the survivor holds; berries, rations and forage are read from the food store. */
+/** What each Burn or Drop button spends, as a count in the bag; Eat buttons follow the bag view instead. */
 const SUPPLY_COUNTS: Record<string, (inventory: GameState['inventory']) => number> = {
   wood: inventory => inventory.wood,
   fiber: inventory => inventory.fiber,
-  stone: inventory => inventory.stone,
-  food: inventory => foodCount(inventory.food, 'berry'),
-  trailFood: inventory => foodCount(inventory.food, 'trailFood'),
-  ...Object.fromEntries(BAG_FOODS.map(({ item }) => [item, (inventory: GameState['inventory']) => foodCount(inventory.food, item)]))
+  stone: inventory => inventory.stone
 };
 const supplyCount = (state: GameState, supply: string): number => SUPPLY_COUNTS[supply]?.(state.inventory) ?? 0;
 
@@ -378,7 +375,10 @@ export class App {
     this.root.querySelector('#prepare-button')?.classList.toggle('ready', bag.prepareReady);
     this.setText('prepare-hint', bag.prepareHint);
     this.root.querySelectorAll<HTMLButtonElement>('[data-supply]').forEach(button => {
-      button.disabled = supplyCount(this.state, button.dataset.supply ?? '') <= 0;
+      // Eat buttons follow the food within reach, the larder included in the clearing; the rest follow the bag.
+      const { action } = button.dataset;
+      if (action === 'eat' || action === 'eatTrailFood') button.disabled = !bag.eatable[(button.dataset.item ?? 'trailFood') as EatableFood];
+      else button.disabled = supplyCount(this.state, button.dataset.supply ?? '') <= 0;
     });
     this.setText('stone-stored', bag.storedAtCamp);
     const pileControls = this.root.querySelector<HTMLElement>('#stone-pile-controls');

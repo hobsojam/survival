@@ -1,5 +1,5 @@
 import { isWinter, nightStart } from '../game/calendar';
-import { FOOD_ITEMS, foodCount, goingSoft, storeTotal, type FoodItem } from '../game/food';
+import { FOOD_ITEMS, availableFood, foodCount, goingSoft, storeTotal, type FoodItem } from '../game/food';
 import { foodIconUrl } from '../art/foodIcons';
 import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
@@ -211,18 +211,25 @@ export function bagFoodMarkup(): string {
   }).join('');
 }
 
-export interface BagView { foods: Record<BagFood, { count: number; shown: boolean }>; berries: string; spaces: string; prepareReady: boolean; prepareHint: string; pileShown: boolean; storedAtCamp: string; pileStored: string; fire: string }
+/** The foods the Bag panel has an Eat button for. */
+export const EATABLE_FOODS = ['berry', 'trailFood', ...BAG_FOODS.filter(cell => cell.eat).map(cell => cell.item)] as const satisfies readonly FoodItem[];
+export type EatableFood = (typeof EATABLE_FOODS)[number];
+
+export interface BagView { foods: Record<BagFood, { count: number; shown: boolean }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; prepareReady: boolean; prepareHint: string; pileShown: boolean; storedAtCamp: string; pileStored: string; fire: string }
 
 export function bagView(state: GameState): BagView {
   const prepareBlocker = trailFoodBlocker(state);
   const pile = state.structures.stonePile;
   const soft = goingSoft(state.inventory.food, 'berry', state.day, BALANCE.bagFreshDays);
-  const foods = Object.fromEntries(BAG_FOODS.map(({ item }) => {
+  // Eat reaches the larder in the clearing, so a cell shows with its button while there is any to eat, even with none in the bag.
+  const eatable = Object.fromEntries(EATABLE_FOODS.map(item => [item, availableFood(state, item) > 0])) as BagView['eatable'];
+  const foods = Object.fromEntries(BAG_FOODS.map(({ item, eat }) => {
     const count = foodCount(state.inventory.food, item);
-    return [item, { count, shown: count > 0 }];
+    return [item, { count, shown: count > 0 || (eat !== null && availableFood(state, item) > 0) }];
   })) as BagView['foods'];
   return {
     foods,
+    eatable,
     berries: `Berries ${foodCount(state.inventory.food, 'berry')}${soft ? ` (${soft} going soft)` : ''}`,
     spaces: `${carriedCount(state)}/${bagCapacity(state)}`,
     prepareReady: !prepareBlocker,
