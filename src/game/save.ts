@@ -77,6 +77,10 @@ function validDiscoveries({ progress }: SaveShape): boolean {
 
 const readyBy = (value: unknown, latest: number): boolean => whole(value) && value >= 1 && value <= latest;
 
+function validWoodpile({ structures, storedWood }: SaveShape): boolean {
+  return count(storedWood) && storedWood <= BALANCE.woodpileCapacity && (structures.woodpile === true || storedWood === 0);
+}
+
 function validStone({ structures, storedStone, quarryReadyDay, rubbleReadyDay, day }: SaveShape): boolean {
   const today = day as number;
   return count(storedStone) && storedStone <= BALANCE.stonePileCapacity && (structures.stonePile === true || storedStone === 0)
@@ -200,7 +204,7 @@ function validCompanion({ companion, day, structures }: SaveShape): boolean {
 /** Checks a version 19 save: the clearing and the larder, shelter upgrades, garden plots, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validGarden, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion];
+  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodpile, validGarden, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

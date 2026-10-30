@@ -626,6 +626,21 @@ describe('the larder in the save', () => {
     return loadGame(storage).kind === 'loaded';
   };
 
+  it('keeps the woodpile to its ground, its capacity and a built pile', () => {
+    const east = (change: (state: GameState) => void) => accepts(state => {
+      const placed = placeBranches(createGame().nodes, ['east-near']);
+      state.nodes = state.nodes.map((node, i) => ({ ...node, x: placed[i].x, y: placed[i].y }));
+      state.clearing = { cleared: ['east-near'], marked: null, felled: [] };
+      change(state);
+    });
+    expect(east(state => { state.structures.woodpile = true; state.storedWood = 12; })).toBe(true);
+    expect(east(state => { state.structures.woodpile = true; state.storedWood = 13; })).toBe(false);
+    expect(east(state => { state.structures.woodpile = true; state.storedWood = 0.5; })).toBe(false);
+    expect(east(state => { state.storedWood = 1; })).toBe(false);
+    expect(east(state => { delete (state as any).storedWood; })).toBe(false);
+    expect(accepts(state => { state.structures.woodpile = true; })).toBe(false);
+  });
+
   it('round-trips a stocked larder', () => {
     const storage = new MemoryStorage();
     const state = createGame();

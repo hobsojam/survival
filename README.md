@@ -37,7 +37,7 @@ Open the local address printed by Vite, usually <http://localhost:5173/>. For a 
 | Tap or click | Walk there, or walk over and use the supply, loose stone, tree, place, lookout, campfire, rubble, quarry face, or path end you tapped |
 | Build buttons | Spend wood, and sometimes fiber or stone, on camp upgrades and tools |
 | Bag buttons | Eat a berry, a ration, or one of your forage finds, burn wood or fiber at camp, or drop a stone where you stand |
-| Store 1 / Take 1 | Move stone between your bag and a built stone pile, or food between your bag and a built larder, in the clearing |
+| Store 1 / Take 1 | Move stone, wood or food between your bag and a built stone pile, woodpile or larder, in the clearing |
 
 The buttons beside the game also let you eat, rest, feed the fire, and sleep. Your survivor's meters and those buttons stay at the top of the sidebar; below them, the **Bag**, **Build**, and **Camp** tabs each show one group of panels, and the sidebar remembers the tab you had open. A dot on Build means something there is ready. If the keyboard does not respond, click the game area once to focus it.
 
@@ -115,6 +115,8 @@ Weathering the cold night also teaches you to make a **stone axe**. Once the too
 Fresh berries and greens go soft after three dawns in your bag. Once the north side's near ground is cleared (see **Clearing more land**), you can build a **larder** there for five wood, two fiber and two stone: a little cache raised on four legs, with a ladder. It keeps up to ten food outside your bag, and fresh food keeps **five dawns** in it instead of three. Under the Larder in the build list, **Store 1** puts the oldest piece of that food from your bag into the larder, and **Take 1** brings the freshest back out; kept food such as hazelnuts and rations moves one at a time too. A row shows for each food while you have some in your bag or the larder.
 
 While you stand anywhere in the clearing, the larder is as good as your bag: eating, Q, cooking, drying rations, planting and offerings all reach into it, spending the oldest fresh food across both (your bag's first on a tie) and kept food from your bag first. Away from camp, or in the quarry, only your bag counts. Food in the larder still goes soft at dawn wherever you are, and one morning note covers what was thrown out of both. The larder doesn't count toward your bag, and a wolf in the dark camp never raids it, though you can choose to leave a larder ration out for one.
+
+Once the east side's near ground is cleared, you can build a **woodpile** there for three wood and one fiber: split logs stacked under a little roof, holding up to twelve. In the build list, **Store 1** stacks a log from your bag and **Take 1** brings one back out (in the clearing). Wood on the pile counts as wood you carry, from anywhere: building, repairing, crafting, clearing land and the cold-night forecast all spend your bag's wood first and then the pile's, and **Burn** at the fire uses the pile's wood when your bag is empty. The Bag panel's wood shows `+n at camp`.
 
 ### Trail rations
 

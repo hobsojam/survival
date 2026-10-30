@@ -215,7 +215,7 @@ export function bagFoodMarkup(): string {
 export const EATABLE_FOODS = ['berry', 'trailFood', ...BAG_FOODS.filter(cell => cell.eat).map(cell => cell.item)] as const satisfies readonly FoodItem[];
 export type EatableFood = (typeof EATABLE_FOODS)[number];
 
-export interface BagView { foods: Record<BagFood, { count: number; shown: boolean }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; prepareReady: boolean; prepareHint: string; pileShown: boolean; storedAtCamp: string; pileStored: string; fire: string }
+export interface BagView { foods: Record<BagFood, { count: number; shown: boolean }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; prepareReady: boolean; prepareHint: string; pileShown: boolean; storedAtCamp: string; pileStored: string; woodShown: boolean; woodAtCamp: string; woodStored: string; fire: string }
 
 export function bagView(state: GameState): BagView {
   const prepareBlocker = trailFoodBlocker(state);
@@ -237,6 +237,9 @@ export function bagView(state: GameState): BagView {
     pileShown: pile,
     storedAtCamp: pile ? `+${state.storedStone} at camp` : '',
     pileStored: `Stored stone ${state.storedStone}/${BALANCE.stonePileCapacity}`,
+    woodShown: state.structures.woodpile,
+    woodAtCamp: state.structures.woodpile ? `+${state.storedWood} at camp` : '',
+    woodStored: `Stored wood ${state.storedWood}/${BALANCE.woodpileCapacity}`,
     fire: state.fireFuel > 0 ? `Fire burning · ${Math.ceil(state.fireFuel)}s of warmth` : 'The fire is unlit'
   };
 }

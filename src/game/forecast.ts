@@ -1,6 +1,7 @@
 import { nightStart } from './calendar';
 import { BALANCE, type GameState } from './state';
 import { isFreezingNight } from './rules';
+import { availableWood } from './camp';
 import { rainWindow } from './rain';
 
 export interface StormReadiness {
@@ -38,7 +39,7 @@ export function stormReadiness(state: GameState): StormReadiness {
   const perLog = secondsPerLog(state);
   const storm = isFreezingNight(state);
   const night = plannedNight(state);
-  const carried = state.inventory.wood * perLog;
+  const carried = availableWood(state) * perLog;
   let fuel: number;
   let needed: number;
   if (storm) {

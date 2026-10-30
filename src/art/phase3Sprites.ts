@@ -407,6 +407,21 @@ function larder(g: Grid, stock: 'empty' | 'some' | 'full'): void {
   box(g, 12, 8, 1, 2, 'k'); dot(g, 14, 5, 'k'); dot(g, 15, 6, 'l');
   box(g, 14, 8, 2, 2, 'B');
 }
+function woodpileSite(g: Grid): void {
+  for (const [x, y] of [[2, 7], [21, 7], [2, 11], [21, 11]]) stake(g, x, y);
+  line(g, 4, 8, 20, 8, 'h'); line(g, 4, 12, 20, 12, 'h');
+  line(g, 10, 10, 14, 10, 'z');
+}
+/** Split logs stacked in rows under a little lean-to roof; the roof is drawn last so the logs peek out beneath it. */
+function woodpile(g: Grid, stock: 'empty' | 'some' | 'full'): void {
+  oval(g, 12, 18, 10, 2, 's');
+  for (const x of [2, 20]) { box(g, x, 5, 2, 13, 'b'); line(g, x, 5, x, 17, 'd'); }
+  box(g, 4, 16, 16, 2, 'a'); line(g, 4, 17, 19, 17, 'b');
+  const log = (x: number, y: number): void => { box(g, x, y, 4, 3, 'c'); line(g, x, y, x + 3, y, 'e'); dot(g, x + 3, y + 1, 'd'); };
+  if (stock !== 'empty') for (const x of [4, 8, 12, 16]) log(x, 13);
+  if (stock === 'full') { for (const x of [6, 10, 14]) log(x, 10); log(8, 7); log(12, 7); }
+  box(g, 0, 2, 24, 3, 'd'); box(g, 1, 2, 12, 1, 'e'); line(g, 0, 4, 23, 4, 'b');
+}
 const DIGITS: Record<string, string[]> = {
   2: ['###', '..#', '###', '#..', '###'], 3: ['###', '..#', '.##', '..#', '###'], 4: ['#.#', '#.#', '###', '..#', '..#'],
   5: ['###', '#..', '###', '..#', '###'], 6: ['###', '#..', '###', '#.#', '###'], 7: ['###', '..#', '.#.', '.#.', '.#.'],
@@ -508,6 +523,8 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   rubble: define(24, 16, campLegend, { ready: g => rubble(g, true), gathered: g => rubble(g, false) }),
   toolshedSite: define(24, 16, campLegend, { still: toolshedSite }),
   toolshed: define(24, 28, campLegend, { built: toolshed }),
+  woodpileSite: define(24, 16, campLegend, { still: woodpileSite }),
+  woodpile: define(24, 20, campLegend, { empty: g => woodpile(g, 'empty'), some: g => woodpile(g, 'some'), full: g => woodpile(g, 'full') }),
   larderSite: define(24, 16, campLegend, { still: larderSite }),
   larder: define(24, 28, campLegend, { empty: g => larder(g, 'empty'), some: g => larder(g, 'some'), full: g => larder(g, 'full') }),
   pileCount: define(13, 7, countLegend, {

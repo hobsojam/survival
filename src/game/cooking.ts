@@ -1,5 +1,5 @@
 import { nightStart } from './calendar';
-import { availableStone, freeSpaces, isAtCamp, isInClearing } from './camp';
+import { availableStone, availableWood, freeSpaces, isAtCamp, isInClearing } from './camp';
 import { addFood, availableFood, spendFood, type FoodItem } from './food';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { BALANCE, type GameState } from './state';
@@ -27,7 +27,7 @@ export function potBlocker(state: GameState): string | null {
   if (!state.structures.toolshed) return 'Build a toolshed first.';
   if (!isInClearing(state)) return 'Return to camp to make the pot.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
-  if (state.inventory.wood < POT_COST.wood || availableStone(state) < POT_COST.stone) return 'Need 1 wood and 2 stone for the pot.';
+  if (availableWood(state) < POT_COST.wood || availableStone(state) < POT_COST.stone) return 'Need 1 wood and 2 stone for the pot.';
   return null;
 }
 

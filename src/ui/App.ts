@@ -3,7 +3,7 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type SiteId, typ
 import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
-import { cookBlocker, isInClearing, sleepBlocker, stargazeBlocker } from '../game/rules';
+import { availableWood, cookBlocker, isAtCamp, isInClearing, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { nextStep, type Side } from '../game/clearing';
 import { offerBlocker } from '../game/companion';
 import { defaultDish, type DishId } from '../game/cooking';
@@ -25,7 +25,9 @@ const SUPPLY_COUNTS: Record<string, (inventory: GameState['inventory']) => numbe
   fiber: inventory => inventory.fiber,
   stone: inventory => inventory.stone
 };
-const supplyCount = (state: GameState, supply: string): number => SUPPLY_COUNTS[supply]?.(state.inventory) ?? 0;
+/** Burn reaches the woodpile at camp; everything else follows the bag. */
+const supplyCount = (state: GameState, supply: string): number =>
+  supply === 'wood' && isAtCamp(state) ? availableWood(state) : SUPPLY_COUNTS[supply]?.(state.inventory) ?? 0;
 
 export class App {
   private state: GameState;
@@ -62,6 +64,7 @@ export class App {
       const groupHeading = id === 'shelterThatched' ? '<h3 class="build-group-heading">Shelter upgrades</h3>' : '';
       let extraControls = '';
       if (id === 'stonePile') extraControls = `<div id="stone-pile-controls" class="stone-pile-controls" hidden><span id="stone-pile-stored">Stored stone 0/${BALANCE.stonePileCapacity}</span><button type="button" data-action="storeStone">Store 1</button><button type="button" data-action="takeStone">Take 1</button></div>`;
+      if (id === 'woodpile') extraControls = `<div id="wood-pile-controls" class="stone-pile-controls" hidden><span id="wood-pile-stored">Stored wood 0/${BALANCE.woodpileCapacity}</span><button type="button" data-action="storeWood">Store 1</button><button type="button" data-action="takeWood">Take 1</button></div>`;
       if (id === 'larder') extraControls = larderMarkup();
       return groupHeading + `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>` + extraControls;
     }).join('');
@@ -103,7 +106,7 @@ export class App {
                 </details></section>
               <section class="panel year-journal-panel" data-tab="camp"><p class="eyebrow">THE YEAR SO FAR</p><div class="year-wheel"><span class="year-dial" aria-hidden="true"><span id="year-hand" class="year-hand"></span></span><p id="year-label" class="year-label"></p><ul class="visually-hidden" aria-label="Seasons"><li id="year-season-0">Autumn</li><li id="year-season-1">Winter</li><li id="year-season-2">Spring</li><li id="year-season-3">Summer</li></ul></div><div class="year-journal-page"><div class="year-journal-head"><button type="button" id="year-journal-previous" class="year-journal-turn" aria-label="Earlier page">‹</button><div><h2 id="year-journal-title"></h2><p id="year-journal-days" class="year-journal-days"></p></div><button type="button" id="year-journal-next" class="year-journal-turn" aria-label="Later page">›</button></div><ul id="year-journal-entries" class="year-journal-entries"></ul></div></section>
               <section class="panel bag-panel" data-tab="bag"><p class="eyebrow">IN YOUR BAG</p><div class="supplies">
-                <div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small><button type="button" class="supply-action" data-action="stokeFire" data-supply="wood" aria-label="Burn one wood">Burn</button></div>
+                <div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small><small id="wood-stored" class="supply-note"></small><button type="button" class="supply-action" data-action="stokeFire" data-supply="wood" aria-label="Burn one wood">Burn</button></div>
                 <div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small><small id="berry-line" class="supply-note"></small><button type="button" class="supply-action" data-action="eat" data-item="berry" data-supply="food" aria-label="Eat one berry">Eat</button></div>
                 <div><span class="supply-icon fiber">≋</span><strong id="fiber-count">0</strong><small>Fiber</small><button type="button" class="supply-action" data-action="burnFiber" data-supply="fiber" aria-label="Burn one fiber">Burn</button></div>
                 <div><span class="supply-icon stone">◆</span><strong id="stone-count">0</strong><small>Stone</small><small id="stone-stored" class="supply-note"></small><button type="button" class="supply-action" data-action="dropStone" data-supply="stone" aria-label="Drop one stone">Drop</button></div>
@@ -126,7 +129,7 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'storeFood' | 'takeFood';
+        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'storeWood' | 'takeWood' | 'storeFood' | 'takeFood';
         const item = button.dataset.item as FoodItem | undefined;
         const dish = button.dataset.dish as DishId | undefined;
         if (type === 'storeFood' || type === 'takeFood') {
@@ -384,6 +387,10 @@ export class App {
     const pileControls = this.root.querySelector<HTMLElement>('#stone-pile-controls');
     if (pileControls) pileControls.hidden = !bag.pileShown;
     this.setText('stone-pile-stored', bag.pileStored);
+    this.setText('wood-stored', bag.woodAtCamp);
+    const woodControls = this.root.querySelector<HTMLElement>('#wood-pile-controls');
+    if (woodControls) woodControls.hidden = !bag.woodShown;
+    this.setText('wood-pile-stored', bag.woodStored);
     this.renderLarder();
     this.setText('fire-status', bag.fire);
     const keepsakes = keepsakeView(this.state);
