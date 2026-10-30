@@ -13,6 +13,18 @@ class MemoryStorage implements Storage {
 }
 
 describe('local save', () => {
+  it('moves the starter branch piles of an older save out to the trees at the clearing\'s edge', () => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    const old = [[22, 15], [18, 16], [21, 18], [16, 14], [24, 13], [13, 7]];
+    const saved = { ...state, nodes: state.nodes.map((node, index) => index < old.length ? { ...node, x: old[index][0], y: old[index][1], amount: 0 } : node) };
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 17, state: saved }));
+    const loaded = loadGame(storage);
+    expect(loaded.kind).toBe('loaded');
+    if (loaded.kind !== 'loaded') return;
+    expect(loaded.state.nodes).toEqual(state.nodes.map((node, index) => index < old.length ? { ...node, amount: 0 } : node));
+  });
+
   it('round trips rations and rejects counts that overfill the bag', () => {
     const storage = new MemoryStorage();
     const state = createGame();

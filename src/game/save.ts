@@ -177,6 +177,23 @@ export function saveGame(storage: Storage, state: GameState): SaveResult {
   }
 }
 
+/** Where branch piles lay before they were moved under trees, by id. */
+const OLD_BRANCH_SPOTS: Record<string, readonly [number, number]> = {
+  'branch-0': [22, 15], 'branch-1': [18, 16], 'branch-2': [21, 18], 'branch-3': [16, 14], 'branch-4': [24, 13], 'branch-5': [13, 7]
+};
+
+/** Moves an older save's branch piles to where they lie now, keeping whether each was picked. */
+function movedBranches(state: unknown): void {
+  if (!object(state) || !Array.isArray(state.nodes)) return;
+  const now = new Map(createGame().nodes.map(node => [node.id, node]));
+  for (const node of state.nodes) {
+    if (!object(node) || typeof node.id !== 'string') continue;
+    const spot = OLD_BRANCH_SPOTS[node.id];
+    const fresh = now.get(node.id);
+    if (spot && fresh && node.x === spot[0] && node.y === spot[1]) Object.assign(node, { x: fresh.x, y: fresh.y });
+  }
+}
+
 export function loadGame(storage: Storage): LoadResult {
   let raw: string | null;
   try {
@@ -192,6 +209,7 @@ export function loadGame(storage: Storage): LoadResult {
     return { kind: 'invalid', reason: 'The local save is not valid JSON.' };
   }
   if (!object(parsed) || parsed.version !== SAVE_VERSION) return { kind: 'invalid', reason: 'This save uses an unsupported version.' };
+  movedBranches(parsed.state);
   if (!validState(parsed.state)) return { kind: 'invalid', reason: 'The local save contains invalid game data.' };
   return { kind: 'loaded', state: parsed.state };
 }

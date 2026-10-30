@@ -8,6 +8,11 @@ import { nightStart, seasonMessage } from '../src/game/calendar';
 const NIGHT = nightStart(1);
 const STORM_NIGHT = nightStart(3);
 const STORM_LENGTH = BALANCE.daySeconds - STORM_NIGHT;
+// The nearest branch pile lies under a tree at the clearing's edge, a short walk from where the survivor starts.
+const besideBranch = (state: GameState): GameState => {
+  const branch = state.nodes.find(node => node.id === 'branch-0')!;
+  return { ...state, player: { ...state.player, x: branch.x + 1, y: branch.y } };
+};
 
 describe('gathering and inventory', () => {
   it('prepares a trail ration only at a built rack in camp, including with a full bag', () => {
@@ -51,7 +56,7 @@ describe('gathering and inventory', () => {
     expect(applyAction(eaten.state, { type: 'visitSite', siteId: 'basket' }).state.progress.discoveries.basket).toBe(true);
   });
   it('gathers nearby wood and spends energy without mutating the old state', () => {
-    const before = createGame();
+    const before = besideBranch(createGame());
     const result = applyAction(before, { type: 'gather', nodeId: 'branch-0' });
     expect(result.state.inventory.wood).toBe(1);
     expect(result.state.player.energy).toBe(96);
@@ -92,7 +97,7 @@ describe('gathering and inventory', () => {
     const state = createGame();
     state.inventory.wood = 6;
     state.inventory.fiber = 2;
-    expect(applyAction(state, { type: 'gather', nodeId: 'branch-0' }).message).toMatch(/full/i);
+    expect(applyAction(besideBranch(state), { type: 'gather', nodeId: 'branch-0' }).message).toMatch(/full/i);
   });
 
   it('gathers berries into food', () => {
@@ -123,7 +128,7 @@ describe('gathering and inventory', () => {
   it('leaves a full bag and the node untouched with useful feedback', () => {
     const state = createGame();
     state.inventory.wood = 8;
-    const result = applyAction(state, { type: 'gather', nodeId: 'branch-0' });
+    const result = applyAction(besideBranch(state), { type: 'gather', nodeId: 'branch-0' });
     expect(result.state.inventory.wood).toBe(8);
     expect(result.state.nodes[0].amount).toBe(1);
     expect(result.message.toLowerCase()).toContain('full');
@@ -132,7 +137,7 @@ describe('gathering and inventory', () => {
   it('allows gathering at zero energy so the player cannot soft lock', () => {
     const state = createGame();
     state.player.energy = 0;
-    expect(applyAction(state, { type: 'gather', nodeId: 'branch-0' }).state.inventory.wood).toBe(1);
+    expect(applyAction(besideBranch(state), { type: 'gather', nodeId: 'branch-0' }).state.inventory.wood).toBe(1);
   });
 });
 
@@ -325,7 +330,7 @@ describe('time and gentle survival', () => {
     state.player.warmth = 0;
     expect(movementFactor(state)).toBe(0.65);
     expect(applyAction(state, { type: 'move', dx: 1, dy: 0 }).state.player.x).toBeGreaterThan(20);
-    expect(applyAction(state, { type: 'gather', nodeId: 'branch-0' }).state.inventory.wood).toBe(1);
+    expect(applyAction(besideBranch(state), { type: 'gather', nodeId: 'branch-0' }).state.inventory.wood).toBe(1);
   });
 
   it('stops movement at the map boundary', () => {
@@ -420,7 +425,7 @@ describe('fire and camp upgrades', () => {
     expect(built.structures.crate).toBe(true);
     expect(built.inventory.wood).toBe(0);
     built.inventory.wood = 8;
-    expect(applyAction(built, { type: 'gather', nodeId: 'branch-0' }).state.inventory.wood).toBe(9);
+    expect(applyAction(besideBranch(built), { type: 'gather', nodeId: 'branch-0' }).state.inventory.wood).toBe(9);
   });
 
   it('does not build twice, overspend, or build away from camp', () => {
@@ -453,7 +458,7 @@ describe('fire and camp upgrades', () => {
 
 describe('daylight spent on work', () => {
   it('gathering takes six seconds of daylight', () => {
-    const result = applyAction(createGame(), { type: 'gather', nodeId: 'branch-0' });
+    const result = applyAction(besideBranch(createGame()), { type: 'gather', nodeId: 'branch-0' });
     expect(result.state.timeOfDay).toBe(6);
     expect(result.state.player.hunger).toBe(99.25);
   });
@@ -695,7 +700,7 @@ describe('forecast cold night', () => {
     expect(dawn.timeOfDay).toBe(30);
     expect(dawn.player.energy).toBe(25);
     expect(dawn.fireFuel).toBe(0);
-    expect(applyAction(dawn, { type: 'gather', nodeId: 'branch-0' }).state.inventory.wood).toBe(1);
+    expect(applyAction(besideBranch(dawn), { type: 'gather', nodeId: 'branch-0' }).state.inventory.wood).toBe(1);
   });
 
   it('requires fire after the last storm second and the survivor at camp', () => {

@@ -203,9 +203,10 @@ export const BALANCE = {
   campRadius: 4
 } as const;
 
+// The first five lie under the trees at the edge of the camp clearing, a short walk from the fire.
 const branchPositions = [
-  [22, 15], [18, 16], [21, 18], [16, 14], [24, 13],
-  [13, 7], [29, 5], [35, 13], [34, 25], [24, 25], [12, 25], [5, 15]
+  [18, 11], [21, 9], [18, 21], [22, 21], [16, 11],
+  [14, 7], [29, 5], [35, 13], [34, 25], [24, 25], [12, 25], [5, 15]
 ];
 const berryPositions = [
   [19, 13], [23, 17], [16, 18], [25, 11],
