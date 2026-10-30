@@ -3,6 +3,7 @@ import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from
 import { advanceTime, applyAction, isColdNight, type Activity, type GameAction } from '../src/game/rules';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { loadGame, saveGame } from '../src/game/save';
+import { isForage } from '../src/game/forage';
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();
@@ -66,8 +67,10 @@ function play(seed: number, each: (state: GameState, step: number) => void): Gam
       const cost: Record<string, number> = goal ? { ...BUILDINGS[goal].cost } : {};
       const wanted = (['branch', 'fiber', 'stone'] as const).filter(kind =>
         state.inventory[kind === 'branch' ? 'wood' : kind] < (cost[kind === 'branch' ? 'wood' : kind] ?? 0));
-      const ready = state.nodes.filter(node => node.amount > 0 && (random() < 0.2 || wanted.includes(node.kind as typeof wanted[number])));
-      const node = ready.length ? pick(ready) : pick(state.nodes);
+      // Seasonal forage is left out, so the runs keep the course they were tuned on.
+      const nodes = state.nodes.filter(node => !isForage(node.kind));
+      const ready = nodes.filter(node => node.amount > 0 && (random() < 0.2 || wanted.includes(node.kind as typeof wanted[number])));
+      const node = ready.length ? pick(ready) : pick(nodes);
       goTo(node.x, node.y);
       act({ type: 'gather', nodeId: node.id });
     } else if (roll < 0.75) {

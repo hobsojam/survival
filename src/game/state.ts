@@ -1,7 +1,7 @@
 import type { JournalEntry } from './journalEntries';
 import type { ClearingState } from './clearing';
 import { emptyFood, type FoodStore } from './food';
-export type ResourceKind = 'branch' | 'berry' | 'fiber' | 'stone';
+export type ResourceKind = 'branch' | 'berry' | 'fiber' | 'stone' | 'hazel' | 'pine' | 'greens' | 'honey';
 
 export const BUILDINGS = {
   shelter: { name: 'Shelter', description: 'A roof against the night cold', symbol: '⌂', cost: { wood: 6, fiber: 2 }, prerequisite: null },
@@ -149,6 +149,14 @@ export const BALANCE = {
   digSeconds: 10,
   digEnergyCost: 8,
   eatHungerGain: 25,
+  /** Forage eaten raw; honey gives a little energy too. Roasted hazelnuts come from the cooking pot. */
+  greensHunger: 15,
+  hazelnutHunger: 15,
+  honeyHunger: 20,
+  honeyEnergy: 5,
+  roastedHazelnutHunger: 50,
+  /** Dawns before the hollow tree has honey again. */
+  honeyRegrowDays: 3,
   trailFoodHungerGain: 45,
   trailFoodSeconds: 12,
   /** Days a fresh berry keeps in the bag, and in the larder. */
@@ -229,6 +237,12 @@ const fiberPositions = [
   [27, 12], [10, 14], [30, 18], [8, 21]
 ];
 const stonePositions = [[31, 10], [11, 22], [29, 21]];
+// Seasonal forage. Hazels stand at the foot of broadleaf trees and pines out in the woods; greens grow by the spring and in
+// the open meadow, and the last two patches come up only after a spring shower. The hollow tree keeps a bees' nest.
+const hazelPositions = [[19, 6], [25.5, 5.5], [26.75, 6.5]];
+const pinePositions = [[9.5, 12.5], [23, 5.5], [19.5, 25]];
+const greensPositions = [[9.5, 17.5], [12.5, 21.5], [27, 22.5], [30.5, 16.5], [12.5, 8]];
+const honeyPositions = [[16, 6.5]];
 const treePositions = [
   [20, 7, 'treeBroadleaf'], [17, 9, 'treeBroadleaf'], [27, 5, 'treeBroadleaf'],
   [22, 23, 'treePine'], [32, 14, 'treePine'], [15, 24, 'treePine']
@@ -239,7 +253,11 @@ export function createGame(): GameState {
     ...branchPositions.map(([x, y], index) => ({ id: `branch-${index}`, kind: 'branch' as const, x, y, amount: 1, readyDay: 1 })),
     ...berryPositions.map(([x, y], index) => ({ id: `berry-${index}`, kind: 'berry' as const, x, y, amount: 1, readyDay: 1 })),
     ...fiberPositions.map(([x, y], index) => ({ id: `fiber-${index}`, kind: 'fiber' as const, x, y, amount: 1, readyDay: 1 })),
-    ...stonePositions.map(([x, y], index) => ({ id: `stone-${index}`, kind: 'stone' as const, x, y, amount: 1, readyDay: 1 }))
+    ...stonePositions.map(([x, y], index) => ({ id: `stone-${index}`, kind: 'stone' as const, x, y, amount: 1, readyDay: 1 })),
+    ...hazelPositions.map(([x, y], index) => ({ id: `hazel-${index}`, kind: 'hazel' as const, x, y, amount: 1, readyDay: 1 })),
+    ...pinePositions.map(([x, y], index) => ({ id: `pine-${index}`, kind: 'pine' as const, x, y, amount: 1, readyDay: 1 })),
+    ...greensPositions.map(([x, y], index) => ({ id: `greens-${index}`, kind: 'greens' as const, x, y, amount: 1, readyDay: 1 })),
+    ...honeyPositions.map(([x, y], index) => ({ id: `honey-${index}`, kind: 'honey' as const, x, y, amount: 1, readyDay: 1 }))
   ];
   const trees: TreeNode[] = treePositions.map(([x, y, sprite], index) => ({ id: `tree-${index}`, x, y, sprite, readyDay: 1 }));
   return {

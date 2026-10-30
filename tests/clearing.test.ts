@@ -3,20 +3,14 @@ import { CLEARING_STEPS, STEP_IDS, choppableTrees, clearGroundBlocker, placeBran
 import { BALANCE, LOOKOUT, SITES, createGame } from '../src/game/state';
 import { applyAction } from '../src/game/rules';
 import { TOO_TIRED_MESSAGE } from '../src/game/needs';
+import { PATH_DESTINATIONS, segmentDistance } from './placement';
 
 const FIRE = { x: BALANCE.campX, y: BALANCE.campY };
-const PATH_DESTINATIONS = [[9, 9], [30, 9], [10, 21], [30, 21]];
 
 /** A point `distance` tiles from the fire at `degrees` (y points down, so north is -90). */
 function at(degrees: number, distance = 5): [number, number] {
   const radians = degrees * Math.PI / 180;
   return [FIRE.x + Math.cos(radians) * distance, FIRE.y + Math.sin(radians) * distance];
-}
-
-function segmentDistance(px: number, py: number, bx: number, by: number): number {
-  const dx = bx - FIRE.x, dy = by - FIRE.y;
-  const t = Math.max(0, Math.min(1, ((px - FIRE.x) * dx + (py - FIRE.y) * dy) / (dx * dx + dy * dy)));
-  return Math.hypot(px - FIRE.x - t * dx, py - FIRE.y - t * dy);
 }
 
 describe('sideAt', () => {

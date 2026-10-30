@@ -1,4 +1,4 @@
-import type { GameState } from './state';
+import { BALANCE, type GameState } from './state';
 
 
 // Food the survivor carries. Fresh food remembers the day each piece was picked, so it can spoil;
@@ -63,6 +63,34 @@ export function spendFood(state: GameState, item: FoodItem, n: number): GameStat
 export function takeFromBag(state: GameState, item: FoodItem, n: number): GameState | null {
   const food = takeFrom(state.inventory.food, item, n);
   return food && { ...state, inventory: { ...state.inventory, food } };
+}
+
+/** Food eaten as it is. Pine needles are for tea, and rations have their own key. */
+export type EdibleFood = 'berry' | 'greens' | 'hazelnut' | 'honey' | 'roastedHazelnuts';
+
+/** What eating one of each gives, as BALANCE keys: state.ts loads this module first, so BALANCE is read only when eating. */
+const EAT_EFFECTS: Record<EdibleFood, { hunger: keyof typeof BALANCE; energy?: keyof typeof BALANCE; message: string }> = {
+  berry: { hunger: 'eatHungerGain', message: 'Ate some berries.' },
+  greens: { hunger: 'greensHunger', message: 'Ate a handful of greens.' },
+  hazelnut: { hunger: 'hazelnutHunger', message: 'Ate a hazelnut.' },
+  honey: { hunger: 'honeyHunger', energy: 'honeyEnergy', message: 'Ate some honey.' },
+  roastedHazelnuts: { hunger: 'roastedHazelnutHunger', message: 'Ate the roasted hazelnuts.' }
+};
+
+/** The hunger and energy one of an item gives, and the line said on eating it. */
+export function eatEffect(item: EdibleFood): { hunger: number; energy: number; message: string } {
+  const { hunger, energy, message } = EAT_EFFECTS[item];
+  return { hunger: BALANCE[hunger], energy: energy ? BALANCE[energy] : 0, message };
+}
+
+/** The day the oldest piece of a fresh item in the bag was picked, or Infinity if there is none. */
+const oldestPick = (state: GameState, item: FreshFood): number => availableFood(state, item) > 0 ? Math.min(...state.inventory.food[item]) : Infinity;
+
+/** What Q eats: the fresh item nearest to going soft (berry wins a tie), then hazelnut, honey, roasted hazelnuts. Never pine needles or rations. */
+export function quickEatItem(state: GameState): FoodItem | null {
+  const berry = oldestPick(state, 'berry'), greens = oldestPick(state, 'greens');
+  if (berry !== Infinity || greens !== Infinity) return berry <= greens ? 'berry' : 'greens';
+  return (['hazelnut', 'honey', 'roastedHazelnuts'] as const).find(item => availableFood(state, item) > 0) ?? null;
 }
 
 /** Fresh food is gone at a dawn once it has been kept for keepDays or more. */

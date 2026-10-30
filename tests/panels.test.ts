@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { CLEARING_STEPS } from '../src/game/clearing';
-import { axeView, clearingView, bagView, buildButtonView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightHint, pickaxeView, pillowView, startNote } from '../src/ui/panels';
-import { emptyFood } from '../src/game/food';
+import { BAG_FOODS, bagFoodMarkup, axeView, clearingView, bagView, buildButtonView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightHint, pickaxeView, pillowView, startNote } from '../src/ui/panels';
+import { addFood, emptyFood } from '../src/game/food';
 import { stock } from './stock';
 
 type Changes = { structures?: Partial<GameState['structures']>; progress?: Partial<GameState['progress']>; inventory?: Partial<GameState['inventory']> };
@@ -193,6 +193,27 @@ describe('bag panel', () => {
     const berries = (picked: number[]) => game({ inventory: { food: { ...emptyFood(), berry: picked } } }, { day: 3 });
     expect(bagView(berries([1, 2, 3])).berries).toBe('Berries 3 (1 going soft)');
     expect(bagView(berries([2, 3, 3])).berries).toBe('Berries 3');
+  });
+
+  it('shows a forage cell only while the bag holds some', () => {
+    const food = addFood(addFood(emptyFood(), 'hazelnut', 2, 1), 'greens', 1, 1);
+    const { foods } = bagView(game({ inventory: { food } }));
+    expect(foods.hazelnut).toEqual({ count: 2, shown: true });
+    expect(foods.greens).toEqual({ count: 1, shown: true });
+    expect(foods.honey).toEqual({ count: 0, shown: false });
+    expect(foods.pineNeedles.shown).toBe(false);
+    expect(foods.roastedHazelnuts.shown).toBe(false);
+  });
+
+  it('draws each forage cell with its icon, and an Eat button for all but pine needles', () => {
+    expect(BAG_FOODS.map(cell => cell.item)).toEqual(['greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts']);
+    const markup = bagFoodMarkup();
+    for (const { item } of BAG_FOODS) {
+      const cell = markup.split('</div>').find(part => part.includes(`data-food="${item}"`))!;
+      expect(cell, item).toContain('src="data:image/svg+xml,');
+      expect(cell, item).toContain(`id="${item}-count"`);
+      expect(cell.includes(`data-action="eat" data-item="${item}"`), item).toBe(item !== 'pineNeedles');
+    }
   });
 
   it('counts spaces and describes the fire and trail rations', () => {

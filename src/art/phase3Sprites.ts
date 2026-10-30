@@ -59,6 +59,71 @@ function reeds(g: Grid, ready: boolean, lean = 0): void {
   }
 }
 
+// Seasonal forage. The hazel's leaves use the broadleaf crown colours, so they turn with the trees in autumn.
+const forageLegend = { s: 'shadow', a: 'wood0', b: 'wood1', c: 'wood2', d: 'wood3', e: 'wood4', h: 'leaf0', i: 'leaf1', j: 'leaf2', k: 'leaf3', l: 'leaf4',
+  m: 'crown1', n: 'crown2', o: 'crown3', p: 'crown4', q: 'grass1', r: 'grass3', t: 'grass4', u: 'scarf2', v: 'scarf3', w: 'scarf4', x: 'ink', y: 'earth2', z: 'earth3' } as const;
+function hazel(g: Grid, ready: boolean): void {
+  oval(g, 8, 14, 6, 2, 's');
+  for (const [x0, x1] of [[5, 3], [8, 8], [11, 13]]) line(g, x0, 13, x1, 6, 'b');
+  oval(g, 8, 8, 6, 4, 'm'); oval(g, 6, 7, 3, 2, 'n'); oval(g, 11, 7, 3, 3, 'n');
+  box(g, 4, 5, 3, 1, 'o'); box(g, 10, 4, 3, 1, 'o'); dot(g, 5, 5, 'p'); dot(g, 11, 4, 'p');
+  if (!ready) return;
+  // Nuts in pale husks, in twos and threes.
+  for (const [x, y] of [[4, 9], [9, 10], [11, 7], [6, 6]]) {
+    box(g, x, y, 2, 2, 'd'); dot(g, x, y, 'e'); dot(g, x + 1, y + 1, 'c');
+    dot(g, x, y - 1, 'l'); dot(g, x + 1, y - 1, 'k');
+  }
+}
+function pineSapling(g: Grid, ready: boolean): void {
+  oval(g, 8, 14, 5, 2, 's'); box(g, 7, 11, 2, 3, 'b'); dot(g, 7, 11, 'c');
+  for (const [y, half] of [[2, 1], [3, 2], [5, 3], [6, 4], [8, 5], [9, 6], [10, 6]]) {
+    box(g, 8 - half, y, half * 2, 1, 'i'); box(g, 8, y, half, 1, 'h');
+  }
+  dot(g, 7, 1, 'j'); dot(g, 8, 1, 'j');
+  if (!ready) {
+    for (const [x, y] of [[4, 8], [11, 9], [6, 5], [10, 6]]) dot(g, x, y, 'c');
+    return;
+  }
+  // Bright new needle tips, frosted at their ends in winter.
+  for (const [x, y] of [[6, 3], [9, 3], [5, 5], [10, 5], [4, 8], [11, 8], [3, 10], [12, 10], [7, 7]]) {
+    dot(g, x, y, 'k'); dot(g, x, y - 1, 'l');
+  }
+}
+function greens(g: Grid, ready: boolean): void {
+  oval(g, 8, 14, 6, 2, 's');
+  if (!ready) {
+    box(g, 4, 12, 8, 2, 'y'); box(g, 5, 12, 3, 1, 'z');
+    for (const x of [5, 8, 11]) line(g, x, 13, x, 11, 'q');
+    return;
+  }
+  // Broad wild-garlic leaves fanning from the ground, with a few white flower heads.
+  for (const [x0, y0, x1, y1] of [[8, 13, 3, 7], [8, 13, 6, 5], [8, 13, 10, 5], [8, 13, 13, 7], [8, 13, 8, 4]]) {
+    line(g, x0 - 1, y0, x1 - 1, y1 + 1, 'j'); line(g, x0, y0, x1, y1, 'k'); dot(g, x1, y1, 'l');
+  }
+  box(g, 5, 11, 6, 2, 'j'); line(g, 4, 12, 12, 12, 'r'); dot(g, 3, 12, 'q'); dot(g, 12, 11, 't');
+  for (const [x, y] of [[5, 4], [11, 4]]) { dot(g, x, y, 'w'); dot(g, x, y + 1, 'q'); }
+}
+type HollowFrame = 'ready' | 'gathered' | 'bees0' | 'bees1';
+function hollowTree(g: Grid, frame: HollowFrame): void {
+  oval(g, 12, 30, 9, 2, 's');
+  // An old broken trunk with roots, a stub of a branch and a few green shoots on top.
+  box(g, 7, 6, 10, 24, 'b'); box(g, 7, 6, 3, 24, 'a'); box(g, 14, 6, 2, 24, 'c'); line(g, 16, 6, 16, 29, 'd');
+  line(g, 4, 30, 7, 26, 'b'); line(g, 20, 30, 17, 26, 'c'); line(g, 3, 30, 5, 30, 'a');
+  for (const [x, y] of [[7, 5], [9, 4], [11, 5], [13, 3], [15, 5], [16, 4]]) box(g, x, y, 2, 2, 'b');
+  dot(g, 13, 3, 'e'); dot(g, 16, 4, 'd');
+  line(g, 17, 12, 21, 9, 'c'); dot(g, 21, 9, 'e');
+  oval(g, 20, 8, 2, 1.5, 'j'); oval(g, 9, 3, 2, 1.5, 'j'); dot(g, 9, 2, 'l'); dot(g, 20, 7, 'l');
+  for (const y of [10, 16, 23]) line(g, 11, y, 12, y + 2, 'a');
+  // The hollow, with the comb glowing gold inside until the honey is taken.
+  oval(g, 12, 18, 2.5, 3.5, 'x'); oval(g, 12, 18, 3.5, 4.5, 'a'); oval(g, 12, 18, 2.5, 3.5, 'x');
+  if (frame === 'gathered') return;
+  box(g, 11, 18, 3, 3, 'u'); dot(g, 11, 18, 'v'); dot(g, 13, 19, 'v'); dot(g, 12, 20, 'w');
+  if (frame === 'ready') return;
+  // A few bees about the opening, drifting from side to side.
+  const spots = frame === 'bees0' ? [[16, 14], [8, 12], [17, 20]] : [[17, 13], [7, 14], [16, 21]];
+  for (const [x, y] of spots) { dot(g, x, y, 'v'); dot(g, x + 1, y, 'x'); }
+}
+
 const campLegend = { s: 'shadow', a: 'wood0', b: 'wood1', c: 'wood2', d: 'wood3', e: 'wood4', f: 'canvas0', g: 'canvas1', h: 'canvas2', i: 'canvas3', j: 'canvas4', k: 'berry2', l: 'berry4', m: 'stone0', n: 'stone1', o: 'stone2', p: 'stone3', q: 'stone4', r: 'fire0', t: 'fire1', u: 'fire2', v: 'fire3', w: 'fire4', z: 'earth3', A: 'earth2', B: 'earth4', C: 'scarf3' } as const;
 function stake(g: Grid, x: number, y: number): void {
   box(g, x, y, 2, 4, 'a'); box(g, x, y, 1, 2, 'd'); dot(g, x, y, 'e');
@@ -366,6 +431,12 @@ export const phase3Sprites: Record<string, SpriteDef> = {
     { rustle: { frames: ['rustle0', 'rustle1', 'ready'], frameRate: 8, repeat: 0 } }),
   fiberReeds: define(16, 16, nodeLegend, { ready: g => reeds(g, true), cut: g => reeds(g, false), sway0: g => reeds(g, true, -1), sway1: g => reeds(g, true, 1) }, [8, 14],
     { sway: { frames: ['ready', 'sway0', 'ready', 'sway1'], frameRate: 2, repeat: -1 } }),
+  hazelSpot: define(16, 16, forageLegend, { ready: g => hazel(g, true), gathered: g => hazel(g, false) }, [8, 14]),
+  pineForage: define(16, 16, forageLegend, { ready: g => pineSapling(g, true), gathered: g => pineSapling(g, false) }, [8, 14]),
+  greensPatch: define(16, 16, forageLegend, { ready: g => greens(g, true), gathered: g => greens(g, false) }, [8, 14]),
+  hollowTree: define(24, 32, forageLegend, {
+    ready: g => hollowTree(g, 'ready'), gathered: g => hollowTree(g, 'gathered'), bees0: g => hollowTree(g, 'bees0'), bees1: g => hollowTree(g, 'bees1')
+  }, [12, 30], { buzz: { frames: ['ready', 'bees0', 'ready', 'bees1'], frameRate: 2, repeat: -1 } }),
   firePit: fireFrames(false), hearth: fireFrames(true), flame: flameOverlay(false), hearthFlame: flameOverlay(true),
   hearthSite: define(24, 12, campLegend, { still: hearthSite }),
   shelterSite: define(48, 32, campLegend, { still: shelterSite }),

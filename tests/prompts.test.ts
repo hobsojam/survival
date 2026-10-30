@@ -53,6 +53,16 @@ describe('camp prompts', () => {
     expect(promptFor(node('stone'))).toBe('E  Collect stone');
   });
 
+  it('names the forage E would gather, in its season', () => {
+    const forage = (kind: 'hazel' | 'pine' | 'greens' | 'honey', day: number) =>
+      ({ ...bareCamp(5, 25), day, nodes: [{ id: kind, kind, x: 5, y: 25, amount: 1, readyDay: 1 }] });
+    expect(promptFor(forage('hazel', 1))).toBe('E  Gather hazelnuts');
+    expect(promptFor(forage('pine', 11))).toBe('E  Gather pine needles');
+    expect(promptFor(forage('greens', 21))).toBe('E  Pick wild greens');
+    expect(promptFor(forage('honey', 31))).toBe('E  Take wild honey');
+    expect(promptFor(forage('honey', 1))).not.toMatch(/^E /);
+  });
+
   it('counts the stones in a loose pile', () => {
     const state = { ...bareCamp(5, 25), stonePiles: [{ id: 'p', x: 5, y: 25, count: 3, area: 'camp' as const }] };
     expect(promptFor(state)).toBe('E  Pick up stone (×3)');

@@ -26,7 +26,8 @@ export function actionPose(type: GameAction['type']): SurvivorAction | undefined
 }
 
 const GATHER_PROMPTS: Record<ResourceKind, string> = {
-  branch: 'E  Pick up fallen branches', berry: 'E  Pick berries', fiber: 'E  Gather fiber', stone: 'E  Collect stone'
+  branch: 'E  Pick up fallen branches', berry: 'E  Pick berries', fiber: 'E  Gather fiber', stone: 'E  Collect stone',
+  hazel: 'E  Gather hazelnuts', pine: 'E  Gather pine needles', greens: 'E  Pick wild greens', honey: 'E  Take wild honey'
 };
 
 function gatherPrompt(found: Gatherable, winter: boolean): string {

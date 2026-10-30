@@ -6,7 +6,8 @@ import { wolfVisit } from './wolves';
 import { bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
 import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
 import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, type StepId } from './clearing';
-import { addFood, availableFood, spendFood, spoil } from './food';
+import { addFood, availableFood, eatEffect, quickEatItem, spendFood, spoil, type FoodItem } from './food';
+import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
 import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
 
@@ -20,7 +21,8 @@ export type GameAction =
   | { type: 'move'; dx: number; dy: number }
   | { type: 'plantGarden'; plotIndex: number }
   | { type: 'harvestGarden'; plotIndex: number }
-  | { type: 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'befriend' | 'craftPillow' | 'craftCloak' }
+  | { type: 'eat'; item?: FoodItem }
+  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'befriend' | 'craftPillow' | 'craftCloak' }
   | { type: 'pickUpStone'; pileId: string };
 
 /** Awake time tires the survivor; work already costs energy, and resting doesn't. */
@@ -298,37 +300,42 @@ const cross: ActionHandler<'cross'> = state => {
 };
 
 type Supply = keyof GameState['inventory'];
-// Berries go into the food store.
-const NODE_RESOURCE: Record<GameState['nodes'][number]['kind'], Supply> = { branch: 'wood', berry: 'food', fiber: 'fiber', stone: 'stone' };
-const GATHER_MESSAGE: Partial<Record<Supply, string>> = {
-  wood: 'Picked up fallen branches.', food: 'Picked berries.', fiber: 'Gathered fiber.', stone: 'Collected stone.'
+// Berries and forage go into the food store.
+const NODE_RESOURCE: Record<GameState['nodes'][number]['kind'], Supply> = {
+  branch: 'wood', berry: 'food', fiber: 'fiber', stone: 'stone', hazel: 'food', pine: 'food', greens: 'food', honey: 'food'
+};
+const GATHER_MESSAGE: Record<GameState['nodes'][number]['kind'], string> = {
+  branch: 'Picked up fallen branches.', berry: 'Picked berries.', fiber: 'Gathered fiber.', stone: 'Collected stone.',
+  hazel: 'Gathered a hazelnut.', pine: 'Gathered a bunch of pine needles.', greens: 'Picked wild greens.', honey: 'Took a little honey from the hollow tree.'
 };
 
-/** The bag with n more of a supply; food found this way is berries, picked today. */
-function withSupply(state: GameState, resource: Supply, n: number): GameState['inventory'] {
+/** The bag with n more of a supply; food comes in as the item given (berries unless said), picked today. */
+function withSupply(state: GameState, resource: Supply, n: number, item: FoodItem = 'berry'): GameState['inventory'] {
   const { inventory } = state;
-  if (resource === 'food') return { ...inventory, food: addFood(inventory.food, 'berry', n, state.day) };
+  if (resource === 'food') return { ...inventory, food: addFood(inventory.food, item, n, state.day) };
   return { ...inventory, [resource]: inventory[resource] + n };
 }
 
 const gather: ActionHandler<'gather'> = (state, action) => {
   const node = state.nodes.find(item => item.id === action.nodeId);
-  if (!node || state.area !== 'camp' || !near(state.player.x, state.player.y, node.x, node.y)) return refuse(state, 'Move closer to gather.');
+  if (!node || state.area !== 'camp' || !nodeShown(state, node) || !near(state.player.x, state.player.y, node.x, node.y)) return refuse(state, 'Move closer to gather.');
   if (node.kind === 'berry' && isWinter(state.day)) return refuse(state, 'The bushes are bare until spring.');
   if (node.amount <= 0) return refuse(state, 'Nothing to gather yet.');
   const resource = NODE_RESOURCE[node.kind];
   if (freeSpaces(state) < spaceFor(resource)) return refuse(state, FULL_BAG_MESSAGE);
-  const nodes = state.nodes.map(item => item === node ? { ...item, amount: item.amount - 1, readyDay: state.day + 1 } : item);
+  const forage = isForage(node.kind) ? FORAGE[node.kind] : null;
+  const readyDay = state.day + (forage?.regrowDays ?? 1);
+  const nodes = state.nodes.map(item => item === node ? { ...item, amount: item.amount - 1, readyDay } : item);
   // Summer bushes are heavy: two berries a pick, if the bag has room.
   const picked = node.kind === 'berry' && isSummer(state.day) ? Math.min(BALANCE.summerBerries, freeSpaces(state)) : 1;
   return {
     state: advanceTime({
       ...state,
       player: tire(state, BALANCE.gatherEnergyCost),
-      inventory: withSupply(state, resource, picked),
+      inventory: withSupply(state, resource, picked, forage?.item),
       nodes
     }, workSeconds(state, BALANCE.gatherSeconds), 'working'),
-    message: picked > 1 ? 'Picked two handfuls of berries.' : GATHER_MESSAGE[resource] ?? ''
+    message: picked > 1 ? 'Picked two handfuls of berries.' : GATHER_MESSAGE[node.kind]
   };
 };
 
@@ -531,21 +538,28 @@ const burnFiber: ActionHandler<'burnFiber'> = state => {
   };
 };
 
-const eat: ActionHandler<'eat'> = state => {
-  const fed = spendFood(state, 'berry', 1);
-  if (!fed) return refuse(state, 'No food in your bag.');
-  return {
-    state: { ...fed, player: { ...fed.player, hunger: Math.min(100, fed.player.hunger + BALANCE.eatHungerGain) } },
-    message: 'Ate some berries.'
-  };
-};
-
-const eatTrailFood: ActionHandler<'eatTrailFood'> = state => {
+function eatRation(state: GameState): ActionResult {
   const fed = spendFood(state, 'trailFood', 1);
   if (!fed) return refuse(state, 'No trail rations in your bag.');
   return {
     state: { ...fed, player: { ...fed.player, hunger: Math.min(100, fed.player.hunger + BALANCE.trailFoodHungerGain) } },
     message: 'Ate a trail ration.'
+  };
+}
+const eatTrailFood: ActionHandler<'eatTrailFood'> = eatRation;
+
+/** Eats one of the item named, or what Q would pick; pine needles wait for tea, and a ration is eaten as one. */
+const eat: ActionHandler<'eat'> = (state, action) => {
+  const item = action.item ?? quickEatItem(state);
+  if (item === 'pineNeedles') return refuse(state, 'Pine needles are for tea.');
+  if (item === 'trailFood') return eatRation(state);
+  const fed = item && spendFood(state, item, 1);
+  if (!item || !fed) return refuse(state, 'No food in your bag.');
+  const { hunger, energy, message } = eatEffect(item);
+  const { player } = fed;
+  return {
+    state: { ...fed, player: { ...player, hunger: Math.min(100, player.hunger + hunger), energy: Math.min(100, player.energy + energy) } },
+    message
   };
 };
 

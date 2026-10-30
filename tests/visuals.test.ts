@@ -33,6 +33,35 @@ describe('native-size scene art', () => {
     }
   });
 
+  it('draws forage spots only in their season', () => {
+    const ids = (day: number) => new Set(sceneVisuals({ ...createGame(), day }, 0).map(item => item.id));
+    const autumn = ids(1), winter = ids(11), summer = ids(31);
+    expect(autumn.has('hazel-0') && !autumn.has('pine-0') && !autumn.has('greens-0') && !autumn.has('honey-0')).toBe(true);
+    expect(winter.has('pine-2') && !winter.has('hazel-0')).toBe(true);
+    expect(summer.has('honey-0') && !summer.has('greens-1')).toBe(true);
+    expect(autumn.has('berry-0') && winter.has('berry-0')).toBe(true);
+  });
+
+  it('draws each forage kind with its own sprite, gathered or ready', () => {
+    const texture = (id: string, day: number, amount: number) => {
+      const state = createGame();
+      state.day = day;
+      state.nodes.find(item => item.id === id)!.amount = amount;
+      return sceneVisuals(state, 0).find(item => item.id === id)?.texture;
+    };
+    expect(texture('hazel-0', 1, 1)).toBe('hazelSpot:ready');
+    expect(texture('hazel-0', 1, 0)).toBe('hazelSpot:gathered');
+    expect(texture('pine-0', 11, 0)).toBe('pineForage:gathered');
+    expect(texture('greens-0', 21, 1)).toBe('greensPatch:ready');
+    expect(texture('honey-0', 31, 0)).toBe('hollowTree:gathered');
+    const buzzing = new Set(Array.from({ length: 8 }, (_, i) => {
+      const state = createGame();
+      state.day = 31;
+      return sceneVisuals(state, i * 500).find(item => item.id === 'honey-0')?.texture;
+    }));
+    expect(buzzing).toEqual(new Set(['hollowTree:ready', 'hollowTree:bees0', 'hollowTree:bees1']));
+  });
+
   it('draws the garden bed and each seasonal plant frame', () => {
     const state = createGame();
     state.structures.garden = true;

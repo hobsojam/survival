@@ -256,7 +256,11 @@ export const JOURNAL_ICONS: Record<JournalId, JournalIcon> = {
 
 /** The icon as a small SVG, one square per pixel, ready for a CSS background. */
 export function journalIconUrl(id: JournalId): string {
-  const { legend, rows } = JOURNAL_ICONS[id];
+  return iconUrl(JOURNAL_ICONS[id]);
+}
+
+/** Paints a 10×10 icon as a crisp SVG data URL in the game palette. */
+export function iconUrl({ legend, rows }: JournalIcon): string {
   const pixels = rows.flatMap((row, y) => [...row].flatMap((pixel, x) =>
     pixel === '.' ? [] : [`<rect x="${x}" y="${y}" width="1" height="1" fill="${palette[legend[pixel]]}"/>`]));
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${JOURNAL_ICON_SIZE} ${JOURNAL_ICON_SIZE}" shape-rendering="crispEdges">${pixels.join('')}</svg>`;

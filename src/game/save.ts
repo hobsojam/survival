@@ -6,6 +6,7 @@ import type { ClearingState, StepId } from './clearing';
 import { CLEARING_STEPS, STEP_IDS, placeBranches } from './clearing';
 import { KEEPSAKES_NEEDED, TRUST_TARGET } from './companion';
 import { FOOD_ITEMS, isFresh } from './food';
+import { FORAGE, isForage } from './forage';
 
 export const SAVE_KEY = 'hearthwild.save';
 const SAVE_VERSION = 19;
@@ -117,7 +118,7 @@ function validWorld({ nodes, trees, stonePiles, day, clearing }: SaveShape): boo
   const nodesMatch = nodes.length === fresh.nodes.length && nodes.every((node, index) => {
     const base = placed[index];
     return object(node) && node.id === base.id && node.kind === base.kind && node.x === base.x && node.y === base.y
-      && (node.amount === 0 || node.amount === 1) && readyBy(node.readyDay, today + 1);
+      && (node.amount === 0 || node.amount === 1) && readyBy(node.readyDay, today + (isForage(base.kind) ? FORAGE[base.kind].regrowDays : 1));
   });
   const treesMatch = trees.length === fresh.trees.length && trees.every((tree, index) => {
     const base = fresh.trees[index];
@@ -131,7 +132,6 @@ function validWorld({ nodes, trees, stonePiles, day, clearing }: SaveShape): boo
 
 const WOLF_TAKES: readonly unknown[] = ['ration', 'berry', 'nothing', 'offered', 'chased'];
 
-/** No wolf yet, or one that came on a day already lived, taking something it could take. */
 /** The last spoiled dawn was a lived day, and something really was thrown out. */
 function validSpoiled({ lastSpoiled, day }: SaveShape): boolean {
   if (lastSpoiled === null) return true;
@@ -139,6 +139,7 @@ function validSpoiled({ lastSpoiled, day }: SaveShape): boolean {
     && count(lastSpoiled.berry) && count(lastSpoiled.greens) && (lastSpoiled.berry as number) + (lastSpoiled.greens as number) >= 1;
 }
 
+/** No wolf yet, or one that came on a day already lived, taking something it could take. */
 function validWolf({ lastWolf, day }: SaveShape): boolean {
   if (lastWolf === null) return true;
   return object(lastWolf) && whole(lastWolf.day) && lastWolf.day >= 1 && lastWolf.day <= (day as number) && WOLF_TAKES.includes(lastWolf.took);

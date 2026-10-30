@@ -26,7 +26,8 @@ describe('new game', () => {
     expect(game.nodes.filter(node => node.kind === 'berry')).toHaveLength(8);
     expect(game.nodes.filter(node => node.kind === 'fiber')).toHaveLength(8);
     expect(game.nodes.filter(node => node.kind === 'stone')).toHaveLength(3);
-    expect(new Set(game.nodes.map(node => node.id)).size).toBe(31);
+    for (const [kind, count] of [['hazel', 3], ['pine', 3], ['greens', 5], ['honey', 1]] as const) expect(game.nodes.filter(node => node.kind === kind), kind).toHaveLength(count);
+    expect(new Set(game.nodes.map(node => node.id)).size).toBe(43);
   });
 });
 

@@ -1,5 +1,6 @@
 import { isWinter, nightStart } from '../game/calendar';
 import { foodCount, goingSoft } from '../game/food';
+import { foodIconUrl } from '../art/foodIcons';
 import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { workSeconds } from '../game/needs';
@@ -164,13 +165,36 @@ export function startNote(save: LoadResult, storageAvailable: boolean): string {
   return 'A fresh camp is ready whenever you are.';
 }
 
-export interface BagView { berries: string; spaces: string; prepareReady: boolean; prepareHint: string; pileShown: boolean; storedAtCamp: string; pileStored: string; fire: string }
+/** The Bag panel's forage cells, shown only while the bag holds some; all but pine needles can be eaten from here. */
+export const BAG_FOODS = [
+  { item: 'greens', label: 'Greens', eat: 'Eat a handful of greens' },
+  { item: 'hazelnut', label: 'Hazelnuts', eat: 'Eat a hazelnut' },
+  { item: 'honey', label: 'Honey', eat: 'Eat some honey' },
+  { item: 'pineNeedles', label: 'Pine needles', eat: null },
+  { item: 'roastedHazelnuts', label: 'Roasted hazelnuts', eat: 'Eat the roasted hazelnuts' }
+] as const;
+export type BagFood = (typeof BAG_FOODS)[number]['item'];
+
+/** Every forage cell, hidden until the bag panel shows it. */
+export function bagFoodMarkup(): string {
+  return BAG_FOODS.map(({ item, label, eat }) => {
+    const button = eat ? `<button type="button" class="supply-action" data-action="eat" data-item="${item}" data-supply="${item}" aria-label="${eat}">Eat</button>` : '';
+    return `<div data-food="${item}" hidden><img class="food-icon" src="${foodIconUrl(item)}" alt=""><strong id="${item}-count">0</strong><small>${label}</small>${button}</div>`;
+  }).join('');
+}
+
+export interface BagView { foods: Record<BagFood, { count: number; shown: boolean }>; berries: string; spaces: string; prepareReady: boolean; prepareHint: string; pileShown: boolean; storedAtCamp: string; pileStored: string; fire: string }
 
 export function bagView(state: GameState): BagView {
   const prepareBlocker = trailFoodBlocker(state);
   const pile = state.structures.stonePile;
   const soft = goingSoft(state.inventory.food, 'berry', state.day, BALANCE.bagFreshDays);
+  const foods = Object.fromEntries(BAG_FOODS.map(({ item }) => {
+    const count = foodCount(state.inventory.food, item);
+    return [item, { count, shown: count > 0 }];
+  })) as BagView['foods'];
   return {
+    foods,
     berries: `Berries ${foodCount(state.inventory.food, 'berry')}${soft ? ` (${soft} going soft)` : ''}`,
     spaces: `${carriedCount(state)}/${bagCapacity(state)}`,
     prepareReady: !prepareBlocker,

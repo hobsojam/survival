@@ -7,6 +7,7 @@ import { rainWindow } from '../game/rain';
 import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 import { markedTrees } from '../game/clearing';
+import { nodeShown } from '../game/forage';
 
 export const NIGHT_DEPTH = BALANCE.mapHeight * TILE + 1;
 export const LIGHT_DEPTH = NIGHT_DEPTH + 1;
@@ -42,7 +43,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     addPiles(state, visuals, add);
     return visuals;
   }
-  for (const node of state.nodes) add(node.id, nodeTexture(node, timeMs, gathered, isWinter(state.day)), node.x, node.y);
+  for (const node of state.nodes.filter(item => nodeShown(state, item))) add(node.id, nodeTexture(node, timeMs, gathered, isWinter(state.day)), node.x, node.y);
   addPiles(state, visuals, add);
   addPuddles(state, add);
   for (const tree of state.trees) add(tree.id, tree.readyDay <= state.day ? `${tree.sprite}:still` : 'stump:still', tree.x, tree.y);
@@ -72,8 +73,18 @@ function pileSize(count: number): string {
   return count === 2 ? 'two' : 'many';
 }
 
-const NODE_SPRITES: Record<ResourceNode['kind'], string> = { branch: 'branchPile', berry: 'berryBush', fiber: 'fiberReeds', stone: 'rock0' };
-const EMPTY_FRAMES: Record<ResourceNode['kind'], string> = { branch: 'depleted', berry: 'picked', fiber: 'cut', stone: 'depleted' };
+const NODE_SPRITES: Record<ResourceNode['kind'], string> = {
+  branch: 'branchPile', berry: 'berryBush', fiber: 'fiberReeds', stone: 'rock0',
+  hazel: 'hazelSpot', pine: 'pineForage', greens: 'greensPatch', honey: 'hollowTree'
+};
+const EMPTY_FRAMES: Record<ResourceNode['kind'], string> = {
+  branch: 'depleted', berry: 'picked', fiber: 'cut', stone: 'depleted', hazel: 'gathered', pine: 'gathered', greens: 'gathered', honey: 'gathered'
+};
+/** Reeds sway and bees drift about the hollow tree, slowly, each out of step with its neighbours. */
+const IDLE_FRAMES: Partial<Record<ResourceNode['kind'], readonly string[]>> = {
+  fiber: ['ready', 'sway0', 'ready', 'sway1'],
+  honey: ['ready', 'bees0', 'ready', 'bees1']
+};
 
 /** In winter the berry bushes stand bare, whatever they would hold. */
 function nodeTexture(node: ResourceNode, timeMs: number, gathered: Gathered, winter: boolean): string {
@@ -86,8 +97,8 @@ function nodeFrame(node: ResourceNode, timeMs: number, gathered: Gathered): stri
   const sinceGather = gathered?.id === node.id ? timeMs - gathered.atMs : -1;
   if (node.kind === 'berry' && sinceGather >= 0 && sinceGather < 300) return `rustle${Math.floor(sinceGather / 150)}`;
   if (node.amount <= 0) return EMPTY_FRAMES[node.kind];
-  if (node.kind === 'fiber') return ['ready', 'sway0', 'ready', 'sway1'][(Math.floor(timeMs / 500) + node.id.length + node.x) % 4];
-  return 'ready';
+  const idle = IDLE_FRAMES[node.kind];
+  return idle ? idle[(Math.floor(timeMs / 500) + node.id.length + Math.floor(node.x)) % idle.length] : 'ready';
 }
 
 /** Where puddles gather at camp once a spring shower starts; they stay until the day ends. */
@@ -100,7 +111,7 @@ function addPuddles(state: GameState, add: AddVisual): void {
 }
 
 /** Small camp structures: where each stands from the fire, drawn as a flat site until built. */
-const CAMP_STRUCTURES = [['crate', 3, 1], ['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3]] as const;
+export const CAMP_STRUCTURES = [['crate', 3, 1], ['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3]] as const;
 
 function addCamp(state: GameState, add: AddVisual): void {
   const { campX: x, campY: y } = BALANCE;

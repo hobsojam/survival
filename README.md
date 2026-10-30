@@ -20,11 +20,11 @@ Open the local address printed by Vite, usually <http://localhost:5173/>. For a 
 | Control | Action |
 | --- | --- |
 | WASD or arrow keys | Move the survivor |
-| E | Gather the nearest branches, berries, fiber plants, rocks, loose stone, or quarry rubble within reach, or dig the quarry face with the pickaxe; at camp with nothing nearby, rest |
+| E | Gather the nearest branches, berries, fiber plants, rocks, seasonal forage, loose stone, or quarry rubble within reach, or dig the quarry face with the pickaxe; at camp with nothing nearby, rest |
 | F | Add one wood to the campfire while at camp |
 | R | Rest at camp for a short break |
 | Z | Sleep until morning (at night, at camp, once the shelter is built) |
-| Q | Eat one carried food |
+| Q | Eat: the fresh food nearest to going soft (berries first if it's a tie), then a hazelnut, honey, or roasted hazelnuts. Never pine needles or rations |
 | C | Cook one berry at a lit campfire after dark |
 | G | Watch the stars at camp after dark |
 | P | Dry one berry into a trail ration at a built drying rack |
@@ -36,7 +36,7 @@ Open the local address printed by Vite, usually <http://localhost:5173/>. For a 
 | Walk off the west edge | Follow the west path into the quarry area, once the shelter is built; walk off the quarry's east edge to come home |
 | Tap or click | Walk there, or walk over and use the supply, loose stone, tree, place, lookout, campfire, rubble, quarry face, or path end you tapped |
 | Build buttons | Spend wood, and sometimes fiber or stone, on camp upgrades and tools |
-| Bag buttons | Eat a berry or ration, burn wood or fiber at camp, or drop a stone where you stand |
+| Bag buttons | Eat a berry, a ration, or one of your forage finds, burn wood or fiber at camp, or drop a stone where you stand |
 | Store 1 / Take 1 | Move stone between your bag and a built stone pile, at camp |
 
 The buttons beside the game also let you eat, rest, feed the fire, and sleep. Your survivor's meters and those buttons stay at the top of the sidebar; below them, the **Bag**, **Build**, and **Camp** tabs each show one group of panels, and the sidebar remembers the tab you had open. A dot on Build means something there is ready. If the keyboard does not respond, click the game area once to focus it.
@@ -58,6 +58,17 @@ Your bag holds eight spaces at first. To build, stand anywhere in the clearing (
 ### The seasons
 
 The year has four seasons of ten days each, so a year is forty days. A new game starts in **autumn** on day 1, then comes **winter** (days 11–20), **spring** (21–30) and **summer** (31–40), and the year begins again with autumn on day 41. The day number keeps counting up. The top bar shows the season with the day (for example "Winter · Day 14 · Morning"), and a small wheel on the year journal's page shows where you are in the year and how many days are left in the season. A message greets the first morning of each season. The world changes colour with the seasons: broadleaf trees turn orange and gold in autumn and stand brown in winter, when snow lies on the ground, while the pines stay green all year. Leaves fall from the broadleaf trees on autumn days, and fireflies come out on summer nights.
+
+#### Forage
+
+Each season has its own wild food, found a little way out from the clearing, and you only see a spot in its season. Gather with E or a tap, and eat from the Bag panel or with Q.
+
+- **Autumn: hazelnuts.** Three hazels grow at the feet of the broadleaf trees. Each gives a hazelnut a day (15 hunger), and hazelnuts keep.
+- **Winter: pine needles.** Three young pines give a bunch of needles a day. They are for tea, not for eating raw.
+- **Spring: wild greens.** Two patches grow near the quiet spring and one out in the meadow, and two more come up for the rest of the day once a shower starts. A handful a day from each (15 hunger), but greens go soft like berries.
+- **Summer: honey.** Bees keep a hollow tree north of camp. Take a little honey (20 hunger and 5 energy); the bees need three dawns to make more.
+
+Each of these shows in the Bag panel only while you carry some.
 
 ### Winter
 
@@ -145,6 +156,6 @@ npm test -- --run
 npm run build
 ```
 
-`npm test` runs the suites in `tests/`. Agent worktrees under `.superpowers/` are excluded. The tests cover game state, renewable fiber, mixed-material building, gathering, day/night survival, tiredness and sleep, being tired, exhausted, hungry, or starving, optional night activities, the clock, the seasons and the changing length of the night, winter nights, bare bushes, the frozen spring, wolves and their tracks, spring rain, puddles, flowers, rabbits and faster regrowth, warm summer nights, the midday heat and summer berries, golden evenings, camp upgrades, the growing clearing and its marked trees, cold-night progression and the storm forecast, the stone axe and tree regrowth, the west crossing and the quarry area, rubble, the toolshed, the pickaxe and digging, the night eyes, trail rations, path discoveries, the lookout, the field journal, heavy and loose stone, the stone pile, the year journal and its pages, befriending, the companion's gifts, keepsakes, the pillow and the cloak, save validation, tap targets and walking, the phone dock, the sidebar tabs, pausing, and canvas scaling, and ambient wildlife timing. A browser playthrough should also check movement, tapping, building, fire, weather visuals, crossing to the quarry and back, and continuing after a reload (in either area), both at desktop size and on a phone held upright.
+`npm test` runs the suites in `tests/`. Agent worktrees under `.superpowers/` are excluded. The tests cover game state, renewable fiber, mixed-material building, gathering, day/night survival, tiredness and sleep, being tired, exhausted, hungry, or starving, optional night activities, the clock, the seasons and the changing length of the night, winter nights, bare bushes, the frozen spring, wolves and their tracks, spring rain, puddles, flowers, rabbits and faster regrowth, warm summer nights, the midday heat and summer berries, seasonal forage and what Q eats, golden evenings, camp upgrades, the growing clearing and its marked trees, cold-night progression and the storm forecast, the stone axe and tree regrowth, the west crossing and the quarry area, rubble, the toolshed, the pickaxe and digging, the night eyes, trail rations, path discoveries, the lookout, the field journal, heavy and loose stone, the stone pile, the year journal and its pages, befriending, the companion's gifts, keepsakes, the pillow and the cloak, save validation, tap targets and walking, the phone dock, the sidebar tabs, pausing, and canvas scaling, and ambient wildlife timing. A browser playthrough should also check movement, tapping, building, fire, weather visuals, crossing to the quarry and back, and continuing after a reload (in either area), both at desktop size and on a phone held upright.
 
 `npm test -- --run --coverage` also writes a coverage report to `coverage/`. CI runs it that way and then sends the code and the coverage report to [SonarCloud](https://sonarcloud.io/project/overview?id=hobsojam_survival), configured in `sonar-project.properties`. The scan needs a `SONAR_TOKEN` repository secret. Dependabot pull requests are never scanned, and pull requests from forks skip the scan because they don't receive the secret.

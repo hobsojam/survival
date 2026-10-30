@@ -548,3 +548,29 @@ describe('the clearing in the save', () => {
     expect(accepts(grown(), 17)).toBe(false);
   });
 });
+
+describe('forage regrowth in the save', () => {
+  const saved = (id: string, readyDay: number): string => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    state.day = 32;
+    state.progress.hearthUnlocked = true;
+    state.progress.nextStormDay = null;
+    const node = state.nodes.find(item => item.id === id)!;
+    node.amount = 0;
+    node.readyDay = readyDay;
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 19, state }));
+    return loadGame(storage).kind;
+  };
+
+  it('lets the hollow tree wait up to three days for its honey', () => {
+    expect(saved('honey-0', 35)).toBe('loaded');
+    expect(saved('honey-0', 36)).toBe('invalid');
+  });
+
+  it('keeps every other spot to the next day', () => {
+    expect(saved('hazel-0', 33)).toBe('loaded');
+    expect(saved('hazel-0', 34)).toBe('invalid');
+    expect(saved('greens-3', 34)).toBe('invalid');
+  });
+});
