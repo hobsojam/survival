@@ -1,7 +1,8 @@
 import { BALANCE, type GameState, type ResourceNode } from '../game/state';
 import { season, type Season } from '../game/calendar';
 import { QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
-import { campCircleTile, pathTile, terrainSprites } from '../art/terrain';
+import { clearingTile, pathTile, terrainSprites } from '../art/terrain';
+import { CLEARING_STEPS, STEP_IDS, clearingKey, clearingReach, type ClearingState, type StepId } from '../game/clearing';
 import { CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_OPEN_PATHS, CAMP_PATHS, CAMP_SIGN, QUARRY_PATHS, QUARRY_SIGN, pathDistance, type PathRoute } from './mapGeometry';
 
 export interface MapItem { x: number; y: number; sprite: string }
@@ -17,9 +18,9 @@ export function terrainKey(state: GameState): TerrainKey {
   return pathOpen(state) ? 'camp-open' : 'camp';
 }
 
-/** The terrain the scene has drawn: it is redrawn when the area, the west path or the season changes. */
+/** The terrain the scene has drawn: it is redrawn when the area, the west path, the cleared ground, the marked trees or the season changes. */
 export function shownTerrainKey(state: GameState): string {
-  return `${terrainKey(state)}-${season(state.day)}`;
+  return `${terrainKey(state)}-${clearingKey(state.clearing.cleared)}-${state.clearing.marked ?? 'unmarked'}-${season(state.day)}`;
 }
 
 const ROUTES: Record<Exclude<TerrainKey, 'quarry'>, readonly PathRoute[]> = { camp: CAMP_PATHS, 'camp-open': CAMP_OPEN_PATHS };
@@ -31,14 +32,26 @@ function hash(x: number, y: number, salt = 0): number {
 }
 
 const flowerPatches = [[11, 8], [30, 7], [7, 23], [28, 23]];
-function earthAt(x: number, y: number, routes: readonly PathRoute[]): boolean {
-  return Math.hypot(x - CAMP_CENTER_X, y - CAMP_CENTER_Y) <= BALANCE.campRadius || pathDistance(x, y, routes) <= .5;
+/** What the camp's trees and decorations must keep clear of, beyond the nodes and the paths. */
+interface CampSite {
+  nodes: ResourceNode[];
+  routes: readonly PathRoute[];
+  cleared: readonly StepId[];
+  /** Where a step still to be cleared has its marked trees. */
+  reserved: readonly { x: number; y: number }[];
+}
+
+/** Whether a point, in tile-corner space, is earth: inside the clearing, or on a path. */
+function earthAt(x: number, y: number, site: CampSite): boolean {
+  const reach = clearingReach(x - .5, y - .5, site.cleared);
+  return Math.hypot(x - CAMP_CENTER_X, y - CAMP_CENTER_Y) <= reach || pathDistance(x, y, site.routes) <= .5;
 }
 const nearSign = (x: number, y: number, sign: { x: number; y: number }): boolean => Math.hypot(x - sign.x, y - sign.y) < 1.5;
-function clearForTree(x: number, y: number, nodes: ResourceNode[], routes: readonly PathRoute[]): boolean {
-  return Math.hypot(x - BALANCE.campX, y - BALANCE.campY) > BALANCE.campRadius + 1 && !nearSign(x, y, CAMP_SIGN) &&
-    nodes.every(node => Math.hypot(x - node.x, y - node.y) >= (node.kind === 'branch' ? 1.5 : 3.5)) &&
-    pathDistance(x + .5, y + .5, routes) >= 1.35;
+function clearForTree(x: number, y: number, site: CampSite): boolean {
+  return Math.hypot(x - BALANCE.campX, y - BALANCE.campY) > clearingReach(x, y, site.cleared) + 1 && !nearSign(x, y, CAMP_SIGN) &&
+    site.nodes.every(node => Math.hypot(x - node.x, y - node.y) >= (node.kind === 'branch' ? 1.5 : 3.5)) &&
+    site.reserved.every(tree => Math.hypot(x - tree.x, y - tree.y) >= 1.2) &&
+    pathDistance(x + .5, y + .5, site.routes) >= 1.35;
 }
 
 function stoneClearsPaths(item: MapItem, routes: readonly PathRoute[]): boolean {
@@ -128,46 +141,53 @@ function quarryDetail(x: number, y: number): string {
   return `pebbles${detail % 2}`;
 }
 
-/** Builds an area's terrain. The camp meadow flowers more in spring, and its flowers are under the snow in winter. */
-export function buildMap(nodes: ResourceNode[], key: TerrainKey, time: Season = 'summer'): TerrainMap {
+/**
+ * Builds an area's terrain. The camp meadow flowers more in spring, and its flowers are under the snow in winter.
+ * The camp's clearing is as wide as the cleared steps make it; the trees of steps still to clear stand in their places,
+ * except the marked step's, which the scene draws itself as choppable trees.
+ */
+export function buildMap(nodes: ResourceNode[], key: TerrainKey, time: Season = 'summer', clearing: ClearingState = { cleared: [], marked: null, felled: [] }): TerrainMap {
   if (key === 'quarry') return buildQuarryMap();
-  const routes = ROUTES[key];
+  const standing = STEP_IDS.filter(id => !clearing.cleared.includes(id));
+  const site: CampSite = { nodes, routes: ROUTES[key], cleared: clearing.cleared, reserved: standing.flatMap(id => CLEARING_STEPS[id].trees) };
   const map = emptyMap();
   for (let y = 0; y < BALANCE.mapHeight; y++) {
     const row: string[] = [];
-    for (let x = 0; x < BALANCE.mapWidth; x++) row.push(layCampTile(x, y, nodes, routes, map, time === 'spring'));
+    for (let x = 0; x < BALANCE.mapWidth; x++) row.push(layCampTile(x, y, site, map, time === 'spring'));
     map.ground.push(row);
   }
   if (time === 'winter') map.decorations = map.decorations.filter(item => !item.sprite.startsWith('flower'));
-  plantGroves(nodes, routes, map);
-  map.rimStones = campRimStones(routes);
+  plantGroves(site, map);
+  map.trees.push(...standing.filter(id => id !== clearing.marked).flatMap(id => CLEARING_STEPS[id].trees.map(({ x, y, sprite }) => ({ x, y, sprite }))));
+  map.rimStones = campRimStones(site);
   map.decorations = map.decorations.filter(item => !nearSign(item.x, item.y, CAMP_SIGN));
   if (key === 'camp-open') map.signs = [{ ...CAMP_SIGN, sprite: 'signpostQuarry' }];
   return map;
 }
 
 /** Adds one camp tile's path, circle edge, tree or decoration to the map and returns its ground sprite. */
-function layCampTile(x: number, y: number, nodes: ResourceNode[], routes: readonly PathRoute[], map: TerrainMap, spring: boolean): string {
-  const circle = campCircleTile(x - BALANCE.campX, y - BALANCE.campY);
-  const path = pathTile(x, y, routes);
+function layCampTile(x: number, y: number, site: CampSite, map: TerrainMap, spring: boolean): string {
+  const circle = clearingTile(x - BALANCE.campX, y - BALANCE.campY, site.cleared);
+  const path = pathTile(x, y, site.routes);
   if (path && circle !== 'full') map.pathTiles.push({ x, y, sprite: path });
   if (circle && circle !== 'full') map.campEdges.push({ x, y, sprite: circle });
   const edge = edgeDistance(x, y);
   const borderTree = edge <= 2 && hash(x, y, 2) % 5 !== 0;
-  if (borderTree && clearForTree(x, y, nodes, routes)) map.trees.push({ x, y, sprite: TREE_SPRITES[hash(x, y, 3) % 3] });
-  else if (edge > 2 && !earthAt(x + .5, y + .5, routes)) {
-    const sprite = campDecoration(x, y, nodes, routes) ?? (spring ? springFlower(x, y, nodes) : null);
+  if (borderTree && clearForTree(x, y, site)) map.trees.push({ x, y, sprite: TREE_SPRITES[hash(x, y, 3) % 3] });
+  else if (edge > 2 && !earthAt(x + .5, y + .5, site)) {
+    const sprite = campDecoration(x, y, site) ?? (spring ? springFlower(x, y, site.nodes) : null);
     if (sprite) map.decorations.push({ x, y, sprite });
   }
   return circle === 'full' ? `earth${hash(x, y, 1) % 3}` : `grass${hash(x, y) % 4}`;
 }
 
-function campDecoration(x: number, y: number, nodes: ResourceNode[], routes: readonly PathRoute[]): string | null {
+function campDecoration(x: number, y: number, site: CampSite): string | null {
+  const { nodes } = site;
   const inPatch = flowerPatches.some(([px, py]) => Math.hypot(x - px, y - py) <= 2.5);
   if (inPatch && hash(x, y, 4) % 3 === 0 && nodes.every(node => Math.hypot(x - node.x, y - node.y) >= 1)) return `flower${hash(x, y, 5) % 3}`;
   if (hash(x, y, 4) % 9 !== 0) return null;
   const detail = hash(x, y, 5) % 17;
-  const special = nodes.every(node => Math.hypot(x - node.x, y - node.y) >= 1.5) && clearForTree(x, y, nodes, routes);
+  const special = nodes.every(node => Math.hypot(x - node.x, y - node.y) >= 1.5) && clearForTree(x, y, site);
   if (special && detail === 0) return 'stump';
   if (special && detail === 1) return 'mushrooms';
   return ['tuft0', 'tuft1', 'pebbles0', 'pebbles1', 'fallenLeaf'][detail % 5];
@@ -190,12 +210,12 @@ function groveCenters(): number[][] {
   return [...preferredCenters, ...fallbackCenters];
 }
 
-function plantGroves(nodes: ResourceNode[], routes: readonly PathRoute[], map: TerrainMap): void {
+function plantGroves(site: CampSite, map: TerrainMap): void {
   const chosenCenters: number[][] = [];
   for (const [cx, cy] of groveCenters()) {
     if (map.groves.length === 8) break;
     if (chosenCenters.some(([x, y]) => Math.hypot(cx - x, cy - y) < 7)) continue;
-    const grove = growGrove(cx, cy, nodes, routes, map.trees);
+    const grove = growGrove(cx, cy, site, map.trees);
     if (grove.length < 3) continue;
     map.groves.push(grove);
     chosenCenters.push([cx, cy]);
@@ -203,26 +223,31 @@ function plantGroves(nodes: ResourceNode[], routes: readonly PathRoute[], map: T
   }
 }
 
-function growGrove(cx: number, cy: number, nodes: ResourceNode[], routes: readonly PathRoute[], trees: MapItem[]): MapItem[] {
+function growGrove(cx: number, cy: number, site: CampSite, trees: MapItem[]): MapItem[] {
   const grove: MapItem[] = [];
   const inside = (x: number, y: number) => x >= 3 && x < BALANCE.mapWidth - 3 && y >= 3 && y < BALANCE.mapHeight - 3;
   for (let i = 0; i < 21 && grove.length < 7; i++) {
     const angle = i * 2.39996 + hash(cx, cy, 10) % 6, radius = 1 + (i % 3);
     const x = Math.round(cx + Math.cos(angle) * radius), y = Math.round(cy + Math.sin(angle) * radius);
-    if (!inside(x, y) || !clearForTree(x, y, nodes, routes)) continue;
+    if (!inside(x, y) || !clearForTree(x, y, site)) continue;
     if ([...trees, ...grove].some(tree => Math.hypot(tree.x - x, tree.y - y) < 1.2)) continue;
     grove.push({ x, y, sprite: TREE_SPRITES[hash(x, y, 6) % 3] });
   }
   return grove;
 }
 
-function campRimStones(routes: readonly PathRoute[]): MapItem[] {
+/** Rim stones ring the clearing's edge, a few more of them as it grows. */
+function campRimStones(site: CampSite): MapItem[] {
+  const reachAt = (angle: number) => clearingReach(BALANCE.campX + Math.cos(angle), BALANCE.campY + Math.sin(angle), site.cleared);
+  const samples = 72;
+  const meanReach = Array.from({ length: samples }, (_, i) => reachAt(i * Math.PI * 2 / samples)).reduce((sum, reach) => sum + reach, 0) / samples;
+  const count = Math.round(26 * meanReach / BALANCE.campRadius);
   const rimStones: MapItem[] = [];
-  for (let i = 0; i < 26; i++) {
-    const angle = i * Math.PI * 2 / 26;
-    const item = { x: CAMP_CENTER_X + Math.cos(angle) * BALANCE.campRadius,
-      y: CAMP_CENTER_Y + Math.sin(angle) * BALANCE.campRadius, sprite: `rimStone${i % 2}` };
-    if (stoneClearsPaths(item, routes)) rimStones.push(item);
+  for (let i = 0; i < count; i++) {
+    const angle = i * Math.PI * 2 / count;
+    const reach = reachAt(angle);
+    const item = { x: CAMP_CENTER_X + Math.cos(angle) * reach, y: CAMP_CENTER_Y + Math.sin(angle) * reach, sprite: `rimStone${i % 2}` };
+    if (stoneClearsPaths(item, site.routes)) rimStones.push(item);
   }
   return rimStones;
 }

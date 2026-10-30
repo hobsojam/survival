@@ -65,9 +65,10 @@ export function animationConfigs(all: Record<string, SpriteDef>): Phaser.Types.A
   })));
 }
 
-/** Paints every sprite frame in the given colours: new textures are created, existing ones repainted in place. */
-export function registerSpriteTextures(scene: Phaser.Scene, colors: Record<PaletteKey, string> = palette): void {
-  for (const [name, def] of Object.entries(sprites)) for (const frame of Object.keys(def.frames)) {
+/** Paints one sprite's frames in the given colours: new textures are created, existing ones repainted in place. */
+export function registerSpriteTexture(scene: Phaser.Scene, name: string, colors: Record<PaletteKey, string> = palette): void {
+  const def = sprites[name];
+  for (const frame of Object.keys(def.frames)) {
     const key = `${name}:${frame}`;
     const texture = scene.textures.exists(key)
       ? scene.textures.get(key) as Phaser.Textures.CanvasTexture
@@ -78,5 +79,10 @@ export function registerSpriteTextures(scene: Phaser.Scene, colors: Record<Palet
     texture.context.putImageData(image, 0, 0);
     texture.refresh();
   }
+}
+
+/** Paints every sprite frame in the given colours. */
+export function registerSpriteTextures(scene: Phaser.Scene, colors: Record<PaletteKey, string> = palette): void {
+  for (const name of Object.keys(sprites)) registerSpriteTexture(scene, name, colors);
   for (const config of animationConfigs(sprites)) if (!scene.anims.exists(config.key!)) scene.anims.create(config);
 }

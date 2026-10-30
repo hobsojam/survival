@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
-import { axeView, bagView, buildButtonView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightHint, pickaxeView, pillowView, startNote } from '../src/ui/panels';
+import { CLEARING_STEPS } from '../src/game/clearing';
+import { axeView, clearingView, bagView, buildButtonView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightHint, pickaxeView, pillowView, startNote } from '../src/ui/panels';
 
 type Changes = { structures?: Partial<GameState['structures']>; progress?: Partial<GameState['progress']>; inventory?: Partial<GameState['inventory']> };
 
@@ -122,7 +123,7 @@ describe('night hint', () => {
     expect(nightHint(game())).toBe('These small moments are waiting for nightfall.');
     const night = game({}, { timeOfDay: nightStart(1) + 1 });
     expect(nightHint(night)).toBe('Optional comforts while the night passes.');
-    expect(nightHint({ ...night, player: { ...night.player, x: 5, y: 25 } })).toBe('Return to the camp circle for a quiet evening.');
+    expect(nightHint({ ...night, player: { ...night.player, x: 5, y: 25 } })).toBe('Return to the clearing for a quiet evening.');
   });
 });
 
@@ -270,5 +271,52 @@ describe('keepsakes and what they make', () => {
     expect(cloakView(friend('fox')).shown).toBe(true);
     expect(cloakView(friend('fox', { cloak: true }))).toMatchObject({ title: 'Fur cloak', cost: 'Made', disabled: true });
     expect(pillowView(friend('bird', { keepsakes: 2 }))).toMatchObject({ copy: 'Build a toolshed first.', cost: '6 feathers', ready: false });
+  });
+});
+
+describe('clearing panel', () => {
+  const withAxe = (clearing: Partial<GameState['clearing']> = {}, inventory: Changes['inventory'] = {}) => {
+    const base = game({ progress: { axeCrafted: true }, inventory });
+    return { ...base, clearing: { ...base.clearing, ...clearing } };
+  };
+
+  it('appears once the axe is crafted', () => {
+    expect(clearingView(game()).shown).toBe(false);
+    expect(clearingView(withAxe()).shown).toBe(true);
+  });
+
+  it('lists each side with its next step, its trees and its cost', () => {
+    const { sides } = clearingView(withAxe());
+    expect(sides.map(side => side.label)).toEqual(['North · near', 'East · near', 'South · near', 'West · near']);
+    expect(sides[0]).toMatchObject({ detail: '4 trees, then 4 wood and 2 fiber', disabled: false, done: false });
+    expect(sides[3].detail).toBe('2 trees, then 4 wood and 2 fiber');
+  });
+
+  it('moves a side on to its far step, and marks it cleared when both are done', () => {
+    const near = clearingView(withAxe({ cleared: ['north-near'] })).sides[0];
+    expect(near.label).toBe('North · far');
+    expect(near.detail).toBe(`${CLEARING_STEPS['north-far'].trees.length} trees, then 6 wood and 3 fiber`);
+    const done = clearingView(withAxe({ cleared: ['north-near', 'north-far'] })).sides[0];
+    expect(done).toMatchObject({ label: 'North · cleared', done: true, disabled: true });
+  });
+
+  it('shows the marked side as chosen and locks the others once a tree is down', () => {
+    const fresh = clearingView(withAxe({ marked: 'north-near' })).sides;
+    expect(fresh[0].chosen).toBe(true);
+    expect(fresh.slice(1).every(side => !side.chosen && !side.disabled)).toBe(true);
+    const started = clearingView(withAxe({ marked: 'north-near', felled: [0] })).sides;
+    expect(started[0]).toMatchObject({ chosen: true, disabled: false });
+    expect(started.slice(1).every(side => side.disabled)).toBe(true);
+  });
+
+  it('describes the ground to clear and follows the blocker', () => {
+    expect(clearingView(withAxe()).clear).toMatchObject({ title: 'Clear the ground', disabled: true, ready: false });
+    const three = clearingView(withAxe({ marked: 'north-near', felled: [0] })).clear;
+    expect(three.copy).toBe('Fell the 3 marked trees left on the north side.');
+    expect(three.disabled).toBe(true);
+    expect(clearingView(withAxe({ marked: 'north-near', felled: [0, 1, 2] })).clear.copy).toBe('Fell the 1 marked tree left on the north side.');
+    const stocked = { wood: 4, fiber: 2 };
+    const ready = clearingView(withAxe({ marked: 'north-near', felled: [0, 1, 2, 3] }, stocked)).clear;
+    expect(ready).toMatchObject({ copy: 'Ready to clear the north side.', cost: '4 wood · 2 fiber', disabled: false, ready: true });
   });
 });

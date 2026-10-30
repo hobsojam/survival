@@ -56,6 +56,13 @@ describe('befriending', () => {
     expect(result.message).toBe('The fox takes the berry, and watches you a while.');
   });
 
+  it('leaves an offering on ground the clearing has grown over', () => {
+    const night = { ...camp(12, nightStart(12) + 5, { trailFood: 1 }), player: { ...base.player, x: 20, y: 9.5 }, fireFuel: 100 };
+    expect(offerFor(night)).toBeNull();
+    const grown = { ...night, clearing: { ...night.clearing, cleared: ['north-near' as const] } };
+    expect(offerFor(grown)).toBe('wolf');
+  });
+
   it('leaves a ration for the wolves on any winter night, fire lit or not', () => {
     const night = { ...camp(12, nightStart(12) + 5, { trailFood: 1 }), player: { ...base.player, x: 20, y: 16 }, fireFuel: 100 };
     expect(offerFor(night)).toBe('wolf');

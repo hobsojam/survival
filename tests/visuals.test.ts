@@ -5,6 +5,7 @@ import { sceneVisuals, playerVisualDepth, GROUND_DECAL_DEPTH, NIGHT_DEPTH, LIGHT
 import { sprites } from '../src/art/sprites';
 import { worldX, worldY } from '../src/scene/art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
+import { CLEARING_STEPS } from '../src/game/clearing';
 import { validateSprite } from '../src/art/textures';
 
 describe('native-size scene art', () => {
@@ -74,6 +75,17 @@ describe('native-size scene art', () => {
     expect(sceneVisuals(state, 0).find(item => item.id === tree.id)?.texture).toBe('stump:still');
     state.day = 4;
     expect(sceneVisuals(state, 0).find(item => item.id === tree.id)?.texture).toBe(`${tree.sprite}:still`);
+  });
+
+  it('shows marked trees with a tie and felled ones as stumps', () => {
+    const state = createGame();
+    state.clearing = { cleared: [], marked: 'north-near', felled: [0] };
+    const visuals = sceneVisuals(state, 0);
+    expect(visuals.find(item => item.id === 'mark-north-near-0')?.texture).toBe('stump:still');
+    const standing = CLEARING_STEPS['north-near'].trees;
+    for (const index of [1, 2, 3]) expect(visuals.find(item => item.id === `mark-north-near-${index}`)?.texture).toBe(`${standing[index].sprite}:marked`);
+    expect(sceneVisuals(createGame(), 0).some(item => item.id.startsWith('mark-'))).toBe(false);
+    for (const name of ['treeBroadleaf', 'treePine']) expect(sprites[name].frames.marked, name).toBeDefined();
   });
 
   it('shows the path places and their searched states', () => {

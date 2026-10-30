@@ -6,6 +6,7 @@ import { wolfTracksShown } from '../game/wolves';
 import { rainWindow } from '../game/rain';
 import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
+import { markedTrees } from '../game/clearing';
 
 export const NIGHT_DEPTH = BALANCE.mapHeight * TILE + 1;
 export const LIGHT_DEPTH = NIGHT_DEPTH + 1;
@@ -45,6 +46,8 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
   addPiles(state, visuals, add);
   addPuddles(state, add);
   for (const tree of state.trees) add(tree.id, tree.readyDay <= state.day ? `${tree.sprite}:still` : 'stump:still', tree.x, tree.y);
+  // Trees marked for clearing wear a tie of fibre; once felled they leave a stump that is cleared away with the ground.
+  for (const tree of markedTrees(state)) add(tree.id, tree.readyDay <= state.day ? `${tree.sprite}:marked` : 'stump:still', tree.x, tree.y);
   addCamp(state, add);
   addFire(state, timeMs, visuals, add);
   return visuals;

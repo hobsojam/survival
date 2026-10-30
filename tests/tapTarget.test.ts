@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, LOOKOUT, SITES, createGame } from '../src/game/state';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
+import { markedTrees } from '../src/game/clearing';
 import { closestGatherable, hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from '../src/scene/tapTarget';
 
 describe('tap targets', () => {
@@ -87,6 +88,16 @@ describe('tap targets', () => {
     const tree = state.trees[0];
     state.trees = [tree];
     expect(pickTapTarget(state, tree.x, tree.y - 1.8)).toMatchObject({ kind: 'tree', id: tree.id });
+  });
+
+  it('picks a marked tree for chopping', () => {
+    const state = createGame();
+    state.nodes = [];
+    state.clearing = { cleared: [], marked: 'north-near', felled: [] };
+    const tree = markedTrees(state)[1];
+    const target = pickTapTarget(state, tree.x, tree.y - 1.8);
+    expect(target).toMatchObject({ kind: 'tree', id: 'mark-north-near-1' });
+    expect(targetAction(target)).toEqual({ type: 'chopTree', treeId: 'mark-north-near-1' });
   });
 
   it('picks the lookout when its roof is tapped', () => {

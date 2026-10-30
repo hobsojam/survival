@@ -1,6 +1,7 @@
 import type { SpriteDef } from './sprites';
 import type { PaletteKey } from './palette';
 import { BALANCE } from '../game/state';
+import { CLEARING_STEPS, STEP_IDS, clearingKey, clearingReach, type StepId } from '../game/clearing';
 import { CAMP_OPEN_PATHS, CAMP_PATHS, QUARRY_PATHS, pathDistance, type PathRoute } from '../scene/mapGeometry';
 
 type Grid = string[][];
@@ -57,33 +58,75 @@ for (let mask = 0; mask < 16; mask++) {
   terrainSprites[`transition${mask}`] = sprite(g, groundLegend);
 }
 
-/** Camp circle tiles by offset: 'full' for solid earth, otherwise the edge sprite's name. */
-const campCircleTiles = new Map<string, string>();
-const circleRadius = BALANCE.campRadius * 16;
-for (let dy = -BALANCE.campRadius; dy <= BALANCE.campRadius; dy++) {
-  for (let dx = -BALANCE.campRadius; dx <= BALANCE.campRadius; dx++) {
-    const g = blank(16, 16);
-    let filled = 0;
-    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-      const distanceSquared = (dx * 16 + x - 8) ** 2 + (dy * 16 + y - 8) ** 2;
-      if (distanceSquared > circleRadius ** 2) continue;
-      g[y][x] = distanceSquared >= (circleRadius - 2) ** 2 ? 'e' : 'g';
-      filled++;
-    }
-    if (filled === 0) continue;
-    const offset = `${dx},${dy}`;
-    if (filled === 256) {
-      campCircleTiles.set(offset, 'full');
-    } else {
-      const name = `campCircle${dx >= 0 ? '+' : ''}${dx}_${dy >= 0 ? '+' : ''}${dy}`;
-      terrainSprites[name] = sprite(g, { e: 'earth0', g: 'earth2' });
-      campCircleTiles.set(offset, name);
-    }
-  }
+/** Terrain sprites made after start-up are also added to each sprite table that mirrors this one. */
+const mirrors: Record<string, SpriteDef>[] = [];
+export function mirrorTerrainSprites(target: Record<string, SpriteDef>): void {
+  Object.assign(target, terrainSprites);
+  mirrors.push(target);
+}
+function addTerrainSprite(name: string, def: SpriteDef): void {
+  terrainSprites[name] = def;
+  for (const target of mirrors) target[name] = def;
 }
 
-export function campCircleTile(dx: number, dy: number): string | undefined {
-  return campCircleTiles.get(`${dx},${dy}`);
+/** The farthest the clearing can reach from the fire, in tiles, with room for the tile that holds the edge. */
+const MAX_REACH = Math.max(...STEP_IDS.map(id => CLEARING_STEPS[id].reach));
+const EDGE_TILES = Math.ceil(MAX_REACH) + 1;
+
+/** Clearing tiles per set of cleared steps, memoised: the offset from the fire's tile maps to 'full' or an edge sprite's name. */
+const clearingTileSets = new Map<string, Map<string, string>>();
+const clearingSprites = new Map<string, string>();
+function clearingTiles(cleared: readonly StepId[]): Map<string, string> {
+  const key = clearingKey(cleared);
+  const cached = clearingTileSets.get(key);
+  if (cached) return cached;
+  const tiles = new Map<string, string>();
+  const innerRadius = (BALANCE.campRadius - 2) * 16 - 12;
+  for (let dy = -EDGE_TILES; dy <= EDGE_TILES; dy++) {
+    for (let dx = -EDGE_TILES; dx <= EDGE_TILES; dx++) {
+      const middle = Math.hypot(dx * 16, dy * 16);
+      if (middle > MAX_REACH * 16 + 12) continue;
+      if (middle < innerRadius) { tiles.set(`${dx},${dy}`, 'full'); continue; }
+      const g = clearingTileGrid(dx, dy, cleared);
+      if (g) tiles.set(`${dx},${dy}`, g === 'full' ? 'full' : clearingSpriteFor(g));
+    }
+  }
+  clearingTileSets.set(key, tiles);
+  return tiles;
+}
+
+/** The earth pixels on one tile, a 2-pixel rim of lighter earth inside the clearing's edge; null when none, 'full' when solid. */
+function clearingTileGrid(dx: number, dy: number, cleared: readonly StepId[]): Grid | 'full' | null {
+  const g = blank(16, 16);
+  let filled = 0;
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const offsetX = dx * 16 + x - 8, offsetY = dy * 16 + y - 8;
+    const reach = clearingReach(BALANCE.campX + offsetX / 16, BALANCE.campY + offsetY / 16, cleared) * 16;
+    const distanceSquared = offsetX ** 2 + offsetY ** 2;
+    if (distanceSquared > reach ** 2) continue;
+    g[y][x] = distanceSquared >= (reach - 2) ** 2 ? 'e' : 'g';
+    filled++;
+  }
+  if (filled === 256) return 'full';
+  return filled ? g : null;
+}
+
+function clearingSpriteFor(g: Grid): string {
+  const shape = g.map(row => row.join('')).join('/');
+  let name = clearingSprites.get(shape);
+  if (!name) {
+    name = `clearingEdge${clearingSprites.size}`;
+    addTerrainSprite(name, sprite(g, { e: 'earth0', g: 'earth2' }));
+    clearingSprites.set(shape, name);
+  }
+  return name;
+}
+// The ring round the fire is made up front; wider clearings make their edge tiles when first drawn.
+clearingTiles([]);
+
+/** The clearing's tile at an offset from the fire's tile: 'full' for solid earth, an edge sprite's name, or nothing. */
+export function clearingTile(dx: number, dy: number, cleared: readonly StepId[]): string | undefined {
+  return clearingTiles(cleared).get(`${dx},${dy}`);
 }
 
 /** Path tiles per route list, memoised; identical tiles share one sprite. */
@@ -157,7 +200,7 @@ for (let i = 0; i < 2; i++) addDecal(`rimStone${i}`, g => {
   rect(g, i ? 6 : 4, i ? 4 : 5, 4, 1, 'l');
 }, 14, 12);
 
-const treeLegend = { a: 'leaf0', b: 'leaf1', c: 'leaf2', d: 'leaf3', e: 'leaf4', f: 'wood0', g: 'wood1', h: 'wood2', i: 'wood3', s: 'shadow' } as const;
+const treeLegend = { a: 'leaf0', b: 'leaf1', c: 'leaf2', d: 'leaf3', e: 'leaf4', f: 'wood0', g: 'wood1', h: 'wood2', i: 'wood3', j: 'wood4', s: 'shadow' } as const;
 const crownLegend = { ...treeLegend, a: 'crown0', b: 'crown1', c: 'crown2', d: 'crown3', e: 'crown4' } as const;
 function tree(name: string, w: number, h: number, shape: 'broad' | 'pine' | 'young'): void {
   const g = blank(w, h), cx = Math.floor(w / 2);
@@ -182,7 +225,15 @@ function tree(name: string, w: number, h: number, shape: 'broad' | 'pine' | 'you
     const x = 3 + (i * 11) % (w - 6), y = 6 + (i * 13) % Math.floor(h * .55);
     if (g[y][x] === 'c' || g[y][x] === 'd') dot(g, x, y, 'e');
   }
-  terrainSprites[name] = sprite(g, shape === 'pine' ? treeLegend : crownLegend, [cx, h - 3]);
+  const def = sprite(g, shape === 'pine' ? treeLegend : crownLegend, [cx, h - 3]);
+  if (shape !== 'young') {
+    // A marked tree has a band of pale fibre tied twice round its trunk, below the crown.
+    const marked = g.map(row => [...row]);
+    rect(marked, cx - 3, h - 7, 7, 2, 'j');
+    for (const x of [cx - 2, cx, cx + 2]) dot(marked, x, h - 6, 'i');
+    def.frames.marked = marked.map(row => row.join(''));
+  }
+  terrainSprites[name] = def;
 }
 tree('treeBroadleaf', 32, 48, 'broad');
 tree('treePine', 32, 48, 'pine');

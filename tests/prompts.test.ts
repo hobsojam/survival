@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, LOOKOUT, SITES, createGame, type GameState } from '../src/game/state';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
+import { markedTrees } from '../src/game/clearing';
 import { KEY_ACTIONS, actionPose, closestSite, closestTree, gatherKeyAction, gatherSpot, promptFor } from '../src/scene/prompts';
 
 /** A camp with nothing to gather, chop or explore, so each test adds only what it checks. */
@@ -15,6 +16,11 @@ const at = (state: GameState, x: number, y: number): GameState => ({ ...state, p
 describe('camp prompts', () => {
   it('offers the fire, rest and building by day at camp', () => {
     expect(promptFor(bareCamp())).toBe('At camp · F Fire · R Rest · Click an upgrade to build');
+  });
+
+  it('offers only clearing comforts on grown ground away from the fire', () => {
+    const state = { ...createGame(), nodes: [], trees: [], clearing: { cleared: ['east-near' as const], marked: null, felled: [] } };
+    expect(promptFor(at(state, BALANCE.campX + 6, BALANCE.campY))).toBe('In the clearing · G Stargaze · Click an upgrade to build');
   });
 
   it('offers night comforts at camp after dark', () => {
@@ -71,6 +77,17 @@ describe('camp prompts', () => {
     expect(promptFor(state)).toBe('Mature tree · craft an axe at camp');
     expect(promptFor({ ...state, progress: { ...state.progress, axeCrafted: true } })).toBe('X  Chop mature tree');
     expect(promptFor({ ...state, trees: [{ ...state.trees[0], readyDay: 9 }] })).toBe('Stump · regrows day 9');
+  });
+
+  it('treats a marked tree like any tree to chop, and its stump as part of the clearing', () => {
+    const marked = { ...bareCamp(), clearing: { cleared: [], marked: 'north-near' as const, felled: [] }, progress: { ...createGame().progress, axeCrafted: true } };
+    const [, second] = markedTrees(marked);
+    const beside = at(marked, second.x, second.y);
+    expect(closestTree(beside)?.id).toBe('mark-north-near-1');
+    expect(promptFor(beside)).toBe('X  Chop mature tree');
+    expect(gatherSpot({ type: 'chopTree', treeId: 'mark-north-near-1' }, marked)).toEqual({ x: second.x, y: second.y, kind: 'branch' });
+    const felled = { ...beside, clearing: { ...marked.clearing, felled: [1] } };
+    expect(promptFor(felled)).toBe('Stump · this ground is being cleared');
   });
 
   it('pairs the gather prompt with the nearby place', () => {

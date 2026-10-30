@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, createGame } from '../src/game/state';
+import { placeBranches } from '../src/game/clearing';
 import { autosaveDelayMs, loadGame, saveGame, SAVE_KEY } from '../src/game/save';
 
 class MemoryStorage implements Storage {
@@ -18,7 +19,7 @@ describe('local save', () => {
     const state = createGame();
     const old = [[22, 15], [18, 16], [21, 18], [16, 14], [24, 13], [13, 7]];
     const saved = { ...state, nodes: state.nodes.map((node, index) => index < old.length ? { ...node, x: old[index][0], y: old[index][1], amount: 0 } : node) };
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 17, state: saved }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 18, state: saved }));
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind !== 'loaded') return;
@@ -58,7 +59,7 @@ describe('local save', () => {
     state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
     state.nodes.find(node => node.kind === 'fiber')!.readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(17);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(18);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);
@@ -368,7 +369,7 @@ describe('garden plots in saves', () => {
 });
 
 describe('the year journal in the save', () => {
-  const store = (state: ReturnType<typeof createGame>, version = 17) => {
+  const store = (state: ReturnType<typeof createGame>, version = 18) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;
@@ -412,7 +413,7 @@ describe('the year journal in the save', () => {
 });
 
 describe('the companion in the save', () => {
-  const store = (state: unknown, version = 17) => {
+  const store = (state: unknown, version = 18) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;
@@ -453,5 +454,52 @@ describe('the companion in the save', () => {
   it('loads wolf visits that were offered or chased off', () => {
     expect(store({ ...onDay(12), lastWolf: { day: 12, took: 'offered' } })).toBe('loaded');
     expect(store({ ...onDay(12), lastWolf: { day: 11, took: 'chased' } })).toBe('loaded');
+  });
+});
+
+describe('the clearing in the save', () => {
+  const accepts = (state: unknown, version = 18) => {
+    const storage = new MemoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
+    return loadGame(storage).kind === 'loaded';
+  };
+  const grown = () => {
+    const state = createGame();
+    const cleared: ('north-near')[] = ['north-near'];
+    const placed = placeBranches(state.nodes, cleared);
+    return { ...state, nodes: state.nodes.map((node, i) => ({ ...node, x: placed[i].x, y: placed[i].y })),
+      clearing: { cleared, marked: 'east-near', felled: [1, 3] } } as ReturnType<typeof createGame>;
+  };
+
+  it('round trips a grown clearing', () => {
+    const storage = new MemoryStorage();
+    expect(saveGame(storage, grown()).ok).toBe(true);
+    const loaded = loadGame(storage);
+    expect(loaded).toEqual({ kind: 'loaded', state: grown() });
+  });
+
+  it('rejects clearings that could not have happened', () => {
+    expect(accepts(grown())).toBe(true);
+    const withClearing = (clearing: unknown) => ({ ...grown(), clearing });
+    expect(accepts(withClearing({ cleared: ['north-near'], marked: 'east-near', felled: [1, 9] }))).toBe(false);
+    expect(accepts(withClearing({ cleared: ['north-near'], marked: null, felled: [1] }))).toBe(false);
+    expect(accepts(withClearing({ cleared: ['north-near'], marked: 'east-near', felled: [1, 1] }))).toBe(false);
+    expect(accepts(withClearing({ cleared: ['west-far'], marked: null, felled: [] }))).toBe(false);
+    expect(accepts(withClearing({ cleared: ['north-near'], marked: 'north-near', felled: [] }))).toBe(false);
+    expect(accepts(withClearing({ cleared: ['north-near', 'north-near'], marked: null, felled: [] }))).toBe(false);
+    expect(accepts(withClearing({ cleared: ['nowhere'], marked: null, felled: [] }))).toBe(false);
+    expect(accepts(withClearing(undefined))).toBe(false);
+  });
+
+  it('rejects branches left where the clearing says they are not', () => {
+    const state = grown();
+    const moved = state.nodes.findIndex((node, i) => node.x !== createGame().nodes[i].x);
+    expect(moved).toBeGreaterThanOrEqual(0);
+    const wrong = { ...state, nodes: state.nodes.map((node, i) => i === moved ? { ...node, x: node.x + 1 } : node) };
+    expect(accepts(wrong)).toBe(false);
+  });
+
+  it('rejects a version 17 save', () => {
+    expect(accepts(grown(), 17)).toBe(false);
   });
 });

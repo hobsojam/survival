@@ -3,7 +3,8 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type SiteId, typ
 import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
-import { cookBlocker, isAtCamp, sleepBlocker, stargazeBlocker } from '../game/rules';
+import { cookBlocker, isInClearing, sleepBlocker, stargazeBlocker } from '../game/rules';
+import { nextStep, type Side } from '../game/clearing';
 import { offerBlocker } from '../game/companion';
 import { dayPillView, renderDayPill, renderYearWheel, yearWheelView, type CalendarRoot } from './calendarView';
 import { isLowMeter } from '../game/needs';
@@ -12,7 +13,7 @@ import { createPause, wirePause, type PauseControl } from './pause';
 import { journalView } from './journal';
 import { renderRegionOverview } from './regionOverview';
 import { currentPage, journalPageView, renderJournalPage, turnPage } from './yearJournal';
-import { axeView, bagView, buildButtonView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightHint, pickaxeView, pillowView, startNote, type ActionPanelView } from './panels';
+import { axeView, bagView, buildButtonView, clearingView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightHint, pickaxeView, pillowView, startNote, type ActionPanelView } from './panels';
 import { Soundscape } from '../game/soundscape';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
@@ -54,6 +55,7 @@ export class App {
       if (id === 'stonePile') extraControls = `<div id="stone-pile-controls" class="stone-pile-controls" hidden><span id="stone-pile-stored">Stored stone 0/${BALANCE.stonePileCapacity}</span><button type="button" data-action="storeStone">Store 1</button><button type="button" data-action="takeStone">Take 1</button></div>`;
       return groupHeading + `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>` + extraControls;
     }).join('');
+    const clearingMarkup = (['north', 'east', 'south', 'west'] as const).map(side => `<button type="button" class="build-item" data-clear-side="${side}"><span class="build-copy"><strong></strong><small></small></span></button>`).join('');
     this.root.innerHTML = `
       <div class="shell">
         <header class="topbar">
@@ -100,7 +102,7 @@ export class App {
               </div><p class="keepsake-line" id="keepsake-line" hidden></p><div class="fire-status" id="fire-status">The fire is unlit</div></section>
               <section class="panel garden-panel" data-tab="camp"><p class="eyebrow">GROW WITH THE SEASONS</p><h2>Berry garden</h2><p class="garden-hint" id="garden-hint"></p><div id="garden-plots"></div></section>
               <section class="panel night-panel" data-tab="camp"><p class="eyebrow">AFTER DARK</p><h2>A little time for yourself</h2><p class="night-hint" id="night-hint">These small moments are waiting for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button></div></section>
-              <section class="panel build-panel" data-tab="build"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand inside the marked camp circle to build.</p><div id="build-list">${buildMarkup}</div></section>
+              <section class="panel build-panel" data-tab="build"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand anywhere in the clearing to build.</p><div id="build-list">${buildMarkup}</div><div id="clearing-group" hidden><h3 class="build-group-heading">Clear the land</h3><div id="clearing-sides">${clearingMarkup}</div><div class="tool-row"><h3 id="clear-title">Clear the ground</h3><p id="clear-copy" class="lookout-copy"></p><button type="button" id="clear-button" data-action="clearGround">Clear the ground</button><small id="clear-cost"></small></div></div></section>
               <section class="panel phone-only" data-tab="camp"><p class="eyebrow">THIS CAMP</p><button type="button" id="phone-new-game" class="secondary-button">Start a new game</button></section>
             </div>
           </aside>
@@ -114,7 +116,7 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone';
+        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone';
         this.scene?.perform({ type });
       });
     });
@@ -127,6 +129,12 @@ export class App {
     this.root.querySelector('#build-list')!.addEventListener('click', event => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-build]');
       if (button) this.scene?.perform({ type: 'build', structureId: button.dataset.build as StructureId });
+    });
+    this.root.querySelector('#clearing-sides')!.addEventListener('click', event => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-clear-side]');
+      if (!button) return;
+      const step = nextStep(this.state, button.dataset.clearSide as Side);
+      if (step) this.scene?.perform({ type: 'markClearing', step });
     });
     this.root.querySelector('#site-button')!.addEventListener('click', () => this.scene?.visitNearestSite());
     this.root.querySelector('#new-game')!.addEventListener('click', () => this.beginNewGame());
@@ -458,10 +466,27 @@ export class App {
 
   private renderBuild(): void {
     this.setText('prompt', this.scene?.getPrompt() ?? 'WASD / arrows  Move');
-    this.setText('build-hint', isAtCamp(this.state) ? 'At camp — click an upgrade to build.' : 'Stand inside the marked camp circle to build.');
+    this.setText('build-hint', isInClearing(this.state) ? 'In the clearing — click an upgrade to build.' : 'Stand anywhere in the clearing to build.');
     for (const id of buildOptions) this.renderBuildButton(id);
+    this.renderClearing();
     const buildReady = Boolean(this.root.querySelector('[data-tab="build"] .ready'));
     this.root.querySelectorAll('[data-tab-button="build"], [data-sidebar-button="build"]').forEach(tab => tab.classList.toggle('has-dot', buildReady));
+  }
+
+  private renderClearing(): void {
+    const view = clearingView(this.state);
+    const group = this.root.querySelector<HTMLElement>('#clearing-group');
+    if (group) group.hidden = !view.shown;
+    for (const side of view.sides) {
+      const button = this.root.querySelector<HTMLButtonElement>(`[data-clear-side="${side.side}"]`);
+      if (!button) continue;
+      button.disabled = side.disabled;
+      button.classList.toggle('built', side.done);
+      button.classList.toggle('chosen', side.chosen);
+      button.querySelector<HTMLElement>('strong')!.textContent = side.label;
+      button.querySelector<HTMLElement>('small')!.textContent = side.detail;
+    }
+    this.renderActionPanel('clear', view.clear);
   }
 
   private renderBuildButton(id: StructureId): void {

@@ -1,4 +1,5 @@
 import type { JournalEntry } from './journalEntries';
+import type { ClearingState } from './clearing';
 export type ResourceKind = 'branch' | 'berry' | 'fiber' | 'stone';
 
 export const BUILDINGS = {
@@ -118,6 +119,8 @@ export interface GameState {
   /** What the survivor has written in the year journal. */
   journal: JournalEntry[];
   companion: Companion;
+  /** How far the camp clearing has been widened, and the step whose trees are being felled. */
+  clearing: ClearingState;
 }
 
 export const BALANCE = {
@@ -253,6 +256,7 @@ export function createGame(): GameState {
     rubbleReadyDay: 1,
     lastWolf: null,
     journal: [],
+    clearing: { cleared: [], marked: null, felled: [] },
     companion: {
       friend: null, since: null, trust: { bird: 0, fox: 0, wolf: 0 }, lastOffer: { bird: 0, fox: 0, wolf: 0 },
       keepsakes: 0, keepsakeLying: false, lastFind: 0, lastGift: 0, pillow: false, cloak: false, alarmDay: 0, foxFled: 0

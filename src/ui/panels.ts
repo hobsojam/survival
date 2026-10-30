@@ -2,9 +2,10 @@ import { isWinter, nightStart } from '../game/calendar';
 import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { workSeconds } from '../game/needs';
-import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, harvestGardenBlocker, isAtCamp, isColdNight, isFreezingNight, lookoutRepairBlocker, plantGardenBlocker, pickaxeBlocker, trailFoodBlocker } from '../game/rules';
+import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, plantGardenBlocker, pickaxeBlocker, trailFoodBlocker } from '../game/rules';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
+import { CLEARING_STEPS, clearGroundBlocker, markBlocker, nextStep, roomLine, type Side } from '../game/clearing';
 import { KEEPSAKES_NEEDED, cloakBlocker, keepsakeKind, pillowBlocker } from '../game/companion';
 
 export interface GardenPlotPanelView {
@@ -114,7 +115,7 @@ export function cloakView(state: GameState): ActionPanelView & { shown: boolean 
 /** The places along the paths found so far, for the Follow the paths panel. */
 export function nightHint(state: GameState): string {
   if (state.timeOfDay < nightStart(state.day)) return 'These small moments are waiting for nightfall.';
-  if (!isAtCamp(state)) return 'Return to the camp circle for a quiet evening.';
+  if (!isInClearing(state)) return 'Return to the clearing for a quiet evening.';
   return 'Optional comforts while the night passes.';
 }
 
@@ -208,4 +209,41 @@ export function buildButtonView(state: GameState, id: StructureId): BuildButtonV
     return { ...view, verb, price: label };
   }
   return view;
+}
+
+export interface ClearingSideView { side: Side; label: string; detail: string; disabled: boolean; done: boolean; chosen: boolean }
+
+const CLEARING_SIDES: readonly Side[] = ['north', 'east', 'south', 'west'];
+
+const capitalised = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
+
+function clearingSideView(state: GameState, side: Side): ClearingSideView {
+  const step = nextStep(state, side);
+  const name = capitalised(side);
+  if (!step) return { side, label: `${name} · cleared`, detail: '', disabled: true, done: true, chosen: false };
+  const { trees, cost } = CLEARING_STEPS[step];
+  const room = roomLine(step, state.structures, id => Object.hasOwn(BUILDINGS, id));
+  const price = `${trees.length} trees, then ${cost.wood} wood and ${cost.fiber} fiber`;
+  return {
+    side,
+    label: `${name} · ${step.endsWith('-far') ? 'far' : 'near'}`,
+    detail: room ? `${price}.${room}` : price,
+    disabled: Boolean(markBlocker(state, step)),
+    done: false,
+    chosen: state.clearing.marked === step
+  };
+}
+
+/** The Build tab's "Clear the land" group: one choice per side, then the button that clears the marked ground. */
+export function clearingView(state: GameState): { shown: boolean; sides: ClearingSideView[]; clear: ActionPanelView } {
+  const { marked, felled } = state.clearing;
+  const blocker = clearGroundBlocker(state);
+  const clear = { title: 'Clear the ground', disabled: Boolean(blocker), ready: !blocker };
+  const sides = CLEARING_SIDES.map(side => clearingSideView(state, side));
+  const shown = state.progress.axeCrafted;
+  if (!marked) return { shown, sides, clear: { ...clear, copy: 'Choose a side to mark its trees for felling.', cost: 'Choose a side first' } };
+  const { side, trees, cost } = CLEARING_STEPS[marked];
+  const left = trees.length - felled.length;
+  const copy = left > 0 ? `Fell the ${left} marked ${left === 1 ? 'tree' : 'trees'} left on the ${side} side.` : `Ready to clear the ${side} side.`;
+  return { shown, sides, clear: { ...clear, copy, cost: `${cost.wood} wood · ${cost.fiber} fiber` } };
 }

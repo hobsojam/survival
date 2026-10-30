@@ -1,5 +1,6 @@
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceNode, type SiteId, type StonePile } from '../game/state';
 import { isAtCamp, type GameAction } from '../game/rules';
+import { choppableTrees } from '../game/clearing';
 import { sprites } from '../art/sprites';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 
@@ -63,7 +64,7 @@ export function pickTapTarget(state: GameState, x: number, y: number): TapTarget
   ] : [
     ...state.nodes.filter(node => node.amount > 0).map(node => ({ target: { kind: 'node' as const, id: node.id, x: node.x, y: node.y } })),
     ...piles,
-    ...state.trees.map(tree => ({ target: { kind: 'tree' as const, id: tree.id, x: tree.x, y: tree.y }, sprite: tree.sprite })),
+    ...choppableTrees(state).map(tree => ({ target: { kind: 'tree' as const, id: tree.id, x: tree.x, y: tree.y }, sprite: tree.sprite })),
     ...(Object.keys(SITES) as SiteId[]).map(id => ({ target: { kind: 'site' as const, id, x: SITES[id].x, y: SITES[id].y } })),
     { target: { kind: 'lookout', x: LOOKOUT.x, y: LOOKOUT.y }, sprite: 'lookout' },
     { target: { kind: 'fire', x: BALANCE.campX, y: BALANCE.campY } },

@@ -1,7 +1,8 @@
 import { isWinter, nightStart } from '../game/calendar';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceKind, type SiteId, type TreeNode } from '../game/state';
-import { isAtCamp, sleepBlocker, type GameAction } from '../game/rules';
+import { isAtCamp, isInClearing, sleepBlocker, type GameAction } from '../game/rules';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
+import { choppableTrees, isClearingStump } from '../game/clearing';
 import { sitePrompt } from '../game/sitePrompt';
 import { OFFER_PROMPT, offerFor } from '../game/companion';
 import { closestGatherable, type Gatherable } from './tapTarget';
@@ -52,7 +53,7 @@ export function gatherSpot(action: GameAction, before: GameState): { x: number; 
   switch (action.type) {
     case 'gather': return before.nodes.find(item => item.id === action.nodeId);
     case 'chopTree': {
-      const tree = before.trees.find(item => item.id === action.treeId);
+      const tree = choppableTrees(before).find(item => item.id === action.treeId);
       return tree && { x: tree.x, y: tree.y, kind: 'branch' };
     }
     case 'pickUpStone': {
@@ -71,7 +72,7 @@ const within = (state: GameState, point: { x: number; y: number }): boolean => a
 /** The nearest camp tree in reach, mature or stump. */
 export function closestTree(state: GameState): TreeNode | undefined {
   if (state.area !== 'camp') return undefined;
-  return state.trees.filter(tree => within(state, tree)).sort((a, b) => away(state, a) - away(state, b))[0];
+  return choppableTrees(state).filter(tree => within(state, tree)).sort((a, b) => away(state, a) - away(state, b))[0];
 }
 
 /** The nearest place along the camp paths in reach. */
@@ -109,6 +110,7 @@ function lookoutPrompt(state: GameState): string {
 function treePrompt(state: GameState): string {
   const tree = closestTree(state);
   if (!tree) return '';
+  if (isClearingStump(tree)) return 'Stump · this ground is being cleared';
   if (tree.readyDay > state.day) return `Stump · regrows day ${tree.readyDay}`;
   if (state.progress.axeCrafted) return 'X  Chop mature tree';
   return 'Mature tree · craft an axe at camp';
@@ -116,7 +118,8 @@ function treePrompt(state: GameState): string {
 
 function campPrompt(state: GameState): string {
   if (pathOpen(state) && within(state, CAMP_EXIT)) return 'Walk west to leave camp';
-  if (!isAtCamp(state)) return 'WASD / arrows  Move';
+  if (!isInClearing(state)) return 'WASD / arrows  Move';
+  if (!isAtCamp(state)) return 'In the clearing · G Stargaze · Click an upgrade to build';
   if (!sleepBlocker(state)) return 'At camp · C Cook · G Stargaze · Z Sleep · F Fire';
   if (state.timeOfDay >= nightStart(state.day)) return 'At camp · C Cook · G Stargaze · F Fire · R Rest';
   return 'At camp · F Fire · R Rest · Click an upgrade to build';
