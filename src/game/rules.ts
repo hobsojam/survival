@@ -3,9 +3,12 @@ import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } 
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
-import { bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
+import { availableStone, availableWood, spendWood, bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
+import { POT_COST, cookBlocker, defaultDish, dishBlocker, foodWord, packDish, potBlocker, serveDish, spendIngredients, type DishId } from './cooking';
 import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
 import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, type StepId } from './clearing';
+import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
+import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
 import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
 
@@ -19,7 +22,11 @@ export type GameAction =
   | { type: 'move'; dx: number; dy: number }
   | { type: 'plantGarden'; plotIndex: number }
   | { type: 'harvestGarden'; plotIndex: number }
-  | { type: 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'befriend' | 'craftPillow' | 'craftCloak' }
+  | { type: 'eat'; item?: FoodItem }
+  | { type: 'storeFood'; item: FoodItem }
+  | { type: 'takeFood'; item: FoodItem }
+  | { type: 'cook'; dish?: DishId }
+  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'storeWood' | 'takeWood' | 'befriend' | 'craftPillow' | 'craftCloak' }
   | { type: 'pickUpStone'; pileId: string };
 
 /** Awake time tires the survivor; work already costs energy, and resting doesn't. */
@@ -36,12 +43,7 @@ function near(x1: number, y1: number, x2: number, y2: number, radius: number = B
 
 export const FULL_BAG_MESSAGE = 'Your bag is full. Eat, burn, or set something down at camp to make room.';
 
-export { bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor };
-
-/** Stone a build can use: the bag plus the camp stone pile, which counts from anywhere. */
-export function availableStone(state: GameState): number {
-  return state.inventory.stone + state.storedStone;
-}
+export { availableStone, availableWood, spendWood, bagCapacity, carriedCount, cookBlocker, freeSpaces, isAtCamp, isInClearing, spaceFor };
 
 /** Pays stone from the bag first, then from the camp pile. */
 export function spendStone(state: GameState, amount: number): GameState {
@@ -52,7 +54,10 @@ export function spendStone(state: GameState, amount: number): GameState {
 export function trailFoodBlocker(state: GameState): string | null {
   if (!state.structures.dryingRack) return 'Build a drying rack to prepare trail food.';
   if (!isAtCamp(state)) return 'Return to camp to use the drying rack.';
-  if (state.inventory.food <= 0) return 'Gather a berry to prepare trail food.';
+  if (availableFood(state, 'berry') <= 0) return 'Gather a berry to prepare trail food.';
+  // The berry may come from the larder, oldest first, so only a bag berry makes room for the ration.
+  const spent = spendFood(state, 'berry', 1);
+  if (spent && freeSpaces(spent) < spaceFor('food')) return 'Make room in your bag for the ration.';
   return null;
 }
 
@@ -63,8 +68,8 @@ export function lookoutRepairBlocker(state: GameState): string | null {
   if (!near(state.player.x, state.player.y, LOOKOUT.x, LOOKOUT.y)) return 'Stand beside the lookout to repair it.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   const { wood, fiber, stone } = LOOKOUT.cost;
-  if (state.inventory.wood < wood || state.inventory.fiber < fiber || availableStone(state) < stone) {
-    const needed = [state.inventory.wood < wood ? `${wood} wood` : null,
+  if (availableWood(state) < wood || state.inventory.fiber < fiber || availableStone(state) < stone) {
+    const needed = [availableWood(state) < wood ? `${wood} wood` : null,
       state.inventory.fiber < fiber ? `${fiber} fiber` : null,
       availableStone(state) < stone ? `${stone} stone` : null].filter(Boolean).join(' and ');
     return `Need ${needed} to repair the lookout.`;
@@ -94,15 +99,6 @@ export function sleepBlocker(state: GameState): string | null {
   return null;
 }
 
-/** Why the survivor can't cook right now, or null if they can. */
-export function cookBlocker(state: GameState): string | null {
-  if (state.timeOfDay < nightStart(state.day)) return 'Cook berries after nightfall.';
-  if (!isAtCamp(state)) return 'Return to camp to cook.';
-  if (state.fireFuel <= 0) return 'Light the campfire before cooking.';
-  if (state.inventory.food <= 0) return 'Gather a berry to cook.';
-  return null;
-}
-
 /** Why the survivor can't watch the stars right now, or null if they can. */
 export function stargazeBlocker(state: GameState): string | null {
   if (state.timeOfDay < nightStart(state.day)) return 'Wait until nightfall to watch the stars.';
@@ -118,14 +114,22 @@ export function pickaxeBlocker(state: GameState): string | null {
   if (!isInClearing(state)) return 'Return to camp to craft the pickaxe.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   const { wood, fiber, stone } = PICKAXE.cost;
-  if (state.inventory.wood < wood || state.inventory.fiber < fiber || availableStone(state) < stone)
+  if (availableWood(state) < wood || state.inventory.fiber < fiber || availableStone(state) < stone)
     return `Need ${wood} wood, ${fiber} fiber, and ${stone} stone for the pickaxe.`;
   return null;
 }
 
-export type BuildStatus = 'built' | 'locked' | 'needsShelter' | 'needsPrerequisite' | 'ready' | 'unavailable';
+export type BuildStatus = 'built' | 'locked' | 'needsShelter' | 'needsPrerequisite' | 'needsGround' | 'ready' | 'unavailable';
 
-/** How a structure's build button should look: built, locked, blocked by a missing shelter, ready to build here, or not yet. */
+/** Why a building can't go up until its ground is cleared, naming the side and step, or null if it needs none or it is clear. */
+export function groundBlocker(state: GameState, id: StructureId): string | null {
+  const definition = BUILDINGS[id];
+  if (!('ground' in definition) || state.clearing.cleared.includes(definition.ground)) return null;
+  const step = definition.ground;
+  return `Clear the ${CLEARING_STEPS[step].side} side's ${step.endsWith('-far') ? 'far' : 'near'} ground first.`;
+}
+
+/** How a structure's build button should look: built, locked, blocked by a missing shelter or uncleared ground, ready to build here, or not yet. */
 export function buildStatus(state: GameState, id: StructureId): BuildStatus {
   const definition = BUILDINGS[id];
   if (state.structures[id]) return 'built';
@@ -133,9 +137,10 @@ export function buildStatus(state: GameState, id: StructureId): BuildStatus {
   const missingPrerequisite = missingStructurePrerequisite(state, definition);
   if (missingPrerequisite === 'shelter') return 'needsShelter';
   if (missingPrerequisite) return 'needsPrerequisite';
+  if (groundBlocker(state, id)) return 'needsGround';
   const cost = definition.cost;
   const stoneCost = 'stone' in cost ? cost.stone : 0;
-  const affordable = state.inventory.wood >= cost.wood && state.inventory.fiber >= cost.fiber && availableStone(state) >= stoneCost;
+  const affordable = availableWood(state) >= cost.wood && state.inventory.fiber >= cost.fiber && availableStone(state) >= stoneCost;
   return affordable && isInClearing(state) && !isExhausted(state) ? 'ready' : 'unavailable';
 }
 
@@ -232,6 +237,13 @@ function dawn(next: GameState, camp: boolean): void {
   // Rocks give their stone once; everything else grows back at dawn.
   next.nodes = next.nodes.map(node => node.kind !== 'stone' && node.readyDay <= next.day ? { ...node, amount: 1 } : node);
   companionDawn(next);
+  // The bag and the larder both throw out what has gone soft, wherever the survivor is; one note covers both.
+  const bag = spoil(next.inventory.food, next.day, BALANCE.bagFreshDays);
+  const larder = spoil(next.larder, next.day, BALANCE.larderFreshDays);
+  next.inventory = { ...next.inventory, food: bag.store };
+  next.larder = larder.store;
+  const lost = { berry: bag.lost.berry + larder.lost.berry, greens: bag.lost.greens + larder.lost.greens };
+  if (lost.berry + lost.greens > 0) next.lastSpoiled = { day: next.day, ...lost };
   if (!stormEnded) return;
   if (weathered) {
     next.progress = { ...next.progress, nextStormDay: null, hearthUnlocked: true };
@@ -253,12 +265,12 @@ function tire(state: GameState, cost: number): GameState['player'] {
   return { ...state.player, energy: Math.max(0, state.player.energy - cost) };
 }
 
-/** Pays wood and fiber from the bag and stone from the bag or pile, then spends build time. */
+/** Pays fiber from the bag and wood and stone from the bag or their stores, then spends build time. */
 function payAndBuild(state: GameState, cost: { wood: number; fiber: number; stone: number }, changes: Partial<GameState>): GameState {
-  const paid = spendStone(state, cost.stone);
+  const paid = spendWood(spendStone(state, cost.stone), cost.wood);
   return advanceTime({
     ...paid,
-    inventory: { ...paid.inventory, wood: state.inventory.wood - cost.wood, fiber: state.inventory.fiber - cost.fiber },
+    inventory: { ...paid.inventory, fiber: state.inventory.fiber - cost.fiber },
     player: tire(state, BALANCE.buildEnergyCost),
     ...changes
   }, workSeconds(state, BALANCE.buildSeconds), 'working');
@@ -293,29 +305,43 @@ const cross: ActionHandler<'cross'> = state => {
   };
 };
 
-const NODE_RESOURCE: Record<GameState['nodes'][number]['kind'], keyof GameState['inventory']> = { branch: 'wood', berry: 'food', fiber: 'fiber', stone: 'stone' };
-const GATHER_MESSAGE: Partial<Record<keyof GameState['inventory'], string>> = {
-  wood: 'Picked up fallen branches.', food: 'Picked berries.', fiber: 'Gathered fiber.', stone: 'Collected stone.'
+type Supply = keyof GameState['inventory'];
+// Berries and forage go into the food store.
+const NODE_RESOURCE: Record<GameState['nodes'][number]['kind'], Supply> = {
+  branch: 'wood', berry: 'food', fiber: 'fiber', stone: 'stone', hazel: 'food', pine: 'food', greens: 'food', honey: 'food'
 };
+const GATHER_MESSAGE: Record<GameState['nodes'][number]['kind'], string> = {
+  branch: 'Picked up fallen branches.', berry: 'Picked berries.', fiber: 'Gathered fiber.', stone: 'Collected stone.',
+  hazel: 'Gathered a hazelnut.', pine: 'Gathered a bunch of pine needles.', greens: 'Picked wild greens.', honey: 'Took a little honey from the hollow tree.'
+};
+
+/** The bag with n more of a supply; food comes in as the item given (berries unless said), picked today. */
+function withSupply(state: GameState, resource: Supply, n: number, item: FoodItem = 'berry'): GameState['inventory'] {
+  const { inventory } = state;
+  if (resource === 'food') return { ...inventory, food: addFood(inventory.food, item, n, state.day) };
+  return { ...inventory, [resource]: inventory[resource] + n };
+}
 
 const gather: ActionHandler<'gather'> = (state, action) => {
   const node = state.nodes.find(item => item.id === action.nodeId);
-  if (!node || state.area !== 'camp' || !near(state.player.x, state.player.y, node.x, node.y)) return refuse(state, 'Move closer to gather.');
+  if (!node || state.area !== 'camp' || !nodeShown(state, node) || !near(state.player.x, state.player.y, node.x, node.y)) return refuse(state, 'Move closer to gather.');
   if (node.kind === 'berry' && isWinter(state.day)) return refuse(state, 'The bushes are bare until spring.');
   if (node.amount <= 0) return refuse(state, 'Nothing to gather yet.');
   const resource = NODE_RESOURCE[node.kind];
   if (freeSpaces(state) < spaceFor(resource)) return refuse(state, FULL_BAG_MESSAGE);
-  const nodes = state.nodes.map(item => item === node ? { ...item, amount: item.amount - 1, readyDay: state.day + 1 } : item);
+  const forage = isForage(node.kind) ? FORAGE[node.kind] : null;
+  const readyDay = state.day + (forage?.regrowDays ?? 1);
+  const nodes = state.nodes.map(item => item === node ? { ...item, amount: item.amount - 1, readyDay } : item);
   // Summer bushes are heavy: two berries a pick, if the bag has room.
   const picked = node.kind === 'berry' && isSummer(state.day) ? Math.min(BALANCE.summerBerries, freeSpaces(state)) : 1;
   return {
     state: advanceTime({
       ...state,
       player: tire(state, BALANCE.gatherEnergyCost),
-      inventory: { ...state.inventory, [resource]: state.inventory[resource] + picked },
+      inventory: withSupply(state, resource, picked, forage?.item),
       nodes
     }, workSeconds(state, BALANCE.gatherSeconds), 'working'),
-    message: picked > 1 ? 'Picked two handfuls of berries.' : GATHER_MESSAGE[resource] ?? ''
+    message: picked > 1 ? 'Picked two handfuls of berries.' : GATHER_MESSAGE[node.kind]
   };
 };
 
@@ -325,7 +351,7 @@ export function axeBlocker(state: GameState): string | null {
   if (!state.structures.toolshed) return 'Build a toolshed first.';
   if (!isInClearing(state)) return 'Return to camp to craft the axe.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
-  if (state.inventory.wood < 1 || state.inventory.fiber < 1 || availableStone(state) < 1) return 'Need 1 wood, 1 fiber, and 1 stone for the axe.';
+  if (availableWood(state) < 1 || state.inventory.fiber < 1 || availableStone(state) < 1) return 'Need 1 wood, 1 fiber, and 1 stone for the axe.';
   return null;
 }
 
@@ -344,6 +370,15 @@ const craftPickaxe: ActionHandler<'craftPickaxe'> = state => {
   return {
     state: payAndBuild(state, PICKAXE.cost, { progress: { ...state.progress, pickaxeCrafted: true } }),
     message: 'Crafted a pickaxe. The quarry face can be worked now.'
+  };
+};
+
+const craftPot: ActionHandler<'craftPot'> = state => {
+  const blocker = potBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  return {
+    state: payAndBuild(state, POT_COST, { progress: { ...state.progress, potCrafted: true } }),
+    message: 'Made a cooking pot. It hangs over the fire on a little tripod.'
   };
 };
 
@@ -457,7 +492,7 @@ const visitSite: ActionHandler<'visitSite'> = (state, action) => {
   const found = advanceTime({
     ...state,
     player: tire(state, BALANCE.gatherEnergyCost),
-    inventory: { ...state.inventory, [resource]: state.inventory[resource] + 2 },
+    inventory: withSupply(state, resource, 2),
     progress: { ...state.progress, discoveries: { ...state.progress.discoveries, [action.siteId]: true } }
   }, workSeconds(state, BALANCE.gatherSeconds), 'working');
   return { state: found, message: action.siteId === 'basket' ? 'An old basket holds two berries.' : 'You find two useful stones tucked in the cairn.' };
@@ -483,6 +518,76 @@ const takeStone: ActionHandler<'takeStone'> = state => {
   if (state.storedStone < 1) return refuse(state, 'The stone pile is empty.');
   if (freeSpaces(state) < spaceFor('stone')) return refuse(state, FULL_BAG_MESSAGE);
   return { state: { ...state, inventory: { ...state.inventory, stone: state.inventory.stone + 1 }, storedStone: state.storedStone - 1 }, message: 'Took a stone from the pile.' };
+};
+
+function woodpileBlocker(state: GameState): string | null {
+  if (!state.structures.woodpile) return 'Build a woodpile first.';
+  if (!isInClearing(state)) return 'Return to camp to use the woodpile.';
+  return null;
+}
+
+const storeWood: ActionHandler<'storeWood'> = state => {
+  const blocker = woodpileBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  if (state.inventory.wood < 1) return refuse(state, 'You have no wood to store.');
+  if (state.storedWood >= BALANCE.woodpileCapacity) return refuse(state, 'The woodpile is full.');
+  return { state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood - 1 }, storedWood: state.storedWood + 1 }, message: 'Stacked a log on the woodpile.' };
+};
+
+const takeWood: ActionHandler<'takeWood'> = state => {
+  const blocker = woodpileBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  if (state.storedWood < 1) return refuse(state, 'The woodpile is empty.');
+  if (freeSpaces(state) < spaceFor('wood')) return refuse(state, FULL_BAG_MESSAGE);
+  return { state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood + 1 }, storedWood: state.storedWood - 1 }, message: 'Took a log from the woodpile.' };
+};
+
+function larderBlocker(state: GameState): string | null {
+  if (!state.structures.larder) return 'Build a larder first.';
+  if (!isInClearing(state)) return 'Return to camp to use the larder.';
+  return null;
+}
+
+/** Moves one of an item between stores: fresh food keeps the day it was picked; `pick` chooses which piece. */
+function moveOne(from: FoodStore, to: FoodStore, item: FoodItem, pick: (days: number[]) => number): { from: FoodStore; to: FoodStore } {
+  if (!isFresh(item)) return { from: { ...from, [item]: from[item] - 1 }, to: { ...to, [item]: to[item] + 1 } };
+  const day = pick(from[item]);
+  const index = from[item].indexOf(day);
+  return { from: { ...from, [item]: from[item].filter((_, i) => i !== index) }, to: addFood(to, item, 1, day) };
+}
+
+/** Why one of an item can't go into the larder now, or null. */
+export function storeFoodBlocker(state: GameState, item: FoodItem): string | null {
+  const blocker = larderBlocker(state);
+  if (blocker) return blocker;
+  if (foodCount(state.inventory.food, item) < 1) return `You have no ${foodWord(item, 2)} to store.`;
+  if (storeTotal(state.larder) >= BALANCE.larderCapacity) return 'The larder is full.';
+  return null;
+}
+
+/** Why one of an item can't come out of the larder now, or null. */
+export function takeFoodBlocker(state: GameState, item: FoodItem): string | null {
+  const blocker = larderBlocker(state);
+  if (blocker) return blocker;
+  if (foodCount(state.larder, item) < 1) return `The larder has no ${foodWord(item, 2)}.`;
+  if (freeSpaces(state) < 1) return FULL_BAG_MESSAGE;
+  return null;
+}
+
+/** Puts the bag's oldest piece of an item in the larder, where it keeps longer. */
+const storeFood: ActionHandler<'storeFood'> = (state, action) => {
+  const blocker = storeFoodBlocker(state, action.item);
+  if (blocker) return refuse(state, blocker);
+  const moved = moveOne(state.inventory.food, state.larder, action.item, days => Math.min(...days));
+  return { state: { ...state, inventory: { ...state.inventory, food: moved.from }, larder: moved.to }, message: `Stored 1 ${foodWord(action.item, 1)} in the larder.` };
+};
+
+/** Takes the larder's freshest piece of an item into the bag. */
+const takeFood: ActionHandler<'takeFood'> = (state, action) => {
+  const blocker = takeFoodBlocker(state, action.item);
+  if (blocker) return refuse(state, blocker);
+  const moved = moveOne(state.larder, state.inventory.food, action.item, days => Math.max(...days));
+  return { state: { ...state, inventory: { ...state.inventory, food: moved.to }, larder: moved.from }, message: `Took 1 ${foodWord(action.item, 1)} from the larder.` };
 };
 
 const dropStone: ActionHandler<'dropStone'> = state => {
@@ -518,53 +623,55 @@ const burnFiber: ActionHandler<'burnFiber'> = state => {
   };
 };
 
-const eat: ActionHandler<'eat'> = state => {
-  if (state.inventory.food <= 0) return refuse(state, 'No food in your bag.');
+function eatRation(state: GameState): ActionResult {
+  const fed = spendFood(state, 'trailFood', 1);
+  if (!fed) return refuse(state, 'No trail rations in your bag.');
   return {
-    state: {
-      ...state,
-      inventory: { ...state.inventory, food: state.inventory.food - 1 },
-      player: { ...state.player, hunger: Math.min(100, state.player.hunger + BALANCE.eatHungerGain) }
-    },
-    message: 'Ate some berries.'
-  };
-};
-
-const eatTrailFood: ActionHandler<'eatTrailFood'> = state => {
-  if (state.inventory.trailFood <= 0) return refuse(state, 'No trail rations in your bag.');
-  return {
-    state: { ...state,
-      inventory: { ...state.inventory, trailFood: state.inventory.trailFood - 1 },
-      player: { ...state.player, hunger: Math.min(100, state.player.hunger + BALANCE.trailFoodHungerGain) }
-    },
+    state: { ...fed, player: { ...fed.player, hunger: Math.min(100, fed.player.hunger + BALANCE.trailFoodHungerGain) } },
     message: 'Ate a trail ration.'
+  };
+}
+const eatTrailFood: ActionHandler<'eatTrailFood'> = eatRation;
+
+/** Eats one of the item named, or what Q would pick; pine needles wait for tea, and a ration is eaten as one. */
+const eat: ActionHandler<'eat'> = (state, action) => {
+  const item = action.item ?? quickEatItem(state);
+  if (item === 'pineNeedles') return refuse(state, 'Pine needles are for tea.');
+  if (item === 'trailFood') return eatRation(state);
+  const fed = item && spendFood(state, item, 1);
+  if (!item || !fed) return refuse(state, 'No food in your bag.');
+  const { hunger, energy, message } = eatEffect(item);
+  const { player } = fed;
+  return {
+    state: { ...fed, player: { ...player, hunger: Math.min(100, player.hunger + hunger), energy: Math.min(100, player.energy + energy) } },
+    message
   };
 };
 
 const prepareTrailFood: ActionHandler<'prepareTrailFood'> = state => {
   const blocker = trailFoodBlocker(state);
-  if (blocker) return refuse(state, blocker);
+  const spent = spendFood(state, 'berry', 1);
+  if (blocker || !spent) return refuse(state, blocker ?? 'No food in your bag.');
   return {
-    state: advanceTime({ ...state,
-      inventory: { ...state.inventory, food: state.inventory.food - 1, trailFood: state.inventory.trailFood + 1 },
+    state: advanceTime({ ...spent,
+      inventory: { ...spent.inventory, food: addFood(spent.inventory.food, 'trailFood', 1, state.day) },
       player: tire(state, BALANCE.gatherEnergyCost)
     }, workSeconds(state, BALANCE.trailFoodSeconds), 'working'),
     message: 'Dried a berry into one trail ration.'
   };
 };
 
-const cook: ActionHandler<'cook'> = state => {
-  const blocker = cookBlocker(state);
-  if (blocker) return refuse(state, blocker);
-  const cooked = advanceTime({ ...state, inventory: { ...state.inventory, food: state.inventory.food - 1 } }, BALANCE.cookSeconds, 'resting');
-  return {
-    state: { ...cooked, player: { ...cooked.player,
-      hunger: Math.min(100, cooked.player.hunger + (state.structures.dryingRack ? BALANCE.rackCookHungerGain : BALANCE.cookHungerGain)),
-      warmth: Math.min(100, cooked.player.warmth + BALANCE.cookWarmthGain)
-    } },
-    message: 'You toast a berry by the fire. A warm little meal.'
-  };
+/** Cooks the dish named, or what C would pick; with nothing to cook, the berry's refusal explains why. */
+const cook: ActionHandler<'cook'> = (state, action) => {
+  const dish = action.dish ?? defaultDish(state) ?? 'berries';
+  const blocker = dishBlocker(state, dish);
+  const spent = spendIngredients(state, dish);
+  if (blocker || !spent) return refuse(state, blocker ?? 'No food in your bag.');
+  return serveDish(advanceTime(packDish(spent, dish), BALANCE.cookSeconds, 'resting'), dish, state.structures.dryingRack);
 };
+
+/** A honey cake's extra energy for this rest or sleep, if one was eaten. */
+const cakeEnergy = (state: GameState): number => state.cakeBonus ? BALANCE.honeyCakeRestBonus : 0;
 
 const STARGAZE_THOUGHTS = [
   'The stars shine between the trees.',
@@ -584,9 +691,9 @@ const stargaze: ActionHandler<'stargaze'> = state => {
 
 const stokeFire: ActionHandler<'stokeFire'> = state => {
   if (!isAtCamp(state)) return refuse(state, 'Move closer to the fire to tend it.');
-  if (state.inventory.wood < 1) return refuse(state, 'You need wood for the fire.');
+  if (availableWood(state) < 1) return refuse(state, 'You need wood for the fire.');
   return {
-    state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood - 1 }, fireFuel: state.fireFuel + (state.structures.hearth ? BALANCE.hearthFireSecondsPerWood : BALANCE.fireSecondsPerWood) },
+    state: { ...spendWood(state, 1), fireFuel: state.fireFuel + (state.structures.hearth ? BALANCE.hearthFireSecondsPerWood : BALANCE.fireSecondsPerWood) },
     message: 'The fire burns brighter.'
   };
 };
@@ -611,7 +718,7 @@ export function plantGardenBlocker(state: GameState, plotIndex: number): string 
   if (!isInClearing(state)) return 'Return to camp to tend the garden.';
   if (!isSpring(state.day)) return 'Plant berry bushes in spring.';
   if (state.gardenPlots[plotIndex].plantedYear !== null) return 'That plot already has a berry bush.';
-  if (state.inventory.food < 1) return 'You need a berry to plant.';
+  if (availableFood(state, 'berry') < 1) return 'You need a berry to plant.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   return null;
 }
@@ -628,13 +735,13 @@ export function harvestGardenBlocker(state: GameState, plotIndex: number): strin
 
 const plantGarden: ActionHandler<'plantGarden'> = (state, action) => {
   const blocker = plantGardenBlocker(state, action.plotIndex);
-  if (blocker) return refuse(state, blocker);
+  const spent = spendFood(state, 'berry', 1);
+  if (blocker || !spent) return refuse(state, blocker ?? 'No food in your bag.');
   const gardenPlots = state.gardenPlots.map((plot, index) => index === action.plotIndex
     ? { plantedYear: yearOf(state.day), harvestedYear: null, harvestReady: false }
     : plot);
   const planted = {
-    ...state,
-    inventory: { ...state.inventory, food: state.inventory.food - 1 },
+    ...spent,
     gardenPlots,
     player: tire(state, BALANCE.gatherEnergyCost)
   };
@@ -649,7 +756,7 @@ const harvestGarden: ActionHandler<'harvestGarden'> = (state, action) => {
     : plot);
   const harvested = {
     ...state,
-    inventory: { ...state.inventory, food: state.inventory.food + 2 },
+    inventory: { ...state.inventory, food: addFood(state.inventory.food, 'berry', 2, state.day) },
     gardenPlots,
     player: tire(state, BALANCE.gatherEnergyCost)
   };
@@ -658,7 +765,7 @@ const harvestGarden: ActionHandler<'harvestGarden'> = (state, action) => {
 
 function missingCost(state: GameState, cost: { wood: number; fiber: number; stone: number }): string | null {
   const needed = [
-    state.inventory.wood < cost.wood ? `${cost.wood} wood` : null,
+    availableWood(state) < cost.wood ? `${cost.wood} wood` : null,
     state.inventory.fiber < cost.fiber ? `${cost.fiber} fiber` : null,
     availableStone(state) < cost.stone ? `${cost.stone} stone` : null
   ].filter(Boolean);
@@ -671,6 +778,8 @@ function buildBlocker(state: GameState, structureId: StructureId): string | null
   if (!definition) return 'That structure is unavailable.';
   if (definition.prerequisite === 'coldNight' && !state.progress.hearthUnlocked) return 'Weather the cold night to unlock the hearth.';
   if (state.structures[structureId]) return 'Already built.';
+  const ground = groundBlocker(state, structureId);
+  if (ground) return ground;
   const missingStructure = missingStructurePrerequisite(state, definition);
   if (missingStructure) return `Build the ${BUILDINGS[missingStructure].name.toLowerCase()} first.`;
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
@@ -695,9 +804,9 @@ const rest: ActionHandler<'rest'> = state => {
   if (!isAtCamp(state)) return refuse(state, 'Move closer to the fire to rest.');
   const rested = advanceTime(state, BALANCE.restSeconds, 'resting');
   const bedGain = BALANCE.bedRestEnergyGain + (state.companion.pillow ? BALANCE.pillowEnergyGain : 0);
-  const gain = recovery(state, rested.structures.bed ? bedGain : BALANCE.restEnergyGain);
+  const gain = recovery(state, rested.structures.bed ? bedGain : BALANCE.restEnergyGain) + cakeEnergy(state);
   return {
-    state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + gain) } },
+    state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + gain) }, cakeBonus: false },
     message: 'You take a short rest.'
   };
 };
@@ -720,11 +829,11 @@ const sleep: ActionHandler<'sleep'> = state => {
   const alarm = alarmAfter(state);
   if (alarm !== null && alarm < night) {
     // Woken early, the survivor gets the share of the night's rest they slept.
-    const energy = state.player.energy + (sleptEnergy(state) - state.player.energy) * alarm / night;
-    const woken = advanceTime({ ...state, player: { ...state.player, energy } }, alarm, 'resting');
+    const energy = Math.min(100, state.player.energy + (sleptEnergy(state) - state.player.energy) * alarm / night + cakeEnergy(state));
+    const woken = advanceTime({ ...state, player: { ...state.player, energy }, cakeBonus: false }, alarm, 'resting');
     return { state: { ...woken, companion: { ...woken.companion, alarmDay: state.day } }, message: ALARM_MESSAGE };
   }
-  const slept = advanceTime({ ...state, player: { ...state.player, energy: sleptEnergy(state) } }, night, 'resting');
+  const slept = advanceTime({ ...state, player: { ...state.player, energy: Math.min(100, sleptEnergy(state) + cakeEnergy(state)) }, cakeBonus: false }, night, 'resting');
   const fireDied = state.fireFuel > 0 && slept.fireFuel <= 0;
   return {
     state: slept,
@@ -753,8 +862,8 @@ const craftCloak: ActionHandler<'craftCloak'> = state =>
   craftKeepsake(state, 'cloak', cloakBlocker(state), 'You made a fur cloak. The nights will bite a little less.');
 
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
-  move, cross, gather, craftAxe, craftPickaxe, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
-  storeStone, takeStone, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
+  move, cross, gather, craftAxe, craftPickaxe, craftPot, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
+  storeStone, takeStone, storeWood, takeWood, storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
   cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, rest, sleep, befriend, craftPillow, craftCloak
 };
 

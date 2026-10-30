@@ -59,6 +59,71 @@ function reeds(g: Grid, ready: boolean, lean = 0): void {
   }
 }
 
+// Seasonal forage. The hazel's leaves use the broadleaf crown colours, so they turn with the trees in autumn.
+const forageLegend = { s: 'shadow', a: 'wood0', b: 'wood1', c: 'wood2', d: 'wood3', e: 'wood4', h: 'leaf0', i: 'leaf1', j: 'leaf2', k: 'leaf3', l: 'leaf4',
+  m: 'crown1', n: 'crown2', o: 'crown3', p: 'crown4', q: 'grass1', r: 'grass3', t: 'grass4', u: 'scarf2', v: 'scarf3', w: 'scarf4', x: 'ink', y: 'earth2', z: 'earth3' } as const;
+function hazel(g: Grid, ready: boolean): void {
+  oval(g, 8, 14, 6, 2, 's');
+  for (const [x0, x1] of [[5, 3], [8, 8], [11, 13]]) line(g, x0, 13, x1, 6, 'b');
+  oval(g, 8, 8, 6, 4, 'm'); oval(g, 6, 7, 3, 2, 'n'); oval(g, 11, 7, 3, 3, 'n');
+  box(g, 4, 5, 3, 1, 'o'); box(g, 10, 4, 3, 1, 'o'); dot(g, 5, 5, 'p'); dot(g, 11, 4, 'p');
+  if (!ready) return;
+  // Nuts in pale husks, in twos and threes.
+  for (const [x, y] of [[4, 9], [9, 10], [11, 7], [6, 6]]) {
+    box(g, x, y, 2, 2, 'd'); dot(g, x, y, 'e'); dot(g, x + 1, y + 1, 'c');
+    dot(g, x, y - 1, 'l'); dot(g, x + 1, y - 1, 'k');
+  }
+}
+function pineSapling(g: Grid, ready: boolean): void {
+  oval(g, 8, 14, 5, 2, 's'); box(g, 7, 11, 2, 3, 'b'); dot(g, 7, 11, 'c');
+  for (const [y, half] of [[2, 1], [3, 2], [5, 3], [6, 4], [8, 5], [9, 6], [10, 6]]) {
+    box(g, 8 - half, y, half * 2, 1, 'i'); box(g, 8, y, half, 1, 'h');
+  }
+  dot(g, 7, 1, 'j'); dot(g, 8, 1, 'j');
+  if (!ready) {
+    for (const [x, y] of [[4, 8], [11, 9], [6, 5], [10, 6]]) dot(g, x, y, 'c');
+    return;
+  }
+  // Bright new needle tips, frosted at their ends in winter.
+  for (const [x, y] of [[6, 3], [9, 3], [5, 5], [10, 5], [4, 8], [11, 8], [3, 10], [12, 10], [7, 7]]) {
+    dot(g, x, y, 'k'); dot(g, x, y - 1, 'l');
+  }
+}
+function greens(g: Grid, ready: boolean): void {
+  oval(g, 8, 14, 6, 2, 's');
+  if (!ready) {
+    box(g, 4, 12, 8, 2, 'y'); box(g, 5, 12, 3, 1, 'z');
+    for (const x of [5, 8, 11]) line(g, x, 13, x, 11, 'q');
+    return;
+  }
+  // Broad wild-garlic leaves fanning from the ground, with a few white flower heads.
+  for (const [x0, y0, x1, y1] of [[8, 13, 3, 7], [8, 13, 6, 5], [8, 13, 10, 5], [8, 13, 13, 7], [8, 13, 8, 4]]) {
+    line(g, x0 - 1, y0, x1 - 1, y1 + 1, 'j'); line(g, x0, y0, x1, y1, 'k'); dot(g, x1, y1, 'l');
+  }
+  box(g, 5, 11, 6, 2, 'j'); line(g, 4, 12, 12, 12, 'r'); dot(g, 3, 12, 'q'); dot(g, 12, 11, 't');
+  for (const [x, y] of [[5, 4], [11, 4]]) { dot(g, x, y, 'w'); dot(g, x, y + 1, 'q'); }
+}
+type HollowFrame = 'ready' | 'gathered' | 'bees0' | 'bees1';
+function hollowTree(g: Grid, frame: HollowFrame): void {
+  oval(g, 12, 30, 9, 2, 's');
+  // An old broken trunk with roots, a stub of a branch and a few green shoots on top.
+  box(g, 7, 6, 10, 24, 'b'); box(g, 7, 6, 3, 24, 'a'); box(g, 14, 6, 2, 24, 'c'); line(g, 16, 6, 16, 29, 'd');
+  line(g, 4, 30, 7, 26, 'b'); line(g, 20, 30, 17, 26, 'c'); line(g, 3, 30, 5, 30, 'a');
+  for (const [x, y] of [[7, 5], [9, 4], [11, 5], [13, 3], [15, 5], [16, 4]]) box(g, x, y, 2, 2, 'b');
+  dot(g, 13, 3, 'e'); dot(g, 16, 4, 'd');
+  line(g, 17, 12, 21, 9, 'c'); dot(g, 21, 9, 'e');
+  oval(g, 20, 8, 2, 1.5, 'j'); oval(g, 9, 3, 2, 1.5, 'j'); dot(g, 9, 2, 'l'); dot(g, 20, 7, 'l');
+  for (const y of [10, 16, 23]) line(g, 11, y, 12, y + 2, 'a');
+  // The hollow, with the comb glowing gold inside until the honey is taken.
+  oval(g, 12, 18, 2.5, 3.5, 'x'); oval(g, 12, 18, 3.5, 4.5, 'a'); oval(g, 12, 18, 2.5, 3.5, 'x');
+  if (frame === 'gathered') return;
+  box(g, 11, 18, 3, 3, 'u'); dot(g, 11, 18, 'v'); dot(g, 13, 19, 'v'); dot(g, 12, 20, 'w');
+  if (frame === 'ready') return;
+  // A few bees about the opening, drifting from side to side.
+  const spots = frame === 'bees0' ? [[16, 14], [8, 12], [17, 20]] : [[17, 13], [7, 14], [16, 21]];
+  for (const [x, y] of spots) { dot(g, x, y, 'v'); dot(g, x + 1, y, 'x'); }
+}
+
 const campLegend = { s: 'shadow', a: 'wood0', b: 'wood1', c: 'wood2', d: 'wood3', e: 'wood4', f: 'canvas0', g: 'canvas1', h: 'canvas2', i: 'canvas3', j: 'canvas4', k: 'berry2', l: 'berry4', m: 'stone0', n: 'stone1', o: 'stone2', p: 'stone3', q: 'stone4', r: 'fire0', t: 'fire1', u: 'fire2', v: 'fire3', w: 'fire4', z: 'earth3', A: 'earth2', B: 'earth4', C: 'scarf3' } as const;
 function stake(g: Grid, x: number, y: number): void {
   box(g, x, y, 2, 4, 'a'); box(g, x, y, 1, 2, 'd'); dot(g, x, y, 'e');
@@ -200,6 +265,19 @@ function flameOverlay(hearth: boolean): SpriteDef {
     frames[`${mode}${i}`] = g => flames(g, hearth, mode, i);
   return define(16, hearth ? 24 : 20, campLegend, frames, [8, hearth ? 16 : 12]);
 }
+/** Three poles lashed at the top, a dark pot hung on a cord beneath; steam curls up while the fire burns. */
+function potTripod(g: Grid, steam: number | null): void {
+  line(g, 12, 3, 2, 23, 'a'); line(g, 12, 3, 3, 23, 'c');
+  line(g, 12, 3, 22, 23, 'a'); line(g, 12, 3, 21, 23, 'b');
+  line(g, 12, 3, 13, 21, 'b');
+  box(g, 11, 2, 3, 2, 'h'); dot(g, 12, 2, 'j');
+  line(g, 12, 4, 12, 9, 'h');
+  line(g, 9, 10, 15, 10, 'n');
+  oval(g, 12, 13, 5, 3.5, 'm'); box(g, 7, 10, 11, 2, 'n'); box(g, 8, 10, 9, 1, 'o');
+  dot(g, 9, 12, 'n'); dot(g, 9, 13, 'n');
+  if (steam === null) return;
+  for (const [x, y] of steam ? [[11, 8], [13, 6], [12, 4]] : [[13, 8], [11, 6], [12, 5]]) { dot(g, x, y, 'q'); dot(g, x, y - 1, 'p'); }
+}
 function hearthSite(g: Grid): void {
   line(g, 2, 9, 21, 9, 'q'); line(g, 4, 3, 4, 9, 'q'); line(g, 21, 4, 21, 9, 'q');
   for (const [x, y] of [[7, 5], [12, 4], [17, 6]]) {
@@ -303,6 +381,47 @@ function toolshed(g: Grid): void {
   line(g, 23, 3, 23, 8, 'b'); box(g, 0, 9, 24, 1, 'b'); box(g, 0, 10, 24, 1, 'a');
   box(g, 2, 25, 20, 1, 'a');
 }
+function larderSite(g: Grid): void {
+  for (const [x, y] of [[3, 6], [19, 6], [3, 11], [19, 11]]) stake(g, x, y);
+  line(g, 5, 7, 19, 7, 'h'); line(g, 5, 12, 19, 12, 'h');
+  line(g, 10, 9, 14, 9, 'z');
+}
+/** A raised cache on four legs with a little ladder: a plank box under a lit roof, its open front showing what is kept. */
+function larder(g: Grid, stock: 'empty' | 'some' | 'full'): void {
+  oval(g, 12, 26, 10, 2, 's');
+  for (const x of [7, 17]) box(g, x, 13, 1, 11, 'a');
+  for (const x of [3, 19]) { box(g, x, 13, 2, 14, 'b'); line(g, x, 13, x, 25, 'd'); }
+  box(g, 2, 11, 20, 2, 'a'); line(g, 2, 11, 21, 11, 'c');
+  box(g, 3, 4, 18, 7, 'c'); for (const x of [7, 17]) line(g, x, 4, x, 10, 'b');
+  box(g, 9, 5, 7, 5, 'a');
+  box(g, 1, 1, 22, 3, 'd'); box(g, 2, 1, 10, 1, 'e'); line(g, 1, 3, 22, 3, 'b');
+  // The ladder leans from the platform's front edge down to the ground, its rails drifting two pixels left.
+  const rail = (top: number, y: number): number => Math.round(top - 2 * (y - 13) / 13);
+  line(g, 13, 13, 11, 26, 'd'); line(g, 16, 13, 14, 26, 'c');
+  for (const y of [16, 19, 22, 25]) line(g, rail(13, y) + 1, y, rail(16, y) - 1, y, 'e');
+  if (stock === 'empty') return;
+  box(g, 10, 8, 2, 2, 'k'); dot(g, 10, 8, 'l');
+  box(g, 13, 7, 2, 3, 'h'); dot(g, 13, 7, 'j');
+  if (stock === 'some') return;
+  box(g, 10, 5, 2, 3, 'h'); dot(g, 10, 5, 'j');
+  box(g, 12, 8, 1, 2, 'k'); dot(g, 14, 5, 'k'); dot(g, 15, 6, 'l');
+  box(g, 14, 8, 2, 2, 'B');
+}
+function woodpileSite(g: Grid): void {
+  for (const [x, y] of [[2, 7], [21, 7], [2, 11], [21, 11]]) stake(g, x, y);
+  line(g, 4, 8, 20, 8, 'h'); line(g, 4, 12, 20, 12, 'h');
+  line(g, 10, 10, 14, 10, 'z');
+}
+/** Split logs stacked in rows under a little lean-to roof; the roof is drawn last so the logs peek out beneath it. */
+function woodpile(g: Grid, stock: 'empty' | 'some' | 'full'): void {
+  oval(g, 12, 18, 10, 2, 's');
+  for (const x of [2, 20]) { box(g, x, 5, 2, 13, 'b'); line(g, x, 5, x, 17, 'd'); }
+  box(g, 4, 16, 16, 2, 'a'); line(g, 4, 17, 19, 17, 'b');
+  const log = (x: number, y: number): void => { box(g, x, y, 4, 3, 'c'); line(g, x, y, x + 3, y, 'e'); dot(g, x + 3, y + 1, 'd'); };
+  if (stock !== 'empty') for (const x of [4, 8, 12, 16]) log(x, 13);
+  if (stock === 'full') { for (const x of [6, 10, 14]) log(x, 10); log(8, 7); log(12, 7); }
+  box(g, 0, 2, 24, 3, 'd'); box(g, 1, 2, 12, 1, 'e'); line(g, 0, 4, 23, 4, 'b');
+}
 const DIGITS: Record<string, string[]> = {
   2: ['###', '..#', '###', '#..', '###'], 3: ['###', '..#', '.##', '..#', '###'], 4: ['#.#', '#.#', '###', '..#', '..#'],
   5: ['###', '#..', '###', '..#', '###'], 6: ['###', '#..', '###', '#.#', '###'], 7: ['###', '..#', '.#.', '.#.', '.#.'],
@@ -366,8 +485,15 @@ export const phase3Sprites: Record<string, SpriteDef> = {
     { rustle: { frames: ['rustle0', 'rustle1', 'ready'], frameRate: 8, repeat: 0 } }),
   fiberReeds: define(16, 16, nodeLegend, { ready: g => reeds(g, true), cut: g => reeds(g, false), sway0: g => reeds(g, true, -1), sway1: g => reeds(g, true, 1) }, [8, 14],
     { sway: { frames: ['ready', 'sway0', 'ready', 'sway1'], frameRate: 2, repeat: -1 } }),
+  hazelSpot: define(16, 16, forageLegend, { ready: g => hazel(g, true), gathered: g => hazel(g, false) }, [8, 14]),
+  pineForage: define(16, 16, forageLegend, { ready: g => pineSapling(g, true), gathered: g => pineSapling(g, false) }, [8, 14]),
+  greensPatch: define(16, 16, forageLegend, { ready: g => greens(g, true), gathered: g => greens(g, false) }, [8, 14]),
+  hollowTree: define(24, 32, forageLegend, {
+    ready: g => hollowTree(g, 'ready'), gathered: g => hollowTree(g, 'gathered'), bees0: g => hollowTree(g, 'bees0'), bees1: g => hollowTree(g, 'bees1')
+  }, [12, 30], { buzz: { frames: ['ready', 'bees0', 'ready', 'bees1'], frameRate: 2, repeat: -1 } }),
   firePit: fireFrames(false), hearth: fireFrames(true), flame: flameOverlay(false), hearthFlame: flameOverlay(true),
   hearthSite: define(24, 12, campLegend, { still: hearthSite }),
+  potTripod: define(24, 28, campLegend, { still: g => potTripod(g, null), steaming0: g => potTripod(g, 0), steaming1: g => potTripod(g, 1) }, [12, 20]),
   shelterSite: define(48, 32, campLegend, { still: shelterSite }),
   shelter: define(48, 40, campLegend, {
     built: g => shelter(g, false), builtBed: g => shelter(g, true),
@@ -397,6 +523,10 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   rubble: define(24, 16, campLegend, { ready: g => rubble(g, true), gathered: g => rubble(g, false) }),
   toolshedSite: define(24, 16, campLegend, { still: toolshedSite }),
   toolshed: define(24, 28, campLegend, { built: toolshed }),
+  woodpileSite: define(24, 16, campLegend, { still: woodpileSite }),
+  woodpile: define(24, 20, campLegend, { empty: g => woodpile(g, 'empty'), some: g => woodpile(g, 'some'), full: g => woodpile(g, 'full') }),
+  larderSite: define(24, 16, campLegend, { still: larderSite }),
+  larder: define(24, 28, campLegend, { empty: g => larder(g, 'empty'), some: g => larder(g, 'some'), full: g => larder(g, 'full') }),
   pileCount: define(13, 7, countLegend, {
     ...Object.fromEntries([2, 3, 4, 5, 6, 7, 8, 9].map(n => [`n${n}`, (g: Grid) => pileCount(g, [String(n)])])),
     lots: g => pileCount(g, ['9', '+'])

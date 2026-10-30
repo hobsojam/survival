@@ -3,6 +3,7 @@ import { nightStart } from '../src/game/calendar';
 import { createGame, type GameState } from '../src/game/state';
 import { advanceTime, applyAction } from '../src/game/rules';
 import { wolfMessage, wolfTracksShown, wolvesClose } from '../src/game/wolves';
+import { stock } from './stock';
 
 const base = createGame();
 /** A winter night at camp with the fire out, the cold night long behind. */
@@ -14,17 +15,17 @@ const dark: GameState = {
 
 describe('wolves in the dark camp', () => {
   it('takes a ration first, then a berry, then nothing', () => {
-    expect(advanceTime({ ...dark, inventory: { ...dark.inventory, trailFood: 2, food: 1 } }, 1))
-      .toMatchObject({ inventory: { trailFood: 1, food: 1 }, lastWolf: { day: 12, took: 'ration' } });
-    expect(advanceTime({ ...dark, inventory: { ...dark.inventory, food: 1 } }, 1))
-      .toMatchObject({ inventory: { food: 0 }, lastWolf: { day: 12, took: 'berry' } });
+    expect(advanceTime({ ...dark, inventory: { ...dark.inventory, food: stock(1, 2) } }, 1))
+      .toMatchObject({ inventory: { food: { trailFood: 1, berry: [1] } }, lastWolf: { day: 12, took: 'ration' } });
+    expect(advanceTime({ ...dark, inventory: { ...dark.inventory, food: stock(1) } }, 1))
+      .toMatchObject({ inventory: { food: { berry: [] } }, lastWolf: { day: 12, took: 'berry' } });
     expect(advanceTime(dark, 1).lastWolf).toEqual({ day: 12, took: 'nothing' });
   });
 
   it('visits once per night', () => {
-    let state: GameState = { ...dark, inventory: { ...dark.inventory, trailFood: 3 } };
+    let state: GameState = { ...dark, inventory: { ...dark.inventory, food: stock(0, 3) } };
     for (let i = 0; i < 20; i++) state = advanceTime(state, 0.5);
-    expect(state.inventory.trailFood).toBe(2);
+    expect(state.inventory.food.trailFood).toBe(2);
   });
 
   it('comes when the fire goes out, not before, and only in winter', () => {
@@ -48,19 +49,19 @@ describe('wolves in the dark camp', () => {
   });
 
   it('says what the wolf took, once', () => {
-    const after = advanceTime({ ...dark, inventory: { ...dark.inventory, trailFood: 1 } }, 1);
+    const after = advanceTime({ ...dark, inventory: { ...dark.inventory, food: stock(0, 1) } }, 1);
     expect(wolfMessage(dark, after)).toBe('A wolf slipped into the dark camp and took a ration.');
     expect(wolfMessage(after, advanceTime(after, 1))).toBeNull();
-    expect(wolfMessage(dark, advanceTime({ ...dark, inventory: { ...dark.inventory, food: 1 } }, 1)))
+    expect(wolfMessage(dark, advanceTime({ ...dark, inventory: { ...dark.inventory, food: stock(1) } }, 1)))
       .toBe('A wolf slipped into the dark camp and took a berry.');
     expect(wolfMessage(dark, advanceTime(dark, 1))).toBe('A wolf circled the dark camp but found nothing to take.');
   });
 
   it('tells of the wolf after sleeping', () => {
-    const evening: GameState = { ...dark, fireFuel: 30, inventory: { ...dark.inventory, trailFood: 1 } };
+    const evening: GameState = { ...dark, fireFuel: 30, inventory: { ...dark.inventory, food: stock(0, 1) } };
     const slept = applyAction(evening, { type: 'sleep' }).state;
     expect(slept.day).toBe(13);
-    expect(slept.inventory.trailFood).toBe(0);
+    expect(slept.inventory.food.trailFood).toBe(0);
     expect(wolfMessage(evening, slept)).toBe('A wolf slipped into the dark camp and took a ration.');
   });
 
@@ -71,5 +72,28 @@ describe('wolves in the dark camp', () => {
     expect(wolfTracksShown({ ...dark, day: 21, timeOfDay: nightStart(21), lastWolf: visit })).toBe(false);
     expect(wolfTracksShown({ ...dark, day: 22, timeOfDay: 10, lastWolf: visit })).toBe(false);
     expect(wolfTracksShown({ ...dark, lastWolf: null })).toBe(false);
+  });
+});
+
+describe('wolves and the larder', () => {
+  const withLarder = (larder: ReturnType<typeof stock>): GameState => ({
+    ...dark,
+    clearing: { cleared: ['north-near'], marked: null, felled: [] },
+    structures: { ...dark.structures, larder: true },
+    player: { ...dark.player, x: 20, y: 15 },
+    larder
+  });
+
+  it('takes nothing from the larder, even with the bag empty', () => {
+    const state = withLarder(stock(2, 1));
+    const next = advanceTime(state, 1);
+    expect(next.lastWolf).toEqual({ day: 12, took: 'nothing' });
+    expect(next.larder).toEqual(state.larder);
+  });
+
+  it('takes a larder ration left out as an offering, as the night\'s visit', () => {
+    const offered = applyAction(withLarder(stock(0, 1)), { type: 'befriend' }).state;
+    expect(offered.larder.trailFood).toBe(0);
+    expect(offered.lastWolf).toEqual({ day: 12, took: 'offered' });
   });
 });

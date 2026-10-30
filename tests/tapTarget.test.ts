@@ -268,3 +268,17 @@ describe('winter tap targets', () => {
     expect(pickTapTarget(winter, bush.x, bush.y)).toMatchObject({ kind: 'node', id: 'berry-0' });
   });
 });
+
+describe('forage out of season', () => {
+  it('leaves an out-of-season spot out of taps and E', () => {
+    const state = createGame();
+    state.trees = [];
+    const hazel = state.nodes.find(item => item.id === 'hazel-0')!;
+    state.player.x = hazel.x; state.player.y = hazel.y;
+    expect(pickTapTarget(state, hazel.x, hazel.y)).toMatchObject({ kind: 'node', id: 'hazel-0' });
+    expect(closestGatherable(state)).toMatchObject({ kind: 'node', node: { id: 'hazel-0' } });
+    state.day = 21;
+    expect(pickTapTarget(state, hazel.x, hazel.y)).toMatchObject({ kind: 'ground' });
+    expect(closestGatherable(state)).toBeUndefined();
+  });
+});

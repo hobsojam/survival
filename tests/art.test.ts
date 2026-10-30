@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { palette } from '../src/art/palette';
 import { createGame } from '../src/game/state';
 import { buildMap } from '../src/scene/map';
+import { sceneVisuals } from '../src/scene/visuals';
+import { FOOD_ICONS, foodIconUrl } from '../src/art/foodIcons';
+import { JOURNAL_ICON_SIZE } from '../src/art/journalIcons';
 import { sprites, type SpriteDef } from '../src/art/sprites';
 import { animationConfigs, rasterizeFrame, validateSprite } from '../src/art/textures';
 
@@ -50,7 +53,11 @@ describe('sprite pipeline', () => {
       dryingRackSite: { size: [32, 16], frames: ['still'] },
       windbreak: { size: [48, 32], frames: ['built'] },
       windbreakSite: { size: [48, 16], frames: ['still'] },
-      logSeat: { size: [24, 12], frames: ['still'] }
+      logSeat: { size: [24, 12], frames: ['still'] },
+      hazelSpot: { size: [16, 16], frames: ['ready', 'gathered'] },
+      pineForage: { size: [16, 16], frames: ['ready', 'gathered'] },
+      greensPatch: { size: [16, 16], frames: ['ready', 'gathered'] },
+      hollowTree: { size: [24, 32], frames: ['ready', 'gathered', 'bees0', 'bees1'] }
     };
     for (const [name, expected] of Object.entries(required)) {
       expect(sprites[name]?.size, name).toEqual(expected.size);
@@ -65,6 +72,25 @@ describe('sprite pipeline', () => {
     expect(sprites.berryBush.frames.ready.join('')).toContain('p');
     expect(sprites.fiberReeds.frames.ready).not.toEqual(sprites.fiberReeds.frames.cut);
   });
+  it('has a sprite frame for every node texture the scene can draw', () => {
+    const textures = new Set<string>();
+    for (const day of [1, 11, 21, 31]) for (const amount of [0, 1]) for (let ms = 0; ms < 2000; ms += 250) {
+      const state = createGame();
+      state.day = day;
+      state.timeOfDay = 200;
+      state.nodes = state.nodes.map(node => ({ ...node, amount }));
+      for (const node of state.nodes) {
+        const ids = new Set(state.nodes.map(item => item.id));
+        for (const visual of sceneVisuals(state, ms, { id: node.id, atMs: ms - 100 })) if (ids.has(visual.id)) textures.add(visual.texture);
+      }
+    }
+    for (const texture of textures) {
+      const [name, frame] = texture.split(':');
+      expect(sprites[name]?.frames[frame], texture).toBeDefined();
+    }
+    expect([...textures].some(texture => texture.startsWith('hollowTree:bees'))).toBe(true);
+  });
+
   it('validates every registered frame, palette symbol, and anchor', () => {
     expect(Object.keys(sprites)).toEqual(expect.arrayContaining([
       'branchPile', ...Array.from({ length: 4 }, (_, i) => `grass${i}`),
@@ -163,5 +189,25 @@ describe('sprite pipeline', () => {
     def.frames.still = ['s.'];
     expect(rasterizeFrame(def, 'still')[3]).toBe(115);
     expect(palette.grass0).toBe('#2f5236');
+  });
+});
+
+describe('food icons', () => {
+  it('draws every food on the journal icon grid, each its own picture', () => {
+    expect(Object.keys(FOOD_ICONS).sort()).toEqual(['greens', 'hazelnut', 'honey', 'honeyCake', 'pineNeedles', 'pineTea', 'roastedHazelnuts', 'salad']);
+    for (const [id, { legend, rows }] of Object.entries(FOOD_ICONS)) {
+      expect(rows, id).toHaveLength(JOURNAL_ICON_SIZE);
+      for (const row of rows) {
+        expect(row, id).toHaveLength(JOURNAL_ICON_SIZE);
+        for (const pixel of row) if (pixel !== '.') expect(legend[pixel], `${id} '${pixel}'`).toBeDefined();
+      }
+    }
+    expect(new Set(Object.values(FOOD_ICONS).map(icon => icon.rows.join(''))).size).toBe(8);
+  });
+
+  it('paints a food icon as a crisp SVG data URL', () => {
+    const svg = decodeURIComponent(foodIconUrl('honey').replace('data:image/svg+xml,', ''));
+    expect(foodIconUrl('honey').startsWith('data:image/svg+xml,')).toBe(true);
+    expect(svg).toContain('shape-rendering="crispEdges"');
   });
 });

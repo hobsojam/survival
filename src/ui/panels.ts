@@ -1,12 +1,15 @@
-import { isWinter, nightStart } from '../game/calendar';
+import { daysLeftInSeason, isWinter, nightStart, season } from '../game/calendar';
+import { FOOD_ITEMS, availableFood, foodCount, goingSoft, isFresh, keptFoodTotal, storeTotal, type FoodItem } from '../game/food';
+import { foodIconUrl } from '../art/foodIcons';
 import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { workSeconds } from '../game/needs';
-import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, plantGardenBlocker, pickaxeBlocker, trailFoodBlocker } from '../game/rules';
+import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
 import { CLEARING_STEPS, clearGroundBlocker, markBlocker, nextStep, roomLine, type Side } from '../game/clearing';
 import { KEEPSAKES_NEEDED, cloakBlocker, keepsakeKind, pillowBlocker } from '../game/companion';
+import { DISHES, DISH_ORDER, dishBlocker, foodWord, ingredientList, potBlocker, type DishId } from '../game/cooking';
 
 export interface GardenPlotPanelView {
   label: string;
@@ -84,6 +87,33 @@ export function pickaxeView(state: GameState): ActionPanelView & { shown: boolea
   return { ...button, title: 'Craft a pickaxe', copy: blocker ?? 'Your toolshed is ready. Craft a pickaxe to work the quarry face.', cost: '2 wood · 1 fiber · 2 stone' };
 }
 
+export function potView(state: GameState): ActionPanelView {
+  if (state.progress.potCrafted) {
+    return { title: 'Cooking pot', copy: 'It hangs over the fire. Cook tea, salad, roasted nuts and honey cake after dark.', cost: 'Made', disabled: true, ready: false };
+  }
+  const blocker = potBlocker(state);
+  return { title: 'Cooking pot', copy: blocker ?? 'A pot on a little tripod, for tea, salad, roasted nuts and honey cake.', cost: '1 wood · 2 stone', disabled: false, ready: !blocker };
+}
+
+export interface DishView { dish: Exclude<DishId, 'berries'>; name: string; icon: string; cost: string; disabled: boolean; title: string }
+
+/** The After dark panel's pot dishes, once the pot is made: each says why it can't be cooked yet. */
+export function nightDishesView(state: GameState): DishView[] {
+  if (!state.progress.potCrafted) return [];
+  return DISH_ORDER.filter((dish): dish is DishView['dish'] => DISHES[dish].potOnly).map(dish => {
+    const blocker = dishBlocker(state, dish);
+    const name = capitalised(DISHES[dish].name);
+    return { dish, name, icon: foodIconUrl(dish), cost: `${ingredientList(dish)} · ${BALANCE.cookSeconds} seconds`, disabled: Boolean(blocker), title: blocker ?? `Cook ${DISHES[dish].name}.` };
+  });
+}
+
+/** A hidden button for each pot dish in the After dark panel, shown once the pot is made. */
+export function nightDishMarkup(): string {
+  return DISH_ORDER.filter(dish => DISHES[dish].potOnly).map(dish =>
+    `<button type="button" data-action="cook" data-dish="${dish}" id="dish-${dish}" hidden><img class="food-icon" src="${foodIconUrl(dish as DishView['dish'])}" alt=""><strong>${capitalised(DISHES[dish].name)}</strong><small>${ingredientList(dish)} · ${BALANCE.cookSeconds} seconds</small></button>`
+  ).join('');
+}
+
 /** The fur or feathers gathered toward the friend's one item; gone once it is made. */
 export function keepsakeView(state: GameState): { shown: boolean; text: string } {
   const { friend, keepsakes, pillow, cloak } = state.companion;
@@ -138,7 +168,22 @@ function winterForecast(state: GameState): ForecastView {
   };
 }
 
+/** Autumn's last three days, with no cold night to warn of instead: the bushes are about to go bare. */
+function lateAutumnForecast(state: GameState): ForecastView | null {
+  const coldNightDue = !state.progress.hearthUnlocked && state.progress.nextStormDay !== null;
+  if (coldNightDue || season(state.day) !== 'autumn' || daysLeftInSeason(state.day) > 3) return null;
+  return {
+    active: false, shown: true,
+    title: 'The bushes will soon be bare',
+    copy: 'Berries go soft in a few days, and the bushes stay bare all winter. Dry rations and gather hazelnuts before the snow comes.',
+    shelter: `Food that keeps: ${keptFoodTotal(state)}`,
+    fire: ''
+  };
+}
+
 export function forecastView(state: GameState): ForecastView {
+  const lateAutumn = lateAutumnForecast(state);
+  if (lateAutumn) return lateAutumn;
   const storm = isColdNight(state);
   if (state.progress.hearthUnlocked) {
     // With the cold night weathered, only winter's nights are left to forecast.
@@ -163,20 +208,85 @@ export function startNote(save: LoadResult, storageAvailable: boolean): string {
   return 'A fresh camp is ready whenever you are.';
 }
 
-export interface BagView { spaces: string; prepareReady: boolean; prepareHint: string; pileShown: boolean; storedAtCamp: string; pileStored: string; fire: string }
+/** The Bag panel's forage cells, shown only while the bag holds some; all but pine needles can be eaten from here. */
+export const BAG_FOODS = [
+  { item: 'greens', label: 'Greens', eat: 'Eat a handful of greens' },
+  { item: 'hazelnut', label: 'Hazelnuts', eat: 'Eat a hazelnut' },
+  { item: 'honey', label: 'Honey', eat: 'Eat some honey' },
+  { item: 'pineNeedles', label: 'Pine needles', eat: null },
+  { item: 'roastedHazelnuts', label: 'Roasted hazelnuts', eat: 'Eat the roasted hazelnuts' }
+] as const;
+export type BagFood = (typeof BAG_FOODS)[number]['item'];
+
+/** Every forage cell, hidden until the bag panel shows it; fresh food has a line for what is going soft. */
+export function bagFoodMarkup(): string {
+  return BAG_FOODS.map(({ item, label, eat }) => {
+    const button = eat ? `<button type="button" class="supply-action" data-action="eat" data-item="${item}" data-supply="${item}" aria-label="${eat}">Eat</button>` : '';
+    const note = isFresh(item) ? `<small id="${item}-note" class="supply-note"></small>` : '';
+    return `<div data-food="${item}" hidden><img class="food-icon" src="${foodIconUrl(item)}" alt=""><strong id="${item}-count">0</strong><small>${label}</small>${note}${button}</div>`;
+  }).join('');
+}
+
+/** The foods the Bag panel has an Eat button for. */
+export const EATABLE_FOODS = ['berry', 'trailFood', ...BAG_FOODS.filter(cell => cell.eat).map(cell => cell.item)] as const satisfies readonly FoodItem[];
+export type EatableFood = (typeof EATABLE_FOODS)[number];
+
+export interface BagView { foods: Record<BagFood, { count: number; shown: boolean; note: string }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; prepareReady: boolean; prepareHint: string; pileShown: boolean; storedAtCamp: string; pileStored: string; woodShown: boolean; woodAtCamp: string; woodStored: string; fire: string }
 
 export function bagView(state: GameState): BagView {
   const prepareBlocker = trailFoodBlocker(state);
   const pile = state.structures.stonePile;
+  /** "(2 going soft)" for the bag's fresh pieces gone at the next dawn, or nothing. */
+  const softNote = (item: FoodItem): string => {
+    const soft = isFresh(item) ? goingSoft(state.inventory.food, item, state.day, BALANCE.bagFreshDays) : 0;
+    return soft ? ` (${soft} going soft)` : '';
+  };
+  // Eat reaches the larder in the clearing, so a cell shows with its button while there is any to eat, even with none in the bag.
+  const eatable = Object.fromEntries(EATABLE_FOODS.map(item => [item, availableFood(state, item) > 0])) as BagView['eatable'];
+  const foods = Object.fromEntries(BAG_FOODS.map(({ item, eat }) => {
+    const count = foodCount(state.inventory.food, item);
+    return [item, { count, shown: count > 0 || (eat !== null && availableFood(state, item) > 0), note: softNote(item).trim() }];
+  })) as BagView['foods'];
   return {
+    foods,
+    eatable,
+    berries: `Berries ${foodCount(state.inventory.food, 'berry')}${softNote('berry')}`,
     spaces: `${carriedCount(state)}/${bagCapacity(state)}`,
     prepareReady: !prepareBlocker,
     prepareHint: prepareBlocker ?? `1 berry · ${workSeconds(state, BALANCE.trailFoodSeconds)} seconds · 1 ration`,
     pileShown: pile,
     storedAtCamp: pile ? `+${state.storedStone} at camp` : '',
     pileStored: `Stored stone ${state.storedStone}/${BALANCE.stonePileCapacity}`,
+    woodShown: state.structures.woodpile,
+    woodAtCamp: state.structures.woodpile ? `+${state.storedWood} at camp` : '',
+    woodStored: `Stored wood ${state.storedWood}/${BALANCE.woodpileCapacity}`,
     fire: state.fireFuel > 0 ? `Fire burning · ${Math.ceil(state.fireFuel)}s of warmth` : 'The fire is unlit'
   };
+}
+
+const LARDER_LABELS: Record<FoodItem, string> = {
+  berry: 'Berries', greens: 'Greens', hazelnut: 'Hazelnuts', honey: 'Honey', pineNeedles: 'Pine needles', roastedHazelnuts: 'Roasted hazelnuts', trailFood: 'Rations'
+};
+
+export interface LarderRowView { item: FoodItem; label: string; kept: number; storeDisabled: boolean; storeTitle: string; takeDisabled: boolean; takeTitle: string }
+
+/** The larder's controls under its build button, once built: how full it is, and a row for each food in the bag or the larder. */
+export function larderView(state: GameState): { shown: boolean; stored: string; rows: LarderRowView[] } {
+  const rows = FOOD_ITEMS.filter(item => foodCount(state.inventory.food, item) + foodCount(state.larder, item) > 0).map(item => {
+    const storeBlocker = storeFoodBlocker(state, item), takeBlocker = takeFoodBlocker(state, item);
+    return {
+      item, label: LARDER_LABELS[item], kept: foodCount(state.larder, item),
+      storeDisabled: Boolean(storeBlocker), storeTitle: storeBlocker ?? `Store 1 ${foodWord(item, 1)}.`,
+      takeDisabled: Boolean(takeBlocker), takeTitle: takeBlocker ?? `Take 1 ${foodWord(item, 1)}.`
+    };
+  });
+  return { shown: state.structures.larder, stored: `Stored food ${storeTotal(state.larder)}/${BALANCE.larderCapacity}`, rows };
+}
+
+/** The larder's controls, hidden until built, with a hidden row for every food. */
+export function larderMarkup(): string {
+  const rows = FOOD_ITEMS.map(item => `<div class="larder-row" data-larder-item="${item}" hidden><span>${LARDER_LABELS[item]} <b id="larder-${item}-count">0</b></span><button type="button" data-action="storeFood" data-item="${item}">Store 1</button><button type="button" data-action="takeFood" data-item="${item}">Take 1</button></div>`).join('');
+  return `<div id="larder-controls" class="stone-pile-controls larder-controls" hidden><span id="larder-stored">Stored food 0/${BALANCE.larderCapacity}</span>${rows}</div>`;
 }
 
 export interface BuildButtonView { disabled: boolean; built: boolean; locked: boolean; ready: boolean; description: string; verb: string; price: string }
@@ -190,18 +300,22 @@ export function buildButtonView(state: GameState, id: StructureId): BuildButtonV
   const stone = 'stone' in cost ? cost.stone : 0;
   const price = [cost.wood ? `${cost.wood} wood` : '', cost.fiber ? `${cost.fiber} fiber` : '', stone ? `${stone} stone` : ''].filter(Boolean).join(' · ');
   const needsPrerequisite = status === 'needsPrerequisite' || status === 'needsShelter';
+  const needsGround = status === 'needsGround';
+  const blocked = needsPrerequisite || needsGround;
   const prerequisite = definition.prerequisite;
   const prerequisiteNames: string[] = [];
   if (prerequisite && prerequisite !== 'coldNight') prerequisiteNames.push(BUILDINGS[prerequisite].name.toLowerCase());
   if ('alsoRequires' in definition) prerequisiteNames.push(BUILDINGS[definition.alsoRequires].name.toLowerCase());
   const prerequisiteDescription = prerequisiteNames.length ? `Requires ${prerequisiteNames.join(' and ')}` : 'Requires its previous shelter upgrade';
+  // Uncleared ground reads like a missing prerequisite, naming the side and step to clear.
+  const blockedDescription = needsGround ? (groundBlocker(state, id) ?? '').replace(/\.$/, '') : prerequisiteDescription;
   const view = {
-    disabled: status === 'built' || status === 'locked' || needsPrerequisite,
+    disabled: status === 'built' || status === 'locked' || blocked,
     built: status === 'built',
-    locked: status === 'locked' || needsPrerequisite,
+    locked: status === 'locked' || blocked,
     ready: status === 'ready',
-    description: needsPrerequisite ? prerequisiteDescription : definition.description,
-    verb: needsPrerequisite ? 'Blocked' : 'Build',
+    description: blocked ? blockedDescription : definition.description,
+    verb: blocked ? 'Blocked' : 'Build',
     price
   };
   if (status === 'built' || status === 'locked') {

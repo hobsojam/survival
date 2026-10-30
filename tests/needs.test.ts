@@ -4,12 +4,13 @@ import { BALANCE, LOOKOUT, createGame, type GameState } from '../src/game/state'
 import { QUARRY_SITE } from '../src/game/areas';
 import { advanceTime, applyAction, buildStatus } from '../src/game/rules';
 import { ALL_NEED_ALERTS, isExhausted, isLowMeter, isHungry, isStarving, isTired, needAlerts, needsMessage } from '../src/game/needs';
+import { stock } from './stock';
 
 /** A survivor at the fire with the given energy and hunger, wood for a crate, berries, and room in the bag. */
 function camp(energy: number, hunger = 100): GameState {
   const state = createGame();
   state.player = { ...state.player, x: BALANCE.campX, y: BALANCE.campY, energy, hunger };
-  state.inventory = { ...state.inventory, wood: 4, food: 2 };
+  state.inventory = { ...state.inventory, wood: 4, food: stock(2) };
   return state;
 }
 
@@ -78,8 +79,8 @@ describe('exhaustion', () => {
     const state = camp(0);
     const node = state.nodes.find(item => item.kind === 'berry')!;
     const byBush = { ...state, player: { ...state.player, x: node.x, y: node.y } };
-    expect(applyAction(byBush, { type: 'gather', nodeId: node.id }).state.inventory.food).toBe(3);
-    expect(applyAction(state, { type: 'eat' }).state.inventory.food).toBe(1);
+    expect(applyAction(byBush, { type: 'gather', nodeId: node.id }).state.inventory.food.berry.length).toBe(3);
+    expect(applyAction(state, { type: 'eat' }).state.inventory.food.berry.length).toBe(1);
     expect(applyAction(state, { type: 'rest' }).state.player.energy).toBe(BALANCE.restEnergyGain);
   });
 });

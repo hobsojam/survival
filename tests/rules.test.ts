@@ -3,6 +3,8 @@ import { BALANCE, BUILDINGS, LOOKOUT, SITES, createGame, type GameState } from '
 import { QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { FULL_BAG_MESSAGE, advanceTime, isAtCamp, isInClearing, isColdNight, isFreezingNight, applyAction, buildStatus, carriedCount, freeSpaces, lookoutRepairBlocker, pickaxeBlocker, sleepBlocker } from '../src/game/rules';
 import { nightStart, seasonMessage } from '../src/game/calendar';
+import { stock } from './stock';
+import { emptyFood } from '../src/game/food';
 
 // Night falls at 181 s on day 1, and the day-three cold night's night starts at 174 s.
 const NIGHT = nightStart(1);
@@ -17,7 +19,7 @@ const besideBranch = (state: GameState): GameState => {
 describe('gathering and inventory', () => {
   it('prepares a trail ration only at a built rack in camp, including with a full bag', () => {
     const state = createGame();
-    state.inventory.food = 1;
+    state.inventory.food = stock(1);
     expect(applyAction(state, { type: 'prepareTrailFood' }).state).toBe(state);
     state.structures.dryingRack = true;
     state.player.x = 0;
@@ -25,7 +27,7 @@ describe('gathering and inventory', () => {
     state.player.x = BALANCE.campX;
     state.inventory.wood = 7;
     const prepared = applyAction(state, { type: 'prepareTrailFood' }).state;
-    expect(prepared.inventory).toMatchObject({ wood: 7, food: 0, trailFood: 1 });
+    expect(prepared.inventory).toMatchObject({ wood: 7, food: { berry: [], trailFood: 1 } });
     expect(prepared.timeOfDay).toBe(BALANCE.trailFoodSeconds);
     expect(applyAction(prepared, { type: 'prepareTrailFood' }).state).toBe(prepared);
     expect(applyAction(prepared, { type: 'gather', nodeId: 'branch-0' }).state).toBe(prepared);
@@ -35,16 +37,16 @@ describe('gathering and inventory', () => {
     const state = createGame();
     state.player.x = 0;
     state.player.hunger = 40;
-    state.inventory.trailFood = 2;
+    state.inventory.food.trailFood = 2;
     const eaten = applyAction(state, { type: 'eatTrailFood' }).state;
     expect(eaten.player.hunger).toBe(85);
-    expect(eaten.inventory.trailFood).toBe(1);
+    expect(eaten.inventory.food.trailFood).toBe(1);
     expect(applyAction({ ...eaten, player: { ...eaten.player, hunger: 90 } }, { type: 'eatTrailFood' }).state.player.hunger).toBe(100);
   });
 
   it('counts rations for discovery rewards, and eating one makes room', () => {
     const state = createGame();
-    state.inventory.trailFood = 7;
+    state.inventory.food.trailFood = 7;
     state.player.x = 8;
     state.player.y = 8;
     state.player.hunger = 50;
@@ -52,7 +54,7 @@ describe('gathering and inventory', () => {
     expect(blocked.state).toBe(state);
     expect(state.progress.discoveries.basket).toBe(false);
     const eaten = applyAction(state, { type: 'eatTrailFood' });
-    expect(eaten.state.inventory.trailFood).toBe(6);
+    expect(eaten.state.inventory.food.trailFood).toBe(6);
     expect(applyAction(eaten.state, { type: 'visitSite', siteId: 'basket' }).state.progress.discoveries.basket).toBe(true);
   });
   it('gathers nearby wood and spends energy without mutating the old state', () => {
@@ -104,7 +106,7 @@ describe('gathering and inventory', () => {
     const state = createGame();
     state.player.x = 19;
     state.player.y = 13;
-    expect(applyAction(state, { type: 'gather', nodeId: 'berry-0' }).state.inventory.food).toBe(1);
+    expect(applyAction(state, { type: 'gather', nodeId: 'berry-0' }).state.inventory.food.berry.length).toBe(1);
   });
 
   it('does not gather a distant or depleted node', () => {
@@ -118,10 +120,10 @@ describe('gathering and inventory', () => {
 
   it('eats one food to restore hunger within its bound', () => {
     const state = createGame();
-    state.inventory.food = 1;
+    state.inventory.food = stock(1);
     state.player.hunger = 80;
     const result = applyAction(state, { type: 'eat' });
-    expect(result.state.inventory.food).toBe(0);
+    expect(result.state.inventory.food.berry.length).toBe(0);
     expect(result.state.player.hunger).toBe(100);
   });
 
@@ -171,7 +173,7 @@ describe('lookout repair', () => {
     state.progress.nextStormDay = null;
     const repaired = applyAction(state, { type: 'repairLookout' }).state;
     expect(repaired.progress.lookoutRepaired).toBe(true);
-    expect(repaired.inventory).toEqual({ wood: 0, food: 0, fiber: 0, stone: 0, trailFood: 0 });
+    expect(repaired.inventory).toEqual({ wood: 0, fiber: 0, stone: 0, food: emptyFood() });
     expect(repaired.timeOfDay).toBe(12);
     expect(repaired.player.energy).toBe(94);
     expect(applyAction(repaired, { type: 'repairLookout' }).state).toBe(repaired);
@@ -200,7 +202,7 @@ describe('stone axe and tree chopping', () => {
     state.structures.toolshed = true;
     const crafted = applyAction(state, { type: 'craftAxe' }).state;
     expect(crafted.progress.axeCrafted).toBe(true);
-    expect(crafted.inventory).toEqual({ wood: 0, food: 0, fiber: 0, stone: 0, trailFood: 0 });
+    expect(crafted.inventory).toEqual({ wood: 0, fiber: 0, stone: 0, food: emptyFood() });
     expect(crafted.timeOfDay).toBe(12);
     expect(applyAction(crafted, { type: 'craftAxe' }).state).toBe(crafted);
   });
@@ -251,7 +253,7 @@ describe('places beyond camp', () => {
     expect(blocked.message).toMatch(/bag/i);
     state.inventory.wood = 0;
     const found = applyAction(state, { type: 'visitSite', siteId: 'basket' }).state;
-    expect(found.inventory.food).toBe(2);
+    expect(found.inventory.food.berry.length).toBe(2);
     expect(found.progress.discoveries.basket).toBe(true);
     expect(applyAction(found, { type: 'visitSite', siteId: 'basket' }).state).toBe(found);
   });
@@ -526,27 +528,27 @@ describe('optional night activities', () => {
   it('cooks one berry by a lit campfire for a warm meal', () => {
     const state = createGame();
     state.timeOfDay = NIGHT + 10;
-    state.inventory.food = 1;
+    state.inventory.food = stock(1);
     state.fireFuel = 30;
     state.player.hunger = 30;
     state.player.warmth = 40;
     const cooked = applyAction(state, { type: 'cook' });
-    expect(cooked.state.inventory.food).toBe(0);
+    expect(cooked.state.inventory.food.berry.length).toBe(0);
     expect(cooked.state.timeOfDay).toBe(NIGHT + 18);
     expect(cooked.state.fireFuel).toBe(22);
     expect(cooked.state.player.hunger).toBeCloseTo(64);
     expect(cooked.state.player.warmth).toBe(54);
-    expect(state.inventory.food).toBe(1);
+    expect(state.inventory.food.berry.length).toBe(1);
   });
 
   it('does not cook in daylight, away from camp, without berries, or without fire', () => {
     const state = createGame();
-    state.inventory.food = 1;
+    state.inventory.food = stock(1);
     state.fireFuel = 20;
     for (const setup of [
       (s: typeof state) => { s.timeOfDay = 100; },
       (s: typeof state) => { s.timeOfDay = NIGHT + 10; s.player.x = 0; },
-      (s: typeof state) => { s.timeOfDay = NIGHT + 10; s.inventory.food = 0; },
+      (s: typeof state) => { s.timeOfDay = NIGHT + 10; s.inventory.food = stock(0); },
       (s: typeof state) => { s.timeOfDay = NIGHT + 10; s.fireFuel = 0; }
     ]) {
       const attempt = structuredClone(state);
@@ -611,7 +613,7 @@ describe('more camp structures', () => {
   it('makes cooked berries more filling without changing supplies or cooking time', () => {
     const state = createGame();
     state.timeOfDay = NIGHT + 10;
-    state.inventory.food = 1;
+    state.inventory.food = stock(1);
     state.fireFuel = 30;
     state.player.hunger = 20;
     const plain = applyAction(state, { type: 'cook' }).state;
@@ -619,7 +621,7 @@ describe('more camp structures', () => {
     const improved = applyAction(state, { type: 'cook' }).state;
     expect(plain.player.hunger).toBeCloseTo(54);
     expect(improved.player.hunger).toBeCloseTo(69);
-    expect(improved.inventory.food).toBe(0);
+    expect(improved.inventory.food.berry.length).toBe(0);
     expect(improved.timeOfDay).toBe(NIGHT + 18);
     expect(improved.fireFuel).toBe(22);
   });
@@ -767,7 +769,7 @@ describe('heavy stone and fiber fuel', () => {
 
   it('counts stone as two spaces', () => {
     const state = createGame();
-    state.inventory = { wood: 2, food: 0, fiber: 0, stone: 1, trailFood: 0 };
+    state.inventory = { wood: 2, fiber: 0, stone: 1, food: emptyFood() };
     expect(carriedCount(state)).toBe(4);
     expect(freeSpaces(state)).toBe(4);
   });
@@ -1403,7 +1405,7 @@ describe('winter larder', () => {
     expect(result.state).toBe(winterDay);
     expect(applyAction({ ...winterDay, day: 51 }, { type: 'gather', nodeId: 'berry-0' }).state).toMatchObject({ day: 51 });
     expect(applyAction({ ...winterDay, day: 51 }, { type: 'gather', nodeId: 'berry-0' }).message).toBe('The bushes are bare until spring.');
-    expect(applyAction({ ...winterDay, day: 21 }, { type: 'gather', nodeId: 'berry-0' }).state.inventory.food).toBe(1);
+    expect(applyAction({ ...winterDay, day: 21 }, { type: 'gather', nodeId: 'berry-0' }).state.inventory.food.berry.length).toBe(1);
   });
 
   it('freezes the quiet spring, but still marks it found', () => {
@@ -1470,7 +1472,7 @@ describe('summer', () => {
 
   it('picks two berries from a summer bush', () => {
     const result = applyAction(atBush(34), { type: 'gather', nodeId: 'berry-0' });
-    expect(result.state.inventory.food).toBe(base.inventory.food + 2);
+    expect(result.state.inventory.food.berry.length).toBe(base.inventory.food.berry.length + 2);
     expect(result.state.nodes.find(node => node.id === 'berry-0')!.amount).toBe(0);
     expect(result.message).toBe('Picked two handfuls of berries.');
   });
@@ -1480,12 +1482,12 @@ describe('summer', () => {
     state.inventory = { ...state.inventory, wood: freeSpaces(state) - 1 + state.inventory.wood };
     expect(freeSpaces(state)).toBe(1);
     const result = applyAction(state, { type: 'gather', nodeId: 'berry-0' });
-    expect(result.state.inventory.food).toBe(state.inventory.food + 1);
+    expect(result.state.inventory.food.berry.length).toBe(state.inventory.food.berry.length + 1);
     expect(result.message).toBe('Picked berries.');
   });
 
   it('picks one berry in autumn', () => {
-    expect(applyAction(atBush(41), { type: 'gather', nodeId: 'berry-0' }).state.inventory.food).toBe(base.inventory.food + 1);
+    expect(applyAction(atBush(41), { type: 'gather', nodeId: 'berry-0' }).state.inventory.food.berry.length).toBe(base.inventory.food.berry.length + 1);
   });
 });
 

@@ -251,12 +251,64 @@ export const JOURNAL_ICONS: Record<JournalId, JournalIcon> = {
     '..d...dd..',
     '.dd....dd.',
     '..........'
+  ] },
+  hazelnuts: { legend: { n: 'wood3', N: 'wood1', l: 'fire1', L: 'fire2' }, rows: [
+    '..........',
+    '...N......',
+    '..nnn.....',
+    '.nnnnn.l..',
+    '.nnNnn.Ll.',
+    '..nnn.lLl.',
+    '..........',
+    '.l.nn..L..',
+    '..nnnn.l..',
+    '...nn.....'
+  ] },
+  pineTea: { legend: { g: 'leaf3', G: 'leaf2', k: 'stone0', t: 'wood3', s: 'stone3' }, rows: [
+    '..s...s...',
+    '...s......',
+    '..G.G.G...',
+    '.kkkkkkk..',
+    '.ktttttkk.',
+    '.kttttttk.',
+    '.kgGgGgk.k',
+    '..kttttk.k',
+    '...kkkkkk.',
+    '..........'
+  ] },
+  salad: { legend: { g: 'leaf4', G: 'leaf3', b: 'berry3', B: 'berry2', w: 'wood3' }, rows: [
+    '..........',
+    '..........',
+    '..gG.gG...',
+    '.gGbGgGBg.',
+    '.GgGGbGgG.',
+    'wwwwwwwwww',
+    '.wwwwwwww.',
+    '..wwwwww..',
+    '...wwww...',
+    '..........'
+  ] },
+  wildHoney: { legend: { h: 'wood4', H: 'fire3', o: 'fire2', w: 'wood2', d: 'wood1' }, rows: [
+    '...dddd...',
+    '..dwwwwd..',
+    '..dwddwd..',
+    '..dwddwd..',
+    '..dwwwwd..',
+    '...hHh....',
+    '...HoH....',
+    '...hoh....',
+    '....H.....',
+    '....h.....'
   ] }
 };
 
 /** The icon as a small SVG, one square per pixel, ready for a CSS background. */
 export function journalIconUrl(id: JournalId): string {
-  const { legend, rows } = JOURNAL_ICONS[id];
+  return iconUrl(JOURNAL_ICONS[id]);
+}
+
+/** Paints a 10×10 icon as a crisp SVG data URL in the game palette. */
+export function iconUrl({ legend, rows }: JournalIcon): string {
   const pixels = rows.flatMap((row, y) => [...row].flatMap((pixel, x) =>
     pixel === '.' ? [] : [`<rect x="${x}" y="${y}" width="1" height="1" fill="${palette[legend[pixel]]}"/>`]));
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${JOURNAL_ICON_SIZE} ${JOURNAL_ICON_SIZE}" shape-rendering="crispEdges">${pixels.join('')}</svg>`;

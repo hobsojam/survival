@@ -1,4 +1,4 @@
-import { isInClearing } from './camp';
+import { availableWood, isInClearing } from './camp';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { BALANCE, BUILDINGS, type GameState, type ResourceNode, type TreeNode } from './state';
 
@@ -195,7 +195,7 @@ export function clearGroundBlocker(state: GameState): string | null {
   if (!isInClearing(state)) return 'Return to camp to clear land.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   const { wood, fiber } = CLEARING_STEPS[marked].cost;
-  if (state.inventory.wood < wood || state.inventory.fiber < fiber) return `Need ${wood} wood and ${fiber} fiber to clear this.`;
+  if (availableWood(state) < wood || state.inventory.fiber < fiber) return `Need ${wood} wood and ${fiber} fiber to clear this.`;
   return null;
 }
 

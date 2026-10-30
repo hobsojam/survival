@@ -1,6 +1,7 @@
 import type { JournalEntry } from './journalEntries';
 import type { ClearingState } from './clearing';
-export type ResourceKind = 'branch' | 'berry' | 'fiber' | 'stone';
+import { emptyFood, type FoodStore } from './food';
+export type ResourceKind = 'branch' | 'berry' | 'fiber' | 'stone' | 'hazel' | 'pine' | 'greens' | 'honey';
 
 export const BUILDINGS = {
   shelter: { name: 'Shelter', description: 'A roof against the night cold', symbol: '⌂', cost: { wood: 6, fiber: 2 }, prerequisite: null },
@@ -15,7 +16,10 @@ export const BUILDINGS = {
   dryingRack: { name: 'Drying rack', description: 'Prepare rations; improve cooked berries', symbol: '☼', cost: { wood: 4, fiber: 0 }, prerequisite: null },
   garden: { name: 'Garden', description: 'Plant berry bushes and gather a little each autumn', symbol: '♧', cost: { wood: 4, fiber: 2 }, prerequisite: null },
   stonePile: { name: 'Stone pile', description: 'Keep up to 12 stone at camp', symbol: '◆', cost: { wood: 3, fiber: 0 }, prerequisite: null },
-  windbreak: { name: 'Windbreak', description: 'Stay warmer when the fire fades', symbol: '▥', cost: { wood: 5, fiber: 0 }, prerequisite: null }
+  windbreak: { name: 'Windbreak', description: 'Stay warmer when the fire fades', symbol: '▥', cost: { wood: 5, fiber: 0 }, prerequisite: null },
+  /** Stands on cleared ground: the step named by `ground` must be cleared first. */
+  larder: { name: 'Larder', description: 'Keep up to 10 food raised off the ground', symbol: '▥', cost: { wood: 5, fiber: 2, stone: 2 }, prerequisite: null, ground: 'north-near' },
+  woodpile: { name: 'Woodpile', description: 'Keep up to 12 wood split and dry', symbol: '▤', cost: { wood: 3, fiber: 1 }, prerequisite: null, ground: 'east-near' }
 } as const;
 
 export type StructureId = keyof typeof BUILDINGS;
@@ -98,11 +102,11 @@ export interface GameState {
   day: number;
   timeOfDay: number;
   player: { x: number; y: number; energy: number; hunger: number; warmth: number };
-  inventory: { wood: number; food: number; fiber: number; stone: number; trailFood: number };
+  inventory: { wood: number; fiber: number; stone: number; food: FoodStore };
   fireFuel: number;
   structures: Record<StructureId, boolean>;
   progress: { nextStormDay: number | null; hearthUnlocked: boolean; lookoutRepaired: boolean; axeCrafted: boolean;
-    quarryFound: boolean; pickaxeCrafted: boolean;
+    quarryFound: boolean; pickaxeCrafted: boolean; potCrafted: boolean;
     discoveries: Record<SiteId, boolean> };
   nodes: ResourceNode[];
   trees: TreeNode[];
@@ -110,12 +114,20 @@ export interface GameState {
   gardenPlots: GardenPlot[];
   /** Stone kept in the camp stone pile, outside the bag. */
   storedStone: number;
+  /** Wood split and stacked on the woodpile, outside the bag: it counts for building and the fire, from anywhere. */
+  storedWood: number;
+  /** Food kept in the larder, outside the bag: reachable only in the clearing, and it keeps fresh food longer. */
+  larder: FoodStore;
   /** First day the quarry face can be dug again. */
   quarryReadyDay: number;
   /** First day the rubble pile gives stone again. */
   rubbleReadyDay: number;
   /** The last winter night a wolf came into the dark camp, and what it took. */
   lastWolf: { day: number; took: WolfTake } | null;
+  /** The last dawn that threw out food gone soft, and how much. */
+  lastSpoiled: { day: number; berry: number; greens: number } | null;
+  /** A honey cake eaten: the next rest or sleep at camp restores a little more energy. */
+  cakeBonus: boolean;
   /** What the survivor has written in the year journal. */
   journal: JournalEntry[];
   companion: Companion;
@@ -146,12 +158,30 @@ export const BALANCE = {
   digSeconds: 10,
   digEnergyCost: 8,
   eatHungerGain: 25,
+  /** Forage eaten raw; honey gives a little energy too. Roasted hazelnuts come from the cooking pot. */
+  greensHunger: 15,
+  hazelnutHunger: 15,
+  honeyHunger: 20,
+  honeyEnergy: 5,
+  roastedHazelnutHunger: 50,
+  /** Dawns before the hollow tree has honey again. */
+  honeyRegrowDays: 3,
   trailFoodHungerGain: 45,
   trailFoodSeconds: 12,
+  /** Days a fresh berry keeps in the bag, and in the larder. */
+  bagFreshDays: 3,
+  larderFreshDays: 5,
   cookSeconds: 8,
   cookHungerGain: 35,
   rackCookHungerGain: 50,
   cookWarmthGain: 10,
+  /** Pot dishes, cooked like berries; none should beat rest and shelter as the way to recover. */
+  teaWarmthGain: 20,
+  teaEnergyGain: 5,
+  saladHungerGain: 40,
+  saladEnergyGain: 10,
+  honeyCakeHungerGain: 60,
+  honeyCakeRestBonus: 10,
   stargazeSeconds: 12,
   /** Leaving an offering out for a wild animal. */
   offerSeconds: 3,
@@ -183,6 +213,8 @@ export const BALANCE = {
   pileMergeRadius: 1,
   pickUpSeconds: 2,
   stonePileCapacity: 12,
+  larderCapacity: 10,
+  woodpileCapacity: 12,
   hearthFireSecondsPerWood: 150,
   coldNightStartDay: 3,
   coldNightRetryDays: 3,
@@ -223,6 +255,12 @@ const fiberPositions = [
   [27, 12], [10, 14], [30, 18], [8, 21]
 ];
 const stonePositions = [[31, 10], [11, 22], [29, 21]];
+// Seasonal forage. Hazels stand at the foot of broadleaf trees and pines out in the woods; greens grow by the spring and in
+// the open meadow, and the last two patches come up only after a spring shower. The hollow tree keeps a bees' nest.
+const hazelPositions = [[17.5, 4.5], [25.5, 5.5], [26.75, 6.5]];
+const pinePositions = [[9.5, 12.5], [23, 5.5], [19.5, 25]];
+const greensPositions = [[9.5, 17.5], [12.5, 21.5], [27, 22.5], [30.5, 16.5], [12.5, 8]];
+const honeyPositions = [[16, 6.5]];
 const treePositions = [
   [20, 7, 'treeBroadleaf'], [17, 9, 'treeBroadleaf'], [27, 5, 'treeBroadleaf'],
   [22, 23, 'treePine'], [32, 14, 'treePine'], [15, 24, 'treePine']
@@ -233,7 +271,11 @@ export function createGame(): GameState {
     ...branchPositions.map(([x, y], index) => ({ id: `branch-${index}`, kind: 'branch' as const, x, y, amount: 1, readyDay: 1 })),
     ...berryPositions.map(([x, y], index) => ({ id: `berry-${index}`, kind: 'berry' as const, x, y, amount: 1, readyDay: 1 })),
     ...fiberPositions.map(([x, y], index) => ({ id: `fiber-${index}`, kind: 'fiber' as const, x, y, amount: 1, readyDay: 1 })),
-    ...stonePositions.map(([x, y], index) => ({ id: `stone-${index}`, kind: 'stone' as const, x, y, amount: 1, readyDay: 1 }))
+    ...stonePositions.map(([x, y], index) => ({ id: `stone-${index}`, kind: 'stone' as const, x, y, amount: 1, readyDay: 1 })),
+    ...hazelPositions.map(([x, y], index) => ({ id: `hazel-${index}`, kind: 'hazel' as const, x, y, amount: 1, readyDay: 1 })),
+    ...pinePositions.map(([x, y], index) => ({ id: `pine-${index}`, kind: 'pine' as const, x, y, amount: 1, readyDay: 1 })),
+    ...greensPositions.map(([x, y], index) => ({ id: `greens-${index}`, kind: 'greens' as const, x, y, amount: 1, readyDay: 1 })),
+    ...honeyPositions.map(([x, y], index) => ({ id: `honey-${index}`, kind: 'honey' as const, x, y, amount: 1, readyDay: 1 }))
   ];
   const trees: TreeNode[] = treePositions.map(([x, y, sprite], index) => ({ id: `tree-${index}`, x, y, sprite, readyDay: 1 }));
   return {
@@ -241,20 +283,24 @@ export function createGame(): GameState {
     day: 1,
     timeOfDay: 0,
     player: { x: BALANCE.campX + 1, y: BALANCE.campY + 1, energy: 100, hunger: 100, warmth: 100 },
-    inventory: { wood: 0, food: 0, fiber: 0, stone: 0, trailFood: 0 },
+    inventory: { wood: 0, fiber: 0, stone: 0, food: emptyFood() },
     fireFuel: 0,
-    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, crate: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false },
+    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, crate: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
-      quarryFound: false, pickaxeCrafted: false,
+      quarryFound: false, pickaxeCrafted: false, potCrafted: false,
       discoveries: { basket: false, spring: false, cairn: false } },
     nodes,
     trees,
     stonePiles: [],
     gardenPlots: Array.from({ length: 3 }, () => ({ plantedYear: null, harvestedYear: null, harvestReady: false })),
     storedStone: 0,
+    storedWood: 0,
+    larder: emptyFood(),
     quarryReadyDay: 1,
     rubbleReadyDay: 1,
     lastWolf: null,
+    lastSpoiled: null,
+    cakeBonus: false,
     journal: [],
     clearing: { cleared: [], marked: null, felled: [] },
     companion: {

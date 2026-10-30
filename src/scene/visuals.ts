@@ -1,12 +1,14 @@
 import { isWinter, nightStart } from '../game/calendar';
 import { gardenPlotStage } from '../game/garden';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceNode } from '../game/state';
-import { isFreezingNight } from '../game/rules';
+import { groundBlocker, isFreezingNight } from '../game/rules';
+import { storeTotal } from '../game/food';
 import { wolfTracksShown } from '../game/wolves';
 import { rainWindow } from '../game/rain';
 import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 import { markedTrees } from '../game/clearing';
+import { nodeShown } from '../game/forage';
 
 export const NIGHT_DEPTH = BALANCE.mapHeight * TILE + 1;
 export const LIGHT_DEPTH = NIGHT_DEPTH + 1;
@@ -42,7 +44,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     addPiles(state, visuals, add);
     return visuals;
   }
-  for (const node of state.nodes) add(node.id, nodeTexture(node, timeMs, gathered, isWinter(state.day)), node.x, node.y);
+  for (const node of state.nodes.filter(item => nodeShown(state, item))) add(node.id, nodeTexture(node, timeMs, gathered, isWinter(state.day)), node.x, node.y);
   addPiles(state, visuals, add);
   addPuddles(state, add);
   for (const tree of state.trees) add(tree.id, tree.readyDay <= state.day ? `${tree.sprite}:still` : 'stump:still', tree.x, tree.y);
@@ -72,8 +74,18 @@ function pileSize(count: number): string {
   return count === 2 ? 'two' : 'many';
 }
 
-const NODE_SPRITES: Record<ResourceNode['kind'], string> = { branch: 'branchPile', berry: 'berryBush', fiber: 'fiberReeds', stone: 'rock0' };
-const EMPTY_FRAMES: Record<ResourceNode['kind'], string> = { branch: 'depleted', berry: 'picked', fiber: 'cut', stone: 'depleted' };
+const NODE_SPRITES: Record<ResourceNode['kind'], string> = {
+  branch: 'branchPile', berry: 'berryBush', fiber: 'fiberReeds', stone: 'rock0',
+  hazel: 'hazelSpot', pine: 'pineForage', greens: 'greensPatch', honey: 'hollowTree'
+};
+const EMPTY_FRAMES: Record<ResourceNode['kind'], string> = {
+  branch: 'depleted', berry: 'picked', fiber: 'cut', stone: 'depleted', hazel: 'gathered', pine: 'gathered', greens: 'gathered', honey: 'gathered'
+};
+/** Reeds sway and bees drift about the hollow tree, slowly, each out of step with its neighbours. */
+const IDLE_FRAMES: Partial<Record<ResourceNode['kind'], readonly string[]>> = {
+  fiber: ['ready', 'sway0', 'ready', 'sway1'],
+  honey: ['ready', 'bees0', 'ready', 'bees1']
+};
 
 /** In winter the berry bushes stand bare, whatever they would hold. */
 function nodeTexture(node: ResourceNode, timeMs: number, gathered: Gathered, winter: boolean): string {
@@ -86,8 +98,8 @@ function nodeFrame(node: ResourceNode, timeMs: number, gathered: Gathered): stri
   const sinceGather = gathered?.id === node.id ? timeMs - gathered.atMs : -1;
   if (node.kind === 'berry' && sinceGather >= 0 && sinceGather < 300) return `rustle${Math.floor(sinceGather / 150)}`;
   if (node.amount <= 0) return EMPTY_FRAMES[node.kind];
-  if (node.kind === 'fiber') return ['ready', 'sway0', 'ready', 'sway1'][(Math.floor(timeMs / 500) + node.id.length + node.x) % 4];
-  return 'ready';
+  const idle = IDLE_FRAMES[node.kind];
+  return idle ? idle[(Math.floor(timeMs / 500) + node.id.length + Math.floor(node.x)) % idle.length] : 'ready';
 }
 
 /** Where puddles gather at camp once a spring shower starts; they stay until the day ends. */
@@ -99,8 +111,25 @@ function addPuddles(state: GameState, add: AddVisual): void {
   PUDDLE_SPOTS.forEach((spot, index) => add(`puddle-${index}`, 'puddle:still', spot.x, spot.y, GROUND_DECAL_DEPTH));
 }
 
-/** Small camp structures: where each stands from the fire, drawn as a flat site until built. */
-const CAMP_STRUCTURES = [['crate', 3, 1], ['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3]] as const;
+/** Small camp structures: where each stands from the fire, drawn as a flat site until built; one on cleared ground only once it is clear. */
+export const CAMP_STRUCTURES = [['crate', 3, 1], ['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3], ['larder', 2.5, -4.5], ['woodpile', 5.5, -1.5]] as const;
+
+/** The larder shows what it keeps: nothing, a little (1 to 6) or plenty (7 to 10). */
+export function larderFrame(stored: number): 'empty' | 'some' | 'full' {
+  if (stored === 0) return 'empty';
+  return stored <= 6 ? 'some' : 'full';
+}
+
+/** The woodpile shows how much it holds: nothing, some (1 to 6) or plenty (7 to 12). */
+export function woodpileFrame(stored: number): 'empty' | 'some' | 'full' {
+  if (stored === 0) return 'empty';
+  return stored <= 6 ? 'some' : 'full';
+}
+
+function builtTexture(state: GameState, id: (typeof CAMP_STRUCTURES)[number][0]): string {
+  if (id === 'woodpile') return `woodpile:${woodpileFrame(state.storedWood)}`;
+  return id === 'larder' ? `larder:${larderFrame(storeTotal(state.larder))}` : `${id}:built`;
+}
 
 function addCamp(state: GameState, add: AddVisual): void {
   const { campX: x, campY: y } = BALANCE;
@@ -116,7 +145,8 @@ function addCamp(state: GameState, add: AddVisual): void {
   }
   add('shelter', shelterTexture, x - 3, y - 2, structures.shelter ? undefined : GROUND_DECAL_DEPTH);
   for (const [id, dx, dy] of CAMP_STRUCTURES) {
-    add(id, structures[id] ? `${id}:built` : `${id}Site:still`, x + dx, y + dy, structures[id] ? undefined : GROUND_DECAL_DEPTH);
+    if (groundBlocker(state, id)) continue;
+    add(id, structures[id] ? builtTexture(state, id) : `${id}Site:still`, x + dx, y + dy, structures[id] ? undefined : GROUND_DECAL_DEPTH);
   }
   if (structures.garden) {
     state.gardenPlots.forEach((plot, index) => {
@@ -148,6 +178,11 @@ function addFire(state: GameState, timeMs: number, visuals: SceneVisual[], add: 
   if (wolfTracksShown(state)) add('wolfTracks', 'wolfTracks:still', x, y, GROUND_DECAL_DEPTH);
   const frame = mode === 'unlit' ? mode : mode + phase;
   add('fire', `${fire}:${frame}`, x, y);
+  // The pot hangs over the fire, steaming while it burns.
+  if (state.progress.potCrafted) {
+    const fireDepth = visuals.at(-1)!.depth;
+    add('potTripod', state.fireFuel > 0 ? `potTripod:steaming${Math.floor(timeMs / 500) % 2}` : 'potTripod:still', x, y, fireDepth + 1);
+  }
   if (state.fireFuel > 0 && state.timeOfDay >= nightStart(state.day)) visuals.push({
     id: 'flame', texture: `${state.structures.hearth ? 'hearthFlame' : 'flame'}:${mode}${phase}`,
     x: Math.round(worldX(x)), y: Math.round(worldY(y)), depth: LIGHT_DEPTH

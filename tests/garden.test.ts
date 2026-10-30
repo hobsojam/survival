@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { gardenDawn, gardenPlotLabel, gardenPlotStage } from '../src/game/garden';
 import { applyAction, harvestGardenBlocker, plantGardenBlocker } from '../src/game/rules';
 import { BALANCE, createGame, type GardenPlot, type GameState } from '../src/game/state';
+import { stock } from './stock';
 
 const plot = (changes: Partial<GardenPlot> = {}): GardenPlot => ({ plantedYear: null, harvestedYear: null, harvestReady: false, ...changes });
 const gardenState = (day: number, changes: Partial<GameState> = {}): GameState => {
@@ -57,22 +58,22 @@ describe('garden seasons', () => {
 
 describe('garden actions', () => {
   it('blocks planting outside an available spring plot', () => {
-    const spring = gardenState(21, { inventory: { ...createGame().inventory, food: 1 } });
+    const spring = gardenState(21, { inventory: { ...createGame().inventory, food: stock(1) } });
     expect(plantGardenBlocker(spring, -1)).toContain('unavailable');
     expect(plantGardenBlocker({ ...spring, structures: { ...spring.structures, garden: false } }, 0)).toContain('Build a garden');
     expect(plantGardenBlocker({ ...spring, area: 'quarry' }, 0)).toContain('camp');
     expect(plantGardenBlocker({ ...spring, day: 11 }, 0)).toContain('spring');
     expect(plantGardenBlocker({ ...spring, gardenPlots: [plot({ plantedYear: 1 }), ...spring.gardenPlots.slice(1)] }, 0)).toContain('already');
-    expect(plantGardenBlocker({ ...spring, inventory: { ...spring.inventory, food: 0 } }, 0)).toContain('berry');
+    expect(plantGardenBlocker({ ...spring, inventory: { ...spring.inventory, food: stock(0) } }, 0)).toContain('berry');
     expect(plantGardenBlocker({ ...spring, player: { ...spring.player, energy: 0 } }, 0)).toContain('tired');
     expect(plantGardenBlocker(spring, 0)).toBeNull();
     expect(applyAction(spring, { type: 'plantGarden', plotIndex: 9 }).state).toBe(spring);
   });
 
   it('plants one berry and applies gather time and energy costs', () => {
-    const state = gardenState(21, { inventory: { ...createGame().inventory, food: 1 } });
+    const state = gardenState(21, { inventory: { ...createGame().inventory, food: stock(1) } });
     const result = applyAction(state, { type: 'plantGarden', plotIndex: 1 });
-    expect(result.state.inventory.food).toBe(0);
+    expect(result.state.inventory.food.berry.length).toBe(0);
     expect(result.state.gardenPlots[1]).toEqual({ plantedYear: 1, harvestedYear: null, harvestReady: false });
     expect(result.state.player.energy).toBeLessThan(state.player.energy);
     expect(result.state.timeOfDay).toBeGreaterThan(state.timeOfDay);
@@ -96,7 +97,7 @@ describe('garden actions', () => {
     const readyPlot = plot({ plantedYear: 1, harvestReady: true });
     const state = gardenState(41, { gardenPlots: [readyPlot, ...createGame().gardenPlots.slice(1)] });
     const result = applyAction(state, { type: 'harvestGarden', plotIndex: 0 });
-    expect(result.state.inventory.food).toBe(2);
+    expect(result.state.inventory.food.berry.length).toBe(2);
     expect(result.state.gardenPlots[0]).toEqual({ plantedYear: 1, harvestedYear: 2, harvestReady: false });
     expect(result.state.player.energy).toBeLessThan(state.player.energy);
     expect(result.state.timeOfDay).toBeGreaterThan(state.timeOfDay);

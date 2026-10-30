@@ -21,6 +21,15 @@ describe('phase 5 scene effects', () => {
     expect(effectVisuals(state, 1000, [{ ...event('gather'), resource: 'branch' }])[0].texture).toBe('gatherPop:wood');
   });
 
+  it('pops each forage find as itself, never as wood', () => {
+    for (const resource of ['hazel', 'pine', 'greens', 'honey'] as const) {
+      const texture = effectVisuals(state, 1000, [{ ...event('gather'), resource }])[0].texture;
+      expect(texture, resource).toBe(`gatherPop:${resource}`);
+      expect(sprites.gatherPop.frames[resource], resource).toBeDefined();
+    }
+    expect(new Set(['hazel', 'pine', 'greens', 'honey', 'berry', 'wood'].map(frame => sprites.gatherPop.frames[frame].join(''))).size).toBe(6);
+  });
+
   it('shows smoke and sparks only for a burning fire', () => {
     const burning = { ...state, fireFuel: 100 };
     const visuals = effectVisuals(burning, 2000, []);
@@ -100,7 +109,7 @@ describe('phase 5 scene effects', () => {
     const storm = { ...state, day: 3, timeOfDay: 190, fireFuel: 100,
       progress: { ...state.progress, nextStormDay: 3 } };
     const events: EffectEvent[] = [
-      ...(['branch', 'berry', 'fiber', 'stone'] as const).map(resource => ({ ...event('gather'), resource })),
+      ...(['branch', 'berry', 'fiber', 'stone', 'hazel', 'pine', 'greens', 'honey'] as const).map(resource => ({ ...event('gather'), resource })),
       event('cook'), event('stargaze'), event('frost')
     ];
     for (const timeMs of [1000, 1250, 1500, 2000]) for (const effect of effectVisuals(storm, timeMs, events)) {

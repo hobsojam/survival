@@ -4,6 +4,8 @@ import { BALANCE, LOOKOUT, SITES, createGame, type GameState } from '../src/game
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { markedTrees } from '../src/game/clearing';
 import { KEY_ACTIONS, actionPose, closestSite, closestTree, gatherKeyAction, gatherSpot, promptFor } from '../src/scene/prompts';
+import { stock } from './stock';
+import { addFood, emptyFood } from '../src/game/food';
 
 /** A camp with nothing to gather, chop or explore, so each test adds only what it checks. */
 function bareCamp(x: number = BALANCE.campX, y: number = BALANCE.campY): GameState {
@@ -32,6 +34,16 @@ describe('camp prompts', () => {
     expect(promptFor(state)).toBe('At camp · C Cook · G Stargaze · Z Sleep · F Fire');
   });
 
+  it('names the dish C would cook after dark', () => {
+    // Every animal has had its offering today, so the berry is left for the pot.
+    const camp = bareCamp();
+    const night = { ...camp, timeOfDay: nightStart(1) + 1, fireFuel: 30, companion: { ...camp.companion, lastOffer: { bird: 1, fox: 1, wolf: 1 } } };
+    expect(promptFor({ ...night, inventory: { ...night.inventory, food: stock(1) } })).toBe('C  Cook a berry · G Stargaze · F Fire · R Rest');
+    const tea = { ...night, progress: { ...night.progress, potCrafted: true },
+      inventory: { ...night.inventory, food: addFood(emptyFood(), 'pineNeedles', 1, 1) } };
+    expect(promptFor(tea)).toBe('C  Cook pine needle tea · G Stargaze · F Fire · R Rest');
+  });
+
   it('shows movement help away from camp with nothing nearby', () => {
     expect(promptFor(bareCamp(5, 25))).toBe('WASD / arrows  Move');
   });
@@ -50,6 +62,16 @@ describe('camp prompts', () => {
     expect(promptFor(node('berry'))).toBe('E  Pick berries');
     expect(promptFor(node('fiber'))).toBe('E  Gather fiber');
     expect(promptFor(node('stone'))).toBe('E  Collect stone');
+  });
+
+  it('names the forage E would gather, in its season', () => {
+    const forage = (kind: 'hazel' | 'pine' | 'greens' | 'honey', day: number) =>
+      ({ ...bareCamp(5, 25), day, nodes: [{ id: kind, kind, x: 5, y: 25, amount: 1, readyDay: 1 }] });
+    expect(promptFor(forage('hazel', 1))).toBe('E  Gather hazelnuts');
+    expect(promptFor(forage('pine', 11))).toBe('E  Gather pine needles');
+    expect(promptFor(forage('greens', 21))).toBe('E  Pick wild greens');
+    expect(promptFor(forage('honey', 31))).toBe('E  Take wild honey');
+    expect(promptFor(forage('honey', 1))).not.toMatch(/^E /);
   });
 
   it('counts the stones in a loose pile', () => {
@@ -217,14 +239,14 @@ describe('winter prompts', () => {
 
 describe('offering prompts', () => {
   it('offers the fox a berry with O while it sits at dusk', () => {
-    const dusk = { ...bareCamp(), timeOfDay: nightStart(1) - 5, inventory: { ...createGame().inventory, food: 1 } };
+    const dusk = { ...bareCamp(), timeOfDay: nightStart(1) - 5, inventory: { ...createGame().inventory, food: stock(1) } };
     expect(promptFor(dusk)).toBe('O  Leave a berry for the fox · At camp · F Fire · R Rest · Click an upgrade to build');
     expect(KEY_ACTIONS).toContainEqual(['O', { type: 'befriend' }]);
   });
 
   it('adds the offering beside a bush the birds visit', () => {
     const bush = createGame().nodes.find(node => node.id === 'berry-0')!;
-    const spring = { ...bareCamp(19, 14), day: 22, timeOfDay: 60, nodes: [bush], inventory: { ...createGame().inventory, food: 1 } };
+    const spring = { ...bareCamp(19, 14), day: 22, timeOfDay: 60, nodes: [bush], inventory: { ...createGame().inventory, food: stock(1) } };
     expect(promptFor(spring)).toBe('E  Pick berries · O  Scatter a berry for the birds');
   });
 });

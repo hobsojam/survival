@@ -4,7 +4,8 @@ import { isAtCamp, isInClearing, sleepBlocker, type GameAction } from '../game/r
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 import { choppableTrees, isClearingStump } from '../game/clearing';
 import { sitePrompt } from '../game/sitePrompt';
-import { OFFER_PROMPT, offerFor } from '../game/companion';
+import { offerFor, offerPrompt } from '../game/companion';
+import { DISHES, defaultDish } from '../game/cooking';
 import { closestGatherable, type Gatherable } from './tapTarget';
 import type { SurvivorAction } from './survivorVisual';
 
@@ -26,7 +27,8 @@ export function actionPose(type: GameAction['type']): SurvivorAction | undefined
 }
 
 const GATHER_PROMPTS: Record<ResourceKind, string> = {
-  branch: 'E  Pick up fallen branches', berry: 'E  Pick berries', fiber: 'E  Gather fiber', stone: 'E  Collect stone'
+  branch: 'E  Pick up fallen branches', berry: 'E  Pick berries', fiber: 'E  Gather fiber', stone: 'E  Collect stone',
+  hazel: 'E  Gather hazelnuts', pine: 'E  Gather pine needles', greens: 'E  Pick wild greens', honey: 'E  Take wild honey'
 };
 
 function gatherPrompt(found: Gatherable, winter: boolean): string {
@@ -91,7 +93,7 @@ export function promptFor(state: GameState): string {
   const site = closestSite(state);
   const nearby = lookoutPrompt(state) || (site ? sitePrompt(state, site.id) : '') || treePrompt(state);
   const animal = offerFor(state);
-  const offer = animal ? `O  ${OFFER_PROMPT[animal]}` : '';
+  const offer = animal ? `O  ${offerPrompt(state, animal)}` : '';
   const gather = found ? gatherPrompt(found, isWinter(state.day)) : '';
   const parts = [gather, nearby, offer].filter(Boolean);
   if (gather && parts.length === 1 && !sleepBlocker(state)) return `${gather} · Z Sleep until morning`;
@@ -120,9 +122,11 @@ function campPrompt(state: GameState): string {
   if (pathOpen(state) && within(state, CAMP_EXIT)) return 'Walk west to leave camp';
   if (!isInClearing(state)) return 'WASD / arrows  Move';
   if (!isAtCamp(state)) return 'In the clearing · G Stargaze · Click an upgrade to build';
-  if (!sleepBlocker(state)) return 'At camp · C Cook · G Stargaze · Z Sleep · F Fire';
-  if (state.timeOfDay >= nightStart(state.day)) return 'At camp · C Cook · G Stargaze · F Fire · R Rest';
-  return 'At camp · F Fire · R Rest · Click an upgrade to build';
+  if (sleepBlocker(state) && state.timeOfDay < nightStart(state.day)) return 'At camp · F Fire · R Rest · Click an upgrade to build';
+  const evening = sleepBlocker(state) ? 'G Stargaze · F Fire · R Rest' : 'G Stargaze · Z Sleep · F Fire';
+  // Once there is something to cook, C names it.
+  const dish = defaultDish(state);
+  return dish ? `C  Cook ${DISHES[dish].name} · ${evening}` : `At camp · C Cook · ${evening}`;
 }
 
 function quarryPrompt(state: GameState, found: Gatherable | undefined): string {

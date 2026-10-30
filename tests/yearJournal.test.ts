@@ -21,7 +21,7 @@ describe('the year journal pages', () => {
     ]), currentPage(6));
     expect(view.entries.map(entry => entry.day)).toEqual(['Day 2', 'Day 4']);
     expect(view.entries[0]).toEqual({ icon: journalIconUrl('leaves'), day: 'Day 2', line: 'The first leaves came down over camp.' });
-    expect(view.blanks).toBe(3);
+    expect(view.blanks).toBe(4);
   });
 
   it('leafs back no further than the first page and no further forward than today', () => {
@@ -38,7 +38,7 @@ describe('the year journal pages', () => {
     expect(view.title).toBe('Winter, year one');
     expect(view.days).toBe('Days 11–20');
     expect(view.entries).toEqual([]);
-    expect(view.blanks).toBe(5);
+    expect(view.blanks).toBe(6);
     expect(view.hasPrevious && view.hasNext).toBe(true);
   });
 
@@ -80,7 +80,7 @@ describe('turning and drawing journal pages', () => {
     expect(elements['#year-journal-days'].textContent).toBe('Days 1–10');
     expect([elements['#year-journal-previous'].disabled, elements['#year-journal-next'].disabled]).toEqual([true, true]);
     const rows = elements['#year-journal-entries'].children as FakeNode[];
-    expect(rows).toHaveLength(5);
+    expect(rows).toHaveLength(6);
     const [icon, text] = rows[0].children as FakeNode[];
     expect(icon.textContent).toBe('');
     expect(icon.attributes.style).toBe(`background-image: url("${journalIconUrl('leaves')}")`);

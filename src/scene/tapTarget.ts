@@ -1,6 +1,7 @@
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceNode, type SiteId, type StonePile } from '../game/state';
 import { isAtCamp, type GameAction } from '../game/rules';
 import { choppableTrees } from '../game/clearing';
+import { nodeShown } from '../game/forage';
 import { sprites } from '../art/sprites';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 
@@ -62,7 +63,7 @@ export function pickTapTarget(state: GameState, x: number, y: number): TapTarget
     { target: { kind: 'rubble', x: RUBBLE_SITE.x, y: RUBBLE_SITE.y } },
     { target: { kind: 'crossing', x: QUARRY_EXIT.x, y: QUARRY_EXIT.y } }
   ] : [
-    ...state.nodes.filter(node => node.amount > 0).map(node => ({ target: { kind: 'node' as const, id: node.id, x: node.x, y: node.y } })),
+    ...state.nodes.filter(node => node.amount > 0 && nodeShown(state, node)).map(node => ({ target: { kind: 'node' as const, id: node.id, x: node.x, y: node.y } })),
     ...piles,
     ...choppableTrees(state).map(tree => ({ target: { kind: 'tree' as const, id: tree.id, x: tree.x, y: tree.y }, sprite: tree.sprite })),
     ...(Object.keys(SITES) as SiteId[]).map(id => ({ target: { kind: 'site' as const, id, x: SITES[id].x, y: SITES[id].y } })),
@@ -80,7 +81,7 @@ export function pickTapTarget(state: GameState, x: number, y: number): TapTarget
 /** What E can act on: a node, a loose pile, the rubble or the quarry face. */
 export type Gatherable = { kind: 'node'; node: ResourceNode } | { kind: 'pile'; pile: StonePile } | { kind: 'rubble' } | { kind: 'quarry' };
 
-/** The nearest thing E can act on within reach: ready camp nodes and this area's loose piles, or the quarry's rubble and face when ready. */
+/** The nearest thing E can act on within reach: ready camp nodes in season and this area's loose piles, or the quarry's rubble and face when ready. */
 export function closestGatherable(state: GameState): Gatherable | undefined {
   const { x, y } = state.player;
   const options: { found: Gatherable; away: number }[] =
@@ -89,7 +90,7 @@ export function closestGatherable(state: GameState): Gatherable | undefined {
     if (state.rubbleReadyDay <= state.day) options.push({ found: { kind: 'rubble' }, away: distance(RUBBLE_SITE.x, RUBBLE_SITE.y, x, y) });
     if (state.quarryReadyDay <= state.day) options.push({ found: { kind: 'quarry' }, away: distance(QUARRY_SITE.x, QUARRY_SITE.y, x, y) });
   } else {
-    options.push(...state.nodes.filter(node => node.amount > 0).map(node => ({ found: { kind: 'node' as const, node }, away: distance(node.x, node.y, x, y) })));
+    options.push(...state.nodes.filter(node => node.amount > 0 && nodeShown(state, node)).map(node => ({ found: { kind: 'node' as const, node }, away: distance(node.x, node.y, x, y) })));
   }
   return options.filter(option => option.away <= BALANCE.interactionRadius).sort((a, b) => a.away - b.away)[0]?.found;
 }

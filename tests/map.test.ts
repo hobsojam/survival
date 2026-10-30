@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE, SITES, createGame } from '../src/game/state';
+import { BALANCE, SITES, createGame, type ResourceKind } from '../src/game/state';
 import { terrainSprites } from '../src/art/terrain';
 import { buildMap, shownTerrainKey, terrainKey, type TerrainMap } from '../src/scene/map';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
@@ -44,6 +44,9 @@ describe('terrain composition', () => {
     expect(map.decorations.some(item => Math.hypot(item.x - BALANCE.campX, item.y - BALANCE.campY) <= BALANCE.campRadius)).toBe(true);
   });
 
+  // Branches lie under trees and a hazel grows at the foot of its tree; other forage keeps a little room, the rest more.
+  const CLEARANCE: Record<ResourceKind, number> = { branch: 1.5, hazel: 1.4, pine: 2.5, greens: 2.5, honey: 2.5, berry: 3.5, fiber: 3.5, stone: 3.5 };
+
   it('is deterministic and leaves the camp and nodes clear of tree trunks', () => {
     const map = buildMap(nodes, 'camp');
     // The scene draws the choppable trees itself, so the map only needs to hold them where it leaves room for a step's trees.
@@ -59,7 +62,7 @@ describe('terrain composition', () => {
     for (const tree of map.trees) {
       if (stepSpots.some(spot => spot.x === tree.x && spot.y === tree.y)) continue; // these stand just past the old edge, where the steps put them
       expect(Math.hypot(tree.x - BALANCE.campX, tree.y - BALANCE.campY)).toBeGreaterThan(BALANCE.campRadius + 1);
-      expect(nodes.every(node => Math.hypot(tree.x - node.x, tree.y - node.y) >= (node.kind === 'branch' ? 1.5 : 3.5))).toBe(true);
+      expect(nodes.every(node => Math.hypot(tree.x - node.x, tree.y - node.y) >= CLEARANCE[node.kind])).toBe(true);
     }
   });
 

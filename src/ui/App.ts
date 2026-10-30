@@ -3,9 +3,11 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type SiteId, typ
 import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
-import { cookBlocker, isInClearing, sleepBlocker, stargazeBlocker } from '../game/rules';
+import { availableWood, cookBlocker, isAtCamp, isInClearing, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { nextStep, type Side } from '../game/clearing';
 import { offerBlocker } from '../game/companion';
+import { defaultDish, type DishId } from '../game/cooking';
+import { foodCount, type FoodItem } from '../game/food';
 import { dayPillView, renderDayPill, renderYearWheel, yearWheelView, type CalendarRoot } from './calendarView';
 import { isLowMeter } from '../game/needs';
 import { gateTap, nextOpenTab, wireSidebarTabs, type DockTab } from './dock';
@@ -13,10 +15,19 @@ import { createPause, wirePause, type PauseControl } from './pause';
 import { journalView } from './journal';
 import { renderRegionOverview } from './regionOverview';
 import { currentPage, journalPageView, renderJournalPage, turnPage } from './yearJournal';
-import { axeView, bagView, buildButtonView, clearingView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightHint, pickaxeView, pillowView, startNote, type ActionPanelView } from './panels';
+import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, type EatableFood, larderMarkup, larderView, clearingView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, pickaxeView, pillowView, potView, startNote, type ActionPanelView } from './panels';
 import { Soundscape } from '../game/soundscape';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
+/** What each Burn or Drop button spends, as a count in the bag; Eat buttons follow the bag view instead. */
+const SUPPLY_COUNTS: Record<string, (inventory: GameState['inventory']) => number> = {
+  wood: inventory => inventory.wood,
+  fiber: inventory => inventory.fiber,
+  stone: inventory => inventory.stone
+};
+/** Burn reaches the woodpile at camp; everything else follows the bag. */
+const supplyCount = (state: GameState, supply: string): number =>
+  supply === 'wood' && isAtCamp(state) ? availableWood(state) : SUPPLY_COUNTS[supply]?.(state.inventory) ?? 0;
 
 export class App {
   private state: GameState;
@@ -53,6 +64,8 @@ export class App {
       const groupHeading = id === 'shelterThatched' ? '<h3 class="build-group-heading">Shelter upgrades</h3>' : '';
       let extraControls = '';
       if (id === 'stonePile') extraControls = `<div id="stone-pile-controls" class="stone-pile-controls" hidden><span id="stone-pile-stored">Stored stone 0/${BALANCE.stonePileCapacity}</span><button type="button" data-action="storeStone">Store 1</button><button type="button" data-action="takeStone">Take 1</button></div>`;
+      if (id === 'woodpile') extraControls = `<div id="wood-pile-controls" class="stone-pile-controls" hidden><span id="wood-pile-stored">Stored wood 0/${BALANCE.woodpileCapacity}</span><button type="button" data-action="storeWood">Store 1</button><button type="button" data-action="takeWood">Take 1</button></div>`;
+      if (id === 'larder') extraControls = larderMarkup();
       return groupHeading + `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>` + extraControls;
     }).join('');
     const clearingMarkup = (['north', 'east', 'south', 'west'] as const).map(side => `<button type="button" class="build-item" data-clear-side="${side}"><span class="build-copy"><strong></strong><small></small></span></button>`).join('');
@@ -66,20 +79,20 @@ export class App {
           <main class="game-panel">
             <div class="game-frame"><div id="game-canvas"></div><div class="phone-meters" aria-hidden="true"><span class="track"><span id="mini-energy" class="fill energy"></span></span><span class="track"><span id="mini-hunger" class="fill hunger"></span></span><span class="track"><span id="mini-warmth" class="fill warmth"></span></span></div><div id="pause-overlay" class="pause-overlay" hidden><div class="pause-card" role="dialog" aria-labelledby="pause-title"><p class="eyebrow">TAKING A BREATH</p><h2 id="pause-title">Paused</h2><p>The clock, the fire, and your survivor will wait for you.</p><button type="button" id="pause-resume" class="primary-button">Resume</button><small class="pause-key">or press Esc</small></div></div><div class="prompt" id="prompt">WASD / arrows  Move</div></div>
             <div class="message" id="message">Gather a few branches. Your camp is waiting.</div>
-            <div class="shortcuts"><span><kbd>WASD</kbd> Move</span><span><kbd>E</kbd> Gather</span><span><kbd>V</kbd> Explore</span><span><kbd>F</kbd> Fire</span><span><kbd>R</kbd> Rest</span><span><kbd>Q</kbd> Berries</span><span><kbd>T</kbd> Ration</span><span><kbd>P</kbd> Prepare</span><span><kbd>C</kbd> Cook</span><span><kbd>G</kbd> Stargaze</span><span><kbd>Z</kbd> Sleep</span><span><kbd>L</kbd> Lookout</span><span><kbd>X</kbd> Chop</span><span><kbd>O</kbd> Offer</span></div>
+            <div class="shortcuts"><span><kbd>WASD</kbd> Move</span><span><kbd>E</kbd> Gather</span><span><kbd>V</kbd> Explore</span><span><kbd>F</kbd> Fire</span><span><kbd>R</kbd> Rest</span><span><kbd>Q</kbd> Eat</span><span><kbd>T</kbd> Ration</span><span><kbd>P</kbd> Prepare</span><span><kbd>C</kbd> Cook</span><span><kbd>G</kbd> Stargaze</span><span><kbd>Z</kbd> Sleep</span><span><kbd>L</kbd> Lookout</span><span><kbd>X</kbd> Chop</span><span><kbd>O</kbd> Offer</span></div>
           </main>
           <aside class="sidebar">
             <section class="panel survivor-panel" data-tab="bag"><p class="eyebrow">YOUR SURVIVOR</p><h2>Take it one day at a time</h2>
               <div class="meter"><div class="meter-title"><span>Energy</span><b id="energy-value">100</b></div><div class="track"><div id="energy-bar" class="fill energy"></div></div></div>
               <div class="meter"><div class="meter-title"><span>Hunger</span><b id="hunger-value">100</b></div><div class="track"><div id="hunger-bar" class="fill hunger"></div></div></div>
               <div class="meter"><div class="meter-title"><span>Warmth</span><b id="warmth-value">100</b></div><div class="track"><div id="warmth-bar" class="fill warmth"></div></div></div>
-              <div class="quick-actions"><button data-action="eat">Eat berries</button><button data-action="eatTrailFood" id="eat-ration-button">Eat ration</button><button data-action="rest">Rest</button><button data-action="stokeFire">Feed fire</button><button data-action="sleep" id="sleep-button">Sleep</button><button data-action="befriend" id="offer-button" hidden>Offer</button></div>
+              <div class="quick-actions"><button data-action="eat">Eat</button><button data-action="eatTrailFood" id="eat-ration-button">Eat ration</button><button data-action="rest">Rest</button><button data-action="stokeFire">Feed fire</button><button data-action="sleep" id="sleep-button">Sleep</button><button data-action="befriend" id="offer-button" hidden>Offer</button></div>
             </section>
             <div class="sidebar-tabs" role="tablist" aria-label="Sidebar"><button type="button" role="tab" data-sidebar-button="bag">🎒 Bag</button><button type="button" role="tab" data-sidebar-button="build">🔨 Build</button><button type="button" role="tab" data-sidebar-button="camp">🌙 Camp</button></div>
             <div class="sidebar-pages">
               <section class="panel forecast-panel" id="forecast-panel" data-tab="camp"><p class="eyebrow">THE FORECAST</p><h2 id="forecast-title">A cold night is coming</h2><p id="forecast-copy" class="forecast-copy"></p><div class="forecast-checks"><span id="forecast-shelter"></span><span id="forecast-fire"></span></div></section>
               <section class="panel lookout-panel" id="lookout-panel" data-tab="build"><p class="eyebrow">A PLACE BEYOND CAMP</p><h2 id="lookout-title">The old lookout</h2><p id="lookout-copy" class="lookout-copy"></p><button type="button" id="lookout-button" data-action="repairLookout">Repair lookout</button><small id="lookout-cost">4 wood · 2 fiber · 2 stone</small></section>
-              <section class="panel axe-panel" data-tab="build"><p class="eyebrow">FOREST TOOLS</p><div class="tool-row"><h2 id="axe-title">Stone axe</h2><p id="axe-copy" class="lookout-copy"></p><button type="button" id="axe-button" data-action="craftAxe">Craft stone axe</button><small id="axe-cost">1 wood · 1 fiber · 1 stone</small></div><div id="pickaxe-row" class="tool-row" hidden><h2 id="pickaxe-title">Pickaxe</h2><p id="pickaxe-copy" class="lookout-copy"></p><button type="button" id="pickaxe-button" data-action="craftPickaxe">Craft pickaxe</button><small id="pickaxe-cost">2 wood · 1 fiber · 2 stone</small></div><div id="pillow-row" class="tool-row" hidden><h2 id="pillow-title">Feather pillow</h2><p id="pillow-copy" class="lookout-copy"></p><button type="button" id="pillow-button" data-action="craftPillow">Stitch a pillow</button><small id="pillow-cost">6 feathers</small></div><div id="cloak-row" class="tool-row" hidden><h2 id="cloak-title">Fur cloak</h2><p id="cloak-copy" class="lookout-copy"></p><button type="button" id="cloak-button" data-action="craftCloak">Make a cloak</button><small id="cloak-cost">6 fur</small></div></section>
+              <section class="panel axe-panel" data-tab="build"><p class="eyebrow">FOREST TOOLS</p><div class="tool-row"><h2 id="axe-title">Stone axe</h2><p id="axe-copy" class="lookout-copy"></p><button type="button" id="axe-button" data-action="craftAxe">Craft stone axe</button><small id="axe-cost">1 wood · 1 fiber · 1 stone</small></div><div id="pickaxe-row" class="tool-row" hidden><h2 id="pickaxe-title">Pickaxe</h2><p id="pickaxe-copy" class="lookout-copy"></p><button type="button" id="pickaxe-button" data-action="craftPickaxe">Craft pickaxe</button><small id="pickaxe-cost">2 wood · 1 fiber · 2 stone</small></div><div id="pot-row" class="tool-row"><h2 id="pot-title">Cooking pot</h2><p id="pot-copy" class="lookout-copy"></p><button type="button" id="pot-button" data-action="craftPot">Make a cooking pot</button><small id="pot-cost">1 wood · 2 stone</small></div><div id="pillow-row" class="tool-row" hidden><h2 id="pillow-title">Feather pillow</h2><p id="pillow-copy" class="lookout-copy"></p><button type="button" id="pillow-button" data-action="craftPillow">Stitch a pillow</button><small id="pillow-cost">6 feathers</small></div><div id="cloak-row" class="tool-row" hidden><h2 id="cloak-title">Fur cloak</h2><p id="cloak-copy" class="lookout-copy"></p><button type="button" id="cloak-button" data-action="craftCloak">Make a cloak</button><small id="cloak-cost">6 fur</small></div></section>
               <section class="panel ration-panel" data-tab="bag"><p class="eyebrow">TRAIL FOOD</p><h2>Drying rack</h2><p class="lookout-copy">Dry a berry at camp for a ration you can eat anywhere. Each restores 45 hunger.</p><button type="button" id="prepare-button" data-action="prepareTrailFood">Prepare trail ration</button><small id="prepare-hint">Build a drying rack first.</small></section>
               <section class="panel sites-panel" data-tab="camp"><p class="eyebrow">BEYOND CAMP</p><h2>Follow the paths</h2><p class="lookout-copy">An old basket, a quiet spring, and a stone cairn wait beyond the clearing.</p><button type="button" id="site-button">Explore nearby place</button><small>Stand beside a place and press V</small></section>
               <section class="panel journal-panel" data-tab="camp"><p class="eyebrow">YOUR FIELD JOURNAL</p><h2>Areas beyond camp</h2><p id="journal-hint" class="journal-hint"></p>
@@ -93,15 +106,15 @@ export class App {
                 </details></section>
               <section class="panel year-journal-panel" data-tab="camp"><p class="eyebrow">THE YEAR SO FAR</p><div class="year-wheel"><span class="year-dial" aria-hidden="true"><span id="year-hand" class="year-hand"></span></span><p id="year-label" class="year-label"></p><ul class="visually-hidden" aria-label="Seasons"><li id="year-season-0">Autumn</li><li id="year-season-1">Winter</li><li id="year-season-2">Spring</li><li id="year-season-3">Summer</li></ul></div><div class="year-journal-page"><div class="year-journal-head"><button type="button" id="year-journal-previous" class="year-journal-turn" aria-label="Earlier page">‹</button><div><h2 id="year-journal-title"></h2><p id="year-journal-days" class="year-journal-days"></p></div><button type="button" id="year-journal-next" class="year-journal-turn" aria-label="Later page">›</button></div><ul id="year-journal-entries" class="year-journal-entries"></ul></div></section>
               <section class="panel bag-panel" data-tab="bag"><p class="eyebrow">IN YOUR BAG</p><div class="supplies">
-                <div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small><button type="button" class="supply-action" data-action="stokeFire" data-supply="wood" aria-label="Burn one wood">Burn</button></div>
-                <div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small><button type="button" class="supply-action" data-action="eat" data-supply="food" aria-label="Eat one berry">Eat</button></div>
+                <div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small><small id="wood-stored" class="supply-note"></small><button type="button" class="supply-action" data-action="stokeFire" data-supply="wood" aria-label="Burn one wood">Burn</button></div>
+                <div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small><small id="berry-line" class="supply-note"></small><button type="button" class="supply-action" data-action="eat" data-item="berry" data-supply="food" aria-label="Eat one berry">Eat</button></div>
                 <div><span class="supply-icon fiber">≋</span><strong id="fiber-count">0</strong><small>Fiber</small><button type="button" class="supply-action" data-action="burnFiber" data-supply="fiber" aria-label="Burn one fiber">Burn</button></div>
-                <div><span class="supply-icon stone">◆</span><strong id="stone-count">0</strong><small>Stone</small><small id="stone-stored" class="stone-stored"></small><button type="button" class="supply-action" data-action="dropStone" data-supply="stone" aria-label="Drop one stone">Drop</button></div>
+                <div><span class="supply-icon stone">◆</span><strong id="stone-count">0</strong><small>Stone</small><small id="stone-stored" class="supply-note"></small><button type="button" class="supply-action" data-action="dropStone" data-supply="stone" aria-label="Drop one stone">Drop</button></div>
                 <div><span class="supply-icon ration">◇</span><strong id="ration-count">0</strong><small>Rations</small><button type="button" class="supply-action" data-action="eatTrailFood" data-supply="trailFood" aria-label="Eat one trail ration">Eat</button></div>
-                <div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small>Carried</small></div>
+                <div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small>Carried</small></div>${bagFoodMarkup()}
               </div><p class="keepsake-line" id="keepsake-line" hidden></p><div class="fire-status" id="fire-status">The fire is unlit</div></section>
               <section class="panel garden-panel" data-tab="camp"><p class="eyebrow">GROW WITH THE SEASONS</p><h2>Berry garden</h2><p class="garden-hint" id="garden-hint"></p><div id="garden-plots"></div></section>
-              <section class="panel night-panel" data-tab="camp"><p class="eyebrow">AFTER DARK</p><h2>A little time for yourself</h2><p class="night-hint" id="night-hint">These small moments are waiting for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button></div></section>
+              <section class="panel night-panel" data-tab="camp"><p class="eyebrow">AFTER DARK</p><h2>A little time for yourself</h2><p class="night-hint" id="night-hint">These small moments are waiting for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" data-dish="berries" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button>${nightDishMarkup()}</div></section>
               <section class="panel build-panel" data-tab="build"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand anywhere in the clearing to build.</p><div id="build-list">${buildMarkup}</div><div id="clearing-group" hidden><h3 class="build-group-heading">Clear the land</h3><div id="clearing-sides">${clearingMarkup}</div><div class="tool-row"><h3 id="clear-title">Clear the ground</h3><p id="clear-copy" class="lookout-copy"></p><button type="button" id="clear-button" data-action="clearGround">Clear the ground</button><small id="clear-cost"></small></div></div></section>
               <section class="panel phone-only" data-tab="camp"><p class="eyebrow">THIS CAMP</p><button type="button" id="phone-new-game" class="secondary-button">Start a new game</button></section>
             </div>
@@ -116,8 +129,13 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone';
-        this.scene?.perform({ type });
+        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'storeWood' | 'takeWood' | 'storeFood' | 'takeFood';
+        const item = button.dataset.item as FoodItem | undefined;
+        const dish = button.dataset.dish as DishId | undefined;
+        if (type === 'storeFood' || type === 'takeFood') {
+          if (item) this.scene?.perform({ type, item });
+        } else if (type === 'cook' && dish) this.scene?.perform({ type, dish });
+        else this.scene?.perform(type === 'eat' && item ? { type, item } : { type });
       });
     });
     this.root.addEventListener('click', event => {
@@ -345,26 +363,61 @@ export class App {
     const { inventory } = this.state;
     const bag = bagView(this.state);
     this.setText('wood-count', String(inventory.wood));
-    this.setText('food-count', String(inventory.food));
+    this.setText('food-count', String(foodCount(inventory.food, 'berry')));
+    this.setText('berry-line', bag.berries);
     this.setText('fiber-count', String(inventory.fiber));
     this.setText('stone-count', String(inventory.stone));
-    this.setText('ration-count', String(inventory.trailFood));
+    this.setText('ration-count', String(foodCount(inventory.food, 'trailFood')));
+    for (const { item } of BAG_FOODS) {
+      const cell = this.root.querySelector<HTMLElement>(`[data-food="${item}"]`);
+      if (cell) cell.hidden = !bag.foods[item].shown;
+      this.setText(`${item}-count`, String(bag.foods[item].count));
+      this.setText(`${item}-note`, bag.foods[item].note);
+    }
     this.setText('space-count', bag.spaces);
-    this.root.querySelector('#eat-ration-button')?.classList.toggle('ready', inventory.trailFood > 0);
+    this.root.querySelector('#eat-ration-button')?.classList.toggle('ready', bag.eatable.trailFood);
     this.root.querySelector('#prepare-button')?.classList.toggle('ready', bag.prepareReady);
     this.setText('prepare-hint', bag.prepareHint);
     this.root.querySelectorAll<HTMLButtonElement>('[data-supply]').forEach(button => {
-      button.disabled = inventory[button.dataset.supply as keyof GameState['inventory']] <= 0;
+      // Eat buttons follow the food within reach, the larder included in the clearing; the rest follow the bag.
+      const { action } = button.dataset;
+      if (action === 'eat' || action === 'eatTrailFood') button.disabled = !bag.eatable[(button.dataset.item ?? 'trailFood') as EatableFood];
+      else button.disabled = supplyCount(this.state, button.dataset.supply ?? '') <= 0;
     });
     this.setText('stone-stored', bag.storedAtCamp);
     const pileControls = this.root.querySelector<HTMLElement>('#stone-pile-controls');
     if (pileControls) pileControls.hidden = !bag.pileShown;
     this.setText('stone-pile-stored', bag.pileStored);
+    this.setText('wood-stored', bag.woodAtCamp);
+    const woodControls = this.root.querySelector<HTMLElement>('#wood-pile-controls');
+    if (woodControls) woodControls.hidden = !bag.woodShown;
+    this.setText('wood-pile-stored', bag.woodStored);
+    this.renderLarder();
     this.setText('fire-status', bag.fire);
     const keepsakes = keepsakeView(this.state);
     const keepsakeLine = this.root.querySelector<HTMLElement>('#keepsake-line');
     if (keepsakeLine) keepsakeLine.hidden = !keepsakes.shown;
     this.setText('keepsake-line', `Keepsakes · ${keepsakes.text}`);
+  }
+
+  private renderLarder(): void {
+    const larder = larderView(this.state);
+    const controls = this.root.querySelector<HTMLElement>('#larder-controls');
+    if (controls) controls.hidden = !larder.shown;
+    this.setText('larder-stored', larder.stored);
+    // Rows hide again once both the bag and the larder are out of an item.
+    this.root.querySelectorAll<HTMLElement>('[data-larder-item]').forEach(row => { row.hidden = true; });
+    for (const row of larder.rows) {
+      const element = this.root.querySelector<HTMLElement>(`[data-larder-item="${row.item}"]`);
+      if (!element) continue;
+      element.hidden = false;
+      this.setText(`larder-${row.item}-count`, String(row.kept));
+      const store = element.querySelector<HTMLButtonElement>('[data-action="storeFood"]')!, take = element.querySelector<HTMLButtonElement>('[data-action="takeFood"]')!;
+      store.disabled = row.storeDisabled;
+      store.title = row.storeTitle;
+      take.disabled = row.takeDisabled;
+      take.title = row.takeTitle;
+    }
   }
 
   private turnJournalPage(step: number): void {
@@ -425,6 +478,7 @@ export class App {
     const pickaxeRow = this.root.querySelector<HTMLElement>('#pickaxe-row');
     if (pickaxeRow) pickaxeRow.hidden = !pickaxe.shown;
     this.renderActionPanel('pickaxe', pickaxe);
+    this.renderActionPanel('pot', potView(this.state));
     for (const [name, view] of [['pillow', pillowView(this.state)], ['cloak', cloakView(this.state)]] as const) {
       const row = this.root.querySelector<HTMLElement>(`#${name}-row`);
       if (row) row.hidden = !view.shown;
@@ -439,7 +493,17 @@ export class App {
     const offerHidden = Boolean(offerBlocker(this.state));
     this.root.querySelectorAll<HTMLButtonElement>('#offer-button, #dock-offer').forEach(button => { button.hidden = offerHidden; });
     const dockCook = this.root.querySelector<HTMLButtonElement>('#dock-cook');
-    if (dockCook) dockCook.hidden = Boolean(cookBlocker(this.state));
+    if (dockCook) dockCook.hidden = defaultDish(this.state) === null;
+    // The pot dishes stay hidden until the pot is made, including after a new game.
+    this.root.querySelectorAll<HTMLButtonElement>('.night-actions [id^="dish-"]').forEach(button => { button.hidden = true; });
+    for (const dish of nightDishesView(this.state)) {
+      const button = this.root.querySelector<HTMLButtonElement>(`#dish-${dish.dish}`);
+      if (!button) continue;
+      button.hidden = false;
+      button.disabled = dish.disabled;
+      button.title = dish.title;
+      button.classList.toggle('ready', !dish.disabled);
+    }
     const dockStargaze = this.root.querySelector<HTMLButtonElement>('#dock-stargaze');
     if (dockStargaze) dockStargaze.hidden = Boolean(stargazeBlocker(this.state));
   }

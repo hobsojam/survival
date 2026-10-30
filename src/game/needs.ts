@@ -42,7 +42,8 @@ interface Meter {
   severeRearm: number;
 }
 
-const METERS: readonly Meter[] = [
+/** Built on use: food.ts reaches this module through camp.ts while state.ts is still loading, before BALANCE exists. */
+const meters = (): readonly Meter[] => [
   { severe: 'exhausted', mild: 'tired', value: state => state.player.energy, isSevere: isExhausted, isMild: isTired, severeRearm: BALANCE.exhaustedEnergy + 10 },
   { severe: 'starving', mild: 'hungry', value: state => state.player.hunger, isSevere: isStarving, isMild: isHungry, severeRearm: 10 }
 ];
@@ -54,7 +55,7 @@ const METERS: readonly Meter[] = [
 export function needAlerts(armed: ReadonlySet<NeedAlert>, state: GameState): { armed: Set<NeedAlert>; fired: NeedAlert[] } {
   const next = new Set(armed);
   const fired: NeedAlert[] = [];
-  for (const meter of METERS) {
+  for (const meter of meters()) {
     const value = meter.value(state);
     if (value >= meter.severeRearm) next.add(meter.severe);
     if (value > BALANCE.lowNeed + 10) next.add(meter.mild);

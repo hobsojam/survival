@@ -1,13 +1,15 @@
-import { BALANCE, BUILDINGS, SITES, createGame, type GameState } from './state';
+import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type StructureId } from './state';
 import { bagCapacity, carriedCount } from './rules';
 import { season, yearOf } from './calendar';
 import { journalEntry, journalSeason, type JournalId } from './journalEntries';
 import type { ClearingState, StepId } from './clearing';
 import { CLEARING_STEPS, STEP_IDS, placeBranches } from './clearing';
 import { KEEPSAKES_NEEDED, TRUST_TARGET } from './companion';
+import { FOOD_ITEMS, isFresh, storeTotal, type FoodStore } from './food';
+import { FORAGE, isForage } from './forage';
 
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 18;
+const SAVE_VERSION = 19;
 export type SaveResult = { ok: true } | { ok: false; error: string };
 export type LoadResult = { kind: 'empty' } | { kind: 'loaded'; state: GameState } | { kind: 'invalid'; reason: string };
 
@@ -32,9 +34,17 @@ function validClock(value: SaveShape): boolean {
     && finite(value.fireFuel) && value.fireFuel >= 0;
 }
 
-function validSurvivor({ player, inventory, area }: SaveShape): boolean {
-  return onMap(player.x, player.y) && meter(player.energy) && meter(player.hunger) && meter(player.warmth)
-    && (['wood', 'food', 'fiber', 'stone', 'trailFood'] as const).every(key => count(inventory[key]))
+/** Every item is there: fresh food as the whole days it was picked, from day 1 to today, and kept food as counts. */
+function validFood(store: unknown, day: unknown): boolean {
+  if (!object(store) || !whole(day)) return false;
+  return FOOD_ITEMS.every(item => (isFresh(item)
+    ? Array.isArray(store[item]) && store[item].every(picked => whole(picked) && picked >= 1 && picked <= day)
+    : count(store[item])));
+}
+
+function validSurvivor({ player, inventory, area, day, cakeBonus }: SaveShape): boolean {
+  return bool(cakeBonus) && onMap(player.x, player.y) && meter(player.energy) && meter(player.hunger) && meter(player.warmth)
+    && (['wood', 'fiber', 'stone'] as const).every(key => count(inventory[key])) && validFood(inventory.food, day)
     && (area === 'camp' || area === 'quarry');
 }
 
@@ -47,10 +57,10 @@ function validProgress({ structures, progress, area }: SaveShape): boolean {
     const definition = BUILDINGS[id];
     if (structures[id] && 'alsoRequires' in definition && !structures[definition.alsoRequires]) return false;
   }
-  if (!(['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'pickaxeCrafted'] as const).every(key => bool(progress[key]))) return false;
+  if (!(['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'pickaxeCrafted', 'potCrafted'] as const).every(key => bool(progress[key]))) return false;
   if ((area === 'quarry' || progress.quarryFound) && !structures.shelter) return false;
   if (progress.pickaxeCrafted && !(progress.quarryFound && structures.toolshed)) return false;
-  if (progress.axeCrafted && !structures.toolshed) return false;
+  if ((progress.axeCrafted || progress.potCrafted) && !structures.toolshed) return false;
   const needsColdNight = [structures.hearth, progress.lookoutRepaired, progress.axeCrafted].includes(true);
   return progress.hearthUnlocked === true || !needsColdNight;
 }
@@ -66,6 +76,10 @@ function validDiscoveries({ progress }: SaveShape): boolean {
 }
 
 const readyBy = (value: unknown, latest: number): boolean => whole(value) && value >= 1 && value <= latest;
+
+function validWoodpile({ structures, storedWood }: SaveShape): boolean {
+  return count(storedWood) && storedWood <= BALANCE.woodpileCapacity && (structures.woodpile === true || storedWood === 0);
+}
 
 function validStone({ structures, storedStone, quarryReadyDay, rubbleReadyDay, day }: SaveShape): boolean {
   const today = day as number;
@@ -101,6 +115,18 @@ function validClearing({ clearing }: SaveShape): boolean {
   return felled.every(index => whole(index) && index >= 0 && index < trees) && new Set(felled).size === felled.length;
 }
 
+/** Buildings on cleared ground stand only where it is cleared; the larder holds real food, no more than fits, and only once built. */
+function validLarder({ larder, structures, day, clearing }: SaveShape): boolean {
+  const { cleared } = clearing as ClearingState;
+  const grounded = (Object.keys(BUILDINGS) as StructureId[]).every(id => {
+    const definition = BUILDINGS[id];
+    return !structures[id] || !('ground' in definition) || cleared.includes(definition.ground);
+  });
+  if (!grounded || !validFood(larder, day)) return false;
+  const stored = storeTotal(larder as FoodStore);
+  return stored <= BALANCE.larderCapacity && (structures.larder === true || stored === 0);
+}
+
 function validWorld({ nodes, trees, stonePiles, day, clearing }: SaveShape): boolean {
   const today = day as number;
   const fresh = createGame();
@@ -108,7 +134,7 @@ function validWorld({ nodes, trees, stonePiles, day, clearing }: SaveShape): boo
   const nodesMatch = nodes.length === fresh.nodes.length && nodes.every((node, index) => {
     const base = placed[index];
     return object(node) && node.id === base.id && node.kind === base.kind && node.x === base.x && node.y === base.y
-      && (node.amount === 0 || node.amount === 1) && readyBy(node.readyDay, today + 1);
+      && (node.amount === 0 || node.amount === 1) && readyBy(node.readyDay, today + (isForage(base.kind) ? FORAGE[base.kind].regrowDays : 1));
   });
   const treesMatch = trees.length === fresh.trees.length && trees.every((tree, index) => {
     const base = fresh.trees[index];
@@ -121,6 +147,13 @@ function validWorld({ nodes, trees, stonePiles, day, clearing }: SaveShape): boo
 }
 
 const WOLF_TAKES: readonly unknown[] = ['ration', 'berry', 'nothing', 'offered', 'chased'];
+
+/** The last spoiled dawn was a lived day, and something really was thrown out. */
+function validSpoiled({ lastSpoiled, day }: SaveShape): boolean {
+  if (lastSpoiled === null) return true;
+  return object(lastSpoiled) && whole(lastSpoiled.day) && lastSpoiled.day >= 1 && lastSpoiled.day <= (day as number)
+    && count(lastSpoiled.berry) && count(lastSpoiled.greens) && (lastSpoiled.berry as number) + (lastSpoiled.greens as number) >= 1;
+}
 
 /** No wolf yet, or one that came on a day already lived, taking something it could take. */
 function validWolf({ lastWolf, day }: SaveShape): boolean {
@@ -168,10 +201,10 @@ function validCompanion({ companion, day, structures }: SaveShape): boolean {
     && (!made || (keepsakes === 0 && !keepsakeLying));
 }
 
-/** Checks a version 18 save: the clearing, shelter upgrades, garden plots, tools, quarry timers, the year journal and companion. */
+/** Checks a version 19 save: the clearing and the larder, shelter upgrades, garden plots, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validGarden, validClearing, validWorld, validWolf, validJournal, validCompanion];
+  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodpile, validGarden, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

@@ -1,4 +1,6 @@
 import { duskLength, nightStart, season, seasonMessage, yearOf, type Season } from './calendar';
+import { defaultDish, type DishId } from './cooking';
+import { foodCount, type FoodItem } from './food';
 import { rainMessage } from './rain';
 import { isAtCamp, isColdNight, isInClearing, type GameAction } from './rules';
 import { LOOKOUT, type GameState } from './state';
@@ -12,7 +14,8 @@ export type JournalId =
   | 'leaves' | 'fox' | 'coldFront' | 'driedBerries' | 'stars'
   | 'firstSnow' | 'wolfTracks' | 'frozenSpring' | 'winterFire' | 'winterCooking'
   | 'firstRain' | 'rabbits' | 'bushesFull' | 'stumpGrowing' | 'springRest'
-  | 'fireflies' | 'twoHandfuls' | 'goldEvening' | 'warmSleep' | 'lookoutEvening';
+  | 'fireflies' | 'twoHandfuls' | 'goldEvening' | 'warmSleep' | 'lookoutEvening'
+  | 'hazelnuts' | 'pineTea' | 'salad' | 'wildHoney';
 
 export interface JournalEntry { year: number; id: JournalId; day: number; variant: number }
 
@@ -30,28 +33,32 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'coldFront', lines: ['The cold night came. I kept the fire through it.', 'The cold night came, and it got the better of me.',
       'A cold autumn night, and the fire kept me warm.'] },
     { id: 'driedBerries', lines: ['Dried berries for the winter.'] },
-    { id: 'stars', lines: ['Lay back and counted stars.'] }
+    { id: 'stars', lines: ['Lay back and counted stars.'] },
+    { id: 'hazelnuts', lines: ['Found hazelnuts in the leaf litter.'] }
   ],
   winter: [
     { id: 'firstSnow', lines: ['Snow fell in the night.'], silent: true },
     { id: 'wolfTracks', lines: ['Paw prints round the fire this morning.'], silent: true },
     { id: 'frozenSpring', lines: ['The quiet spring had frozen over.'] },
     { id: 'winterFire', lines: ['Kept the fire alive through a whole winter night.'] },
-    { id: 'winterCooking', lines: ['Cooked berries by the fire, with the snow coming down.'] }
+    { id: 'winterCooking', lines: ['Cooked berries by the fire, with the snow coming down.'] },
+    { id: 'pineTea', lines: ['Pine needle tea, hot in the snow.'] }
   ],
   spring: [
     { id: 'firstRain', lines: ['The first rain of spring.'], silent: true },
     { id: 'rabbits', lines: ['Rabbits in the meadow.'] },
     { id: 'bushesFull', lines: ['The bushes are full again.'] },
     { id: 'stumpGrowing', lines: ['A stump I cut is growing back already.'] },
-    { id: 'springRest', lines: ['Sat a while at the spring, now that it\'s thawed.'] }
+    { id: 'springRest', lines: ['Sat a while at the spring, now that it\'s thawed.'] },
+    { id: 'salad', lines: ['Greens and berries, the first salad of spring.'] }
   ],
   summer: [
     { id: 'fireflies', lines: ['Fireflies over camp.'] },
     { id: 'twoHandfuls', lines: ['Two handfuls from one bush.'] },
     { id: 'goldEvening', lines: ['The evening went gold.'] },
     { id: 'warmSleep', lines: ['Slept out without a fire, and it was warm.'] },
-    { id: 'lookoutEvening', lines: ['Watched the land from the lookout on a long evening.'] }
+    { id: 'lookoutEvening', lines: ['Watched the land from the lookout on a long evening.'] },
+    { id: 'wildHoney', lines: ['Wild honey from the hollow tree.'] }
   ]
 };
 
@@ -75,6 +82,13 @@ const within = (state: GameState, point: { x: number; y: number }, tiles: number
 const acted = (m: Moment, type: GameAction['type']): boolean => m.action?.type === type && done(m);
 const onAfter = (m: Moment, when: boolean): Noticed | null => (when ? { day: m.after.day } : null);
 const onBefore = (m: Moment, when: boolean): Noticed | null => (when ? { day: m.before.day } : null);
+const berries = (state: GameState): number => foodCount(state.inventory.food, 'berry');
+/** A successful gather that brought more of one food into the bag. */
+const gathered = (m: Moment, item: FoodItem): boolean =>
+  acted(m, 'gather') && foodCount(m.after.inventory.food, item) > foodCount(m.before.inventory.food, item);
+/** A successful cook of this dish: the one named, or on a bare C press the one C picks, wherever its ingredients were kept. */
+const cooked = (m: Moment, dish: DishId): boolean =>
+  m.action?.type === 'cook' && done(m) && (m.action.dish ?? defaultDish(m.before)) === dish;
 const atSpring = (m: Moment): boolean => m.action?.type === 'visitSite' && m.action.siteId === 'spring' && done(m);
 
 const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
@@ -99,16 +113,20 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   winterCooking: m => onBefore(m, acted(m, 'cook')),
   firstRain: m => onAfter(m, rainMessage(m.before, m.after) !== null),
   rabbits: m => onAfter(m, awake(m) && m.after.area === 'camp' && daylight(m.after) && RABBIT_HOMES.some(home => within(m.after, home, 4))),
-  bushesFull: m => onBefore(m, m.action?.type === 'gather' && done(m) && m.after.inventory.food > m.before.inventory.food),
+  bushesFull: m => onBefore(m, m.action?.type === 'gather' && done(m) && berries(m.after) > berries(m.before)),
   stumpGrowing: m => onAfter(m, dawn(m) && m.after.trees.some(tree => tree.readyDay === m.after.day && tree.readyDay > 1)),
   springRest: m => onBefore(m, atSpring(m)),
   fireflies: m => onAfter(m, awake(m) && isInClearing(m.after) && !daylight(m.after)),
-  twoHandfuls: m => onBefore(m, m.action?.type === 'gather' && m.after.inventory.food - m.before.inventory.food === 2),
+  twoHandfuls: m => onBefore(m, m.action?.type === 'gather' && berries(m.after) - berries(m.before) === 2),
   goldEvening: m => onAfter(m, awake(m) && isInClearing(m.after) && m.before.day === m.after.day
     && daylight(m.before) && !daylight(m.after)),
   warmSleep: m => onBefore(m, acted(m, 'sleep') && m.after.fireFuel === 0),
   lookoutEvening: m => onAfter(m, awake(m) && m.after.progress.lookoutRepaired && m.after.area === 'camp'
-    && within(m.after, LOOKOUT, 2) && atDusk(m.after))
+    && within(m.after, LOOKOUT, 2) && atDusk(m.after)),
+  hazelnuts: m => onBefore(m, gathered(m, 'hazelnut')),
+  pineTea: m => onBefore(m, cooked(m, 'pineTea')),
+  salad: m => onBefore(m, cooked(m, 'salad')),
+  wildHoney: m => onBefore(m, gathered(m, 'honey'))
 };
 
 /**

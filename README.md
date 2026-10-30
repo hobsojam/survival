@@ -20,12 +20,12 @@ Open the local address printed by Vite, usually <http://localhost:5173/>. For a 
 | Control | Action |
 | --- | --- |
 | WASD or arrow keys | Move the survivor |
-| E | Gather the nearest branches, berries, fiber plants, rocks, loose stone, or quarry rubble within reach, or dig the quarry face with the pickaxe; at camp with nothing nearby, rest |
+| E | Gather the nearest branches, berries, fiber plants, rocks, seasonal forage, loose stone, or quarry rubble within reach, or dig the quarry face with the pickaxe; at camp with nothing nearby, rest |
 | F | Add one wood to the campfire while at camp |
 | R | Rest at camp for a short break |
 | Z | Sleep until morning (at night, at camp, once the shelter is built) |
-| Q | Eat one carried food |
-| C | Cook one berry at a lit campfire after dark |
+| Q | Eat: the fresh food nearest to going soft (berries first if it's a tie), then a hazelnut, honey, or roasted hazelnuts. Never pine needles or rations |
+| C | Cook at a lit campfire after dark: one berry, or with the pot the first dish you have the food for |
 | G | Watch the stars at camp after dark |
 | P | Dry one berry into a trail ration at a built drying rack |
 | T | Eat one trail ration, anywhere |
@@ -36,8 +36,8 @@ Open the local address printed by Vite, usually <http://localhost:5173/>. For a 
 | Walk off the west edge | Follow the west path into the quarry area, once the shelter is built; walk off the quarry's east edge to come home |
 | Tap or click | Walk there, or walk over and use the supply, loose stone, tree, place, lookout, campfire, rubble, quarry face, or path end you tapped |
 | Build buttons | Spend wood, and sometimes fiber or stone, on camp upgrades and tools |
-| Bag buttons | Eat a berry or ration, burn wood or fiber at camp, or drop a stone where you stand |
-| Store 1 / Take 1 | Move stone between your bag and a built stone pile, at camp |
+| Bag buttons | Eat a berry, a ration, or one of your forage finds, burn wood or fiber at camp, or drop a stone where you stand |
+| Store 1 / Take 1 | Move stone, wood or food between your bag and a built stone pile, woodpile or larder, in the clearing |
 
 The buttons beside the game also let you eat, rest, feed the fire, and sleep. Your survivor's meters and those buttons stay at the top of the sidebar; below them, the **Bag**, **Build**, and **Camp** tabs each show one group of panels, and the sidebar remembers the tab you had open. A dot on Build means something there is ready. If the keyboard does not respond, click the game area once to focus it.
 
@@ -59,11 +59,22 @@ Your bag holds eight spaces at first. To build, stand anywhere in the clearing (
 
 The year has four seasons of ten days each, so a year is forty days. A new game starts in **autumn** on day 1, then comes **winter** (days 11–20), **spring** (21–30) and **summer** (31–40), and the year begins again with autumn on day 41. The day number keeps counting up. The top bar shows the season with the day (for example "Winter · Day 14 · Morning"), and a small wheel on the year journal's page shows where you are in the year and how many days are left in the season. A message greets the first morning of each season. The world changes colour with the seasons: broadleaf trees turn orange and gold in autumn and stand brown in winter, when snow lies on the ground, while the pines stay green all year. Leaves fall from the broadleaf trees on autumn days, and fireflies come out on summer nights.
 
+#### Forage
+
+Each season has its own wild food, found a little way out from the clearing, and you only see a spot in its season. Gather with E or a tap, and eat from the Bag panel or with Q.
+
+- **Autumn: hazelnuts.** Three hazels grow at the feet of the broadleaf trees. Each gives a hazelnut a day (15 hunger), and hazelnuts keep.
+- **Winter: pine needles.** Three young pines give a bunch of needles a day. They are for tea, not for eating raw.
+- **Spring: wild greens.** Two patches grow near the quiet spring and one out in the meadow, and two more come up for the rest of the day once a shower starts. A handful a day from each (15 hunger), but greens go soft like berries.
+- **Summer: honey.** Bees keep a hollow tree north of camp. Take a little honey (20 hunger and 5 energy); the bees need three dawns to make more.
+
+Each of these shows in the Bag panel only while you carry some.
+
 ### Winter
 
 Winter is the hard season. **Every winter night is a bitter night**, like the cold night: the fire burns twice as fast, and you lose warmth quickly away from a lit fire, a little more slowly inside the shelter. A long winter night needs about three plain logs (two with the hearth). There is no penalty for a cold winter night, though; that stays with the autumn cold night. Once the cold night is behind you, the forecast card warns about winter nights and shows how much fire tonight needs.
 
-Food and rest are harder to find. The **berry bushes stand bare** all winter (search one to see), so dry trail rations and keep berries before the snow comes; the bushes are full again on the first day of spring. The **quiet spring freezes over** and gives no rest, though you can still find it. Snow covers the ground and the paths, the camp circle stays a trodden patch, the birds leave until spring, and the crickets fall quiet. The fox still visits.
+Food and rest are harder to find. The **berry bushes stand bare** all winter (search one to see), so dry rations and gather nuts before the snow comes; the bushes are full again on the first day of spring. The **quiet spring freezes over** and gives no rest, though you can still find it. Snow covers the ground and the paths, the camp circle stays a trodden patch, the birds leave until spring, and the crickets fall quiet. The fox still visits.
 
 **Wolves** come close to a dark camp. On a winter night, when the fire burns low (under 20 seconds of fuel), one to three pairs of eyes watch from the edge of camp and you hear a howl now and then; they fade back when you feed the fire. The first time the fire goes out on a winter night, wherever you are, a wolf slips in and takes a trail ration from your bag, or a berry if you have no rations. If you are asleep, you hear about it when you wake. It happens at most once a night, and paw prints circle the fire pit until the next nightfall.
 
@@ -77,11 +88,11 @@ Summer is the season of plenty. **Nights are warm**: your warmth doesn't fall an
 
 ### The year journal
 
-Below the field journal in the Camp tab sits **the year so far**, a keepsake of your time at camp. Each season has its own page, and each new year starts fresh pages ("Autumn, year two"). As small moments of the season happen, or as you try things the season invites, the survivor writes them down with the day, and a quiet line tells you: "Written in your journal: …". Blank lines with a "?" show how much of the season is still waiting to be found, without saying what. Missing one costs nothing; next year brings another chance. Leaf back through earlier seasons and years with the arrows. The journal is its own reward: nothing in it changes the game.
+Below the field journal in the Camp tab sits **the year so far**, a keepsake of your time at camp. Each season has its own page, and each new year starts fresh pages ("Autumn, year two"). As small moments of the season happen, or as you try things the season invites, the survivor writes them down with the day, and a quiet line tells you: "Written in your journal: …". Blank lines with a "?" show how much of the season is still waiting to be found, without saying what. Missing one costs nothing; next year brings another chance. Each page has six lines, including a few from the foraging year: the first hazelnuts of autumn, pine needle tea in winter, a spring salad, and wild honey in summer. Leaf back through earlier seasons and years with the arrows. The journal is its own reward: nothing in it changes the game.
 
 ### A friend at camp
 
-The birds, the fox and even the winter wolves can come to trust you, if you share what they like to eat. Watch what each of them nibbles at. When the moment is right, the hint line offers it (press **O**, or tap **Offer** among the buttons), and each animal takes one offering a day at most. Nothing is lost by waiting, and an animal shows it is warming to you before it stays. The first to be won over becomes your friend for good, and you only ever have one. The others stay wild and visit as before.
+The birds, the fox and even the winter wolves can come to trust you, if you share what they like to eat. Watch what each of them nibbles at. When the moment is right, the hint line offers it (press **O**, or tap **Offer** among the buttons), and each animal takes one offering a day at most. Nothing is lost by waiting, and an animal shows it is warming to you before it stays. The first to be won over becomes your friend for good, and you only ever have one. The others stay wild and visit as before. The fox takes a berry, but in winter, when the bushes are bare, it will take a hazelnut instead if you have one (in the bag, or in the larder while you are in the clearing).
 
 - **A bird** wakes you once on a winter night if the fire is about to go out, and sings at spring dawns. It stays all winter, flits between the trees and roofs near you, and lands on your shoulder when you stand still.
 - **The fox** now and then leaves a berry by your bedroll at dawn, if your bag has room.
@@ -91,7 +102,7 @@ Every few days your friend leaves a feather or a tuft of fur by the fire; walk o
 
 ### The cold night
 
-The forecast card warns you about the cold night on **day 3**. It shows only while a cold night is on its way or in winter, and steps aside the rest of the year. Build a shelter and keep the fire burning through dawn while you stay at camp. The cold night burns fire fuel twice as fast. On day 3 two fresh logs at nightfall last the full night, but nights grow longer toward winter, so a later cold night can need three; the card says how many to bring. The card shows your shelter status and how much fuel is needed. Sleeping passes the night, but the fire still burns and the cold-night outcome still applies.
+The forecast card warns you about the cold night on **day 3**. It shows only while a cold night is on its way, in winter, and in late autumn (days 8–10) when it warns the bushes are about to go bare, and steps aside the rest of the year. Build a shelter and keep the fire burning through dawn while you stay at camp. The cold night burns fire fuel twice as fast. On day 3 two fresh logs at nightfall last the full night, but nights grow longer toward winter, so a later cold night can need three; the card says how many to bring. The card shows your shelter status and how much fuel is needed. Sleeping passes the night, but the fire still burns and the cold-night outcome still applies.
 
 You'll know when it comes. On its day, from mid-afternoon, the light cools, the wind gets up and the fire's smoke streams sideways, and a message warns that tonight will be bitter. Once night falls, snow blows across the camp, frost creeps in round the edges of the view, and the day pill turns frosty and reads **Cold night** with a snowflake (just the snowflake on a phone). Winter's bitter nights bring the same snow and frost. If you sleep through the cold night, it plays out in a few quick seconds instead of a blink, and at dawn you're told plainly whether the fire held; if it did, the morning breaks warm and golden.
 
@@ -99,9 +110,33 @@ If you weather it with warmth above 20, you unlock the **stone hearth**. Build i
 
 Weathering the cold night also teaches you to make a **stone axe**. Once the toolshed is built, craft it at camp from the **Forest tools** panel for one wood, one fiber, and one stone; until then the panel says "Build a toolshed first." Then stand near a mature tree and press **X** (or tap the tree) to chop it: it takes ten seconds and eight energy and gives two wood, leaving a stump that regrows after three dawns. Fallen branches stay easy to gather without the axe.
 
+### Camp stores
+
+Fresh berries and greens go soft after three dawns in your bag. Once the north side's near ground is cleared (see **Clearing more land**), you can build a **larder** there for five wood, two fiber and two stone: a little cache raised on four legs, with a ladder. It keeps up to ten food outside your bag, and fresh food keeps **five dawns** in it instead of three. Under the Larder in the build list, **Store 1** puts the oldest piece of that food from your bag into the larder, and **Take 1** brings the freshest back out; kept food such as hazelnuts and rations moves one at a time too. A row shows for each food while you have some in your bag or the larder.
+
+While you stand anywhere in the clearing, the larder is as good as your bag: eating, Q, cooking, drying rations, planting and offerings all reach into it, spending the oldest fresh food across both (your bag's first on a tie) and kept food from your bag first. Away from camp, or in the quarry, only your bag counts. Food in the larder still goes soft at dawn wherever you are, and one morning note covers what was thrown out of both. The larder doesn't count toward your bag, and a wolf in the dark camp never raids it, though you can choose to leave a larder ration out for one.
+
+Once the east side's near ground is cleared, you can build a **woodpile** there for three wood and one fiber: split logs stacked under a little roof, holding up to twelve. In the build list, **Store 1** stacks a log from your bag and **Take 1** brings one back out (in the clearing). Wood on the pile counts as wood you carry, from anywhere: building, repairing, crafting, clearing land and the cold-night forecast all spend your bag's wood first and then the pile's, and **Burn** at the fire uses the pile's wood when your bag is empty. The Bag panel's wood shows `+n at camp`.
+
 ### Trail rations
 
 Once the drying rack is built, you can dry one berry at camp into a **trail ration** (P, or **Prepare trail ration** in the sidebar); it takes twelve seconds. Eat a ration anywhere with T to restore 45 hunger, which makes longer trips along the paths easier. Rations count toward your bag like any other supply.
+
+### Cooking
+
+After nightfall, at a lit campfire, C (or **Cook a berry** in the After dark panel) toasts one berry for 35 hunger (50 with the drying rack) and 10 warmth. It takes eight seconds.
+
+Once the toolshed is built, you can make a **cooking pot** in the Forest tools panel for one wood and two stone (the stone can come from the camp stone pile). It hangs over the fire on a little tripod, steaming while the fire burns. With the pot, the After dark panel offers a button for each dish, and C cooks the first one you have the food for, in this order:
+
+| Dish | Ingredients | What it does |
+|---|---|---|
+| Cooked berry | 1 berry | 35 hunger (50 with the drying rack), 10 warmth |
+| Pine needle tea | 1 pine needles | 20 warmth, 5 energy |
+| Greens and berry salad | 1 greens, 1 berry | 40 hunger, 10 energy |
+| Roasted hazelnuts | 2 hazelnuts | a portion of roasted hazelnuts for your bag, eaten later for 50 hunger |
+| Honey cake | 1 honey, 1 hazelnut, 1 berry | 60 hunger, and your next rest or sleep at camp restores 10 more energy |
+
+Pot dishes keep the same evening ritual: after dark, at camp, at a lit fire, eight seconds each.
 
 ### Beyond camp
 
@@ -145,6 +180,6 @@ npm test -- --run
 npm run build
 ```
 
-`npm test` runs the suites in `tests/`. Agent worktrees under `.superpowers/` are excluded. The tests cover game state, renewable fiber, mixed-material building, gathering, day/night survival, tiredness and sleep, being tired, exhausted, hungry, or starving, optional night activities, the clock, the seasons and the changing length of the night, winter nights, bare bushes, the frozen spring, wolves and their tracks, spring rain, puddles, flowers, rabbits and faster regrowth, warm summer nights, the midday heat and summer berries, golden evenings, camp upgrades, the growing clearing and its marked trees, cold-night progression and the storm forecast, the stone axe and tree regrowth, the west crossing and the quarry area, rubble, the toolshed, the pickaxe and digging, the night eyes, trail rations, path discoveries, the lookout, the field journal, heavy and loose stone, the stone pile, the year journal and its pages, befriending, the companion's gifts, keepsakes, the pillow and the cloak, save validation, tap targets and walking, the phone dock, the sidebar tabs, pausing, and canvas scaling, and ambient wildlife timing. A browser playthrough should also check movement, tapping, building, fire, weather visuals, crossing to the quarry and back, and continuing after a reload (in either area), both at desktop size and on a phone held upright.
+`npm test` runs the suites in `tests/`. Agent worktrees under `.superpowers/` are excluded. The tests cover game state, renewable fiber, mixed-material building, gathering, day/night survival, tiredness and sleep, being tired, exhausted, hungry, or starving, optional night activities, the clock, the seasons and the changing length of the night, winter nights, bare bushes, the frozen spring, wolves and their tracks, spring rain, puddles, flowers, rabbits and faster regrowth, warm summer nights, the midday heat and summer berries, seasonal forage and what Q eats, golden evenings, camp upgrades, the growing clearing and its marked trees, cold-night progression and the storm forecast, the stone axe and tree regrowth, the west crossing and the quarry area, rubble, the toolshed, the pickaxe and digging, the night eyes, trail rations, path discoveries, the lookout, the field journal, heavy and loose stone, the stone pile, the year journal and its pages, food and spoilage, seasonal foraging, cooking, the larder, the woodpile, befriending, the companion's gifts, keepsakes, the pillow and the cloak, save validation, tap targets and walking, the phone dock, the sidebar tabs, pausing, and canvas scaling, and ambient wildlife timing. A browser playthrough should also check movement, tapping, building, fire, weather visuals, crossing to the quarry and back, and continuing after a reload (in either area), both at desktop size and on a phone held upright.
 
 `npm test -- --run --coverage` also writes a coverage report to `coverage/`. CI runs it that way and then sends the code and the coverage report to [SonarCloud](https://sonarcloud.io/project/overview?id=hobsojam_survival), configured in `sonar-project.properties`. The scan needs a `SONAR_TOKEN` repository secret. Dependabot pull requests are never scanned, and pull requests from forks skip the scan because they don't receive the secret.

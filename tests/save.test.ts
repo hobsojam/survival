@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE, createGame } from '../src/game/state';
+import { BALANCE, createGame, type GameState } from '../src/game/state';
+import { addFood, emptyFood, type FoodStore } from '../src/game/food';
 import { placeBranches } from '../src/game/clearing';
 import { autosaveDelayMs, loadGame, saveGame, SAVE_KEY } from '../src/game/save';
+import { carriedCount } from '../src/game/rules';
+import { stock } from './stock';
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();
@@ -19,7 +22,7 @@ describe('local save', () => {
     const state = createGame();
     const old = [[22, 15], [18, 16], [21, 18], [16, 14], [24, 13], [13, 7]];
     const saved = { ...state, nodes: state.nodes.map((node, index) => index < old.length ? { ...node, x: old[index][0], y: old[index][1], amount: 0 } : node) };
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 18, state: saved }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 19, state: saved }));
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind !== 'loaded') return;
@@ -29,14 +32,38 @@ describe('local save', () => {
   it('round trips rations and rejects counts that overfill the bag', () => {
     const storage = new MemoryStorage();
     const state = createGame();
-    state.inventory.trailFood = 2;
+    state.inventory.food.trailFood = 2;
     expect(saveGame(storage, state).ok).toBe(true);
     expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
     state.inventory.wood = 7;
     expect(saveGame(storage, state).ok).toBe(false);
     state.inventory.wood = 0;
-    state.inventory.trailFood = -1;
+    state.inventory.food.trailFood = -1;
     expect(saveGame(storage, state).ok).toBe(false);
+  });
+
+  it('round-trips the day each berry was picked, and rejects food that could not be', () => {
+    const storage = new MemoryStorage();
+    const state = { ...createGame(), day: 3 };
+    state.inventory.food = addFood(addFood(emptyFood(), 'berry', 1, 1), 'berry', 1, 3);
+    expect(saveGame(storage, state).ok).toBe(true);
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
+    const saves = (food: unknown) => saveGame(new MemoryStorage(), { ...state, inventory: { ...state.inventory, food } as GameState['inventory'] }).ok;
+    expect(saves({ ...emptyFood(), berry: [4] })).toBe(false);
+    expect(saves({ ...emptyFood(), berry: [0] })).toBe(false);
+    expect(saves({ ...emptyFood(), greens: [2.5] })).toBe(false);
+    expect(saves({ ...emptyFood(), honey: 1.5 })).toBe(false);
+    expect(saves({ ...emptyFood(), berry: 2 })).toBe(false);
+    const partial: Partial<FoodStore> = emptyFood();
+    delete partial.pineNeedles;
+    expect(saves(partial)).toBe(false);
+    expect(saves(3)).toBe(false);
+  });
+
+  it('rejects a version 18 save, from before the food store', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 18, state: createGame() }));
+    expect(loadGame(storage).kind).toBe('invalid');
   });
 
   it('round-trips progression across a page reload', () => {
@@ -47,7 +74,7 @@ describe('local save', () => {
     state.player.x = 7.5;
     state.player.y = 11.25;
     state.inventory.wood = 5;
-    state.inventory.food = 2;
+    state.inventory.food = stock(2);
     state.inventory.fiber = 1;
     state.fireFuel = 43;
     state.structures.shelter = true;
@@ -59,7 +86,7 @@ describe('local save', () => {
     state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
     state.nodes.find(node => node.kind === 'fiber')!.readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(18);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(19);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);
@@ -369,7 +396,7 @@ describe('garden plots in saves', () => {
 });
 
 describe('the year journal in the save', () => {
-  const store = (state: ReturnType<typeof createGame>, version = 18) => {
+  const store = (state: ReturnType<typeof createGame>, version = 19) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;
@@ -413,7 +440,7 @@ describe('the year journal in the save', () => {
 });
 
 describe('the companion in the save', () => {
-  const store = (state: unknown, version = 18) => {
+  const store = (state: unknown, version = 19) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;
@@ -457,8 +484,27 @@ describe('the companion in the save', () => {
   });
 });
 
+describe('the spoiled-food note in the save', () => {
+  const accepts = (lastSpoiled: unknown) => {
+    const storage = new MemoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 19, state: { ...createGame(), day: 6, lastSpoiled, progress: { ...createGame().progress, nextStormDay: null, hearthUnlocked: true } } }));
+    return loadGame(storage).kind === 'loaded';
+  };
+
+  it('accepts none, or a lived day with something thrown out', () => {
+    expect(accepts(null)).toBe(true);
+    expect(accepts({ day: 6, berry: 1, greens: 0 })).toBe(true);
+    expect(accepts({ day: 4, berry: 0, greens: 2 })).toBe(true);
+  });
+
+  it('refuses a future day, an empty loss or odd counts', () => {
+    [{ day: 7, berry: 1, greens: 0 }, { day: 0, berry: 1, greens: 0 }, { day: 5, berry: 0, greens: 0 }, { day: 5, berry: -1, greens: 2 },
+      { day: 5, berry: 1.5, greens: 0 }, { day: 5, berry: 1 }, 'soft', undefined].forEach(bad => expect(accepts(bad), JSON.stringify(bad)).toBe(false));
+  });
+});
+
 describe('the clearing in the save', () => {
-  const accepts = (state: unknown, version = 18) => {
+  const accepts = (state: unknown, version = 19) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind === 'loaded';
@@ -501,5 +547,134 @@ describe('the clearing in the save', () => {
 
   it('rejects a version 17 save', () => {
     expect(accepts(grown(), 17)).toBe(false);
+  });
+});
+
+describe('forage regrowth in the save', () => {
+  const saved = (id: string, readyDay: number): string => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    state.day = 32;
+    state.progress.hearthUnlocked = true;
+    state.progress.nextStormDay = null;
+    const node = state.nodes.find(item => item.id === id)!;
+    node.amount = 0;
+    node.readyDay = readyDay;
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 19, state }));
+    return loadGame(storage).kind;
+  };
+
+  it('lets the hollow tree wait up to three days for its honey', () => {
+    expect(saved('honey-0', 35)).toBe('loaded');
+    expect(saved('honey-0', 36)).toBe('invalid');
+  });
+
+  it('saves and loads gathered honey and greens in the bag', () => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    state.day = 32;
+    state.progress.hearthUnlocked = true;
+    state.progress.nextStormDay = null;
+    const honey = state.nodes.find(item => item.id === 'honey-0')!;
+    honey.amount = 0;
+    honey.readyDay = state.day + BALANCE.honeyRegrowDays;
+    state.inventory.food = addFood(addFood(emptyFood(), 'honey', 1, 32), 'greens', 2, 30);
+    expect(saveGame(storage, state).ok).toBe(true);
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
+  });
+
+  it('keeps every other spot to the next day', () => {
+    expect(saved('hazel-0', 33)).toBe('loaded');
+    expect(saved('hazel-0', 34)).toBe('invalid');
+    expect(saved('greens-3', 34)).toBe('invalid');
+  });
+});
+
+describe('the cooking pot in the save', () => {
+  const accepts = (change: (state: GameState) => void) => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    change(state);
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 19, state }));
+    return loadGame(storage).kind === 'loaded';
+  };
+
+  it('keeps a pot made in the toolshed, and a honey cake\'s bonus', () => {
+    expect(accepts(state => { state.structures.shelter = true; state.structures.toolshed = true; state.progress.potCrafted = true; state.cakeBonus = true; })).toBe(true);
+  });
+
+  it('refuses a pot without a toolshed, or odd flags', () => {
+    expect(accepts(state => { state.progress.potCrafted = true; })).toBe(false);
+    expect(accepts(state => { (state.progress as any).potCrafted = 'yes'; })).toBe(false);
+    expect(accepts(state => { delete (state.progress as any).potCrafted; })).toBe(false);
+    expect(accepts(state => { (state as any).cakeBonus = 1; })).toBe(false);
+    expect(accepts(state => { delete (state as any).cakeBonus; })).toBe(false);
+  });
+});
+
+describe('the larder in the save', () => {
+  const accepts = (change: (state: GameState) => void) => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    state.day = 6;
+    state.progress = { ...state.progress, nextStormDay: null, hearthUnlocked: true };
+    const placed = placeBranches(state.nodes, ['north-near']);
+    state.nodes = state.nodes.map((node, i) => ({ ...node, x: placed[i].x, y: placed[i].y }));
+    state.clearing = { cleared: ['north-near'], marked: null, felled: [] };
+    change(state);
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 19, state }));
+    return loadGame(storage).kind === 'loaded';
+  };
+
+  it('keeps the woodpile to its ground, its capacity and a built pile', () => {
+    const east = (change: (state: GameState) => void) => accepts(state => {
+      const placed = placeBranches(createGame().nodes, ['east-near']);
+      state.nodes = state.nodes.map((node, i) => ({ ...node, x: placed[i].x, y: placed[i].y }));
+      state.clearing = { cleared: ['east-near'], marked: null, felled: [] };
+      change(state);
+    });
+    expect(east(state => { state.structures.woodpile = true; state.storedWood = 12; })).toBe(true);
+    expect(east(state => { state.structures.woodpile = true; state.storedWood = 13; })).toBe(false);
+    expect(east(state => { state.structures.woodpile = true; state.storedWood = 0.5; })).toBe(false);
+    expect(east(state => { state.storedWood = 1; })).toBe(false);
+    expect(east(state => { delete (state as any).storedWood; })).toBe(false);
+    expect(accepts(state => { state.structures.woodpile = true; })).toBe(false);
+  });
+
+  it('round-trips a stocked larder', () => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    const placed = placeBranches(state.nodes, ['north-near']);
+    state.nodes = state.nodes.map((node, i) => ({ ...node, x: placed[i].x, y: placed[i].y }));
+    state.clearing = { cleared: ['north-near'], marked: null, felled: [] };
+    state.structures.larder = true;
+    state.larder = addFood(addFood(emptyFood(), 'berry', 2, 1), 'honey', 1, 1);
+    expect(saveGame(storage, state).ok).toBe(true);
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
+  });
+
+  it('holds real food, at most 10, and only once built', () => {
+    expect(accepts(state => { state.structures.larder = true; state.larder = addFood(stock(4), 'hazelnut', 6, 1); })).toBe(true);
+    expect(accepts(state => { state.structures.larder = true; state.larder = addFood(stock(5), 'hazelnut', 6, 1); })).toBe(false);
+    expect(accepts(state => { state.larder = stock(1); })).toBe(false);
+    expect(accepts(state => { state.structures.larder = true; state.larder = { ...emptyFood(), berry: [7] }; })).toBe(false);
+    expect(accepts(state => { state.structures.larder = true; (state.larder as any).honey = -1; })).toBe(false);
+    expect(accepts(state => { delete (state as any).larder; })).toBe(false);
+  });
+
+  it('stands only on cleared north ground', () => {
+    expect(accepts(state => { state.structures.larder = true; })).toBe(true);
+    expect(accepts(state => {
+      state.structures.larder = true;
+      state.clearing = { cleared: [], marked: null, felled: [] };
+      state.nodes = createGame().nodes;
+    })).toBe(false);
+  });
+
+  it('leaves the larder out of the bag\'s count', () => {
+    const state = createGame();
+    state.inventory.food = stock(3);
+    expect(carriedCount({ ...state, larder: stock(10) })).toBe(3);
+    expect(accepts(state => { state.structures.larder = true; state.inventory.food = stock(8); state.larder = stock(10); })).toBe(true);
   });
 });

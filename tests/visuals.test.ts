@@ -7,6 +7,7 @@ import { worldX, worldY } from '../src/scene/art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { CLEARING_STEPS } from '../src/game/clearing';
 import { validateSprite } from '../src/art/textures';
+import { stock } from './stock';
 
 describe('native-size scene art', () => {
   it('selects pixel textures for every resource and camp site', () => {
@@ -31,6 +32,35 @@ describe('native-size scene art', () => {
       expect(Number.isInteger(item.x) && Number.isInteger(item.y)).toBe(true);
       expect(item.depth).toBe(sites.has(item.id) ? GROUND_DECAL_DEPTH : item.y);
     }
+  });
+
+  it('draws forage spots only in their season', () => {
+    const ids = (day: number) => new Set(sceneVisuals({ ...createGame(), day }, 0).map(item => item.id));
+    const autumn = ids(1), winter = ids(11), summer = ids(31);
+    expect(autumn.has('hazel-0') && !autumn.has('pine-0') && !autumn.has('greens-0') && !autumn.has('honey-0')).toBe(true);
+    expect(winter.has('pine-2') && !winter.has('hazel-0')).toBe(true);
+    expect(summer.has('honey-0') && !summer.has('greens-1')).toBe(true);
+    expect(autumn.has('berry-0') && winter.has('berry-0')).toBe(true);
+  });
+
+  it('draws each forage kind with its own sprite, gathered or ready', () => {
+    const texture = (id: string, day: number, amount: number) => {
+      const state = createGame();
+      state.day = day;
+      state.nodes.find(item => item.id === id)!.amount = amount;
+      return sceneVisuals(state, 0).find(item => item.id === id)?.texture;
+    };
+    expect(texture('hazel-0', 1, 1)).toBe('hazelSpot:ready');
+    expect(texture('hazel-0', 1, 0)).toBe('hazelSpot:gathered');
+    expect(texture('pine-0', 11, 0)).toBe('pineForage:gathered');
+    expect(texture('greens-0', 21, 1)).toBe('greensPatch:ready');
+    expect(texture('honey-0', 31, 0)).toBe('hollowTree:gathered');
+    const buzzing = new Set(Array.from({ length: 8 }, (_, i) => {
+      const state = createGame();
+      state.day = 31;
+      return sceneVisuals(state, i * 500).find(item => item.id === 'honey-0')?.texture;
+    }));
+    expect(buzzing).toEqual(new Set(['hollowTree:ready', 'hollowTree:bees0', 'hollowTree:bees1']));
   });
 
   it('draws the garden bed and each seasonal plant frame', () => {
@@ -343,5 +373,44 @@ describe('the quarry area', () => {
     state.player.y = BALANCE.campY;
     state.fireFuel = 20;
     expect(playerVisualDepth(state)).toBe((state.player.y + 0.5) * 16);
+  });
+
+  it('hangs the pot on its tripod over the fire once made, steaming while the fire burns', () => {
+    const state = createGame();
+    expect(sceneVisuals(state, 0).some(item => item.id === 'potTripod')).toBe(false);
+    state.progress.potCrafted = true;
+    const fire = sceneVisuals(state, 0).find(item => item.id === 'fire')!;
+    const still = sceneVisuals(state, 0).find(item => item.id === 'potTripod')!;
+    expect(still).toMatchObject({ texture: 'potTripod:still', x: fire.x, y: fire.y });
+    expect(still.depth).toBeGreaterThan(fire.depth);
+    state.fireFuel = 40;
+    expect(sceneVisuals(state, 0).find(item => item.id === 'potTripod')!.texture).toBe('potTripod:steaming0');
+    expect(sceneVisuals(state, 600).find(item => item.id === 'potTripod')!.texture).toBe('potTripod:steaming1');
+    expect(() => validateSprite(sprites.potTripod)).not.toThrow();
+    for (const frame of ['still', 'steaming0', 'steaming1']) expect(sprites.potTripod.frames[frame], frame).toBeDefined();
+  });
+});
+
+describe('the larder', () => {
+  const north = { cleared: ['north-near' as const], marked: null, felled: [] };
+  const larder = (state: ReturnType<typeof createGame>) => sceneVisuals(state, 0).find(item => item.id === 'larder');
+
+  it('is not drawn until the north side\'s near ground is cleared', () => {
+    expect(larder(createGame())).toBeUndefined();
+    const built = createGame();
+    built.structures.larder = true;
+    expect(larder(built)).toBeUndefined();
+  });
+
+  it('draws a flat site on the cleared ground, then the raised cache showing what it keeps', () => {
+    const state = { ...createGame(), clearing: north };
+    expect(larder(state)).toMatchObject({ texture: 'larderSite:still', depth: GROUND_DECAL_DEPTH });
+    state.structures.larder = true;
+    expect(larder(state)!.texture).toBe('larder:empty');
+    expect(larder(state)!.depth).toBe(larder(state)!.y);
+    const kept = (berries: number) => larder({ ...state, larder: stock(berries) })!.texture;
+    expect([kept(1), kept(6), kept(7), kept(10)]).toEqual(['larder:some', 'larder:some', 'larder:full', 'larder:full']);
+    for (const name of ['larder', 'larderSite']) expect(() => validateSprite(sprites[name])).not.toThrow();
+    for (const frame of ['empty', 'some', 'full']) expect(sprites.larder.frames[frame], frame).toBeDefined();
   });
 });
