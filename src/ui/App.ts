@@ -3,7 +3,7 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type SiteId, typ
 import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
-import { cookBlocker, isAtCamp, sleepBlocker, stargazeBlocker } from '../game/rules';
+import { cookBlocker, isInClearing, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { offerBlocker } from '../game/companion';
 import { dayPillView, renderDayPill, renderYearWheel, yearWheelView, type CalendarRoot } from './calendarView';
 import { isLowMeter } from '../game/needs';
@@ -458,7 +458,7 @@ export class App {
 
   private renderBuild(): void {
     this.setText('prompt', this.scene?.getPrompt() ?? 'WASD / arrows  Move');
-    this.setText('build-hint', isAtCamp(this.state) ? 'At camp — click an upgrade to build.' : 'Stand inside the marked camp circle to build.');
+    this.setText('build-hint', isInClearing(this.state) ? 'At camp — click an upgrade to build.' : 'Stand inside the marked camp circle to build.');
     for (const id of buildOptions) this.renderBuildButton(id);
     const buildReady = Boolean(this.root.querySelector('[data-tab="build"] .ready'));
     this.root.querySelectorAll('[data-tab-button="build"], [data-sidebar-button="build"]').forEach(tab => tab.classList.toggle('has-dot', buildReady));

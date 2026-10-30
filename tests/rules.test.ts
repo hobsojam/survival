@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, BUILDINGS, LOOKOUT, SITES, createGame, type GameState } from '../src/game/state';
 import { QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
-import { FULL_BAG_MESSAGE, advanceTime, isAtCamp, isColdNight, isFreezingNight, applyAction, buildStatus, carriedCount, freeSpaces, lookoutRepairBlocker, pickaxeBlocker, sleepBlocker } from '../src/game/rules';
+import { FULL_BAG_MESSAGE, advanceTime, isAtCamp, isInClearing, isColdNight, isFreezingNight, applyAction, buildStatus, carriedCount, freeSpaces, lookoutRepairBlocker, pickaxeBlocker, sleepBlocker } from '../src/game/rules';
 import { nightStart, seasonMessage } from '../src/game/calendar';
 
 // Night falls at 181 s on day 1, and the day-three cold night's night starts at 174 s.
@@ -1486,5 +1486,59 @@ describe('summer', () => {
 
   it('picks one berry in autumn', () => {
     expect(applyAction(atBush(41), { type: 'gather', nodeId: 'berry-0' }).state.inventory.food).toBe(base.inventory.food + 1);
+  });
+});
+
+describe('the grown clearing', () => {
+  const grown = (): GameState => {
+    const state = createGame();
+    state.clearing.cleared = ['north-near'];
+    state.player.x = 20;
+    state.player.y = 9.5;
+    return state;
+  };
+
+  it('counts new ground as the clearing but not as camp', () => {
+    const state = grown();
+    expect(isInClearing(state)).toBe(true);
+    expect(isAtCamp(state)).toBe(false);
+  });
+
+  it('lets the survivor build on new ground', () => {
+    const state = grown();
+    state.inventory.wood = 5;
+    expect(buildStatus(state, 'windbreak')).toBe('ready');
+  });
+
+  it('keeps rest and sleep for the warmth around the fire', () => {
+    const state = grown();
+    expect(applyAction(state, { type: 'rest' }).state).toBe(state);
+    state.timeOfDay = NIGHT;
+    state.structures.shelter = true;
+    expect(sleepBlocker(state)).toBe('Return to the marked camp area to sleep.');
+  });
+
+  it('gives no warmth on new ground', () => {
+    const night = (x: number, y: number, cleared: GameState['clearing']['cleared']) => {
+      const state = createGame();
+      state.timeOfDay = NIGHT;
+      state.fireFuel = 50;
+      state.structures.shelter = true;
+      state.structures.windbreak = true;
+      state.clearing.cleared = cleared;
+      state.player.x = x;
+      state.player.y = y;
+      return advanceTime(state, 10).player.warmth;
+    };
+    expect(night(20, 9.5, ['north-near'])).toBe(night(20, 9.5, []));
+  });
+
+  it('matches the camp ring exactly while nothing is cleared', () => {
+    for (let i = 0; i < 50; i++) {
+      const state = createGame();
+      state.player.x = Math.random() * 40;
+      state.player.y = Math.random() * 30;
+      expect(isInClearing(state)).toBe(isAtCamp(state));
+    }
   });
 });

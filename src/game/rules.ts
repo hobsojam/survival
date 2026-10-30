@@ -3,7 +3,7 @@ import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } 
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
-import { bagCapacity, carriedCount, freeSpaces, isAtCamp, spaceFor } from './camp';
+import { bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
 import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
 import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, type GameState, type SiteId, type StructureId } from './state';
@@ -33,7 +33,7 @@ function near(x1: number, y1: number, x2: number, y2: number, radius: number = B
 
 export const FULL_BAG_MESSAGE = 'Your bag is full. Eat, burn, or set something down at camp to make room.';
 
-export { bagCapacity, carriedCount, freeSpaces, isAtCamp, spaceFor };
+export { bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor };
 
 /** Stone a build can use: the bag plus the camp stone pile, which counts from anywhere. */
 export function availableStone(state: GameState): number {
@@ -103,7 +103,7 @@ export function cookBlocker(state: GameState): string | null {
 /** Why the survivor can't watch the stars right now, or null if they can. */
 export function stargazeBlocker(state: GameState): string | null {
   if (state.timeOfDay < nightStart(state.day)) return 'Wait until nightfall to watch the stars.';
-  if (!isAtCamp(state)) return 'Return to camp to watch the stars.';
+  if (!isInClearing(state)) return 'Return to camp to watch the stars.';
   return null;
 }
 
@@ -112,7 +112,7 @@ export function pickaxeBlocker(state: GameState): string | null {
   if (state.progress.pickaxeCrafted) return 'You already have a pickaxe.';
   if (!state.progress.quarryFound) return 'Find the quarry first.';
   if (!state.structures.toolshed) return 'Build a toolshed first.';
-  if (!isAtCamp(state)) return 'Return to camp to craft the pickaxe.';
+  if (!isInClearing(state)) return 'Return to camp to craft the pickaxe.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   const { wood, fiber, stone } = PICKAXE.cost;
   if (state.inventory.wood < wood || state.inventory.fiber < fiber || availableStone(state) < stone)
@@ -133,7 +133,7 @@ export function buildStatus(state: GameState, id: StructureId): BuildStatus {
   const cost = definition.cost;
   const stoneCost = 'stone' in cost ? cost.stone : 0;
   const affordable = state.inventory.wood >= cost.wood && state.inventory.fiber >= cost.fiber && availableStone(state) >= stoneCost;
-  return affordable && isAtCamp(state) && !isExhausted(state) ? 'ready' : 'unavailable';
+  return affordable && isInClearing(state) && !isExhausted(state) ? 'ready' : 'unavailable';
 }
 
 function isStructurePrerequisite(prerequisite: string | null): prerequisite is StructureId {
@@ -320,7 +320,7 @@ export function axeBlocker(state: GameState): string | null {
   if (state.progress.axeCrafted) return 'You already have a stone axe.';
   if (!state.progress.hearthUnlocked) return 'Weather the cold night before crafting an axe.';
   if (!state.structures.toolshed) return 'Build a toolshed first.';
-  if (!isAtCamp(state)) return 'Return to camp to craft the axe.';
+  if (!isInClearing(state)) return 'Return to camp to craft the axe.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   if (state.inventory.wood < 1 || state.inventory.fiber < 1 || availableStone(state) < 1) return 'Need 1 wood, 1 fiber, and 1 stone for the axe.';
   return null;
@@ -432,7 +432,7 @@ const visitSite: ActionHandler<'visitSite'> = (state, action) => {
 
 function stonePileBlocker(state: GameState): string | null {
   if (!state.structures.stonePile) return 'Build a stone pile first.';
-  if (!isAtCamp(state)) return 'Return to camp to use the stone pile.';
+  if (!isInClearing(state)) return 'Return to camp to use the stone pile.';
   return null;
 }
 
@@ -575,7 +575,7 @@ function gardenPlotIndexValid(plotIndex: number): boolean {
 export function plantGardenBlocker(state: GameState, plotIndex: number): string | null {
   if (!gardenPlotIndexValid(plotIndex)) return 'That garden plot is unavailable.';
   if (!state.structures.garden) return 'Build a garden first.';
-  if (!isAtCamp(state)) return 'Return to camp to tend the garden.';
+  if (!isInClearing(state)) return 'Return to camp to tend the garden.';
   if (!isSpring(state.day)) return 'Plant berry bushes in spring.';
   if (state.gardenPlots[plotIndex].plantedYear !== null) return 'That plot already has a berry bush.';
   if (state.inventory.food < 1) return 'You need a berry to plant.';
@@ -586,7 +586,7 @@ export function plantGardenBlocker(state: GameState, plotIndex: number): string 
 export function harvestGardenBlocker(state: GameState, plotIndex: number): string | null {
   if (!gardenPlotIndexValid(plotIndex)) return 'That garden plot is unavailable.';
   if (!state.structures.garden) return 'Build a garden first.';
-  if (!isAtCamp(state)) return 'Return to camp to tend the garden.';
+  if (!isInClearing(state)) return 'Return to camp to tend the garden.';
   if (!state.gardenPlots[plotIndex].harvestReady) return 'Those berries are not ready yet.';
   if (freeSpaces(state) < 2) return 'Make room for 2 berries before harvesting.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
@@ -633,7 +633,7 @@ function missingCost(state: GameState, cost: { wood: number; fiber: number; ston
 }
 
 function buildBlocker(state: GameState, structureId: StructureId): string | null {
-  if (!isAtCamp(state)) return 'Return to the marked camp area to build.';
+  if (!isInClearing(state)) return 'Return to the marked camp area to build.';
   const definition = BUILDINGS[structureId];
   if (!definition) return 'That structure is unavailable.';
   if (definition.prerequisite === 'coldNight' && !state.progress.hearthUnlocked) return 'Weather the cold night to unlock the hearth.';

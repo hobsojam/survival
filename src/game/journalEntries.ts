@@ -1,6 +1,6 @@
 import { duskLength, nightStart, season, seasonMessage, yearOf, type Season } from './calendar';
 import { rainMessage } from './rain';
-import { isAtCamp, isColdNight, type GameAction } from './rules';
+import { isAtCamp, isColdNight, isInClearing, type GameAction } from './rules';
 import { LOOKOUT, type GameState } from './state';
 import { RABBIT_HOMES } from './wildlife';
 import { wolfMessage } from './wolves';
@@ -79,8 +79,8 @@ const atSpring = (m: Moment): boolean => m.action?.type === 'visitSite' && m.act
 
 const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   // Not in the day's first moments, so the morning's own message (a new game, a waking) stays on screen.
-  leaves: m => onAfter(m, awake(m) && m.before.timeOfDay >= 30 && isAtCamp(m.after) && daylight(m.after)),
-  fox: m => onAfter(m, awake(m) && isAtCamp(m.after) && atDusk(m.after)),
+  leaves: m => onAfter(m, awake(m) && m.before.timeOfDay >= 30 && isInClearing(m.after) && daylight(m.after)),
+  fox: m => onAfter(m, awake(m) && isInClearing(m.after) && atDusk(m.after)),
   coldFront: m => {
     if (isColdNight(m.before) && !isColdNight(m.after)) return { day: m.before.day, variant: m.after.progress.hearthUnlocked ? 0 : 1, silent: true };
     // Once the cold night is long weathered, any autumn night kept warm at camp fills its place in later years.
@@ -102,9 +102,9 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   bushesFull: m => onBefore(m, m.action?.type === 'gather' && done(m) && m.after.inventory.food > m.before.inventory.food),
   stumpGrowing: m => onAfter(m, dawn(m) && m.after.trees.some(tree => tree.readyDay === m.after.day && tree.readyDay > 1)),
   springRest: m => onBefore(m, atSpring(m)),
-  fireflies: m => onAfter(m, awake(m) && isAtCamp(m.after) && !daylight(m.after)),
+  fireflies: m => onAfter(m, awake(m) && isInClearing(m.after) && !daylight(m.after)),
   twoHandfuls: m => onBefore(m, m.action?.type === 'gather' && m.after.inventory.food - m.before.inventory.food === 2),
-  goldEvening: m => onAfter(m, awake(m) && isAtCamp(m.after) && m.before.day === m.after.day
+  goldEvening: m => onAfter(m, awake(m) && isInClearing(m.after) && m.before.day === m.after.day
     && daylight(m.before) && !daylight(m.after)),
   warmSleep: m => onBefore(m, acted(m, 'sleep') && m.after.fireFuel === 0),
   lookoutEvening: m => onAfter(m, awake(m) && m.after.progress.lookoutRepaired && m.after.area === 'camp'

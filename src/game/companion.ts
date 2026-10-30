@@ -1,6 +1,6 @@
 import { isWinter, nightStart } from './calendar';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
-import { freeSpaces, isAtCamp } from './camp';
+import { freeSpaces, isInClearing } from './camp';
 import { BALANCE, type Friend, type GameState } from './state';
 import { dayHash, foxAt, foxSpookRadius } from './wildlife';
 
@@ -45,13 +45,13 @@ const ORDER: readonly Friend[] = ['fox', 'wolf', 'bird'];
 
 /** Which animal an offering would go to here and now, the fox first; none once a friend has stayed. */
 export function offerFor(state: GameState): Friend | null {
-  if (state.companion.friend || !isAtCamp(state)) return null;
+  if (state.companion.friend || !isInClearing(state)) return null;
   return ORDER.find(animal => state.companion.lastOffer[animal] !== state.day && WILLING[animal](state)) ?? null;
 }
 
 export function offerBlocker(state: GameState): string | null {
   if (offerFor(state)) return null;
-  const waiting = !state.companion.friend && isAtCamp(state) && ORDER.some(animal => WILLING[animal](state));
+  const waiting = !state.companion.friend && isInClearing(state) && ORDER.some(animal => WILLING[animal](state));
   return waiting ? 'You have already left something out today.' : 'Nothing here wants an offering right now.';
 }
 
@@ -161,7 +161,7 @@ function itemBlocker(state: GameState, item: keyof typeof ITEMS): string | null 
   if (!friendly(state.companion.friend)) return `You need ${pieces} for a ${name}.`;
   if (!state.structures.toolshed) return 'Build a toolshed first.';
   if (item === 'pillow' && !state.structures.bed) return 'Build a bed first.';
-  if (!isAtCamp(state)) return `Return to camp to make the ${name}.`;
+  if (!isInClearing(state)) return `Return to camp to make the ${name}.`;
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   if (state.companion.keepsakes < KEEPSAKES_NEEDED) return `Need ${KEEPSAKES_NEEDED} ${pieces} for the ${name}.`;
   return null;
