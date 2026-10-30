@@ -25,7 +25,7 @@ Open the local address printed by Vite, usually <http://localhost:5173/>. For a 
 | R | Rest at camp for a short break |
 | Z | Sleep until morning (at night, at camp, once the shelter is built) |
 | Q | Eat: the fresh food nearest to going soft (berries first if it's a tie), then a hazelnut, honey, or roasted hazelnuts. Never pine needles or rations |
-| C | Cook one berry at a lit campfire after dark |
+| C | Cook at a lit campfire after dark: one berry, or with the pot the first dish you have the food for |
 | G | Watch the stars at camp after dark |
 | P | Dry one berry into a trail ration at a built drying rack |
 | T | Eat one trail ration, anywhere |
@@ -133,7 +133,7 @@ Once the toolshed is built, you can make a **cooking pot** in the Forest tools p
 | Cooked berry | 1 berry | 35 hunger (50 with the drying rack), 10 warmth |
 | Pine needle tea | 1 pine needles | 20 warmth, 5 energy |
 | Greens and berry salad | 1 greens, 1 berry | 40 hunger, 10 energy |
-| Roasted hazelnuts | 2 hazelnuts | one roasted hazelnuts for your bag, eaten later for 50 hunger |
+| Roasted hazelnuts | 2 hazelnuts | a portion of roasted hazelnuts for your bag, eaten later for 50 hunger |
 | Honey cake | 1 honey, 1 hazelnut, 1 berry | 60 hunger, and your next rest or sleep at camp restores 10 more energy |
 
 Pot dishes keep the same evening ritual: after dark, at camp, at a lit fire, eight seconds each.

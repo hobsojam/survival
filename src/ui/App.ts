@@ -375,7 +375,7 @@ export class App {
       this.setText(`${item}-note`, bag.foods[item].note);
     }
     this.setText('space-count', bag.spaces);
-    this.root.querySelector('#eat-ration-button')?.classList.toggle('ready', foodCount(inventory.food, 'trailFood') > 0);
+    this.root.querySelector('#eat-ration-button')?.classList.toggle('ready', bag.eatable.trailFood);
     this.root.querySelector('#prepare-button')?.classList.toggle('ready', bag.prepareReady);
     this.setText('prepare-hint', bag.prepareHint);
     this.root.querySelectorAll<HTMLButtonElement>('[data-supply]').forEach(button => {
