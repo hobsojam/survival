@@ -81,7 +81,13 @@ export function defaultDish(state: GameState): DishId | null {
 
 const up = (value: number, gain: number): number => Math.min(100, value + gain);
 
-/** What a dish does once cooked: `cooked` has paid for it and spent the time; the rack is read from before. */
+/** The paid state with what a dish leaves in the bag, put there before the cooking time runs so a dawn's gift can't take its space. */
+export function packDish(paid: GameState, dish: DishId): GameState {
+  if (dish !== 'roastedHazelnuts') return paid;
+  return { ...paid, inventory: { ...paid.inventory, food: addFood(paid.inventory.food, 'roastedHazelnuts', 1, paid.day) } };
+}
+
+/** What a dish does once cooked: `cooked` has paid for it, been packed and spent the time; the rack is read from before. */
 export function serveDish(cooked: GameState, dish: DishId, dryingRack: boolean): { state: GameState; message: string } {
   const { player } = cooked;
   switch (dish) {
@@ -100,7 +106,7 @@ export function serveDish(cooked: GameState, dish: DishId, dryingRack: boolean):
       message: 'You toss greens and berries together. A fresh little supper.'
     };
     case 'roastedHazelnuts': return {
-      state: { ...cooked, inventory: { ...cooked.inventory, food: addFood(cooked.inventory.food, 'roastedHazelnuts', 1, cooked.day) } },
+      state: cooked,
       message: 'You roast the hazelnuts in the pot and keep them for later.'
     };
     case 'honeyCake': return {

@@ -4,7 +4,7 @@ import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSec
 import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
 import { availableStone, availableWood, spendWood, bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
-import { POT_COST, cookBlocker, defaultDish, dishBlocker, foodWord, potBlocker, serveDish, spendIngredients, type DishId } from './cooking';
+import { POT_COST, cookBlocker, defaultDish, dishBlocker, foodWord, packDish, potBlocker, serveDish, spendIngredients, type DishId } from './cooking';
 import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
 import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, type StepId } from './clearing';
 import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
@@ -667,7 +667,7 @@ const cook: ActionHandler<'cook'> = (state, action) => {
   const blocker = dishBlocker(state, dish);
   const spent = spendIngredients(state, dish);
   if (blocker || !spent) return refuse(state, blocker ?? 'No food in your bag.');
-  return serveDish(advanceTime(spent, BALANCE.cookSeconds, 'resting'), dish, state.structures.dryingRack);
+  return serveDish(advanceTime(packDish(spent, dish), BALANCE.cookSeconds, 'resting'), dish, state.structures.dryingRack);
 };
 
 /** A honey cake's extra energy for this rest or sleep, if one was eaten. */
