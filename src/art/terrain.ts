@@ -227,8 +227,16 @@ function tree(name: string, w: number, h: number, shape: 'broad' | 'pine' | 'you
   }
   const def = sprite(g, shape === 'pine' ? treeLegend : crownLegend, [cx, h - 3]);
   if (shape !== 'young') {
-    // A marked tree has a band of pale fibre tied twice round its trunk, below the crown.
-    const marked = g.map(row => [...row]);
+    // Chop targets have a broader trunk and roots; scenery trees keep their slender still frame.
+    const mature = g.map(row => [...row]);
+    rect(mature, cx - 4, h - 17, 9, 14, 'f');
+    rect(mature, cx - 2, h - 16, 3, 11, 'g');
+    rect(mature, cx - 5, h - 5, 11, 1, 'f');
+    rect(mature, cx - 7, h - 4, 15, 1, 'f');
+    dot(mature, cx - 4, h - 4, 'g'); dot(mature, cx + 3, h - 4, 'g');
+    def.frames.mature = mature.map(row => row.join(''));
+    // A marked tree adds a pale fibre band to the same mature trunk.
+    const marked = mature.map(row => [...row]);
     rect(marked, cx - 3, h - 7, 7, 2, 'j');
     for (const x of [cx - 2, cx, cx + 2]) dot(marked, x, h - 6, 'i');
     def.frames.marked = marked.map(row => row.join(''));
