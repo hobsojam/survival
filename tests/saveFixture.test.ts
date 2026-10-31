@@ -1,10 +1,11 @@
 // save-v23.json is a frozen save from version 23. Never edit or regenerate it: it proves old camps keep loading.
 // When the save format changes, add an upgrade step in src/game/saveUpgrades.ts until this file loads again.
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { GameState } from '../src/game/state';
 import { loadGame, saveGame, SAVE_KEY, SAVE_VERSION } from '../src/game/save';
 import { OLDEST_UPGRADABLE_VERSION } from '../src/game/saveUpgrades';
+// Read as the exact text that was saved, the way a browser would hand it back from local storage.
+import FIXTURE from './fixtures/save-v23.json?raw';
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();
@@ -16,7 +17,6 @@ class MemoryStorage implements Storage {
   removeItem(key: string): void { this.data.delete(key); }
 }
 
-const FIXTURE = readFileSync(new URL('./fixtures/save-v23.json', import.meta.url), 'utf8');
 const frozen = JSON.parse(FIXTURE) as { version: number; state: GameState };
 
 function load(raw: string = FIXTURE) {
