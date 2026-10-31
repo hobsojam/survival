@@ -5,8 +5,8 @@ export default defineConfig({
   base: './',
   test: {
     environment: 'node',
-    // Agent worktrees live under .superpowers/ and carry their own copies of the tests.
-    exclude: [...configDefaults.exclude, '.superpowers/**'],
+    // Agent worktrees and Stryker sandboxes carry their own copies of the tests.
+    exclude: [...configDefaults.exclude, '.superpowers/**', '.stryker-tmp/**'],
     // CI hands the lcov report to SonarCloud; locally run `npm test -- --run --coverage`.
     coverage: {
       provider: 'v8',
