@@ -387,7 +387,7 @@ export function larderMarkup(): string {
   return `<div id="larder-controls" class="stone-pile-controls larder-controls" hidden><span id="larder-stored">Stored food 0/${BALANCE.larderCapacity}</span>${rows}</div>`;
 }
 
-export interface BuildButtonView { disabled: boolean; built: boolean; locked: boolean; ready: boolean; description: string; verb: string; price: string }
+export interface BuildButtonView { shown: boolean; disabled: boolean; built: boolean; locked: boolean; ready: boolean; description: string; verb: string; price: string }
 
 const BLOCKED_LABELS = { built: ['Built', 'Complete'], locked: ['Locked', 'Weather cold night'] } as const;
 
@@ -417,6 +417,7 @@ export function buildButtonView(state: GameState, id: StructureId): BuildButtonV
   const status = buildStatus(state, id);
   const blocked = status === 'needsPrerequisite' || status === 'needsShelter' || status === 'needsGround';
   const view = {
+    shown: status === 'ready' || status === 'unavailable',
     disabled: status === 'built' || status === 'locked' || blocked,
     built: status === 'built',
     locked: status === 'locked' || blocked,
@@ -430,6 +431,18 @@ export function buildButtonView(state: GameState, id: StructureId): BuildButtonV
     return { ...view, verb, price: label };
   }
   return view;
+}
+
+const SHELTER_UPGRADES: readonly StructureId[] = ['shelterThatched', 'shelterStonework', 'shelterPorch', 'shelterFinished'];
+
+export interface BuildListView { shelterHeading: boolean; empty: boolean; hint: string }
+
+export function buildListView(state: GameState): BuildListView {
+  const shown = (Object.keys(BUILDINGS) as StructureId[]).filter(id => buildButtonView(state, id).shown);
+  const empty = shown.length === 0;
+  let hint = isInClearing(state) ? 'In the clearing — click an upgrade to build.' : 'Stand anywhere in the clearing to build.';
+  if (empty) hint = 'Nothing new to build for now. Clear more land or explore to find what comes next.';
+  return { shelterHeading: SHELTER_UPGRADES.some(id => shown.includes(id)), empty, hint };
 }
 
 export interface ClearingSideView { side: Side; label: string; detail: string; disabled: boolean; done: boolean; chosen: boolean }

@@ -3,7 +3,7 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type SiteId, typ
 import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
-import { availableFiber, availableWood, cookBlocker, isAtCamp, isInClearing, sleepBlocker, stargazeBlocker } from '../game/rules';
+import { availableFiber, availableWood, cookBlocker, isAtCamp, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { nextStep, type Side } from '../game/clearing';
 import { offerBlocker } from '../game/companion';
 import { defaultDish, type DishId } from '../game/cooking';
@@ -15,7 +15,7 @@ import { createPause, wirePause, type PauseControl } from './pause';
 import { journalView } from './journal';
 import { renderRegionOverview } from './regionOverview';
 import { currentPage, journalPageView, renderJournalPage, turnPage } from './yearJournal';
-import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, type EatableFood, larderMarkup, larderView, clearingView, cloakView, forecastView, bedMarkup, bedsPanelView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
+import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListView, type EatableFood, larderMarkup, larderView, clearingView, cloakView, forecastView, bedMarkup, bedsPanelView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
 import type { UpgradeId } from '../game/workshop';
 import { Soundscape } from '../game/soundscape';
 
@@ -63,7 +63,7 @@ export class App {
     this.pause = createPause(this.root, { scenes: () => this.game?.scene, sound: this.soundscape, save: () => { if (this.storage) this.saveCurrent(); }, started: () => Boolean(this.scene) });
     const buildMarkup = buildOptions.map(id => {
       const { name, description, symbol } = BUILDINGS[id];
-      const groupHeading = id === 'shelterThatched' ? '<h3 class="build-group-heading">Shelter upgrades</h3>' : '';
+      const groupHeading = id === 'shelterThatched' ? '<h3 id="shelter-upgrades-heading" class="build-group-heading">Shelter upgrades</h3>' : '';
       let extraControls = '';
       if (id === 'larder') extraControls = larderMarkup();
       return groupHeading + `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>` + extraControls;
@@ -571,7 +571,10 @@ export class App {
 
   private renderBuild(): void {
     this.setText('prompt', this.scene?.getPrompt() ?? 'WASD / arrows  Move');
-    this.setText('build-hint', isInClearing(this.state) ? 'In the clearing — click an upgrade to build.' : 'Stand anywhere in the clearing to build.');
+    const list = buildListView(this.state);
+    this.setText('build-hint', list.hint);
+    const heading = this.root.querySelector<HTMLElement>('#shelter-upgrades-heading');
+    if (heading) heading.hidden = !list.shelterHeading;
     for (const id of buildOptions) this.renderBuildButton(id);
     this.renderClearing();
     const buildReady = Boolean(this.root.querySelector('[data-tab="build"] .ready'));
@@ -597,6 +600,7 @@ export class App {
   private renderBuildButton(id: StructureId): void {
     const view = buildButtonView(this.state, id);
     const button = this.root.querySelector<HTMLButtonElement>(`[data-build="${id}"]`)!;
+    button.hidden = !view.shown;
     button.disabled = view.disabled;
     button.classList.toggle('built', view.built);
     button.classList.toggle('locked', view.locked);

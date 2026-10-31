@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
-import { BALANCE, createGame, type GameState } from '../src/game/state';
+import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from '../src/game/state';
 import { CLEARING_STEPS } from '../src/game/clearing';
-import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishesView, nightHint, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
+import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishesView, nightHint, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
 import { dishBlocker } from '../src/game/cooking';
 import { addFood, emptyFood } from '../src/game/food';
 import { stock } from './stock';
@@ -269,7 +269,7 @@ describe('bag panel', () => {
 
 describe('build buttons', () => {
   it('prices a building and marks it ready when affordable at camp', () => {
-    expect(buildButtonView(game({ inventory: supplies }), 'shelter')).toEqual({ disabled: false, built: false, locked: false, ready: true,
+    expect(buildButtonView(game({ inventory: supplies }), 'shelter')).toEqual({ shown: true, disabled: false, built: false, locked: false, ready: true,
       description: 'A roof against the night cold', verb: 'Build', price: '6 wood · 2 fiber' });
     expect(buildButtonView(game({ inventory: supplies }), 'dryingRack')).toMatchObject({ price: '4 wood', ready: true });
   });
@@ -285,6 +285,39 @@ describe('build buttons', () => {
 
   it('shows built structures as complete', () => {
     expect(buildButtonView(game({ structures: { dryingRack: true } }), 'dryingRack')).toMatchObject({ disabled: true, built: true, locked: false, verb: 'Built', price: 'Complete' });
+  });
+});
+
+describe('the build list shows only what can be built', () => {
+  const ALL = Object.keys(BUILDINGS) as StructureId[];
+  const shownIn = (state: GameState) => ALL.filter(id => buildButtonView(state, id).shown);
+  const SHELTER_UPGRADES = ['shelterThatched', 'shelterStonework', 'shelterPorch', 'shelterFinished'] as const;
+  const everything = Object.fromEntries(ALL.map(id => [id, true])) as Partial<GameState['structures']>;
+
+  it('on a new game, offers the shelter and the buildings that need nothing first', () => {
+    expect(shownIn(game()).sort()).toEqual(['dryingRack', 'garden', 'shelter', 'stonePile', 'windbreak'].sort());
+    for (const id of ['bed', 'toolshed', 'hearth', 'larder', 'house', ...SHELTER_UPGRADES] as const) expect(buildButtonView(game(), id).shown, id).toBe(false);
+  });
+
+  it('hides what is built or waits on cleared ground, and keeps what is only short of materials', () => {
+    expect(buildButtonView(game({ structures: { dryingRack: true } }), 'dryingRack').shown).toBe(false);
+    expect(buildButtonView(game({ inventory: supplies }), 'larder').shown).toBe(false);
+    const short = buildButtonView(game(), 'dryingRack');
+    expect(short).toMatchObject({ shown: true, ready: false });
+  });
+
+  it('shows the shelter upgrades heading only while an upgrade is offered', () => {
+    expect(buildListView(game()).shelterHeading).toBe(false);
+    expect(buildListView(game({ structures: { shelter: true } })).shelterHeading).toBe(true);
+    const finished = Object.fromEntries(['shelter', ...SHELTER_UPGRADES].map(id => [id, true]));
+    expect(buildListView(game({ structures: finished })).shelterHeading).toBe(false);
+  });
+
+  it('says so when there is nothing new to build, and otherwise keeps its usual hint', () => {
+    expect(buildListView(game({ structures: everything }))).toEqual({ shelterHeading: false, empty: true,
+      hint: 'Nothing new to build for now. Clear more land or explore to find what comes next.' });
+    expect(buildListView(game())).toMatchObject({ empty: false, hint: 'In the clearing — click an upgrade to build.' });
+    expect(buildListView(game({}, { area: 'quarry' }))).toMatchObject({ empty: false, hint: 'Stand anywhere in the clearing to build.' });
   });
 });
 
