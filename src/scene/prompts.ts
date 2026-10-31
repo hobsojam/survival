@@ -19,7 +19,7 @@ export const KEY_ACTIONS: readonly [string, GameAction][] = [
 
 const ACTION_POSES: Partial<Record<GameAction['type'], SurvivorAction>> = {
   gather: 'gather', rest: 'rest', cook: 'cook', stargaze: 'stargaze',
-  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather'
+  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', fish: 'gather'
 };
 
 /** The survivor's pose for an action that changed the game, if it has one. */

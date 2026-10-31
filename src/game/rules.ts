@@ -15,6 +15,7 @@ import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
 import { logsInStore } from './wood';
 import { settleStores } from './stores';
 import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, cartSpace, countWord, fellingWood, upgradeBlocker, type UpgradeId } from './workshop';
+import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishingSecondsFor, validRoll } from './fishing';
 import { ENDED_MESSAGE, judgeSickDay, markWarmMeal, markWarmRest, sicknessTick } from './sickness';
 import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
 
@@ -37,7 +38,9 @@ export type GameAction =
   | { type: 'takeFood'; item: FoodItem }
   | { type: 'cook'; dish?: DishId }
   | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' }
-  | { type: 'pickUpStone'; pileId: string };
+  | { type: 'pickUpStone'; pileId: string }
+  | { type: 'makeFishingLine' }
+  | { type: 'fish'; roll: number };
 
 /** Awake time tires the survivor; work already costs energy, and resting doesn't. */
 export type Activity = 'awake' | 'working' | 'resting';
@@ -417,6 +420,26 @@ const craftPot: ActionHandler<'craftPot'> = state => {
   };
 };
 
+const makeFishingLine: ActionHandler<'makeFishingLine'> = state => {
+  const blocker = fishingLineBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  return {
+    state: payAndBuild(state, { ...FISHING_LINE_COST, stone: 0 }, { progress: { ...state.progress, fishingLine: true } }),
+    message: 'You twist fiber into a line and tie it to a stick.'
+  };
+};
+
+const fish: ActionHandler<'fish'> = (state, action) => {
+  if (!validRoll(action.roll)) return refuse(state, 'That action is not available yet.');
+  const blocker = fishingBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  const caught = catches(state, action.roll);
+  const waited = advanceTime(state, fishingSecondsFor(state), 'working');
+  if (!caught) return { state: { ...waited, fishingMisses: state.fishingMisses + 1 }, message: 'You wait by the hole in the ice, but nothing bites.' };
+  const food = addFood(waited.inventory.food, 'fish', 1, waited.day);
+  return { state: { ...waited, fishingMisses: 0, inventory: { ...waited.inventory, food } }, message: 'You break the ice and wait. A fish takes the line.' };
+};
+
 const craftPack: ActionHandler<'craftPack'> = state => {
   const blocker = packBlocker(state);
   if (blocker) return refuse(state, blocker);
@@ -530,7 +553,7 @@ const clearGround: ActionHandler<'clearGround'> = state => {
 function restAtSpring(state: GameState): ActionResult {
   if (isWinter(state.day)) return {
     state: { ...state, progress: { ...state.progress, discoveries: { ...state.progress.discoveries, spring: true } } },
-    message: 'The spring is frozen over.'
+    message: state.progress.fishingLine ? 'The spring is frozen over.' : 'The spring is frozen over. With a fishing line, you could fish through the ice.'
   };
   const rested = advanceTime({ ...state, progress: { ...state.progress,
     discoveries: { ...state.progress.discoveries, spring: true } } }, BALANCE.restSeconds, 'resting');
@@ -938,7 +961,8 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak
+  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak,
+  makeFishingLine, fish
 };
 
 /** An action that carried the survivor into the end of their story says so, in place of its own message. */

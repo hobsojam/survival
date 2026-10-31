@@ -192,7 +192,7 @@ describe('sprite pipeline', () => {
 
 describe('food icons', () => {
   it('draws every food on the journal icon grid, each its own picture', () => {
-    expect(Object.keys(FOOD_ICONS).sort()).toEqual(['greens', 'hazelnut', 'honey', 'honeyCake', 'pineNeedles', 'pineTea', 'roastedHazelnuts', 'salad', 'stew', 'vegetables']);
+    expect(Object.keys(FOOD_ICONS).sort()).toEqual(['fish', 'greens', 'hazelnut', 'honey', 'honeyCake', 'pineNeedles', 'pineTea', 'roastedHazelnuts', 'salad', 'stew', 'vegetables']);
     for (const [id, { legend, rows }] of Object.entries(FOOD_ICONS)) {
       expect(rows, id).toHaveLength(JOURNAL_ICON_SIZE);
       for (const row of rows) {
@@ -200,7 +200,7 @@ describe('food icons', () => {
         for (const pixel of row) if (pixel !== '.') expect(legend[pixel], `${id} '${pixel}'`).toBeDefined();
       }
     }
-    expect(new Set(Object.values(FOOD_ICONS).map(icon => icon.rows.join(''))).size).toBe(10);
+    expect(new Set(Object.values(FOOD_ICONS).map(icon => icon.rows.join(''))).size).toBe(11);
   });
 
   it('paints a food icon as a crisp SVG data URL', () => {

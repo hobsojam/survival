@@ -7,8 +7,9 @@ export interface FoodStore {
   roastedHazelnuts: number;
   trailFood: number;
   vegetables: number;
+  fish: number;
 }
 
 export function emptyFood(): FoodStore {
-  return { berry: [], greens: [], hazelnut: 0, honey: 0, pineNeedles: 0, roastedHazelnuts: 0, trailFood: 0, vegetables: 0 };
+  return { berry: [], greens: [], hazelnut: 0, honey: 0, pineNeedles: 0, roastedHazelnuts: 0, trailFood: 0, vegetables: 0, fish: 0 };
 }

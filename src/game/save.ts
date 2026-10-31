@@ -86,7 +86,7 @@ function validProgress({ structures, progress, area }: SaveShape): boolean {
   // Exactly the buildings there are, and no others.
   if (Object.keys(structures).length !== buildingIds.length || !buildingIds.every(id => bool(structures[id]))) return false;
   if (!validStructureDependencies(structures)) return false;
-  const flags = ['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'pickaxeCrafted', 'potCrafted', 'packWoven'] as const;
+  const flags = ['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'pickaxeCrafted', 'potCrafted', 'packWoven', 'fishingLine'] as const;
   return flags.every(key => bool(progress[key])) && validWorkshop(structures, progress) && validProgressDependencies(structures, progress, area);
 }
 
@@ -276,8 +276,9 @@ function validCompanion({ companion, day, structures }: SaveShape): boolean {
   return validBefriendedCompanion(companion, day as number, structures);
 }
 
-/** Well, or sick since a lived day with fewer cared-for and uncared-for days than settle it; a story that has ended, ended on a lived day. */
-function validSickness({ sickness, ending, day }: SaveShape): boolean {
+/** No more than two empty goes at the ice in a row; well, or sick since a lived day with fewer cared-for and uncared-for days than settle it; a story that has ended, ended on a lived day. */
+function validSickness({ sickness, ending, day, fishingMisses }: SaveShape): boolean {
+  if (!count(fishingMisses) || fishingMisses > BALANCE.fishingMaxMisses) return false;
   if (!object(sickness) || !finite(sickness.starvedSeconds) || sickness.starvedSeconds < 0) return false;
   const { sick, sickFromDay, cared, uncared, ateWarm, restedWarm } = sickness;
   if (!bool(sick) || !bool(ateWarm) || !bool(restedWarm) || !count(cared) || !count(uncared)) return false;

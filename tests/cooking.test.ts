@@ -62,9 +62,9 @@ describe('the cooking pot', () => {
 });
 
 describe('the dishes', () => {
-  it('lists every dish in order, and only berries cook without the pot', () => {
-    expect(DISH_ORDER).toEqual(['berries', 'pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew']);
-    expect(DISH_ORDER.filter(dish => !DISHES[dish].potOnly)).toEqual(['berries']);
+  it('lists every dish in order, and only a fish and berries cook without the pot', () => {
+    expect(DISH_ORDER).toEqual(['fish', 'berries', 'pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew']);
+    expect(DISH_ORDER.filter(dish => !DISHES[dish].potOnly)).toEqual(['fish', 'berries']);
   });
 
   it('cooks berries without the pot exactly as before', () => {

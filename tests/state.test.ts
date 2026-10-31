@@ -18,7 +18,7 @@ describe('new game', () => {
     expect(game.gardenPlots).toEqual(Array.from({ length: 3 }, () => ({ plantedYear: null, harvestedYear: null, harvestReady: false })));
     expect(BUILDINGS.dryingRack.cost).toEqual({ wood: 4, fiber: 0 });
     expect(BUILDINGS.windbreak.cost).toEqual({ wood: 5, fiber: 0 });
-    expect(game.progress).toEqual({ nextStormDay: 3, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false, quarryFound: false, pickaxeCrafted: false, potCrafted: false, packWoven: false, workshop: { saw: false, handcart: false, bedTools: false },
+    expect(game.progress).toEqual({ nextStormDay: 3, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false, quarryFound: false, pickaxeCrafted: false, potCrafted: false, packWoven: false, fishingLine: false, workshop: { saw: false, handcart: false, bedTools: false },
       discoveries: { basket: false, spring: false, cairn: false } });
     expect(game.cakeBonus).toBe(false);
     expect(game.trees).toHaveLength(6);

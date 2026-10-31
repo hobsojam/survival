@@ -1,3 +1,4 @@
+import { withFishing } from '../game/fishing';
 import Phaser from 'phaser';
 import { BALANCE, type GameState } from '../game/state';
 import { newsBetween } from '../game/news';
@@ -156,9 +157,11 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  perform(action: GameAction, announce = true): void {
+  perform(requested: GameAction, announce = true): void {
     // The sidebar's buttons still click while the game is paused; nothing should happen.
     if (this.scene.isPaused() || this.nightWatch.running) return;
+    // A visit to the frozen spring with a line is a go at fishing, and fishing needs a roll of chance.
+    const action = withFishing(this.state, requested, Math.random());
     if (action.type !== 'move') this.walkTarget = nextWalk(this.walkTarget, { kind: 'action' });
     const before = this.state;
     const result = applyAction(before, action);

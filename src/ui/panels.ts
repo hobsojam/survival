@@ -14,6 +14,7 @@ import type { LoadResult } from '../game/save';
 import { CLEARING_STEPS, clearGroundBlocker, markBlocker, nextStep, roomLine, type Side } from '../game/clearing';
 import { KEEPSAKES_NEEDED, cloakBlocker, keepsakeKind, pillowBlocker } from '../game/companion';
 import { DISHES, DISH_ORDER, dishBlocker, foodWord, ingredientList, potBlocker, type DishId } from '../game/cooking';
+import { fishingLineBlocker } from '../game/fishing';
 
 export interface GardenPlotPanelView {
   label: string;
@@ -179,21 +180,31 @@ export function packView(state: GameState): ActionPanelView {
   return { title: 'Woven pack', copy: blocker ?? `A pack of woven fiber on a wooden frame, to carry ${BALANCE.packCapacity}.`, cost: '2 wood · 4 fiber', disabled: false, ready: !blocker };
 }
 
+/** The Forest tools panel's fishing line: made in the clearing from a wood and a fiber, for the frozen spring. */
+export function fishingLineView(state: GameState): ActionPanelView {
+  if (state.progress.fishingLine) {
+    return { title: 'Fishing line', copy: 'In winter, fish through the ice at the quiet spring.', cost: 'Made', disabled: true, ready: false };
+  }
+  const blocker = fishingLineBlocker(state);
+  return { title: 'Fishing line', copy: blocker ?? 'A line of twisted fiber on a stick, to fish through the frozen spring in winter.', cost: '1 wood · 1 fiber', disabled: false, ready: !blocker };
+}
+
 export interface DishView { dish: Exclude<DishId, 'berries'>; name: string; icon: string; cost: string; disabled: boolean; title: string }
 
-/** The After dark panel's pot dishes, once the pot is made: each says why it can't be cooked yet. */
+/** The After dark panel's dishes beyond a toasted berry: a fish whenever there is one, and the pot dishes once the pot is made. Each says why it can't be cooked yet. */
 export function nightDishesView(state: GameState): DishView[] {
-  if (!state.progress.potCrafted) return [];
-  return DISH_ORDER.filter((dish): dish is DishView['dish'] => DISHES[dish].potOnly).map(dish => {
+  const offered = (dish: DishId): dish is DishView['dish'] =>
+    dish === 'fish' ? availableFood(state, 'fish') > 0 : DISHES[dish].potOnly && state.progress.potCrafted;
+  return DISH_ORDER.filter(offered).map(dish => {
     const blocker = dishBlocker(state, dish);
     const name = capitalised(DISHES[dish].name);
     return { dish, name, icon: foodIconUrl(dish), cost: `${ingredientList(dish)} · ${BALANCE.cookSeconds} seconds`, disabled: Boolean(blocker), title: blocker ?? `Cook ${DISHES[dish].name}.` };
   });
 }
 
-/** A hidden button for each pot dish in the After dark panel, shown once the pot is made. */
+/** A hidden button for each dish beyond a toasted berry in the After dark panel, shown once it can be offered. */
 export function nightDishMarkup(): string {
-  return DISH_ORDER.filter(dish => DISHES[dish].potOnly).map(dish =>
+  return DISH_ORDER.filter(dish => dish !== 'berries').map(dish =>
     `<button type="button" data-action="cook" data-dish="${dish}" id="dish-${dish}" hidden><img class="food-icon" src="${foodIconUrl(dish as DishView['dish'])}" alt=""><strong>${capitalised(DISHES[dish].name)}</strong><small>${ingredientList(dish)} · ${BALANCE.cookSeconds} seconds</small></button>`
   ).join('');
 }
@@ -299,7 +310,8 @@ export const BAG_FOODS = [
   { item: 'honey', label: 'Honey', eat: 'Eat some honey' },
   { item: 'pineNeedles', label: 'Pine needles', eat: null },
   { item: 'roastedHazelnuts', label: 'Roasted hazelnuts', eat: 'Eat the roasted hazelnuts' },
-  { item: 'vegetables', label: 'Vegetables', eat: 'Eat some raw vegetables' }
+  { item: 'vegetables', label: 'Vegetables', eat: 'Eat some raw vegetables' },
+  { item: 'fish', label: 'Fish', eat: 'Eat a raw fish' }
 ] as const;
 export type BagFood = (typeof BAG_FOODS)[number]['item'];
 
@@ -363,7 +375,7 @@ function fireLine(state: GameState): string {
 }
 
 const LARDER_LABELS: Record<FoodItem, string> = {
-  berry: 'Berries', greens: 'Greens', hazelnut: 'Hazelnuts', honey: 'Honey', pineNeedles: 'Pine needles', roastedHazelnuts: 'Roasted hazelnuts', trailFood: 'Rations', vegetables: 'Vegetables'
+  berry: 'Berries', greens: 'Greens', hazelnut: 'Hazelnuts', honey: 'Honey', pineNeedles: 'Pine needles', roastedHazelnuts: 'Roasted hazelnuts', trailFood: 'Rations', vegetables: 'Vegetables', fish: 'Fish'
 };
 
 export interface LarderRowView { item: FoodItem; label: string; kept: number; storeDisabled: boolean; storeTitle: string; takeDisabled: boolean; takeTitle: string }

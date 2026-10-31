@@ -16,10 +16,18 @@ type Upgradable = Record<string, unknown>;
 
 /** Each step, keyed by the version it upgrades from. */
 export const SAVE_UPGRADES: Readonly<Record<number, SaveUpgrade>> = {
-  // Version 24: the survivor can fall sick, and their story can end. An older camp comes in well.
-  23: state => ({ ...(state as Upgradable),
-    sickness: { starvedSeconds: 0, sick: false, sickFromDay: null, cared: 0, uncared: 0, ateWarm: false, restedWarm: false },
-    ending: null })
+  // Version 24: the survivor can fall sick, their story can end, and the frozen spring can be fished.
+  // An older camp comes in well, with no fishing line and no fish.
+  23: old => {
+    const state = old as Upgradable & { progress: Upgradable; inventory: Upgradable & { food: Upgradable }; larder: Upgradable };
+    return { ...state,
+      sickness: { starvedSeconds: 0, sick: false, sickFromDay: null, cared: 0, uncared: 0, ateWarm: false, restedWarm: false },
+      ending: null,
+      fishingMisses: 0,
+      progress: { ...state.progress, fishingLine: false },
+      inventory: { ...state.inventory, food: { ...state.inventory.food, fish: 0 } },
+      larder: { ...state.larder, fish: 0 } };
+  }
 };
 
 export type UpgradeResult = { ok: true; state: unknown } | { ok: false; reason: string };
