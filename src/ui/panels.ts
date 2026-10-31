@@ -402,6 +402,23 @@ export function campStoresView(state: GameState): CampStoresView {
   return { shown: structures.larder || lines.some(line => line.shown), lines };
 }
 
+/** Every building's button for the build list, in order, with the Shelter upgrades heading above the first upgrade. */
+export function buildListMarkup(): string {
+  return (Object.keys(BUILDINGS) as StructureId[]).map(id => {
+    const { name, description, symbol } = BUILDINGS[id];
+    const groupHeading = id === 'shelterThatched' ? '<h3 id="shelter-upgrades-heading" class="build-group-heading">Shelter upgrades</h3>' : '';
+    return groupHeading + `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>`;
+  }).join('');
+}
+
+const CAMP_STORE_IDS: readonly CampStoreId[] = ['wood', 'fiber', 'stone', 'cart'];
+
+/** The Camp stores panel, hidden until a store exists, with a hidden line per store and the larder's controls. */
+export function campStoresMarkup(): string {
+  const lines = CAMP_STORE_IDS.map(id => `<p id="store-line-${id}" class="store-line" hidden></p>`).join('');
+  return `<section class="panel stores-panel" id="stores-panel" data-tab="bag" hidden><p class="eyebrow">CAMP STORES</p><div class="store-lines">${lines}</div>${larderMarkup()}</section>`;
+}
+
 export interface BuildButtonView { shown: boolean; disabled: boolean; built: boolean; locked: boolean; ready: boolean; description: string; verb: string; price: string }
 
 const BLOCKED_LABELS = { built: ['Built', 'Complete'], locked: ['Locked', 'Weather cold night'] } as const;
