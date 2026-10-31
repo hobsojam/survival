@@ -48,7 +48,7 @@ Each building uses the existing `ground: StepId` mechanism: it can't be built un
 - The horse or oxen, the stable and pens. That's the new-areas project. The woodshed becomes the stable then.
 - Decorating, and a thirst meter. Water exists only for the beds and cooking.
 - A field. It comes later, on the south ground or in a new area.
-- Save migrations. Each project bumps `SAVE_VERSION`, and old saves are rejected, as now.
+- Save migrations. They're their own project (`2026-10-31-save-upgrades-design.md`). From version 23 on, each format change adds an upgrade step.
 - NPCs. The homestead has no other people.
 
 ## Anti-goals
