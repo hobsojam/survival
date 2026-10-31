@@ -1,6 +1,6 @@
-import { availableWood, isInClearing } from './camp';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { BALANCE, BUILDINGS, type GameState, type ResourceNode, type TreeNode } from './state';
+import { availableWood } from './wood';
 
 // The camp clearing starts as the ring round the fire and widens one side at a time. Each side has a near and a far step;
 // every step names the trees that stand in its way and the building the cleared ground makes room for.
@@ -138,6 +138,11 @@ export function clearingReach(x: number, y: number, cleared: readonly StepId[]):
 
 export function inClearing(x: number, y: number, cleared: readonly StepId[]): boolean {
   return Math.hypot(x - BALANCE.campX, y - BALANCE.campY) <= clearingReach(x, y, cleared);
+}
+
+/** Whether the survivor stands anywhere in the camp clearing, including ground cleared beyond the fire's warmth. */
+export function isInClearing(state: GameState): boolean {
+  return state.area === 'camp' && inClearing(state.player.x, state.player.y, state.clearing.cleared);
 }
 
 /** A stable label for a set of cleared steps, for caching the ground drawn from it. */

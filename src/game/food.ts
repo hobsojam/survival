@@ -1,6 +1,9 @@
-import { isInClearing } from './camp';
+import { isInClearing } from './clearing';
 import { BALANCE, type GameState } from './state';
+import type { FoodStore } from './foodStore';
 
+export { emptyFood } from './foodStore';
+export type { FoodStore } from './foodStore';
 
 // Food the survivor carries. Fresh food remembers the day each piece was picked, so it can spoil;
 // kept food is just a count. Every eater goes through availableFood and spendFood, which reach into the larder at camp.
@@ -10,20 +13,6 @@ export type KeptFood = 'hazelnut' | 'honey' | 'pineNeedles' | 'roastedHazelnuts'
 export type FoodItem = FreshFood | KeptFood;
 
 export const FOOD_ITEMS: readonly FoodItem[] = ['berry', 'greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood'];
-
-export interface FoodStore {
-  berry: number[];
-  greens: number[];
-  hazelnut: number;
-  honey: number;
-  pineNeedles: number;
-  roastedHazelnuts: number;
-  trailFood: number;
-}
-
-export function emptyFood(): FoodStore {
-  return { berry: [], greens: [], hazelnut: 0, honey: 0, pineNeedles: 0, roastedHazelnuts: 0, trailFood: 0 };
-}
 
 export function isFresh(item: FoodItem): item is FreshFood {
   return item === 'berry' || item === 'greens';

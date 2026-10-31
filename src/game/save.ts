@@ -48,21 +48,31 @@ function validSurvivor({ player, inventory, area, day, cakeBonus }: SaveShape): 
     && (area === 'camp' || area === 'quarry');
 }
 
-/** Flags are booleans, and nothing is unlocked without what unlocks it. */
-function validProgress({ structures, progress, area }: SaveShape): boolean {
-  if (!(Object.keys(BUILDINGS) as (keyof typeof BUILDINGS)[]).every(id => bool(structures[id]))) return false;
+function validStructureDependencies(structures: ObjectValue): boolean {
   for (const id of Object.keys(BUILDINGS) as (keyof typeof BUILDINGS)[]) {
     const prerequisite = BUILDINGS[id].prerequisite;
     if (structures[id] && prerequisite && prerequisite !== 'coldNight' && prerequisite in BUILDINGS && !structures[prerequisite]) return false;
     const definition = BUILDINGS[id];
     if (structures[id] && 'alsoRequires' in definition && !structures[definition.alsoRequires]) return false;
   }
-  if (!(['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'pickaxeCrafted', 'potCrafted'] as const).every(key => bool(progress[key]))) return false;
+  return true;
+}
+
+function validProgressDependencies(structures: ObjectValue, progress: ObjectValue, area: unknown): boolean {
   if ((area === 'quarry' || progress.quarryFound) && !structures.shelter) return false;
   if (progress.pickaxeCrafted && !(progress.quarryFound && structures.toolshed)) return false;
   if ((progress.axeCrafted || progress.potCrafted) && !structures.toolshed) return false;
   const needsColdNight = [structures.hearth, progress.lookoutRepaired, progress.axeCrafted].includes(true);
   return progress.hearthUnlocked === true || !needsColdNight;
+}
+
+/** Flags are booleans, and nothing is unlocked without what unlocks it. */
+function validProgress({ structures, progress, area }: SaveShape): boolean {
+  const buildingIds = Object.keys(BUILDINGS) as (keyof typeof BUILDINGS)[];
+  if (!buildingIds.every(id => bool(structures[id]))) return false;
+  if (!validStructureDependencies(structures)) return false;
+  const flags = ['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'pickaxeCrafted', 'potCrafted'] as const;
+  return flags.every(key => bool(progress[key])) && validProgressDependencies(structures, progress, area);
 }
 
 function validStorm({ progress, day }: SaveShape): boolean {
@@ -178,27 +188,49 @@ function validJournal({ journal, day }: SaveShape): boolean {
 
 const FRIENDS = ['bird', 'fox', 'wolf'] as const;
 
+type CompanionShape = ObjectValue & { trust: ObjectValue; lastOffer: ObjectValue };
+
+function companionShape(value: unknown): value is CompanionShape {
+  return object(value) && object(value.trust) && object(value.lastOffer);
+}
+
+function validCompanionItems(companion: CompanionShape): boolean {
+  const { friend, keepsakes, keepsakeLying, pillow, cloak } = companion;
+  const knownFriend = friend === null || FRIENDS.includes(friend as typeof FRIENDS[number]);
+  return knownFriend && bool(keepsakeLying) && bool(pillow) && bool(cloak)
+    && count(keepsakes) && keepsakes <= KEEPSAKES_NEEDED;
+}
+
+function validCompanionHistory(companion: CompanionShape, day: number): boolean {
+  const lived = (value: unknown): boolean => count(value) && value <= day;
+  if (!(['lastFind', 'lastGift', 'alarmDay', 'foxFled'] as const).every(key => lived(companion[key]))) return false;
+  return FRIENDS.every(animal => count(companion.trust[animal]) && companion.trust[animal] <= TRUST_TARGET[animal]
+    && lived(companion.lastOffer[animal]));
+}
+
+function validUnbefriendedCompanion(companion: CompanionShape): boolean {
+  const { since, trust, keepsakes, keepsakeLying, pillow, cloak } = companion;
+  return since === null && FRIENDS.every(animal => (trust[animal] as number) < TRUST_TARGET[animal])
+    && keepsakes === 0 && !keepsakeLying && !pillow && !cloak;
+}
+
+function validBefriendedCompanion(companion: CompanionShape, day: number, structures: ObjectValue): boolean {
+  const { friend, since, keepsakes, keepsakeLying, pillow, cloak } = companion;
+  const made = pillow || cloak;
+  return count(since) && since >= 1 && since <= day && !(pillow && cloak)
+    && (!pillow || (friend === 'bird' && structures.bed === true)) && (!cloak || friend !== 'bird')
+    && (!made || (keepsakes === 0 && !keepsakeLying));
+}
+
 /**
  * No friend and trust still short of every target, or one friend that came on a lived day.
  * Keepsakes come only from a friend, at most six, and each item only from its own friend's fur or feathers.
  */
 function validCompanion({ companion, day, structures }: SaveShape): boolean {
-  if (!object(companion) || !object(companion.trust) || !object(companion.lastOffer)) return false;
-  const { friend, since, trust, lastOffer, keepsakes, keepsakeLying, pillow, cloak } = companion as ObjectValue
-    & { trust: ObjectValue; lastOffer: ObjectValue };
-  const lived = (value: unknown): boolean => count(value) && value <= (day as number);
-  const known = friend === null || FRIENDS.includes(friend as typeof FRIENDS[number]);
-  if (!known || !bool(keepsakeLying) || !bool(pillow) || !bool(cloak) || !count(keepsakes) || keepsakes > KEEPSAKES_NEEDED) return false;
-  if (!(['lastFind', 'lastGift', 'alarmDay', 'foxFled'] as const).every(key => lived(companion[key]))) return false;
-  if (!FRIENDS.every(animal => count(trust[animal]) && trust[animal] <= TRUST_TARGET[animal] && lived(lastOffer[animal]))) return false;
-  if (friend === null) {
-    return since === null && FRIENDS.every(animal => (trust[animal] as number) < TRUST_TARGET[animal])
-      && keepsakes === 0 && !keepsakeLying && !pillow && !cloak;
-  }
-  const made = pillow || cloak;
-  return lived(since) && (since as number) >= 1 && !(pillow && cloak)
-    && (!pillow || (friend === 'bird' && structures.bed === true)) && (!cloak || friend !== 'bird')
-    && (!made || (keepsakes === 0 && !keepsakeLying));
+  if (!companionShape(companion)) return false;
+  if (!validCompanionItems(companion) || !validCompanionHistory(companion, day as number)) return false;
+  if (companion.friend === null) return validUnbefriendedCompanion(companion);
+  return validBefriendedCompanion(companion, day as number, structures);
 }
 
 /** Checks a version 19 save: the clearing and the larder, shelter upgrades, garden plots, tools, quarry timers, the year journal and companion. */

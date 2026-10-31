@@ -293,30 +293,39 @@ export interface BuildButtonView { disabled: boolean; built: boolean; locked: bo
 
 const BLOCKED_LABELS = { built: ['Built', 'Complete'], locked: ['Locked', 'Weather cold night'] } as const;
 
-export function buildButtonView(state: GameState, id: StructureId): BuildButtonView {
-  const status = buildStatus(state, id);
-  const definition = BUILDINGS[id];
-  const cost = definition.cost;
+function buildPrice(id: StructureId): string {
+  const cost = BUILDINGS[id].cost;
   const stone = 'stone' in cost ? cost.stone : 0;
-  const price = [cost.wood ? `${cost.wood} wood` : '', cost.fiber ? `${cost.fiber} fiber` : '', stone ? `${stone} stone` : ''].filter(Boolean).join(' · ');
-  const needsPrerequisite = status === 'needsPrerequisite' || status === 'needsShelter';
-  const needsGround = status === 'needsGround';
-  const blocked = needsPrerequisite || needsGround;
+  return [cost.wood ? `${cost.wood} wood` : '', cost.fiber ? `${cost.fiber} fiber` : '', stone ? `${stone} stone` : '']
+    .filter(Boolean).join(' · ');
+}
+
+function prerequisiteDescription(id: StructureId): string {
+  const definition = BUILDINGS[id];
   const prerequisite = definition.prerequisite;
   const prerequisiteNames: string[] = [];
   if (prerequisite && prerequisite !== 'coldNight') prerequisiteNames.push(BUILDINGS[prerequisite].name.toLowerCase());
   if ('alsoRequires' in definition) prerequisiteNames.push(BUILDINGS[definition.alsoRequires].name.toLowerCase());
-  const prerequisiteDescription = prerequisiteNames.length ? `Requires ${prerequisiteNames.join(' and ')}` : 'Requires its previous shelter upgrade';
-  // Uncleared ground reads like a missing prerequisite, naming the side and step to clear.
-  const blockedDescription = needsGround ? (groundBlocker(state, id) ?? '').replace(/\.$/, '') : prerequisiteDescription;
+  return prerequisiteNames.length ? `Requires ${prerequisiteNames.join(' and ')}` : 'Requires its previous shelter upgrade';
+}
+
+function buildDescription(state: GameState, id: StructureId, status: ReturnType<typeof buildStatus>): string {
+  if (status === 'needsGround') return (groundBlocker(state, id) ?? '').replace(/\.$/, '');
+  if (status === 'needsPrerequisite' || status === 'needsShelter') return prerequisiteDescription(id);
+  return BUILDINGS[id].description;
+}
+
+export function buildButtonView(state: GameState, id: StructureId): BuildButtonView {
+  const status = buildStatus(state, id);
+  const blocked = status === 'needsPrerequisite' || status === 'needsShelter' || status === 'needsGround';
   const view = {
     disabled: status === 'built' || status === 'locked' || blocked,
     built: status === 'built',
     locked: status === 'locked' || blocked,
     ready: status === 'ready',
-    description: blocked ? blockedDescription : definition.description,
+    description: buildDescription(state, id, status),
     verb: blocked ? 'Blocked' : 'Build',
-    price
+    price: buildPrice(id)
   };
   if (status === 'built' || status === 'locked') {
     const [verb, label] = BLOCKED_LABELS[status];

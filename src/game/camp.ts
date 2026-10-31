@@ -1,16 +1,13 @@
-import { inClearing } from './clearing';
 import { storeTotal } from './food';
 import { BALANCE, type GameState } from './state';
+
+export { isInClearing } from './clearing';
+export { availableWood, spendWood } from './wood';
 
 // Where the survivor is and what their bag holds: plain reads of the state that the rules and the companion both use.
 
 export function isAtCamp(state: GameState): boolean {
   return state.area === 'camp' && Math.hypot(state.player.x - BALANCE.campX, state.player.y - BALANCE.campY) <= BALANCE.campRadius;
-}
-
-/** Whether the survivor stands anywhere in the camp clearing, including ground cleared beyond the fire's warmth. */
-export function isInClearing(state: GameState): boolean {
-  return state.area === 'camp' && inClearing(state.player.x, state.player.y, state.clearing.cleared);
 }
 
 /** Bag spaces one of this supply takes; stone is heavy, and each piece of food takes one. */
@@ -30,17 +27,6 @@ export function bagCapacity(state: GameState): number {
 
 export function freeSpaces(state: GameState): number {
   return bagCapacity(state) - carriedCount(state);
-}
-
-/** Wood a build or the fire can use: the bag plus the woodpile, which counts from anywhere. */
-export function availableWood(state: GameState): number {
-  return state.inventory.wood + state.storedWood;
-}
-
-/** Pays wood from the bag first, then from the woodpile. */
-export function spendWood(state: GameState, amount: number): GameState {
-  const fromBag = Math.min(amount, state.inventory.wood);
-  return { ...state, inventory: { ...state.inventory, wood: state.inventory.wood - fromBag }, storedWood: state.storedWood - (amount - fromBag) };
 }
 
 /** Stone a build can use: the bag plus the camp stone pile, which counts from anywhere. */
