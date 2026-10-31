@@ -1,0 +1,3 @@
+# Project review guidance
+
+When reviewing changes to code covered by mutation testing or its tests, check the latest available weekly mutation report (`mutation-report` artifact in the **Mutation testing** GitHub Actions workflow). Focus on surviving mutants in the changed behavior. Distinguish meaningful gaps from equivalent or low-value mutants, and recommend focused assertions only for meaningful gaps. Treat the mutation score as informational. Do not run the full mutation suite for every review; run it when investigating a relevant survivor or when explicitly requested. If no recent report is available, continue the review without one.
