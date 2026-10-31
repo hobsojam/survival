@@ -98,7 +98,7 @@ describe('stacking and taking wood', () => {
 
   it('refuses a full pile, a full bag and nothing to move', () => {
     const full = stocked(1, 12);
-    expect(applyAction(full, { type: 'storeWood' })).toEqual({ state: full, message: 'The woodpile is full.' });
+    expect(applyAction(full, { type: 'storeWood' })).toEqual({ state: full, message: 'The wood store is full.' });
     const packed = stocked(BALANCE.baseCapacity, 3);
     expect(applyAction(packed, { type: 'takeWood' })).toEqual({ state: packed, message: FULL_BAG_MESSAGE });
     expect(applyAction(stocked(0, 3), { type: 'storeWood' }).message).toBe('You have no wood to store.');

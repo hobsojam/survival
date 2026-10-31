@@ -19,7 +19,9 @@ export const BUILDINGS = {
   /** Stands on cleared ground: the step named by `ground` must be cleared first. */
   larder: { name: 'Larder', description: 'Keep up to 10 food raised off the ground', symbol: '▥', cost: { wood: 5, fiber: 2, stone: 2 }, prerequisite: null, ground: 'north-near' },
   woodpile: { name: 'Woodpile', description: 'Keep up to 12 wood split and dry', symbol: '▤', cost: { wood: 3, fiber: 1 }, prerequisite: null, ground: 'east-near' },
-  fibreStack: { name: 'Fibre stack', description: 'Keep up to 12 fiber dry under thatch', symbol: '≋', cost: { wood: 2, fiber: 3 }, prerequisite: null, ground: 'east-near' }
+  fibreStack: { name: 'Fibre stack', description: 'Keep up to 12 fiber dry under thatch', symbol: '≋', cost: { wood: 2, fiber: 3 }, prerequisite: null, ground: 'east-near' },
+  /** The survivor moves in the moment it is built, and the shelter becomes a woodshed. */
+  house: { name: 'House', description: 'A home with a fireplace of its own', symbol: '⌂', cost: { wood: 12, fiber: 6, stone: 8 }, prerequisite: 'shelterFinished', alsoRequires: 'bed', ground: 'north-far' }
 } as const;
 
 export type StructureId = keyof typeof BUILDINGS;
@@ -107,6 +109,8 @@ export interface GameState {
   player: { x: number; y: number; energy: number; hunger: number; warmth: number };
   inventory: { wood: number; fiber: number; stone: number; food: FoodStore };
   fireFuel: number;
+  /** Seconds the house's fireplace has left to burn; it stays 0 until the house is built. */
+  fireplaceFuel: number;
   structures: Record<StructureId, boolean>;
   progress: { nextStormDay: number | null; hearthUnlocked: boolean; lookoutRepaired: boolean; axeCrafted: boolean;
     quarryFound: boolean; pickaxeCrafted: boolean; potCrafted: boolean; packWoven: boolean;
@@ -154,6 +158,8 @@ export const BALANCE = {
   gatherSeconds: 6,
   buildEnergyCost: 6,
   buildSeconds: 12,
+  /** The house takes twice the standard build time. */
+  houseBuildSeconds: 24,
   chopEnergyCost: 8,
   chopSeconds: 10,
   treeRegrowDays: 3,
@@ -220,6 +226,12 @@ export const BALANCE = {
   stonePileCapacity: 12,
   larderCapacity: 10,
   woodpileCapacity: 12,
+  /** The shelter, once the house stands, holds this much more wood as a woodshed. */
+  woodshedCapacity: 24,
+  /** Each log the fireplace takes from the wood store burns this long. */
+  fireplaceSecondsPerWood: 200,
+  /** How near the house counts as home. */
+  homeRadius: 2.5,
   fibreStackCapacity: 12,
   hearthFireSecondsPerWood: 150,
   coldNightStartDay: 3,
@@ -291,7 +303,8 @@ export function createGame(): GameState {
     player: { x: BALANCE.campX + 1, y: BALANCE.campY + 1, energy: 100, hunger: 100, warmth: 100 },
     inventory: { wood: 0, fiber: 0, stone: 0, food: emptyFood() },
     fireFuel: 0,
-    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false },
+    fireplaceFuel: 0,
+    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false, house: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
       quarryFound: false, pickaxeCrafted: false, potCrafted: false, packWoven: false,
       discoveries: { basket: false, spring: false, cairn: false } },

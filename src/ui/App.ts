@@ -396,7 +396,13 @@ export class App {
     this.setText('stone-pile-stored', bag.pileStored);
     this.setText('wood-stored', bag.woodAtCamp);
     const woodControls = this.root.querySelector<HTMLElement>('#wood-pile-controls');
-    if (woodControls) woodControls.hidden = !bag.woodShown;
+    if (woodControls) {
+      woodControls.hidden = !bag.woodShown;
+      // The wood store's controls sit under the woodpile, or under the house while its woodshed is the only store.
+      const holder = this.state.structures.woodpile || !this.state.structures.house ? 'woodpile' : 'house';
+      const button = this.root.querySelector(`[data-build="${holder}"]`);
+      if (button && button.nextElementSibling !== woodControls) button.after(woodControls);
+    }
     this.setText('wood-pile-stored', bag.woodStored);
     this.setText('fiber-stored', bag.fiberAtCamp);
     const fiberControls = this.root.querySelector<HTMLElement>('#fibre-stack-controls');

@@ -4,6 +4,7 @@ import { foodIconUrl } from '../art/foodIcons';
 import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { workSeconds } from '../game/needs';
+import { woodStoreCapacity } from '../game/home';
 import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
@@ -244,6 +245,8 @@ export interface BagView { foods: Record<BagFood, { count: number; shown: boolea
 export function bagView(state: GameState): BagView {
   const prepareBlocker = trailFoodBlocker(state);
   const pile = state.structures.stonePile;
+  // The woodpile and, once the house stands, the woodshed keep one wood store between them.
+  const woodStore = state.structures.woodpile || state.structures.house;
   /** "(2 going soft)" for the bag's fresh pieces gone at the next dawn, or nothing. */
   const softNote = (item: FoodItem): string => {
     const soft = isFresh(item) ? goingSoft(state.inventory.food, item, state.day, BALANCE.bagFreshDays) : 0;
@@ -267,9 +270,9 @@ export function bagView(state: GameState): BagView {
     pileShown: pile,
     storedAtCamp: pile ? `+${state.storedStone} at camp` : '',
     pileStored: `Stored stone ${state.storedStone}/${BALANCE.stonePileCapacity}`,
-    woodShown: state.structures.woodpile,
-    woodAtCamp: state.structures.woodpile ? `+${state.storedWood} at camp` : '',
-    woodStored: `Stored wood ${state.storedWood}/${BALANCE.woodpileCapacity}`,
+    woodShown: woodStore,
+    woodAtCamp: woodStore ? `+${state.storedWood} at camp` : '',
+    woodStored: `Stored wood ${state.storedWood}/${woodStoreCapacity(state)}`,
     fiberShown: state.structures.fibreStack,
     fiberAtCamp: state.structures.fibreStack ? `+${state.storedFiber} at camp` : '',
     fiberStored: `Stored fiber ${state.storedFiber}/${BALANCE.fibreStackCapacity}`,

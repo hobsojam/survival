@@ -10,6 +10,7 @@ import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, ma
 import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
 import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
+import { woodStoreCapacity } from './home';
 import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
@@ -276,14 +277,14 @@ function tire(state: GameState, cost: number): GameState['player'] {
   return { ...state.player, energy: Math.max(0, state.player.energy - cost) };
 }
 
-/** Pays wood, fiber and stone from the bag first, then from their stores, then spends build time. */
-function payAndBuild(state: GameState, cost: { wood: number; fiber: number; stone: number }, changes: Partial<GameState>): GameState {
+/** Pays wood, fiber and stone from the bag first, then from their stores, then spends build time (the standard time unless given). */
+function payAndBuild(state: GameState, cost: { wood: number; fiber: number; stone: number }, changes: Partial<GameState>, seconds: number = BALANCE.buildSeconds): GameState {
   const paid = spendFiber(spendWood(spendStone(state, cost.stone), cost.wood), cost.fiber);
   return advanceTime({
     ...paid,
     player: tire(state, BALANCE.buildEnergyCost),
     ...changes
-  }, workSeconds(state, BALANCE.buildSeconds), 'working');
+  }, workSeconds(state, seconds), 'working');
 }
 
 function quarryFoundOnArrival(moved: GameState): ActionResult {
@@ -539,26 +540,31 @@ const takeStone: ActionHandler<'takeStone'> = state => {
   return { state: { ...state, inventory: { ...state.inventory, stone: state.inventory.stone + 1 }, storedStone: state.storedStone - 1 }, message: 'Took a stone from the pile.' };
 };
 
-function woodpileBlocker(state: GameState): string | null {
-  if (!state.structures.woodpile) return 'Build a woodpile first.';
-  if (!isInClearing(state)) return 'Return to camp to use the woodpile.';
+/** The woodpile names the wood store while it stands; with only the house, the woodshed does. */
+function woodStoreName(state: GameState): string {
+  return state.structures.woodpile ? 'woodpile' : 'woodshed';
+}
+
+function woodStoreBlocker(state: GameState): string | null {
+  if (!state.structures.woodpile && !state.structures.house) return 'Build a woodpile first.';
+  if (!isInClearing(state)) return `Return to camp to use the ${woodStoreName(state)}.`;
   return null;
 }
 
 const storeWood: ActionHandler<'storeWood'> = state => {
-  const blocker = woodpileBlocker(state);
+  const blocker = woodStoreBlocker(state);
   if (blocker) return refuse(state, blocker);
   if (state.inventory.wood < 1) return refuse(state, 'You have no wood to store.');
-  if (state.storedWood >= BALANCE.woodpileCapacity) return refuse(state, 'The woodpile is full.');
-  return { state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood - 1 }, storedWood: state.storedWood + 1 }, message: 'Stacked a log on the woodpile.' };
+  if (state.storedWood >= woodStoreCapacity(state)) return refuse(state, 'The wood store is full.');
+  return { state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood - 1 }, storedWood: state.storedWood + 1 }, message: `Stacked a log on the ${woodStoreName(state)}.` };
 };
 
 const takeWood: ActionHandler<'takeWood'> = state => {
-  const blocker = woodpileBlocker(state);
+  const blocker = woodStoreBlocker(state);
   if (blocker) return refuse(state, blocker);
-  if (state.storedWood < 1) return refuse(state, 'The woodpile is empty.');
+  if (state.storedWood < 1) return refuse(state, `The ${woodStoreName(state)} is empty.`);
   if (freeSpaces(state) < spaceFor('wood')) return refuse(state, FULL_BAG_MESSAGE);
-  return { state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood + 1 }, storedWood: state.storedWood - 1 }, message: 'Took a log from the woodpile.' };
+  return { state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood + 1 }, storedWood: state.storedWood - 1 }, message: `Took a log from the ${woodStoreName(state)}.` };
 };
 
 function fibreStackBlocker(state: GameState): string | null {
@@ -832,12 +838,16 @@ function buildingCost(structureId: StructureId): { wood: number; fiber: number; 
   return { wood: cost.wood, fiber: cost.fiber, stone: 'stone' in cost ? cost.stone : 0 };
 }
 
+const MOVING_IN_MESSAGE = 'You carry your bed into the house. The fireplace inside will keep you warm now, and the campfire is yours to light whenever you like.';
+
 const build: ActionHandler<'build'> = (state, action) => {
   const blocker = buildBlocker(state, action.structureId);
   if (blocker) return refuse(state, blocker);
+  const house = action.structureId === 'house';
   return {
-    state: payAndBuild(state, buildingCost(action.structureId), { structures: { ...state.structures, [action.structureId]: true } }),
-    message: `Built the ${BUILDINGS[action.structureId].name.toLowerCase()}.`
+    state: payAndBuild(state, buildingCost(action.structureId), { structures: { ...state.structures, [action.structureId]: true } },
+      house ? BALANCE.houseBuildSeconds : BALANCE.buildSeconds),
+    message: house ? MOVING_IN_MESSAGE : `Built the ${BUILDINGS[action.structureId].name.toLowerCase()}.`
   };
 };
 
