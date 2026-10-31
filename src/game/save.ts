@@ -11,8 +11,10 @@ import { woodStoreCapacity } from './home';
 import { BED_CROPS, dryLimitsFor } from './beds';
 import { WORKSHOP_UPGRADES, type UpgradeId } from './workshop';
 
+import { SAVE_VERSION, upgradeSave } from './saveUpgrades';
+
+export { SAVE_VERSION };
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 23;
 export type SaveResult = { ok: true } | { ok: false; error: string };
 export type LoadResult = { kind: 'empty' } | { kind: 'loaded'; state: GameState } | { kind: 'invalid'; reason: string };
 
@@ -331,8 +333,11 @@ export function loadGame(storage: Storage): LoadResult {
   } catch {
     return { kind: 'invalid', reason: 'The local save is not valid JSON.' };
   }
-  if (!object(parsed) || parsed.version !== SAVE_VERSION) return { kind: 'invalid', reason: 'This save uses an unsupported version.' };
-  movedBranches(parsed.state);
-  if (!validState(parsed.state)) return { kind: 'invalid', reason: 'The local save contains invalid game data.' };
-  return { kind: 'loaded', state: parsed.state };
+  if (!object(parsed)) return { kind: 'invalid', reason: 'This save uses an unsupported version.' };
+  // An older save is brought up to date first, then checked exactly as a current one is.
+  const upgraded = upgradeSave(parsed.version, parsed.state);
+  if (!upgraded.ok) return { kind: 'invalid', reason: upgraded.reason };
+  movedBranches(upgraded.state);
+  if (!validState(upgraded.state)) return { kind: 'invalid', reason: 'The local save contains invalid game data.' };
+  return { kind: 'loaded', state: upgraded.state };
 }
