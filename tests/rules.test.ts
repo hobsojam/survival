@@ -931,27 +931,6 @@ describe('the stone pile at camp', () => {
     expect(built.inventory.wood).toBe(0);
   });
 
-  it('stores and takes stone at camp, up to twelve', () => {
-    const state = camp();
-    state.inventory.stone = 1;
-    expect(applyAction(state, { type: 'storeStone' }).state).toBe(state);
-    state.structures.stonePile = true;
-    const stored = applyAction(state, { type: 'storeStone' }).state;
-    expect(stored.inventory.stone).toBe(0);
-    expect(stored.storedStone).toBe(1);
-    const full = { ...state, storedStone: BALANCE.stonePileCapacity };
-    expect(applyAction(full, { type: 'storeStone' }).state).toBe(full);
-    const crowded = { ...stored, inventory: { ...stored.inventory, wood: 7 } };
-    expect(applyAction(crowded, { type: 'takeStone' }).state).toBe(crowded);
-    const taken = applyAction(stored, { type: 'takeStone' }).state;
-    expect(taken.inventory.stone).toBe(1);
-    expect(taken.storedStone).toBe(0);
-    const away = { ...stored, player: { ...stored.player, x: 0, y: 0 } };
-    expect(applyAction(away, { type: 'takeStone' }).state).toBe(away);
-    const awayStore = { ...state, player: { ...state.player, x: 0, y: 0 } };
-    expect(applyAction(awayStore, { type: 'storeStone' }).state).toBe(awayStore);
-  });
-
   it('pays for the hearth from the bag first, then the pile', () => {
     const state = unlocked(camp());
     state.structures.stonePile = true;

@@ -5,7 +5,6 @@ import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WID
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
 import { availableFiber, availableWood, cookBlocker, isAtCamp, isInClearing, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { nextStep, type Side } from '../game/clearing';
-import { hasWoodStore } from '../game/home';
 import { offerBlocker } from '../game/companion';
 import { defaultDish, type DishId } from '../game/cooking';
 import { foodCount, type FoodItem } from '../game/food';
@@ -66,9 +65,6 @@ export class App {
       const { name, description, symbol } = BUILDINGS[id];
       const groupHeading = id === 'shelterThatched' ? '<h3 class="build-group-heading">Shelter upgrades</h3>' : '';
       let extraControls = '';
-      if (id === 'stonePile') extraControls = `<div id="stone-pile-controls" class="stone-pile-controls" hidden><span id="stone-pile-stored">Stored stone 0/${BALANCE.stonePileCapacity}</span><button type="button" data-action="storeStone">Store 1</button><button type="button" data-action="takeStone">Take 1</button></div>`;
-      if (id === 'woodpile') extraControls = `<div id="wood-pile-controls" class="stone-pile-controls" hidden><span id="wood-pile-stored">Stored wood 0/${BALANCE.woodpileCapacity}</span><button type="button" data-action="storeWood">Store 1</button><button type="button" data-action="takeWood">Take 1</button></div>`;
-      if (id === 'fibreStack') extraControls = `<div id="fibre-stack-controls" class="stone-pile-controls" hidden><span id="fibre-stack-stored">Stored fiber 0/${BALANCE.fibreStackCapacity}</span><button type="button" data-action="storeFiber">Store 1</button><button type="button" data-action="takeFiber">Take 1</button></div>`;
       if (id === 'larder') extraControls = larderMarkup();
       return groupHeading + `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>` + extraControls;
     }).join('');
@@ -97,7 +93,7 @@ export class App {
               <section class="panel forecast-panel" id="forecast-panel" data-tab="camp"><p class="eyebrow">THE FORECAST</p><h2 id="forecast-title">A cold night is coming</h2><p id="forecast-copy" class="forecast-copy"></p><div class="forecast-checks"><span id="forecast-shelter"></span><span id="forecast-fire"></span></div></section>
               <section class="panel lookout-panel" id="lookout-panel" data-tab="build"><p class="eyebrow">A PLACE BEYOND CAMP</p><h2 id="lookout-title">The old lookout</h2><p id="lookout-copy" class="lookout-copy"></p><button type="button" id="lookout-button" data-action="repairLookout">Repair lookout</button><small id="lookout-cost">4 wood · 2 fiber · 2 stone</small></section>
               <section class="panel axe-panel" data-tab="build"><p class="eyebrow">FOREST TOOLS</p><div class="tool-row"><h2 id="axe-title">Stone axe</h2><p id="axe-copy" class="lookout-copy"></p><button type="button" id="axe-button" data-action="craftAxe">Craft stone axe</button><small id="axe-cost">1 wood · 1 fiber · 1 stone</small></div><div id="pickaxe-row" class="tool-row" hidden><h2 id="pickaxe-title">Pickaxe</h2><p id="pickaxe-copy" class="lookout-copy"></p><button type="button" id="pickaxe-button" data-action="craftPickaxe">Craft pickaxe</button><small id="pickaxe-cost">2 wood · 1 fiber · 2 stone</small></div><div id="pot-row" class="tool-row"><h2 id="pot-title">Cooking pot</h2><p id="pot-copy" class="lookout-copy"></p><button type="button" id="pot-button" data-action="craftPot">Make a cooking pot</button><small id="pot-cost">1 wood · 2 stone</small></div><div id="pack-row" class="tool-row"><h2 id="pack-title">Woven pack</h2><p id="pack-copy" class="lookout-copy"></p><button type="button" id="pack-button" data-action="craftPack">Weave a pack</button><small id="pack-cost">2 wood · 4 fiber</small></div><div id="pillow-row" class="tool-row" hidden><h2 id="pillow-title">Feather pillow</h2><p id="pillow-copy" class="lookout-copy"></p><button type="button" id="pillow-button" data-action="craftPillow">Stitch a pillow</button><small id="pillow-cost">6 feathers</small></div><div id="cloak-row" class="tool-row" hidden><h2 id="cloak-title">Fur cloak</h2><p id="cloak-copy" class="lookout-copy"></p><button type="button" id="cloak-button" data-action="craftCloak">Make a cloak</button><small id="cloak-cost">6 fur</small></div></section>
-              <section class="panel workshop-panel" id="workshop-panel" data-tab="build" hidden><p class="eyebrow">THE WORKSHOP</p><div id="saw-row" class="tool-row"><h2 id="saw-title"></h2><p id="saw-copy" class="lookout-copy"></p><button type="button" id="saw-button" data-upgrade="saw">Make a saw</button><small id="saw-cost"></small></div><div id="handcart-row" class="tool-row"><h2 id="handcart-title"></h2><p id="handcart-copy" class="lookout-copy"></p><button type="button" id="handcart-button" data-upgrade="handcart">Build a handcart</button><small id="handcart-cost"></small></div><div id="bedtools-row" class="tool-row"><h2 id="bedtools-title"></h2><p id="bedtools-copy" class="lookout-copy"></p><button type="button" id="bedtools-button" data-upgrade="bedTools">Make bed tools</button><small id="bedtools-cost"></small></div><div id="cart-row" class="stone-pile-controls" hidden><span id="cart-line">Cart 0/12 wood</span><button type="button" id="unload-cart-button" data-action="unloadCart">Unload the cart</button></div></section>
+              <section class="panel workshop-panel" id="workshop-panel" data-tab="build" hidden><p class="eyebrow">THE WORKSHOP</p><div id="saw-row" class="tool-row"><h2 id="saw-title"></h2><p id="saw-copy" class="lookout-copy"></p><button type="button" id="saw-button" data-upgrade="saw">Make a saw</button><small id="saw-cost"></small></div><div id="handcart-row" class="tool-row"><h2 id="handcart-title"></h2><p id="handcart-copy" class="lookout-copy"></p><button type="button" id="handcart-button" data-upgrade="handcart">Build a handcart</button><small id="handcart-cost"></small></div><div id="bedtools-row" class="tool-row"><h2 id="bedtools-title"></h2><p id="bedtools-copy" class="lookout-copy"></p><button type="button" id="bedtools-button" data-upgrade="bedTools">Make bed tools</button><small id="bedtools-cost"></small></div></section>
               <section class="panel ration-panel" data-tab="bag"><p class="eyebrow">TRAIL FOOD</p><h2>Drying rack</h2><p class="lookout-copy">Dry a berry at camp for a ration you can eat anywhere. Each restores 45 hunger.</p><button type="button" id="prepare-button" data-action="prepareTrailFood">Prepare trail ration</button><small id="prepare-hint">Build a drying rack first.</small></section>
               <section class="panel sites-panel" data-tab="camp"><p class="eyebrow">BEYOND CAMP</p><h2>Follow the paths</h2><p class="lookout-copy">An old basket, a quiet spring, and a stone cairn wait beyond the clearing.</p><button type="button" id="site-button">Explore nearby place</button><small>Stand beside a place and press V</small></section>
               <section class="panel journal-panel" data-tab="camp"><p class="eyebrow">YOUR FIELD JOURNAL</p><h2>Areas beyond camp</h2><p id="journal-hint" class="journal-hint"></p>
@@ -135,7 +131,7 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'storeWood' | 'takeWood' | 'storeFiber' | 'takeFiber' | 'storeFood' | 'takeFood' | 'drawWater' | 'unloadCart';
+        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeFood' | 'takeFood' | 'drawWater';
         const item = button.dataset.item as FoodItem | undefined;
         const dish = button.dataset.dish as DishId | undefined;
         if (type === 'storeFood' || type === 'takeFood') {
@@ -405,23 +401,8 @@ export class App {
       else button.disabled = supplyCount(this.state, button.dataset.supply ?? '') <= 0;
     });
     this.setText('stone-stored', bag.storedAtCamp);
-    const pileControls = this.root.querySelector<HTMLElement>('#stone-pile-controls');
-    if (pileControls) pileControls.hidden = !bag.pileShown;
-    this.setText('stone-pile-stored', bag.pileStored);
     this.setText('wood-stored', bag.woodAtCamp);
-    const woodControls = this.root.querySelector<HTMLElement>('#wood-pile-controls');
-    if (woodControls) {
-      woodControls.hidden = !bag.woodShown;
-      // The wood store's controls sit under the woodpile, or under the house while its woodshed is the only store.
-      const holder = this.state.structures.woodpile || !hasWoodStore(this.state) ? 'woodpile' : 'house';
-      const button = this.root.querySelector(`[data-build="${holder}"]`);
-      if (button && button.nextElementSibling !== woodControls) button.after(woodControls);
-    }
-    this.setText('wood-pile-stored', bag.woodStored);
     this.setText('fiber-stored', bag.fiberAtCamp);
-    const fiberControls = this.root.querySelector<HTMLElement>('#fibre-stack-controls');
-    if (fiberControls) fiberControls.hidden = !bag.fiberShown;
-    this.setText('fibre-stack-stored', bag.fiberStored);
     this.renderLarder();
     this.setText('fire-status', bag.fire);
     const keepsakes = keepsakeView(this.state);
@@ -527,10 +508,6 @@ export class App {
       if (element) element.hidden = !row.shown;
       this.renderActionPanel(name, row);
     }
-    const cart = this.root.querySelector<HTMLElement>('#cart-row');
-    if (cart) cart.hidden = !view.cart.shown;
-    this.setText('cart-line', view.cart.line);
-    this.root.querySelector('#unload-cart-button')?.classList.toggle('ready', view.cart.ready);
   }
 
   private renderNight(): void {

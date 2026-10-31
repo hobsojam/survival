@@ -251,14 +251,14 @@ describe('bag panel', () => {
 
   it('counts spaces and describes the fire and trail rations', () => {
     const view = bagView(game({ inventory: { wood: 2, stone: 1 } }, { fireFuel: 12.2 }));
-    expect(view).toMatchObject({ spaces: '4/8', fire: 'Fire burning · 13s of warmth', pileShown: false, storedAtCamp: '' });
+    expect(view).toMatchObject({ spaces: '4/8', fire: 'Fire burning · 13s of warmth', storedAtCamp: '' });
     expect(view.prepareReady).toBe(false);
     expect(bagView(game()).fire).toBe('The fire is unlit');
   });
 
   it('shows the stone pile once it is built', () => {
     expect(bagView(game({ structures: { stonePile: true } }, { storedStone: 3 })))
-      .toMatchObject({ pileShown: true, storedAtCamp: '+3 at camp', pileStored: 'Stored stone 3/12' });
+      .toMatchObject({ storedAtCamp: '+3 at camp' });
   });
 
   it('offers trail rations with a drying rack and a berry at camp', () => {

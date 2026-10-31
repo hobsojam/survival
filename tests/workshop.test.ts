@@ -119,10 +119,8 @@ describe('making an upgrade', () => {
 });
 
 describe('spelling small counts', () => {
-  it('spells every count the cart can hold, and one stays singular', () => {
+  it('spells every count the cart can hold', () => {
     expect([1, 2, 4, 9, 12].map(countWord)).toEqual(['one', 'two', 'four', 'nine', 'twelve']);
-    const result = applyAction(made(workshopCamp({ woodpile: true }, { cartWood: 2, storedWood: BALANCE.woodpileCapacity - 1 }), 'handcart'), { type: 'unloadCart' });
-    expect(result.message).toBe('Unloaded one wood. The wood store is full, so one stays in the cart.');
   });
 });
 
@@ -248,29 +246,6 @@ describe('the handcart', () => {
     expect(logsInStore(state)).toBe(6);
     expect(spendWood(state, 5)).toMatchObject({ inventory: { wood: 0 }, cartWood: 0, storedWood: 3 });
   });
-
-  it('says why it can\'t be unloaded, in order', () => {
-    const unload = (state: GameState) => applyAction(state, { type: 'unloadCart' }).message;
-    const away = { player: { ...createGame().player, x: 1, y: 1 } };
-    expect(unload(workshopCamp({ woodpile: true }, away))).toBe('Make a handcart first.');
-    expect(unload(carted({ ...away, cartWood: 3 }))).toBe('Return to camp to unload the cart.');
-    expect(unload(carted())).toBe('The cart is empty.');
-    expect(unload(carted({ cartWood: 3 }, {}))).toBe('Build a woodpile to unload the cart into.');
-    expect(unload(carted({ cartWood: 3, storedWood: BALANCE.woodpileCapacity }))).toBe('The wood store is full.');
-  });
-
-  it('unloads everything that fits onto the woodpile, at once', () => {
-    const state = carted({ cartWood: 5 });
-    const result = applyAction(state, { type: 'unloadCart' });
-    expect(result.message).toBe('Unloaded five wood onto the woodpile.');
-    expect(result.state).toMatchObject({ cartWood: 0, storedWood: 5, timeOfDay: state.timeOfDay });
-  });
-
-  it('leaves what doesn\'t fit in the cart', () => {
-    const result = applyAction(carted({ cartWood: 5, storedWood: BALANCE.woodpileCapacity - 2 }), { type: 'unloadCart' });
-    expect(result.message).toBe('Unloaded two wood. The wood store is full, so three stay in the cart.');
-    expect(result.state).toMatchObject({ cartWood: 3, storedWood: BALANCE.woodpileCapacity });
-  });
 });
 
 describe('the fireplace and the cart', () => {
@@ -293,11 +268,12 @@ describe('the fireplace and the cart', () => {
     expect(later).toMatchObject({ storedWood: 0, cartWood: 3 });
   });
 
-  it('doesn\'t say the fireplace went out while the cart still has wood', () => {
+  it('doesn\'t say the fireplace went out while the cart still has wood, and stacks what is left in the woodshed', () => {
     const result = applyAction(home({ storedWood: 0, cartWood: 12, fireplaceFuel: 0, timeOfDay: nightStart(6) }), { type: 'sleep' });
     expect(result.message).not.toContain('The fireplace went out in the night.');
-    expect(result.state.cartWood).toBeLessThan(12);
-    expect(result.state.cartWood).toBeGreaterThan(0);
+    expect(result.state.cartWood).toBe(0);
+    expect(result.state.storedWood).toBeLessThan(12);
+    expect(result.state.storedWood).toBeGreaterThan(0);
   });
 
   it('shows the store emptied before the cart while a cold night plays out', () => {
@@ -400,13 +376,6 @@ describe('the workshop panel', () => {
     expect(workshopView(made(workshopCamp(), 'saw')).rows.saw).toMatchObject({ cost: 'Made', disabled: true, ready: false });
   });
 
-  it('shows the cart\'s load and whether it can be unloaded, once the handcart is made', () => {
-    expect(workshopView(workshopCamp()).cart.shown).toBe(false);
-    const cart = workshopView(made(workshopCamp({ woodpile: true }, { cartWood: 5 }), 'handcart')).cart;
-    expect(cart).toEqual({ shown: true, line: 'Cart 5/12 wood', ready: true });
-    expect(workshopView(made(workshopCamp({ woodpile: true }), 'handcart')).cart.ready).toBe(false);
-  });
-
   it('counts the cart in the bag panel\'s wood at camp and in the fireplace\'s line', () => {
     const state = made(workshopCamp({ woodpile: true }, { cartWood: 5, storedWood: 2 }), 'handcart');
     expect(bagView(state).woodAtCamp).toBe('+7 at camp');
@@ -415,9 +384,9 @@ describe('the workshop panel', () => {
     expect(bagView(housed).fire).toBe('The fireplace is banked · 7 logs in store');
   });
 
-  it('shows the cart\'s wood at camp in the bag panel even without a woodpile, without the store controls', () => {
+  it('shows the cart\'s wood at camp in the bag panel even without a woodpile', () => {
     const state = made(workshopCamp({}, { cartWood: 5 }), 'handcart');
-    expect(bagView(state)).toMatchObject({ woodAtCamp: '+5 at camp', woodShown: false });
+    expect(bagView(state).woodAtCamp).toBe('+5 at camp');
     expect(bagView(workshopCamp()).woodAtCamp).toBe('');
   });
 

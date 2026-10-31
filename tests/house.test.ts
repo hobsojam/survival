@@ -1,3 +1,4 @@
+import { settleStores } from '../src/game/stores';
 import { describe, expect, it } from 'vitest';
 import { BALANCE, BUILDINGS, createGame, type GameState } from '../src/game/state';
 import { CLEARING_STEPS, STEP_IDS, clearingReach, inClearing, placeBranches } from '../src/game/clearing';
@@ -151,44 +152,23 @@ describe('the wood store', () => {
     expect(woodStoreCapacity(housed({ woodpile: true }))).toBe(36);
   });
 
-  it('refuses a full store', () => {
+  it('takes wood by itself up to the whole store, with only the house or beside the woodpile', () => {
+    expect(settleStores(withBag(housed(), { wood: 2 }))).toMatchObject({ storedWood: 2, inventory: { wood: 0 } });
+    expect(settleStores(withBag(housed({}, { storedWood: 23 }), { wood: 3 }))).toMatchObject({ storedWood: 24, inventory: { wood: 2 } });
+    expect(settleStores(withBag(housed({ woodpile: true }, { storedWood: 12 }), { wood: 3 }))).toMatchObject({ storedWood: 15, inventory: { wood: 0 } });
     const full = withBag(housed({ woodpile: true }, { storedWood: 36 }), { wood: 1 });
-    expect(applyAction(full, { type: 'storeWood' })).toEqual({ state: full, message: 'The wood store is full.' });
-    const shed = withBag(housed({}, { storedWood: 24 }), { wood: 1 });
-    expect(applyAction(shed, { type: 'storeWood' })).toEqual({ state: shed, message: 'The wood store is full.' });
-    const room = withBag(housed({ woodpile: true }, { storedWood: 12 }), { wood: 1 });
-    expect(applyAction(room, { type: 'storeWood' }).state.storedWood).toBe(13);
+    expect(settleStores(full)).toBe(full);
   });
 
-  it('stores and takes wood with only the house built', () => {
-    const stored = applyAction(withBag(housed(), { wood: 2 }), { type: 'storeWood' });
-    expect(stored.state).toMatchObject({ storedWood: 1, inventory: { wood: 1 } });
-    expect(stored.message).toBe('Stacked a log on the woodshed.');
-    const taken = applyAction(stored.state, { type: 'takeWood' });
-    expect(taken.state).toMatchObject({ storedWood: 0, inventory: { wood: 2 } });
-    expect(taken.message).toBe('Took a log from the woodshed.');
-    expect(applyAction(taken.state, { type: 'takeWood' }).message).toBe('The woodshed is empty.');
+  it('keeps wood in the bag away from camp, or with neither store built', () => {
+    const away = withBag(housed({}, { area: 'quarry' }), { wood: 2 });
+    expect(settleStores(away)).toBe(away);
+    const bare = withBag(camp(), { wood: 2 });
+    expect(settleStores(bare)).toBe(bare);
   });
 
-  it('names the woodshed when the survivor is away from camp', () => {
-    const away = withBag(housed({}, { area: 'quarry', storedWood: 3 }), { wood: 2 });
-    for (const type of ['storeWood', 'takeWood'] as const) expect(applyAction(away, { type })).toEqual({ state: away, message: 'Return to camp to use the woodshed.' });
-  });
-
-  it('keeps naming the woodpile while it stands beside the woodshed', () => {
-    const both = withBag(housed({ woodpile: true }), { wood: 2 });
-    expect(applyAction(both, { type: 'storeWood' }).message).toBe('Stacked a log on the woodpile.');
-    expect(applyAction(both, { type: 'takeWood' }).message).toBe('The woodpile is empty.');
-  });
-
-  it('still asks for a woodpile with neither built', () => {
-    const state = withBag(camp(), { wood: 2 });
-    for (const type of ['storeWood', 'takeWood'] as const) expect(applyAction(state, { type })).toEqual({ state, message: 'Build a woodpile first.' });
-  });
-
-  it('shows the wood store in the bag with its whole capacity', () => {
-    expect(bagView(housed({}, { storedWood: 5 }))).toMatchObject({ woodShown: true, woodAtCamp: '+5 at camp', woodStored: 'Stored wood 5/24' });
-    expect(bagView(housed({ woodpile: true }, { storedWood: 20 }))).toMatchObject({ woodStored: 'Stored wood 20/36' });
+  it('counts the wood store in the bag', () => {
+    expect(bagView(housed({}, { storedWood: 5 }))).toMatchObject({ woodAtCamp: '+5 at camp' });
   });
 });
 

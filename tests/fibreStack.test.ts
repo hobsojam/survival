@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, BUILDINGS, LOOKOUT, createGame, type GameState } from '../src/game/state';
 import { CLEARING_STEPS, STEP_IDS, clearGroundBlocker, inClearing, placeBranches } from '../src/game/clearing';
-import { FULL_BAG_MESSAGE, applyAction, availableFiber, buildStatus, groundBlocker, lookoutRepairBlocker, spendFiber } from '../src/game/rules';
+import { applyAction, availableFiber, buildStatus, groundBlocker, lookoutRepairBlocker, spendFiber } from '../src/game/rules';
 import { bagView, buildButtonView } from '../src/ui/panels';
 import { CAMP_STRUCTURES, stockFrame } from '../src/scene/visuals';
 import { PATH_DESTINATIONS, segmentDistance } from './placement';
@@ -85,35 +85,6 @@ describe('where the fibre stack stands', () => {
   });
 });
 
-describe('storing and taking fiber', () => {
-  it('moves one bundle at a time', () => {
-    const stored = applyAction(stocked(2, 0), { type: 'storeFiber' });
-    expect(stored.message).toBe('Tucked a bundle of fiber under the thatch.');
-    expect(stored.state).toMatchObject({ storedFiber: 1, inventory: { fiber: 1 } });
-    const taken = applyAction(stored.state, { type: 'takeFiber' });
-    expect(taken.message).toBe('Took a bundle of fiber from the stack.');
-    expect(taken.state).toMatchObject({ storedFiber: 0, inventory: { fiber: 2 } });
-  });
-
-  it('refuses a full stack, a full bag and nothing to move', () => {
-    const full = stocked(1, 12);
-    expect(applyAction(full, { type: 'storeFiber' })).toEqual({ state: full, message: 'The fibre stack is full.' });
-    const packed = stocked(BALANCE.baseCapacity, 3);
-    expect(applyAction(packed, { type: 'takeFiber' })).toEqual({ state: packed, message: FULL_BAG_MESSAGE });
-    expect(applyAction(stocked(0, 3), { type: 'storeFiber' }).message).toBe('You have no fiber to store.');
-    expect(applyAction(stocked(0, 0), { type: 'takeFiber' }).message).toBe('The fibre stack is empty.');
-  });
-
-  it('needs the fibre stack built and the survivor in the clearing', () => {
-    const unbuilt = camp(false);
-    for (const type of ['storeFiber', 'takeFiber'] as const) {
-      expect(applyAction(unbuilt, { type }).message).toBe('Build a fibre stack first.');
-      const away = { ...stocked(2, 2), player: { ...unbuilt.player, x: 5, y: 5 } };
-      expect(applyAction(away, { type })).toEqual({ state: away, message: 'Return to camp to use the fibre stack.' });
-    }
-  });
-});
-
 describe('using stored fiber', () => {
   it('counts the bag and the stack, spending the bag first', () => {
     expect(availableFiber(stocked(2, 3))).toBe(5);
@@ -182,7 +153,7 @@ describe('using stored fiber', () => {
 
 describe('the bag panel and the fibre stack', () => {
   it('shows what the stack holds once built', () => {
-    expect(bagView(camp(false))).toMatchObject({ fiberShown: false, fiberAtCamp: '' });
-    expect(bagView(stocked(1, 5))).toMatchObject({ fiberShown: true, fiberAtCamp: '+5 at camp', fiberStored: 'Stored fiber 5/12' });
+    expect(bagView(camp(false))).toMatchObject({ fiberAtCamp: '' });
+    expect(bagView(stocked(1, 5))).toMatchObject({ fiberAtCamp: '+5 at camp' });
   });
 });

@@ -3,7 +3,7 @@ import { BALANCE, BUILDINGS, LOOKOUT, createGame, type GameState } from '../src/
 import { CLEARING_STEPS, STEP_IDS, clearGroundBlocker, inClearing, placeBranches } from '../src/game/clearing';
 import { potBlocker } from '../src/game/cooking';
 import { stormReadiness } from '../src/game/forecast';
-import { FULL_BAG_MESSAGE, applyAction, availableWood, buildStatus, groundBlocker, lookoutRepairBlocker, spendWood } from '../src/game/rules';
+import { applyAction, availableWood, buildStatus, groundBlocker, lookoutRepairBlocker, spendWood } from '../src/game/rules';
 import { bagView, buildButtonView } from '../src/ui/panels';
 import { CAMP_STRUCTURES, stockFrame } from '../src/scene/visuals';
 import { PATH_DESTINATIONS, segmentDistance } from './placement';
@@ -86,35 +86,6 @@ describe('where the woodpile stands', () => {
   });
 });
 
-describe('stacking and taking wood', () => {
-  it('moves one log at a time', () => {
-    const stored = applyAction(stocked(2, 0), { type: 'storeWood' });
-    expect(stored.message).toBe('Stacked a log on the woodpile.');
-    expect(stored.state).toMatchObject({ storedWood: 1, inventory: { wood: 1 } });
-    const taken = applyAction(stored.state, { type: 'takeWood' });
-    expect(taken.message).toBe('Took a log from the woodpile.');
-    expect(taken.state).toMatchObject({ storedWood: 0, inventory: { wood: 2 } });
-  });
-
-  it('refuses a full pile, a full bag and nothing to move', () => {
-    const full = stocked(1, 12);
-    expect(applyAction(full, { type: 'storeWood' })).toEqual({ state: full, message: 'The wood store is full.' });
-    const packed = stocked(BALANCE.baseCapacity, 3);
-    expect(applyAction(packed, { type: 'takeWood' })).toEqual({ state: packed, message: FULL_BAG_MESSAGE });
-    expect(applyAction(stocked(0, 3), { type: 'storeWood' }).message).toBe('You have no wood to store.');
-    expect(applyAction(stocked(0, 0), { type: 'takeWood' }).message).toBe('The woodpile is empty.');
-  });
-
-  it('needs the woodpile built and the survivor in the clearing', () => {
-    const unbuilt = camp(false);
-    for (const type of ['storeWood', 'takeWood'] as const) {
-      expect(applyAction(unbuilt, { type }).message).toBe('Build a woodpile first.');
-      const away = { ...stocked(2, 2), player: { ...unbuilt.player, x: 5, y: 5 } };
-      expect(applyAction(away, { type })).toEqual({ state: away, message: 'Return to camp to use the woodpile.' });
-    }
-  });
-});
-
 describe('using stored wood', () => {
   it('counts the bag and the pile, spending the bag first', () => {
     expect(availableWood(stocked(2, 3))).toBe(5);
@@ -176,7 +147,7 @@ describe('using stored wood', () => {
 
 describe('the bag panel and the woodpile', () => {
   it('shows what the pile holds once built', () => {
-    expect(bagView(camp(false))).toMatchObject({ woodShown: false, woodAtCamp: '' });
-    expect(bagView(stocked(1, 5))).toMatchObject({ woodShown: true, woodAtCamp: '+5 at camp', woodStored: 'Stored wood 5/12' });
+    expect(bagView(camp(false))).toMatchObject({ woodAtCamp: '' });
+    expect(bagView(stocked(1, 5))).toMatchObject({ woodAtCamp: '+5 at camp' });
   });
 });

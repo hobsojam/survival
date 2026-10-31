@@ -5,8 +5,8 @@ import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/st
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { BED_CROPS, bedSoil, bedStage, drawWaterBlocker, harvestBedBlocker, sowBedBlocker, type BedSoil, type BedStage } from '../game/beds';
 import { workSeconds } from '../game/needs';
-import { hasWoodStore, livesInHouse, woodStoreCapacity } from '../game/home';
-import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker, unloadCartBlocker } from '../game/rules';
+import { hasWoodStore, livesInHouse } from '../game/home';
+import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
 import { WORKSHOP_UPGRADES, upgradeBlocker, type UpgradeId } from '../game/workshop';
 import { logsInStore } from '../game/wood';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
@@ -97,7 +97,7 @@ export interface ActionPanelView { title: string; copy: string; cost: string; di
 /** What each workshop upgrade does, shown while it can be made. */
 const UPGRADE_COPY: Record<UpgradeId, { title: string; copy: string; made: string }> = {
   saw: { title: 'Saw', copy: 'Felling a tree gives four wood instead of two.', made: 'Felling a tree gives four wood.' },
-  handcart: { title: 'Handcart', copy: 'Felled wood goes into a cart by the workshop, and counts as stored wood.', made: 'Felled wood goes into the cart. Unload it onto the wood store to make room.' },
+  handcart: { title: 'Handcart', copy: 'Felled wood goes into a cart by the workshop, and counts as stored wood.', made: 'Felled wood goes into the cart, and from there onto the wood store whenever it has room.' },
   bedTools: { title: 'Hoe and watering can', copy: 'A dry bed holds on a day longer before it withers.', made: 'A dry bed holds on a day longer before it withers.' }
 };
 
@@ -108,10 +108,9 @@ const costLabel = (cost: Record<'wood' | 'fiber' | 'stone', number>): string =>
 export interface WorkshopView {
   shown: boolean;
   rows: Record<UpgradeId, ActionPanelView & { shown: boolean }>;
-  cart: { shown: boolean; line: string; ready: boolean };
 }
 
-/** The workshop panel, once it stands: each upgrade with its cost or why it can't be made, and the handcart's load. */
+/** The workshop panel, once it stands: each upgrade with its cost or why it can't be made. */
 export function workshopView(state: GameState): WorkshopView {
   const row = (id: UpgradeId): ActionPanelView & { shown: boolean } => {
     const { title, copy, made } = UPGRADE_COPY[id];
@@ -122,8 +121,7 @@ export function workshopView(state: GameState): WorkshopView {
   };
   return {
     shown: state.structures.workshop,
-    rows: { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools') },
-    cart: { shown: state.progress.workshop.handcart, line: `Cart ${state.cartWood}/${BALANCE.handcartCapacity} wood`, ready: !unloadCartBlocker(state) }
+    rows: { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools') }
   };
 }
 
@@ -318,7 +316,7 @@ export function bagFoodMarkup(): string {
 export const EATABLE_FOODS = ['berry', 'trailFood', ...BAG_FOODS.filter(cell => cell.eat).map(cell => cell.item)] as const satisfies readonly FoodItem[];
 export type EatableFood = (typeof EATABLE_FOODS)[number];
 
-export interface BagView { foods: Record<BagFood, { count: number; shown: boolean; note: string }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; spacesLabel: string; packHint: string; prepareReady: boolean; prepareHint: string; pileShown: boolean; storedAtCamp: string; pileStored: string; woodShown: boolean; woodAtCamp: string; woodStored: string; fiberShown: boolean; fiberAtCamp: string; fiberStored: string; fire: string }
+export interface BagView { foods: Record<BagFood, { count: number; shown: boolean; note: string }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; spacesLabel: string; packHint: string; prepareReady: boolean; prepareHint: string; storedAtCamp: string; woodAtCamp: string; fiberAtCamp: string; fire: string }
 
 export function bagView(state: GameState): BagView {
   const prepareBlocker = trailFoodBlocker(state);
@@ -345,16 +343,10 @@ export function bagView(state: GameState): BagView {
     packHint: state.progress.packWoven ? '' : `Weave a pack at the toolshed to carry ${BALANCE.packCapacity}.`,
     prepareReady: !prepareBlocker,
     prepareHint: prepareBlocker ?? `1 berry · ${workSeconds(state, BALANCE.trailFoodSeconds)} seconds · 1 ration`,
-    pileShown: pile,
     storedAtCamp: pile ? `+${state.storedStone} at camp` : '',
-    pileStored: `Stored stone ${state.storedStone}/${BALANCE.stonePileCapacity}`,
-    woodShown: woodStore,
     // The handcart's load counts as wood at camp even before there is a woodpile to unload it onto.
     woodAtCamp: woodStore || state.progress.workshop.handcart ? `+${logsInStore(state)} at camp` : '',
-    woodStored: `Stored wood ${state.storedWood}/${woodStoreCapacity(state)}`,
-    fiberShown: state.structures.fibreStack,
     fiberAtCamp: state.structures.fibreStack ? `+${state.storedFiber} at camp` : '',
-    fiberStored: `Stored fiber ${state.storedFiber}/${BALANCE.fibreStackCapacity}`,
     fire: fireLine(state)
   };
 }
