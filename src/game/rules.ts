@@ -595,13 +595,20 @@ const storeWood: ActionHandler<'storeWood'> = state => {
   return { state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood - 1 }, storedWood: state.storedWood + 1 }, message: `Stacked a log on the ${woodStoreName(state)}.` };
 };
 
+/** Why the handcart can't be unloaded into the wood store right now, or null if it can. */
+export function unloadCartBlocker(state: GameState): string | null {
+  if (!state.progress.workshop.handcart) return 'Make a handcart first.';
+  if (!isInClearing(state)) return 'Return to camp to unload the cart.';
+  if (state.cartWood < 1) return 'The cart is empty.';
+  if (!hasWoodStore(state)) return 'Build a woodpile to unload the cart into.';
+  if (state.storedWood >= woodStoreCapacity(state)) return 'The wood store is full.';
+  return null;
+}
+
 const unloadCart: ActionHandler<'unloadCart'> = state => {
-  if (!state.progress.workshop.handcart) return refuse(state, 'Make a handcart first.');
-  if (!isInClearing(state)) return refuse(state, 'Return to camp to unload the cart.');
-  if (state.cartWood < 1) return refuse(state, 'The cart is empty.');
-  if (!hasWoodStore(state)) return refuse(state, 'Build a woodpile to unload the cart into.');
+  const blocker = unloadCartBlocker(state);
+  if (blocker) return refuse(state, blocker);
   const room = woodStoreCapacity(state) - state.storedWood;
-  if (room < 1) return refuse(state, 'The wood store is full.');
   const moved = Math.min(room, state.cartWood);
   const left = state.cartWood - moved;
   return {

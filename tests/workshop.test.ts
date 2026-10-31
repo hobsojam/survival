@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, BUILDINGS, createGame, type GameState } from '../src/game/state';
-import { CLEARING_STEPS, placeBranches } from '../src/game/clearing';
+import { CLEARING_STEPS, STEP_IDS, inClearing, placeBranches } from '../src/game/clearing';
+import { CAMP_STRUCTURES, CART_SPOT, sceneVisuals } from '../src/scene/visuals';
+import { sprites } from '../src/art/sprites';
+import { validateSprite } from '../src/art/textures';
+import { bagView, bedsPanelView, workshopView } from '../src/ui/panels';
+import { journalView } from '../src/ui/journal';
+import { PATH_DESTINATIONS, segmentDistance } from './placement';
 import { TOO_TIRED_MESSAGE } from '../src/game/needs';
 import { advanceTime, applyAction, buildStatus, groundBlocker } from '../src/game/rules';
 import { nightStart } from '../src/game/calendar';
@@ -313,5 +319,104 @@ describe('saving the cart', () => {
     expect(load(carted, saved => { saved.cartWood = -1; })).toBe('invalid');
     expect(load(carted, saved => { saved.progress.workshop.handcart = false; saved.cartWood = 1; })).toBe('invalid');
     expect(load(carted, saved => { delete saved.cartWood; })).toBe('invalid');
+  });
+});
+
+describe('where the workshop stands', () => {
+  const EAST: Cleared = ['east-near', 'east-far'];
+  const SPOT = { x: campX + 8, y: campY - 1 };
+  const CART = { x: campX + 7.5, y: campY + 1.5 };
+  const distance = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
+
+  it("stands on the east side's far ground, with the cart parked below it", () => {
+    expect(CAMP_STRUCTURES).toContainEqual(['workshop', 8, -1]);
+    expect(CART_SPOT).toEqual({ dx: 7.5, dy: 1.5 });
+    for (const spot of [SPOT, CART]) {
+      expect(inClearing(spot.x, spot.y, EAST)).toBe(true);
+      expect(inClearing(spot.x, spot.y, ['east-near'])).toBe(false);
+    }
+  });
+
+  it('keeps clear of camp trees, the other sides\' trees, paths and the other buildings', () => {
+    for (const spot of [SPOT, CART]) {
+      for (const tree of createGame().trees) expect(distance(spot, tree), tree.id).toBeGreaterThanOrEqual(1.5);
+      for (const id of STEP_IDS.filter(step => !EAST.includes(step))) {
+        for (const tree of CLEARING_STEPS[id].trees) expect(distance(spot, tree), id).toBeGreaterThanOrEqual(1.5);
+      }
+      for (const [dx, dy] of PATH_DESTINATIONS) expect(segmentDistance(spot.x + 0.5, spot.y + 0.5, dx, dy)).toBeGreaterThanOrEqual(1.35);
+      const others = CAMP_STRUCTURES.filter(([id]) => id !== 'workshop').map(([, dx, dy]) => ({ x: campX + dx, y: campY + dy }));
+      for (const other of others) expect(distance(spot, other)).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('shows a site once the ground is clear, the workshop once built, and the cart by its load', () => {
+    const textures = (state: GameState, id: string) => sceneVisuals(state, 0).filter(visual => visual.id === id).map(visual => visual.texture);
+    expect(textures(workshopCamp({ workshop: false }, {}, ['east-near']), 'workshop')).toEqual([]);
+    expect(textures(workshopCamp({ workshop: false }), 'workshop')).toEqual(['workshopSite:still']);
+    expect(textures(workshopCamp(), 'workshop')).toEqual(['workshop:built']);
+    expect(textures(workshopCamp(), 'handcart')).toEqual([]);
+    const cart = (cartWood: number) => textures(made(workshopCamp({}, { cartWood }), 'handcart'), 'handcart');
+    expect([cart(0), cart(4), cart(12)]).toEqual([['handcart:empty'], ['handcart:some'], ['handcart:full']]);
+  });
+
+  it('draws the workshop and the cart in dark-edged wood, each stage of the cart different', () => {
+    expect(sprites.workshopSite.frames.still).toBeDefined();
+    expect(sprites.workshop.size).toEqual([36, 28]);
+    expect(sprites.handcart.size).toEqual([20, 14]);
+    for (const name of ['workshopSite', 'workshop', 'handcart']) expect(() => validateSprite(sprites[name]), name).not.toThrow();
+    const symbols = new Set(sprites.workshop.frames.built.join('').split('').map(symbol => sprites.workshop.legend[symbol]));
+    expect(symbols).toContain('wood0');
+    const stages = ['empty', 'some', 'full'].map(stage => sprites.handcart.frames[stage].join(''));
+    expect(new Set(stages).size).toBe(3);
+  });
+});
+
+describe('the workshop panel', () => {
+  it('shows once the workshop is built, with the bed tools only once the beds are built', () => {
+    expect(workshopView(workshopCamp({ workshop: false })).shown).toBe(false);
+    const view = workshopView(workshopCamp());
+    expect(view.shown).toBe(true);
+    expect([view.rows.saw.shown, view.rows.handcart.shown, view.rows.bedTools.shown]).toEqual([true, true, false]);
+    expect(workshopView(workshopCamp({ vegetableBeds: true }, {}, ['east-near', 'east-far', 'west-near'])).rows.bedTools.shown).toBe(true);
+  });
+
+  it('gives each upgrade its cost and why it can\'t be made yet', () => {
+    const { rows } = workshopView(workshopCamp());
+    expect(rows.saw).toMatchObject({ title: 'Saw', cost: '3 wood · 3 stone', copy: 'Need 3 wood and 3 stone for the saw.', disabled: false, ready: false });
+    expect(rows.handcart).toMatchObject({ title: 'Handcart', cost: '8 wood · 2 fiber · 1 stone' });
+    const ready = workshopView(withBag(workshopCamp(), { wood: 3, stone: 3 })).rows.saw;
+    expect(ready).toMatchObject({ ready: true, copy: 'Felling a tree gives four wood instead of two.' });
+  });
+
+  it('marks a made upgrade as made', () => {
+    expect(workshopView(made(workshopCamp(), 'saw')).rows.saw).toMatchObject({ cost: 'Made', disabled: true, ready: false });
+  });
+
+  it('shows the cart\'s load and whether it can be unloaded, once the handcart is made', () => {
+    expect(workshopView(workshopCamp()).cart.shown).toBe(false);
+    const cart = workshopView(made(workshopCamp({ woodpile: true }, { cartWood: 5 }), 'handcart')).cart;
+    expect(cart).toEqual({ shown: true, line: 'Cart 5/12 wood', ready: true });
+    expect(workshopView(made(workshopCamp({ woodpile: true }), 'handcart')).cart.ready).toBe(false);
+  });
+
+  it('counts the cart in the bag panel\'s wood at camp and in the fireplace\'s line', () => {
+    const state = made(workshopCamp({ woodpile: true }, { cartWood: 5, storedWood: 2 }), 'handcart');
+    expect(bagView(state).woodAtCamp).toBe('+7 at camp');
+    const FINISHED: Structures = { woodpile: true, shelterThatched: true, shelterStonework: true, shelterPorch: true, shelterFinished: true, hearth: true, bed: true, house: true };
+    const housed = made(workshopCamp(FINISHED, { cartWood: 5, storedWood: 2, timeOfDay: 10 }, ['north-near', 'north-far', 'east-near', 'east-far']), 'handcart');
+    expect(bagView(housed).fire).toBe('The fireplace is banked · 7 logs in store');
+  });
+
+  it('mentions the watering can in the beds hint once it is made', () => {
+    const beds = workshopCamp({ vegetableBeds: true }, {}, ['east-near', 'east-far', 'west-near']);
+    expect(bedsPanelView(beds).hint).not.toContain('watering can');
+    expect(bedsPanelView(made(beds, 'bedTools')).hint).toContain(' The watering can keeps them a day longer.');
+  });
+
+  it('points the journal to the workshop once the east far ground is clear', () => {
+    const state = { ...workshopCamp({ workshop: false }), progress: { ...workshopCamp().progress, lookoutRepaired: true } };
+    expect(journalView(state).nextHint).toBe('Build a workshop on the cleared east ground to make a saw and a handcart.');
+    expect(journalView(workshopCamp()).nextHint).not.toContain('workshop');
+    expect(journalView(workshopCamp({ workshop: false }, {}, ['east-near'])).nextHint).not.toContain('workshop');
   });
 });
