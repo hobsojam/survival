@@ -406,7 +406,7 @@ describe('the pot dishes after dark', () => {
   it('lists each pot dish with its blocker', () => {
     const state = night(true);
     const dishes = nightDishesView(state);
-    expect(dishes.map(entry => entry.dish)).toEqual(['pineTea', 'salad', 'roastedHazelnuts', 'honeyCake']);
+    expect(dishes.map(entry => entry.dish)).toEqual(['pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew']);
     for (const entry of dishes) {
       const blocker = dishBlocker(state, entry.dish);
       expect(entry.disabled, entry.dish).toBe(Boolean(blocker));

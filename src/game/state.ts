@@ -22,6 +22,7 @@ export const BUILDINGS = {
   woodpile: { name: 'Woodpile', description: 'Keep up to 12 wood split and dry', symbol: '▤', cost: { wood: 3, fiber: 1 }, prerequisite: null, ground: 'east-near' },
   fibreStack: { name: 'Fibre stack', description: 'Keep up to 12 fiber dry under thatch', symbol: '≋', cost: { wood: 2, fiber: 3 }, prerequisite: null, ground: 'east-near' },
   vegetableBeds: { name: 'Vegetable beds', description: 'Three raised beds for potatoes, beans and carrots', symbol: '▦', cost: { wood: 6, fiber: 2 }, prerequisite: null, ground: 'west-near' },
+  well: { name: 'Well', description: 'Draw water for the beds and the pot', symbol: '◉', cost: { wood: 2, fiber: 0, stone: 6 }, prerequisite: 'vegetableBeds', ground: 'west-far' },
   /** The survivor moves in the moment it is built, and the shelter becomes a woodshed. */
   house: { name: 'House', description: 'A home with a fireplace of its own', symbol: '⌂', cost: { wood: 12, fiber: 6, stone: 8 }, prerequisite: 'shelterFinished', alsoRequires: 'bed', ground: 'north-far' }
 } as const;
@@ -199,6 +200,9 @@ export const BALANCE = {
   saladEnergyGain: 10,
   honeyCakeHungerGain: 60,
   honeyCakeRestBonus: 10,
+  /** Vegetable stew, cooked in the pot once the well stands. */
+  stewHungerGain: 55,
+  stewWarmthGain: 15,
   stargazeSeconds: 12,
   /** Leaving an offering out for a wild animal. */
   offerSeconds: 3,
@@ -313,7 +317,7 @@ export function createGame(): GameState {
     inventory: { wood: 0, fiber: 0, stone: 0, food: emptyFood() },
     fireFuel: 0,
     fireplaceFuel: 0,
-    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false, vegetableBeds: false, house: false },
+    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false, vegetableBeds: false, well: false, house: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
       quarryFound: false, pickaxeCrafted: false, potCrafted: false, packWoven: false,
       discoveries: { basket: false, spring: false, cairn: false } },

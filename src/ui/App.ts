@@ -117,7 +117,7 @@ export class App {
                 <div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small id="space-label">Carried</small></div>${bagFoodMarkup()}
               </div><p class="keepsake-line" id="pack-hint" hidden></p><p class="keepsake-line" id="keepsake-line" hidden></p><div class="fire-status" id="fire-status">The fire is unlit</div></section>
               <section class="panel garden-panel" data-tab="camp"><p class="eyebrow">GROW WITH THE SEASONS</p><h2>Berry garden</h2><p class="garden-hint" id="garden-hint"></p><div id="garden-plots"></div></section>
-              <section class="panel beds-panel" data-tab="camp" hidden><p class="eyebrow">THE WEST GROUND</p><h2>Vegetable beds</h2><p class="garden-hint" id="beds-hint"></p><div id="bed-list"></div></section>
+              <section class="panel beds-panel" data-tab="camp" hidden><p class="eyebrow">THE WEST GROUND</p><h2>Vegetable beds</h2><p class="garden-hint" id="beds-hint"></p><div id="bed-list"></div><div class="tool-row" id="draw-water-row" hidden><button type="button" id="draw-water-button" data-action="drawWater">Draw water</button><small id="draw-water-hint"></small></div></section>
               <section class="panel night-panel" data-tab="camp"><p class="eyebrow">AFTER DARK</p><h2>A little time for yourself</h2><p class="night-hint" id="night-hint">These small moments are waiting for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" data-dish="berries" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button>${nightDishMarkup()}</div></section>
               <section class="panel build-panel" data-tab="build"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand anywhere in the clearing to build.</p><div id="build-list">${buildMarkup}</div><div id="clearing-group" hidden><h3 class="build-group-heading">Clear the land</h3><div id="clearing-sides">${clearingMarkup}</div><div class="tool-row"><h3 id="clear-title">Clear the ground</h3><p id="clear-copy" class="lookout-copy"></p><button type="button" id="clear-button" data-action="clearGround">Clear the ground</button><small id="clear-cost"></small></div></div></section>
               <section class="panel phone-only" data-tab="camp"><p class="eyebrow">THIS CAMP</p><button type="button" id="phone-new-game" class="secondary-button">Start a new game</button></section>
@@ -133,7 +133,7 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'storeWood' | 'takeWood' | 'storeFiber' | 'takeFiber' | 'storeFood' | 'takeFood';
+        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'storeWood' | 'takeWood' | 'storeFiber' | 'takeFiber' | 'storeFood' | 'takeFood' | 'drawWater';
         const item = button.dataset.item as FoodItem | undefined;
         const dish = button.dataset.dish as DishId | undefined;
         if (type === 'storeFood' || type === 'takeFood') {
@@ -561,6 +561,14 @@ export class App {
     this.setText('beds-hint', view.hint);
     const list = this.root.querySelector<HTMLElement>('#bed-list');
     if (list) list.innerHTML = view.beds.map((bed, index) => bedMarkup(bed, index)).join('');
+    const water = this.root.querySelector<HTMLElement>('#draw-water-row');
+    if (water) water.hidden = !view.water.shown;
+    const button = this.root.querySelector<HTMLButtonElement>('#draw-water-button');
+    if (button) {
+      button.disabled = view.water.disabled;
+      button.classList.toggle('ready', !view.water.disabled);
+    }
+    this.setText('draw-water-hint', view.water.hint);
   }
 
   private renderBuild(): void {

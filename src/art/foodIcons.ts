@@ -2,7 +2,7 @@ import { iconUrl, type JournalIcon } from './journalIcons';
 
 // The Bag panel's little pictures of foraged food and what the camp makes from it, on the journal icons' 10×10 grid.
 
-type FoodIconId = 'greens' | 'hazelnut' | 'honey' | 'pineNeedles' | 'roastedHazelnuts' | 'vegetables' | 'pineTea' | 'salad' | 'honeyCake';
+type FoodIconId = 'greens' | 'hazelnut' | 'honey' | 'pineNeedles' | 'roastedHazelnuts' | 'vegetables' | 'pineTea' | 'salad' | 'honeyCake' | 'stew';
 
 export const FOOD_ICONS: Record<FoodIconId, JournalIcon> = {
   greens: { legend: { d: 'leaf1', g: 'leaf2', G: 'leaf3', L: 'leaf4' }, rows: [
@@ -111,6 +111,18 @@ export const FOOD_ICONS: Record<FoodIconId, JournalIcon> = {
     '.cWCCWCCc.',
     '.cccccccc.',
     '..........',
+    '..........'
+  ] },
+  stew: { legend: { c: 'stone1', C: 'stone2', b: 'earth2', o: 'fire2', g: 'leaf3', y: 'scarf3', s: 'frost' }, rows: [
+    '..s...s...',
+    '...s...s..',
+    '..s...s...',
+    '.cCCCCCCc.',
+    'ccbobgbycc',
+    '.cbgybobc.',
+    '.cCbbbbCc.',
+    '..cCCCCc..',
+    '...cccc...',
     '..........'
   ] }
 };

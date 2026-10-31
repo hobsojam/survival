@@ -6,19 +6,20 @@ import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { BALANCE, type GameState } from './state';
 
 // Cooking at the evening fire. Without the pot it is one berry toasted on a stick; the pot, made at the toolshed,
-// adds tea, salad, roasted nuts and honey cake. Every dish is cooked after dark, at camp, at a lit fire.
+// adds tea, salad, roasted nuts, honey cake and, once the well stands, vegetable stew. Every dish is cooked after dark, at camp, at a lit fire.
 
-export type DishId = 'berries' | 'pineTea' | 'salad' | 'roastedHazelnuts' | 'honeyCake';
+export type DishId = 'berries' | 'pineTea' | 'salad' | 'roastedHazelnuts' | 'honeyCake' | 'stew';
 
 export const DISHES: Record<DishId, { name: string; ingredients: Partial<Record<FoodItem, number>>; potOnly: boolean }> = {
   berries: { name: 'a berry', ingredients: { berry: 1 }, potOnly: false },
   pineTea: { name: 'pine needle tea', ingredients: { pineNeedles: 1 }, potOnly: true },
   salad: { name: 'greens and berry salad', ingredients: { greens: 1, berry: 1 }, potOnly: true },
   roastedHazelnuts: { name: 'roasted hazelnuts', ingredients: { hazelnut: 2 }, potOnly: true },
-  honeyCake: { name: 'honey cake', ingredients: { honey: 1, hazelnut: 1, berry: 1 }, potOnly: true }
+  honeyCake: { name: 'honey cake', ingredients: { honey: 1, hazelnut: 1, berry: 1 }, potOnly: true },
+  stew: { name: 'vegetable stew', ingredients: { vegetables: 2 }, potOnly: true }
 };
 
-export const DISH_ORDER: readonly DishId[] = ['berries', 'pineTea', 'salad', 'roastedHazelnuts', 'honeyCake'];
+export const DISH_ORDER: readonly DishId[] = ['berries', 'pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew'];
 
 export const POT_COST = { wood: 1, fiber: 0, stone: 2 } as const;
 
@@ -76,6 +77,7 @@ export function spendIngredients(state: GameState, dish: DishId): GameState | nu
 /** Why this dish can't be cooked now, or null. Includes cookBlocker's time/place/fire checks. */
 export function dishBlocker(state: GameState, dish: DishId): string | null {
   if (!DISHES[dish].potOnly) return cookBlocker(state);
+  if (dish === 'stew' && !state.structures.well) return 'Build the well to cook stew.';
   if (!state.progress.potCrafted) return 'Make a cooking pot first.';
   if (state.timeOfDay < nightStart(state.day)) return 'Cook after nightfall.';
   const fire = cookingFireBlocker(state);
@@ -124,6 +126,10 @@ export function serveDish(cooked: GameState, dish: DishId, dryingRack: boolean):
     case 'honeyCake': return {
       state: { ...cooked, player: { ...player, hunger: up(player.hunger, BALANCE.honeyCakeHungerGain) }, cakeBonus: true },
       message: 'You bake a little honey cake. You will rest well tonight.'
+    };
+    case 'stew': return {
+      state: { ...cooked, player: { ...player, hunger: up(player.hunger, BALANCE.stewHungerGain), warmth: up(player.warmth, BALANCE.stewWarmthGain) } },
+      message: 'You simmer a vegetable stew. It fills you up and warms you through.'
     };
   }
 }

@@ -563,6 +563,46 @@ function vegetableBedsSite(g: Grid): void {
   for (const x of [5, 19, 33]) { box(g, x, 7, 10, 4, 'A'); line(g, x + 1, 7, x + 8, 7, 'z'); }
 }
 
+/** Where the well will go: a staked, strung square of turned earth with a few stones laid out in a ring. */
+function wellSite(g: Grid): void {
+  oval(g, 10, 6, 6, 3, 'A'); oval(g, 10, 6, 4, 2, 'z');
+  for (const [x, y] of [[1, 1], [17, 1], [1, 7], [17, 7]]) stake(g, x, y);
+  line(g, 3, 2, 16, 2, 'h'); line(g, 3, 8, 16, 8, 'h');
+  for (const [x, y] of [[5, 5], [14, 5], [7, 8], [12, 8], [10, 3]]) { dot(g, x, y, 'o'); dot(g, x + 1, y, 'q'); }
+}
+
+const wellLegend = { ...campLegend, W: 'storm', x: 'frost' } as const;
+
+/**
+ * A round stone well under a little peaked wooden roof, with a crank on its axle and a bucket on the rope. The stone
+ * wall, the posts and the roof are all edged in dark wood, so the well reads against the bare earth of the camp.
+ */
+function well(g: Grid): void {
+  oval(g, 9.5, 22, 9, 1.5, 's');
+  // Two posts carry the axle, standing behind the rim.
+  for (const x of [3, 15]) { box(g, x, 5, 2, 9, 'a'); line(g, x + 1, 5, x + 1, 12, 'c'); }
+  // The wall: courses of grey stone with darker mortar and pale tops, edged in dark wood.
+  box(g, 2, 14, 16, 8, 'a'); box(g, 3, 14, 14, 7, 'o');
+  line(g, 3, 17, 16, 17, 'n'); line(g, 3, 19, 16, 19, 'n');
+  for (const [x, y] of [[6, 16], [10, 16], [14, 16], [4, 18], [8, 18], [12, 18], [6, 20], [10, 20], [14, 20]]) dot(g, x, y, 'n');
+  for (const [x, y] of [[3, 16], [7, 16], [11, 16], [5, 18], [9, 18], [13, 18], [3, 20], [7, 20], [11, 20]]) dot(g, x, y, 'p');
+  // The rim, seen from above: a ring of pale stone round dark water with one glint of sky.
+  oval(g, 9.5, 13.5, 8, 2.5, 'a'); oval(g, 9.5, 13.5, 7, 1.6, 'p'); oval(g, 9.5, 13.5, 5, 0.8, 'W');
+  line(g, 3, 15, 16, 15, 'a'); dot(g, 7, 13, 'x'); for (const x of [4, 9, 14]) dot(g, x, 12, 'q');
+  // The axle with its crank on the right, and the bucket on its rope over the water.
+  line(g, 5, 7, 14, 7, 'b'); line(g, 5, 8, 14, 8, 'a');
+  line(g, 17, 7, 18, 7, 'a'); line(g, 18, 8, 18, 10, 'a'); dot(g, 18, 10, 'd');
+  dot(g, 10, 9, 'h');
+  box(g, 8, 10, 4, 3, 'a'); box(g, 9, 11, 2, 1, 'c'); line(g, 9, 10, 10, 10, 'd');
+  // The roof is drawn last so its eaves overhang the posts.
+  for (let y = 1; y <= 4; y++) {
+    const half = Math.min(10, 2 * y + 1);
+    box(g, 10 - half, y, half * 2, 1, y % 2 ? 'c' : 'd');
+    dot(g, 10 - half, y, 'a'); dot(g, 9 + half, y, 'a');
+  }
+  line(g, 8, 0, 11, 0, 'a'); line(g, 0, 5, 19, 5, 'a'); line(g, 1, 4, 18, 4, 'b');
+}
+
 const bedLegend = { s: 'shadow', a: 'wood0', b: 'wood1', c: 'wood2', d: 'wood3', f: 'earth0', g: 'earth1', h: 'earth3',
   j: 'leaf1', k: 'leaf2', l: 'leaf3', m: 'leaf4', n: 'grass4', o: 'flower2', p: 'scarf2', u: 'fire2', w: 'fire3', x: 'canvas2', v: 'frost' } as const;
 type BedCrop = 'potatoes' | 'beans' | 'carrots';
@@ -701,6 +741,8 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   larder: define(24, 28, campLegend, { empty: g => larder(g, 'empty'), some: g => larder(g, 'some'), full: g => larder(g, 'full') }),
   vegetableBedsSite: define(48, 16, campLegend, { still: vegetableBedsSite }),
   vegBed: define(14, 12, bedLegend, BED_FRAMES),
+  wellSite: define(20, 12, campLegend, { still: wellSite }),
+  well: define(20, 24, wellLegend, { built: well }),
   pileCount: define(13, 7, countLegend, {
     ...Object.fromEntries([2, 3, 4, 5, 6, 7, 8, 9].map(n => [`n${n}`, (g: Grid) => pileCount(g, [String(n)])])),
     lots: g => pileCount(g, ['9', '+'])

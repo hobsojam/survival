@@ -63,6 +63,9 @@ export function bedsDawn(next: GameState, endedDay: number): void {
   next.beds = next.beds.map(bed => grownBed(next, bed, endedDay));
 }
 
+/** A sown bed that isn't ripe yet: the only kind that water helps. */
+export const needsWater = (bed: Bed): boolean => bed.sown && bed.grown < BALANCE.cropGrowDays;
+
 const validIndex = (index: number): boolean => Number.isInteger(index) && index >= 0 && index < BED_CROPS.length;
 
 /** The refusals both sowing and harvesting share: a real bed, built, and the survivor in the clearing. */
@@ -87,6 +90,20 @@ export function harvestBedBlocker(state: GameState, index: number): string | nul
   if (blocker) return blocker;
   if (bedStage(state.beds[index]) !== 'ripe') return 'That bed is not ready yet.';
   if (freeSpaces(state) < BALANCE.cropYield) return `Make room for ${BALANCE.cropYield} vegetables before harvesting.`;
+  if (isExhausted(state)) return TOO_TIRED_MESSAGE;
+  return null;
+}
+
+/** Why water can't be drawn for the beds now, or null: it waters every sown bed still growing, once a day, and not after the rain has. */
+export function drawWaterBlocker(state: GameState): string | null {
+  if (!state.structures.well) return 'Build the well first.';
+  if (!isInClearing(state)) return 'Return to camp to draw water.';
+  if (isWinter(state.day)) return 'The beds are resting for winter.';
+  const thirsty = state.beds.filter(needsWater);
+  if (thirsty.length === 0) return 'Nothing in the beds needs water.';
+  if (thirsty.every(bed => bed.wateredDay === state.day)) return 'The beds are already watered today.';
+  const rain = rainWindow(state.day);
+  if (rain && state.timeOfDay >= rain.start) return 'The rain has watered the beds today.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   return null;
 }

@@ -3,7 +3,7 @@ import { FOOD_ITEMS, availableFood, foodCount, goingSoft, isFresh, keptFoodTotal
 import { foodIconUrl } from '../art/foodIcons';
 import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
-import { BED_CROPS, bedSoil, bedStage, harvestBedBlocker, sowBedBlocker, type BedSoil, type BedStage } from '../game/beds';
+import { BED_CROPS, bedSoil, bedStage, drawWaterBlocker, harvestBedBlocker, sowBedBlocker, type BedSoil, type BedStage } from '../game/beds';
 import { workSeconds } from '../game/needs';
 import { hasWoodStore, livesInHouse, woodStoreCapacity } from '../game/home';
 import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
@@ -53,8 +53,11 @@ const BED_SOIL_WORDS: Record<BedSoil, string | null> = { fresh: null, dry: 'Dry,
 
 export interface BedPanelView { label: string; action: 'sowBed' | 'harvestBed'; verb: string; disabled: boolean; title: string }
 
-/** The Vegetable beds panel, once built: a line per bed naming its crop, how far it has grown and how its soil is, with Sow or Harvest. */
-export function bedsPanelView(state: GameState): { shown: boolean; hint: string; beds: BedPanelView[] } {
+/** The Draw water button under the beds: shown once the well stands, with why it is refused as its hint. */
+export interface DrawWaterView { shown: boolean; disabled: boolean; hint: string }
+
+/** The Vegetable beds panel, once built: a line per bed naming its crop, how far it has grown and how its soil is, with Sow or Harvest, and Draw water once the well stands. */
+export function bedsPanelView(state: GameState): { shown: boolean; hint: string; beds: BedPanelView[]; water: DrawWaterView } {
   const beds = state.beds.map((bed, index) => {
     const crop = BED_CROPS[index];
     const label = [capitalised(crop), BED_STAGE_WORDS[bedStage(bed)], BED_SOIL_WORDS[bedSoil(state, bed)]].filter(Boolean).join(' · ');
@@ -65,8 +68,10 @@ export function bedsPanelView(state: GameState): { shown: boolean; hint: string;
     const blocker = harvestBedBlocker(state, index);
     return { label, action: 'harvestBed' as const, verb: 'Harvest', disabled: Boolean(blocker), title: blocker ?? `Harvest ${BALANCE.cropYield} vegetables.` };
   });
-  const hint = 'Each bed keeps its own seed, so sowing costs nothing. Rain waters the beds; left dry for a few days, a crop wilts and then withers. A ripe crop waits safely until you harvest it.';
-  return { shown: state.structures.vegetableBeds, hint, beds };
+  const watering = state.structures.well ? 'Rain waters the beds, or draw a bucket from the well once a day' : 'Rain waters the beds';
+  const hint = `Each bed keeps its own seed, so sowing costs nothing. ${watering}; left dry for a few days, a crop wilts and then withers. A ripe crop waits safely until you harvest it.`;
+  const blocker = drawWaterBlocker(state);
+  return { shown: state.structures.vegetableBeds, hint, beds, water: { shown: state.structures.well, disabled: Boolean(blocker), hint: blocker ?? '' } };
 }
 
 export function bedMarkup(bed: BedPanelView, index: number): string {
