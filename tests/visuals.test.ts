@@ -18,14 +18,13 @@ describe('native-size scene art', () => {
     expect(keys).toContain('fiberReeds:ready');
     expect(keys).toContain('rock0:still');
     expect(keys).toContain('shelterSite:still');
-    expect(keys).toContain('crateSite:still');
     expect(keys).toContain('dryingRackSite:still');
     expect(keys).toContain('windbreakSite:still');
     expect(keys).toContain('logSeat:still');
     expect(keys).toContain('lookout:damaged');
     expect(keys).toContain('firePit:unlit');
     expect(keys).not.toContain('hearthSite:still');
-    const sites = new Set(['shelter', 'crate', 'dryingRack', 'garden', 'windbreak', 'stonePile', 'toolshed']);
+    const sites = new Set(['shelter', 'dryingRack', 'garden', 'windbreak', 'stonePile', 'toolshed']);
     for (const item of visuals) {
       const [name, frame] = item.texture.split(':');
       expect(sprites[name]?.frames[frame], item.texture).toBeDefined();
@@ -140,7 +139,6 @@ describe('native-size scene art', () => {
     state.nodes.find(node => node.kind === 'stone')!.amount = 0;
     state.structures.shelter = true;
     state.structures.bed = true;
-    state.structures.crate = true;
     state.structures.hearth = true;
     state.structures.dryingRack = true;
     state.structures.windbreak = true;
@@ -148,7 +146,7 @@ describe('native-size scene art', () => {
     const keys = sceneVisuals(state, 0).map(item => item.texture);
     expect(keys).toEqual(expect.arrayContaining([
       'branchPile:depleted', 'berryBush:picked', 'fiberReeds:cut', 'pebbles0:still',
-      'shelter:builtBed', 'crate:built', 'dryingRack:built', 'windbreak:built', 'hearth:burning0'
+      'shelter:builtBed', 'dryingRack:built', 'windbreak:built', 'hearth:burning0'
     ]));
     expect(keys).not.toContain('firePit:unlit');
   });
@@ -277,7 +275,7 @@ describe('native-size scene art', () => {
   });
 
   it('keeps every new scene sprite on an integer pixel grid', () => {
-    for (const name of ['berryBush', 'fiberReeds', 'shelter', 'crate', 'dryingRack', 'windbreak', 'firePit', 'hearth', 'flame', 'survivor', 'bird', 'fox', 'firefly']) {
+    for (const name of ['berryBush', 'fiberReeds', 'shelter', 'dryingRack', 'windbreak', 'firePit', 'hearth', 'flame', 'survivor', 'bird', 'fox', 'firefly']) {
       const def = sprites[name];
       expect(def, name).toBeDefined();
       expect(() => validateSprite(def), name).not.toThrow();
@@ -324,7 +322,7 @@ describe('the quarry area', () => {
     expect(ids).not.toContain('there');
     for (const node of state.nodes) expect(ids).not.toContain(node.id);
     for (const tree of state.trees) expect(ids).not.toContain(tree.id);
-    for (const id of ['shelter', 'crate', 'dryingRack', 'windbreak', 'stonePile', 'toolshed', 'logSeat', 'hearthSite', 'fire', 'flame', 'lookout', 'site-basket', 'site-spring', 'site-cairn'])
+    for (const id of ['shelter', 'dryingRack', 'windbreak', 'stonePile', 'toolshed', 'logSeat', 'hearthSite', 'fire', 'flame', 'lookout', 'site-basket', 'site-spring', 'site-cairn'])
       expect(ids).not.toContain(id);
     const quarry = visuals.find(item => item.id === 'quarry')!;
     expect(quarry.x).toBe((QUARRY_SITE.x + 0.5) * 16);

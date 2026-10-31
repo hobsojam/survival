@@ -362,7 +362,7 @@ describe('fire and camp upgrades', () => {
     expect(applyAction(state, { type: 'build', structureId: 'dryingRack' }).message).toBe('Built the drying rack.');
   });
 
-  it('builds while standing at the visible shelter and crate sites', () => {
+  it('builds while standing at the visible shelter and drying rack sites', () => {
     const shelterState = createGame();
     shelterState.inventory.wood = 6;
     shelterState.inventory.fiber = 2;
@@ -370,11 +370,11 @@ describe('fire and camp upgrades', () => {
     shelterState.player.y = 13;
     expect(applyAction(shelterState, { type: 'build', structureId: 'shelter' }).state.structures.shelter).toBe(true);
 
-    const crateState = createGame();
-    crateState.inventory.wood = 4;
-    crateState.player.x = 23;
-    crateState.player.y = 16;
-    expect(applyAction(crateState, { type: 'build', structureId: 'crate' }).state.structures.crate).toBe(true);
+    const rackState = createGame();
+    rackState.inventory.wood = 4;
+    rackState.player.x = 22;
+    rackState.player.y = 13;
+    expect(applyAction(rackState, { type: 'build', structureId: 'dryingRack' }).state.structures.dryingRack).toBe(true);
   });
 
   it('uses one wood to fuel the fire for 90 seconds', async () => {
@@ -420,12 +420,15 @@ describe('fire and camp upgrades', () => {
     expect(applyAction(built, { type: 'rest' }).state.player.energy).toBe(64);
   });
 
-  it('crate costs four wood and raises carrying capacity to sixteen', () => {
+  it('the woven pack costs two wood and four fiber and raises carrying capacity to sixteen', () => {
     const state = createGame();
-    state.inventory.wood = 4;
-    const built = applyAction(state, { type: 'build', structureId: 'crate' }).state;
-    expect(built.structures.crate).toBe(true);
-    expect(built.inventory.wood).toBe(0);
+    state.structures.shelter = true;
+    state.structures.toolshed = true;
+    state.inventory.wood = 2;
+    state.inventory.fiber = 4;
+    const built = applyAction(state, { type: 'craftPack' }).state;
+    expect(built.progress.packWoven).toBe(true);
+    expect(built.inventory).toMatchObject({ wood: 0, fiber: 0 });
     built.inventory.wood = 8;
     expect(applyAction(besideBranch(built), { type: 'gather', nodeId: 'branch-0' }).state.inventory.wood).toBe(9);
   });

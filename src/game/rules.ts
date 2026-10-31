@@ -10,7 +10,7 @@ import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, ma
 import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
 import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
-import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
+import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
   | { type: 'gather'; nodeId: string }
@@ -26,7 +26,7 @@ export type GameAction =
   | { type: 'storeFood'; item: FoodItem }
   | { type: 'takeFood'; item: FoodItem }
   | { type: 'cook'; dish?: DishId }
-  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'storeWood' | 'takeWood' | 'storeFiber' | 'takeFiber' | 'befriend' | 'craftPillow' | 'craftCloak' }
+  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'storeWood' | 'takeWood' | 'storeFiber' | 'takeFiber' | 'befriend' | 'craftPillow' | 'craftCloak' }
   | { type: 'pickUpStone'; pileId: string };
 
 /** Awake time tires the survivor; work already costs energy, and resting doesn't. */
@@ -116,6 +116,17 @@ export function pickaxeBlocker(state: GameState): string | null {
   const { wood, fiber, stone } = PICKAXE.cost;
   if (availableWood(state) < wood || availableFiber(state) < fiber || availableStone(state) < stone)
     return `Need ${wood} wood, ${fiber} fiber, and ${stone} stone for the pickaxe.`;
+  return null;
+}
+
+/** Why the woven pack can't be made right now, or null if it can. Wood and fiber can come from their camp stores. */
+export function packBlocker(state: GameState): string | null {
+  if (state.progress.packWoven) return 'You already have a woven pack.';
+  if (!state.structures.toolshed) return 'Build a toolshed first.';
+  if (!isInClearing(state)) return 'Return to camp to weave the pack.';
+  if (isExhausted(state)) return TOO_TIRED_MESSAGE;
+  const { wood, fiber } = PACK.cost;
+  if (availableWood(state) < wood || availableFiber(state) < fiber) return `Need ${wood} wood and ${fiber} fiber for the pack.`;
   return null;
 }
 
@@ -378,6 +389,15 @@ const craftPot: ActionHandler<'craftPot'> = state => {
   return {
     state: payAndBuild(state, POT_COST, { progress: { ...state.progress, potCrafted: true } }),
     message: 'Made a cooking pot. It hangs over the fire on a little tripod.'
+  };
+};
+
+const craftPack: ActionHandler<'craftPack'> = state => {
+  const blocker = packBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  return {
+    state: payAndBuild(state, PACK.cost, { progress: { ...state.progress, packWoven: true } }),
+    message: 'You wove a pack. There\'s room for twice as much now.'
   };
 };
 
@@ -883,7 +903,7 @@ const craftCloak: ActionHandler<'craftCloak'> = state =>
   craftKeepsake(state, 'cloak', cloakBlocker(state), 'You made a fur cloak. The nights will bite a little less.');
 
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
-  move, cross, gather, craftAxe, craftPickaxe, craftPot, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
+  move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
   storeStone, takeStone, storeWood, takeWood, storeFiber, takeFiber, storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
   cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, rest, sleep, befriend, craftPillow, craftCloak
 };

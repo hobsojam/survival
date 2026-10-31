@@ -271,7 +271,7 @@ describe('build buttons', () => {
   it('prices a building and marks it ready when affordable at camp', () => {
     expect(buildButtonView(game({ inventory: supplies }), 'shelter')).toEqual({ disabled: false, built: false, locked: false, ready: true,
       description: 'A roof against the night cold', verb: 'Build', price: '6 wood · 2 fiber' });
-    expect(buildButtonView(game({ inventory: supplies }), 'crate')).toMatchObject({ price: '4 wood', ready: true });
+    expect(buildButtonView(game({ inventory: supplies }), 'dryingRack')).toMatchObject({ price: '4 wood', ready: true });
   });
 
   it('includes stone in the price, and locks the hearth until the cold night', () => {
@@ -284,7 +284,7 @@ describe('build buttons', () => {
   });
 
   it('shows built structures as complete', () => {
-    expect(buildButtonView(game({ structures: { crate: true } }), 'crate')).toMatchObject({ disabled: true, built: true, locked: false, verb: 'Built', price: 'Complete' });
+    expect(buildButtonView(game({ structures: { dryingRack: true } }), 'dryingRack')).toMatchObject({ disabled: true, built: true, locked: false, verb: 'Built', price: 'Complete' });
   });
 });
 
@@ -294,7 +294,7 @@ describe('exhaustion in the panels', () => {
     const shed = game({ progress: { ...afterColdNight, quarryFound: true }, structures: { shelter: true, toolshed: true }, inventory: supplies });
     expect(axeView(tired(shed)).ready).toBe(false);
     expect(pickaxeView(tired(shed)).ready).toBe(false);
-    expect(buildButtonView(tired(game({ inventory: supplies })), 'crate').ready).toBe(false);
+    expect(buildButtonView(tired(game({ inventory: supplies })), 'dryingRack').ready).toBe(false);
     const atLookout = { ...shed, player: { ...shed.player, x: 30, y: 8 } };
     expect(lookoutView(tired(atLookout)).ready).toBe(false);
   });

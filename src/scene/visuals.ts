@@ -112,7 +112,7 @@ function addPuddles(state: GameState, add: AddVisual): void {
 }
 
 /** Small camp structures: where each stands from the fire, drawn as a flat site until built; one on cleared ground only once it is clear. */
-export const CAMP_STRUCTURES = [['crate', 3, 1], ['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3], ['larder', 2.5, -4.5], ['woodpile', 5.5, -1.5], ['fibreStack', 5.5, 1.5]] as const;
+export const CAMP_STRUCTURES = [['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3], ['larder', 2.5, -4.5], ['woodpile', 5.5, -1.5], ['fibreStack', 5.5, 1.5]] as const;
 
 /** A camp store shows how much it holds: nothing, some (1 to 6) or plenty (7 and up); the larder, woodpile and fibre stack share it. */
 export function stockFrame(stored: number): 'empty' | 'some' | 'full' {

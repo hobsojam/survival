@@ -47,8 +47,6 @@ describe('sprite pipeline', () => {
       hearthSite: { size: [24, 12], frames: ['still'] },
       shelter: { size: [48, 40], frames: ['built', 'builtBed'] },
       shelterSite: { size: [48, 32], frames: ['still'] },
-      crate: { size: [16, 16], frames: ['built'] },
-      crateSite: { size: [16, 16], frames: ['still'] },
       dryingRack: { size: [32, 32], frames: ['built'] },
       dryingRackSite: { size: [32, 16], frames: ['still'] },
       windbreak: { size: [48, 32], frames: ['built'] },

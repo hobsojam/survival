@@ -10,7 +10,6 @@ export const BUILDINGS = {
   shelterPorch: { name: 'Small porch', description: 'Add a little covered space at the entrance', symbol: '⌂', cost: { wood: 3, fiber: 0, stone: 3 }, prerequisite: 'shelterStonework' },
   shelterFinished: { name: 'Door and shutters', description: 'Finish the shelter with a door and shutters', symbol: '▣', cost: { wood: 2, fiber: 2 }, prerequisite: 'shelterPorch' },
   bed: { name: 'Bed', description: 'Rest more deeply at camp', symbol: '▣', cost: { wood: 4, fiber: 1 }, prerequisite: 'shelter' },
-  crate: { name: 'Storage crate', description: 'Carry up to 16 supplies', symbol: '▤', cost: { wood: 4, fiber: 0 }, prerequisite: null },
   toolshed: { name: 'Toolshed', description: 'Make tools here', symbol: '⚒', cost: { wood: 5, fiber: 2 }, prerequisite: 'shelter' },
   hearth: { name: 'Stone hearth', description: 'Each log keeps the fire longer', symbol: '♨', cost: { wood: 2, fiber: 0, stone: 3 }, prerequisite: 'coldNight' },
   dryingRack: { name: 'Drying rack', description: 'Prepare rations; improve cooked berries', symbol: '☼', cost: { wood: 4, fiber: 0 }, prerequisite: null },
@@ -26,6 +25,9 @@ export const BUILDINGS = {
 export type StructureId = keyof typeof BUILDINGS;
 
 export const PICKAXE = { cost: { wood: 2, fiber: 1, stone: 2 } } as const;
+
+/** A woven pack, made at the toolshed: the survivor wears it, and it carries packCapacity. */
+export const PACK = { cost: { wood: 2, fiber: 4, stone: 0 } } as const;
 
 export const LOOKOUT = { x: 30, y: 8, cost: { wood: 4, fiber: 2, stone: 2 } } as const;
 
@@ -107,7 +109,7 @@ export interface GameState {
   fireFuel: number;
   structures: Record<StructureId, boolean>;
   progress: { nextStormDay: number | null; hearthUnlocked: boolean; lookoutRepaired: boolean; axeCrafted: boolean;
-    quarryFound: boolean; pickaxeCrafted: boolean; potCrafted: boolean;
+    quarryFound: boolean; pickaxeCrafted: boolean; potCrafted: boolean; packWoven: boolean;
     discoveries: Record<SiteId, boolean> };
   nodes: ResourceNode[];
   trees: TreeNode[];
@@ -147,7 +149,7 @@ export const BALANCE = {
   /** Game seconds advanced per real second while the player is awake. */
   clockRate: 8 / 11,
   baseCapacity: 8,
-  crateCapacity: 16,
+  packCapacity: 16,
   gatherEnergyCost: 4,
   gatherSeconds: 6,
   buildEnergyCost: 6,
@@ -289,9 +291,9 @@ export function createGame(): GameState {
     player: { x: BALANCE.campX + 1, y: BALANCE.campY + 1, energy: 100, hunger: 100, warmth: 100 },
     inventory: { wood: 0, fiber: 0, stone: 0, food: emptyFood() },
     fireFuel: 0,
-    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, crate: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false },
+    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
-      quarryFound: false, pickaxeCrafted: false, potCrafted: false,
+      quarryFound: false, pickaxeCrafted: false, potCrafted: false, packWoven: false,
       discoveries: { basket: false, spring: false, cairn: false } },
     nodes,
     trees,

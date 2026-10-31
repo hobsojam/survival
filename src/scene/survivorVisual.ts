@@ -10,6 +10,8 @@ export interface SurvivorVisualState {
   energy: number;
   hunger: number;
   nowMs: number;
+  /** Wearing the woven pack: every texture has a `…Pack` twin. */
+  packed?: boolean;
   action?: { kind: SurvivorAction; startedAtMs: number };
 }
 
@@ -48,6 +50,11 @@ function idleNeedPose(state: SurvivorVisualState): 'shiver' | 'tired' | 'hungry'
 }
 
 export function selectSurvivorVisual(state: SurvivorVisualState): SurvivorVisual {
+  const visual = unpackedVisual(state);
+  return state.packed ? { ...visual, texture: `${visual.texture}Pack` } : visual;
+}
+
+function unpackedVisual(state: SurvivorVisualState): SurvivorVisual {
   if (state.moving) {
     let group = 'walkSide';
     if (state.facing === 'up') group = 'walkUp';

@@ -23,7 +23,7 @@ export function carriedCount(state: GameState): number {
 }
 
 export function bagCapacity(state: GameState): number {
-  return state.structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity;
+  return state.progress.packWoven ? BALANCE.packCapacity : BALANCE.baseCapacity;
 }
 
 export function freeSpaces(state: GameState): number {

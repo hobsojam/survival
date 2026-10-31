@@ -173,17 +173,6 @@ function shelter(g: Grid, bed: boolean, stage: ShelterStage = 'plain'): void {
     box(g, 34, 21, 4, 4, 'a'); box(g, 35, 22, 2, 2, 'j'); line(g, 36, 22, 36, 24, 'b');
   }
 }
-function crateSite(g: Grid): void {
-  for (const [x, y] of [[2, 9], [12, 9], [2, 13], [12, 13]]) stake(g, x, y);
-  line(g, 4, 11, 11, 11, 'j'); line(g, 7, 8, 7, 13, 'j');
-}
-function crate(g: Grid): void {
-  oval(g, 8, 13, 6, 2, 's');
-  box(g, 2, 5, 12, 8, 'a'); box(g, 3, 6, 10, 6, 'c');
-  box(g, 2, 4, 12, 3, 'd'); box(g, 3, 4, 10, 1, 'e');
-  line(g, 5, 5, 5, 12, 'b'); line(g, 10, 5, 10, 12, 'b');
-  line(g, 3, 9, 12, 9, 'a'); dot(g, 3, 8, 'e'); dot(g, 12, 8, 'e');
-}
 function rackSite(g: Grid): void {
   for (const x of [3, 27]) for (const y of [7, 12]) stake(g, x, y);
   line(g, 5, 8, 27, 8, 'h'); line(g, 5, 12, 27, 12, 'h');
@@ -538,8 +527,6 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   gardenSite: define(48, 24, campLegend, { still: gardenBed }),
   garden: define(48, 24, campLegend, { built: gardenBed }),
   gardenPlant: define(16, 16, nodeLegend, { seedling: g => gardenPlant(g, 'seedling'), growing: g => gardenPlant(g, 'growing'), ripe: g => gardenPlant(g, 'ripe'), dormant: g => gardenPlant(g, 'dormant') }),
-  crateSite: define(16, 16, campLegend, { still: crateSite }),
-  crate: define(16, 16, campLegend, { built: crate }),
   dryingRackSite: define(32, 16, campLegend, { still: rackSite }),
   dryingRack: define(32, 32, campLegend, { built: rack }),
   windbreakSite: define(48, 16, campLegend, { still: windbreakSite }),

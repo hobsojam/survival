@@ -61,7 +61,7 @@ function validStructureDependencies(structures: ObjectValue): boolean {
 function validProgressDependencies(structures: ObjectValue, progress: ObjectValue, area: unknown): boolean {
   if ((area === 'quarry' || progress.quarryFound) && !structures.shelter) return false;
   if (progress.pickaxeCrafted && !(progress.quarryFound && structures.toolshed)) return false;
-  if ((progress.axeCrafted || progress.potCrafted) && !structures.toolshed) return false;
+  if ((progress.axeCrafted || progress.potCrafted || progress.packWoven) && !structures.toolshed) return false;
   const needsColdNight = [structures.hearth, progress.lookoutRepaired, progress.axeCrafted].includes(true);
   return progress.hearthUnlocked === true || !needsColdNight;
 }
@@ -69,9 +69,10 @@ function validProgressDependencies(structures: ObjectValue, progress: ObjectValu
 /** Flags are booleans, and nothing is unlocked without what unlocks it. */
 function validProgress({ structures, progress, area }: SaveShape): boolean {
   const buildingIds = Object.keys(BUILDINGS) as (keyof typeof BUILDINGS)[];
-  if (!buildingIds.every(id => bool(structures[id]))) return false;
+  // Exactly the buildings there are: an old save's storage crate is refused.
+  if (Object.keys(structures).length !== buildingIds.length || !buildingIds.every(id => bool(structures[id]))) return false;
   if (!validStructureDependencies(structures)) return false;
-  const flags = ['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'pickaxeCrafted', 'potCrafted'] as const;
+  const flags = ['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'pickaxeCrafted', 'potCrafted', 'packWoven'] as const;
   return flags.every(key => bool(progress[key])) && validProgressDependencies(structures, progress, area);
 }
 
