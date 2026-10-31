@@ -50,7 +50,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
   for (const node of state.nodes.filter(item => nodeShown(state, item))) add(node.id, nodeTexture(node, timeMs, gathered, isWinter(state.day)), node.x, node.y);
   addPiles(state, visuals, add);
   addPuddles(state, add);
-  for (const tree of state.trees) add(tree.id, tree.readyDay <= state.day ? `${tree.sprite}:still` : 'stump:still', tree.x, tree.y);
+  for (const tree of state.trees) add(tree.id, tree.readyDay <= state.day ? `${tree.sprite}:mature` : 'stump:still', tree.x, tree.y);
   // Trees marked for clearing wear a tie of fibre; once felled they leave a stump that is cleared away with the ground.
   for (const tree of markedTrees(state)) add(tree.id, tree.readyDay <= state.day ? `${tree.sprite}:marked` : 'stump:still', tree.x, tree.y);
   addCamp(state, add);
