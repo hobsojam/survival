@@ -1,6 +1,6 @@
 import type { JournalEntry } from './journalEntries';
 import type { ClearingState } from './clearing';
-import { emptyFood, type FoodStore } from './food';
+import { emptyFood, type FoodStore } from './foodStore';
 export type ResourceKind = 'branch' | 'berry' | 'fiber' | 'stone' | 'hazel' | 'pine' | 'greens' | 'honey';
 
 export const BUILDINGS = {
