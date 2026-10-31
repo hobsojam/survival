@@ -155,6 +155,18 @@ describe('eating from the bag and the larder', () => {
     expect(both.larder.berry).toEqual([6]);
   });
 
+  it('spends the oldest pieces when both stores contain unsorted picks', () => {
+    const state = withStores(camp(), { ...emptyFood(), berry: [8, 2, 6] }, { ...emptyFood(), berry: [7, 1, 5] });
+    const spent = spendFood(state, 'berry', 3)!;
+    expect(spent.inventory.food.berry).toEqual([6, 8]);
+    expect(spent.larder.berry).toEqual([7]);
+  });
+
+  it('refuses to spend more fresh food than the two stores contain', () => {
+    const state = withStores(camp(), { ...emptyFood(), berry: [3] }, emptyFood());
+    expect(spendFood(state, 'berry', 2)).toBeNull();
+  });
+
   it('takes kept food from the bag first', () => {
     const state = withStores(camp(), food([['hazelnut', 1, 1]]), food([['hazelnut', 2, 1]]));
     const one = spendFood(state, 'hazelnut', 1)!;
@@ -171,6 +183,11 @@ describe('eating from the bag and the larder', () => {
     expect(quickEatItem(withStores(camp(), emptyFood(), food([['berry', 1, 4]])))).toBe('berry');
     expect(quickEatItem(withStores(camp(), food([['hazelnut', 1, 1]]), emptyFood()))).toBe('hazelnut');
     expect(quickEatItem(away(withStores(camp(), emptyFood(), food([['berry', 1, 4]]))))).toBeNull();
+  });
+
+  it('lets Q choose the oldest piece when one food has several ages', () => {
+    const state = withStores(camp(), { ...emptyFood(), berry: [9, 2] }, { ...emptyFood(), greens: [5] });
+    expect(quickEatItem(state)).toBe('berry');
   });
 
   it('ignores the larder away from camp, whatever it holds', () => {
