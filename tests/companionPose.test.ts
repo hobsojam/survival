@@ -83,7 +83,8 @@ describe('the bird among the perches', () => {
   });
 
   it('hops along the crowns of grown trees, but not onto stumps', () => {
-    const tree = base.trees[0];
+    // The broadleaf nearest the fire: the bird keeps to trees within its day range of camp.
+    const tree = base.trees.find(each => each.id === 'tree-1')!;
     const walking = withFriend('bird', { player: { ...base.player, x: tree.x - 1, y: tree.y + 1 } });
     const perch = companionPose(walking, 0, 0, 1)!;
     expect([perch.x, perch.height]).toEqual([tree.x, 2.1]);

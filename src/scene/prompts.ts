@@ -6,6 +6,7 @@ import { choppableTrees, isClearingStump } from '../game/clearing';
 import { sitePrompt } from '../game/sitePrompt';
 import { offerFor, offerPrompt } from '../game/companion';
 import { DISHES, defaultDish } from '../game/cooking';
+import { isAtHome, livesInHouse } from '../game/home';
 import { closestGatherable, type Gatherable } from './tapTarget';
 import type { SurvivorAction } from './survivorVisual';
 
@@ -46,7 +47,7 @@ export function gatherKeyAction(state: GameState): GameAction | undefined {
     case 'pile': return { type: 'pickUpStone', pileId: found.pile.id };
     case 'rubble': return { type: 'gatherRubble' };
     case 'quarry': return { type: 'digQuarry' };
-    default: return isAtCamp(state) ? { type: 'rest' } : undefined;
+    default: return isAtHome(state) ? { type: 'rest' } : undefined;
   }
 }
 
@@ -121,12 +122,25 @@ function treePrompt(state: GameState): string {
 function campPrompt(state: GameState): string {
   if (pathOpen(state) && within(state, CAMP_EXIT)) return 'Walk west to leave camp';
   if (!isInClearing(state)) return 'WASD / arrows  Move';
+  if (livesInHouse(state)) return housePrompt(state);
   if (!isAtCamp(state)) return 'In the clearing · G Stargaze · Click an upgrade to build';
   if (sleepBlocker(state) && state.timeOfDay < nightStart(state.day)) return 'At camp · F Fire · R Rest · Click an upgrade to build';
   const evening = sleepBlocker(state) ? 'G Stargaze · F Fire · R Rest' : 'G Stargaze · Z Sleep · F Fire';
   // Once there is something to cook, C names it.
   const dish = defaultDish(state);
   return dish ? `C  Cook ${DISHES[dish].name} · ${evening}` : `At camp · C Cook · ${evening}`;
+}
+
+/** Living in the house: home is for resting, sleeping and cooking, and the campfire is there to feed if wanted. */
+function housePrompt(state: GameState): string {
+  const night = state.timeOfDay >= nightStart(state.day);
+  if (isAtHome(state)) {
+    if (!night) return 'At home · R Rest · Click an upgrade to build';
+    const dish = defaultDish(state);
+    return dish ? `C  Cook ${DISHES[dish].name} · G Stargaze · Z Sleep` : 'At home · C Cook · G Stargaze · Z Sleep';
+  }
+  if (!isAtCamp(state)) return 'In the clearing · G Stargaze · Click an upgrade to build';
+  return night ? 'At the campfire · G Stargaze · F Fire' : 'At the campfire · F Fire · Click an upgrade to build';
 }
 
 function quarryPrompt(state: GameState, found: Gatherable | undefined): string {

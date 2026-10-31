@@ -7,9 +7,10 @@ import { CLEARING_STEPS, STEP_IDS, placeBranches } from './clearing';
 import { KEEPSAKES_NEEDED, TRUST_TARGET } from './companion';
 import { FOOD_ITEMS, isFresh, storeTotal, type FoodStore } from './food';
 import { FORAGE, isForage } from './forage';
+import { woodStoreCapacity } from './home';
 
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 20;
+const SAVE_VERSION = 21;
 export type SaveResult = { ok: true } | { ok: false; error: string };
 export type LoadResult = { kind: 'empty' } | { kind: 'loaded'; state: GameState } | { kind: 'invalid'; reason: string };
 
@@ -88,8 +89,14 @@ function validDiscoveries({ progress }: SaveShape): boolean {
 
 const readyBy = (value: unknown, latest: number): boolean => whole(value) && value >= 1 && value <= latest;
 
-function validWoodpile({ structures, storedWood }: SaveShape): boolean {
-  return count(storedWood) && storedWood <= BALANCE.woodpileCapacity && (structures.woodpile === true || storedWood === 0);
+/** The wood store holds no more than the woodpile and the woodshed between them, and nothing until one is built. */
+function validWoodStore(value: SaveShape): boolean {
+  return count(value.storedWood) && value.storedWood <= woodStoreCapacity(value as unknown as GameState);
+}
+
+/** The fireplace's fuel is never negative, and there is none until the house stands. */
+function validFireplace({ structures, fireplaceFuel }: SaveShape): boolean {
+  return finite(fireplaceFuel) && fireplaceFuel >= 0 && (structures.house === true || fireplaceFuel === 0);
 }
 
 function validFibreStack({ structures, storedFiber }: SaveShape): boolean {
@@ -238,10 +245,10 @@ function validCompanion({ companion, day, structures }: SaveShape): boolean {
   return validBefriendedCompanion(companion, day as number, structures);
 }
 
-/** Checks a version 20 save: the clearing, the larder, the woodpile and the fibre stack, shelter upgrades, garden plots, tools, quarry timers, the year journal and companion. */
+/** Checks a version 21 save: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, shelter upgrades, garden plots, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodpile, validFibreStack, validGarden, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion];
+  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

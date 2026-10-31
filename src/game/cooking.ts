@@ -1,5 +1,6 @@
 import { nightStart } from './calendar';
 import { availableStone, availableWood, freeSpaces, isAtCamp, isInClearing } from './camp';
+import { fuelLeft, isAtHome, livesInHouse } from './home';
 import { addFood, availableFood, spendFood, type FoodItem } from './food';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { BALANCE, type GameState } from './state';
@@ -31,11 +32,21 @@ export function potBlocker(state: GameState): string | null {
   return null;
 }
 
+/** Why there is no fire to cook at here: in the house it is the fireplace, otherwise the campfire. */
+function cookingFireBlocker(state: GameState): string | null {
+  if (livesInHouse(state)) {
+    if (!isAtHome(state)) return 'Go home to cook.';
+    return fuelLeft(state) <= 0 ? 'The fireplace is out. Stock the wood store.' : null;
+  }
+  if (!isAtCamp(state)) return 'Return to camp to cook.';
+  return state.fireFuel <= 0 ? 'Light the campfire before cooking.' : null;
+}
+
 /** Why the survivor can't toast a berry right now, or null if they can: the cooking there is without the pot. */
 export function cookBlocker(state: GameState): string | null {
   if (state.timeOfDay < nightStart(state.day)) return 'Cook berries after nightfall.';
-  if (!isAtCamp(state)) return 'Return to camp to cook.';
-  if (state.fireFuel <= 0) return 'Light the campfire before cooking.';
+  const fire = cookingFireBlocker(state);
+  if (fire) return fire;
   if (availableFood(state, 'berry') <= 0) return 'Gather a berry to cook.';
   return null;
 }
@@ -66,8 +77,8 @@ export function dishBlocker(state: GameState, dish: DishId): string | null {
   if (!DISHES[dish].potOnly) return cookBlocker(state);
   if (!state.progress.potCrafted) return 'Make a cooking pot first.';
   if (state.timeOfDay < nightStart(state.day)) return 'Cook after nightfall.';
-  if (!isAtCamp(state)) return 'Return to camp to cook.';
-  if (state.fireFuel <= 0) return 'Light the campfire before cooking.';
+  const fire = cookingFireBlocker(state);
+  if (fire) return fire;
   const paid = spendIngredients(state, dish);
   if (!paid) return `You need ${ingredientList(dish)} for ${DISHES[dish].name}.`;
   if (dish === 'roastedHazelnuts' && freeSpaces(paid) < 1) return 'Make room in your bag for the roasted hazelnuts.';

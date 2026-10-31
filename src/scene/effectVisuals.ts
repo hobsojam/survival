@@ -2,6 +2,7 @@ import { BALANCE, type GameState, type ResourceKind } from '../game/state';
 import { isFreezingNight } from '../game/rules';
 import { rainFade } from '../game/rain';
 import { coldNightApproach } from '../game/coldNight';
+import { HOUSE_SPOT, fireplaceBurning } from '../game/home';
 import { TILE, worldX, worldY } from './art';
 import { GROUND_DECAL_DEPTH, LIGHT_DEPTH, WEATHER_DEPTH } from './visuals';
 
@@ -32,6 +33,7 @@ export function effectVisuals(state: GameState, timeMs: number, events: EffectEv
   const freezing = isFreezingNight(state);
   const wind = freezing ? 1 : coldNightApproach(state);
   if (state.area === 'camp' && state.fireFuel > 0) results.push(...fireVisuals(timeMs, wind));
+  if (state.area === 'camp' && fireplaceBurning(state)) results.push(...chimneyVisuals(timeMs, wind));
   if (wind > 0) results.push(...weatherVisuals(timeMs, wind, freezing));
   const shower = rainFade(state);
   if (shower > 0) results.push(...rainVisuals(timeMs, shower));
@@ -44,23 +46,39 @@ export function effectVisuals(state: GameState, timeMs: number, events: EffectEv
 
 /** Smoke puffs and sparks rising from the camp fire, streaming sideways as the wind gets up. */
 function fireVisuals(timeMs: number, wind: number): EffectVisual[] {
-  const results: EffectVisual[] = [];
   const fireX = Math.round(worldX(BALANCE.campX));
   const fireY = Math.round(worldY(BALANCE.campY));
-  for (let i = 0; i < 2; i++) {
-    const age = wrap(timeMs + i * 700, 1400);
-    if (age >= 1000) continue;
-    const frame = Math.min(2, Math.floor(age / 334));
-    const x = fireX - 3 + i * 4 + Math.floor(age / 400) + Math.round(wind * (4 + age / 60));
-    const y = fireY - 11 - Math.floor(age / 110);
-    results.push(visual(`fire:smoke:${i}`, `smokePuff:puff${frame}`, x, y, fireY + 1, (1 - age / 1300) * 0.65));
-  }
+  const results = smokeVisuals('fire', fireX, fireY, fireY + 1, timeMs, wind);
   for (let i = 0; i < 2; i++) {
     const age = wrap(timeMs + i * 450, 900);
     if (age >= 350) continue;
     const x = fireX - 3 + i * 5 + Math.floor(age / 140) + Math.round(wind * age / 30);
     const y = fireY - 9 - Math.floor(age / 70);
     results.push(visual(`fire:spark:${i}`, 'spark:still', x, y, LIGHT_DEPTH + 0.2, 1 - age / 400));
+  }
+  return results;
+}
+
+/** Where the chimney smoke starts, in world pixels from the house's foot: the sprite is anchored 20 across and 30 down, and the
+ * chimney's mouth is at 31, 0, so the puffs, which rise from 11 pixels above their start, leave the mouth itself. */
+const CHIMNEY_OFFSET = { x: 11, y: -19 } as const;
+
+/** The campfire's smoke, rising from the house chimney while the fireplace burns. */
+function chimneyVisuals(timeMs: number, wind: number): EffectVisual[] {
+  const houseY = Math.round(worldY(HOUSE_SPOT.y));
+  return smokeVisuals('chimney', Math.round(worldX(HOUSE_SPOT.x)) + CHIMNEY_OFFSET.x, houseY + CHIMNEY_OFFSET.y, houseY + 1, timeMs, wind);
+}
+
+/** Two smoke puffs rising from 11 pixels above a fire, drifting with the wind. */
+function smokeVisuals(source: string, fromX: number, fromY: number, depth: number, timeMs: number, wind: number): EffectVisual[] {
+  const results: EffectVisual[] = [];
+  for (let i = 0; i < 2; i++) {
+    const age = wrap(timeMs + i * 700, 1400);
+    if (age >= 1000) continue;
+    const frame = Math.min(2, Math.floor(age / 334));
+    const x = fromX - 3 + i * 4 + Math.floor(age / 400) + Math.round(wind * (4 + age / 60));
+    const y = fromY - 11 - Math.floor(age / 110);
+    results.push(visual(`${source}:smoke:${i}`, `smokePuff:puff${frame}`, x, y, depth, (1 - age / 1300) * 0.65));
   }
   return results;
 }

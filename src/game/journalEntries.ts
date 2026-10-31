@@ -2,7 +2,8 @@ import { duskLength, nightStart, season, seasonMessage, yearOf, type Season } fr
 import { defaultDish, type DishId } from './cooking';
 import { foodCount, type FoodItem } from './food';
 import { rainMessage } from './rain';
-import { isAtCamp, isColdNight, isInClearing, type GameAction } from './rules';
+import { fuelLeft, isAtHome, livesInHouse, warmFuel } from './home';
+import { isColdNight, isInClearing, type GameAction } from './rules';
 import { LOOKOUT, type GameState } from './state';
 import { RABBIT_HOMES } from './wildlife';
 import { wolfMessage } from './wolves';
@@ -15,7 +16,7 @@ export type JournalId =
   | 'firstSnow' | 'wolfTracks' | 'frozenSpring' | 'winterFire' | 'winterCooking'
   | 'firstRain' | 'rabbits' | 'bushesFull' | 'stumpGrowing' | 'springRest'
   | 'fireflies' | 'twoHandfuls' | 'goldEvening' | 'warmSleep' | 'lookoutEvening'
-  | 'hazelnuts' | 'pineTea' | 'salad' | 'wildHoney';
+  | 'hazelnuts' | 'pineTea' | 'salad' | 'wildHoney' | 'fireside';
 
 export interface JournalEntry { year: number; id: JournalId; day: number; variant: number }
 
@@ -34,7 +35,8 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
       'A cold autumn night, and the fire kept me warm.'] },
     { id: 'driedBerries', lines: ['Dried berries for the winter.'] },
     { id: 'stars', lines: ['Lay back and counted stars.'] },
-    { id: 'hazelnuts', lines: ['Found hazelnuts in the leaf litter.'] }
+    { id: 'hazelnuts', lines: ['Found hazelnuts in the leaf litter.'] },
+    { id: 'fireside', lines: ['A night by the fireplace, the door shut against the wind.'] }
   ],
   winter: [
     { id: 'firstSnow', lines: ['Snow fell in the night.'], silent: true },
@@ -97,9 +99,9 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   fox: m => onAfter(m, awake(m) && isInClearing(m.after) && atDusk(m.after)),
   coldFront: m => {
     if (isColdNight(m.before) && !isColdNight(m.after)) return { day: m.before.day, variant: m.after.progress.hearthUnlocked ? 0 : 1, silent: true };
-    // Once the cold night is long weathered, any autumn night kept warm at camp fills its place in later years.
+    // Once the cold night is long weathered, any autumn night kept warm at home fills its place in later years.
     const weathered = m.before.progress.hearthUnlocked && m.before.progress.nextStormDay === null;
-    return dawn(m) && weathered && isAtCamp(m.before) && m.before.fireFuel > 0 ? { day: m.before.day, variant: 2 } : null;
+    return dawn(m) && weathered && isAtHome(m.before) && fuelLeft(m.before) > 0 ? { day: m.before.day, variant: 2 } : null;
   },
   driedBerries: m => onBefore(m, acted(m, 'prepareTrailFood')),
   stars: m => onBefore(m, acted(m, 'stargaze')),
@@ -108,7 +110,7 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   frozenSpring: m => onBefore(m, atSpring(m)),
   // Slept through at camp: a fire still burning at dawn never went out in the sleep, since nobody fed it.
   // Before lying down, a fire that went out brought a wolf (or the friend's chase); a ration left out says nothing either way.
-  winterFire: m => onBefore(m, acted(m, 'sleep') && dawn(m) && isAtCamp(m.before) && m.after.fireFuel > 0
+  winterFire: m => onBefore(m, acted(m, 'sleep') && dawn(m) && isAtHome(m.before) && fuelLeft(m.after) > 0
     && (m.before.lastWolf?.day !== m.before.day || m.before.lastWolf.took === 'offered')),
   winterCooking: m => onBefore(m, acted(m, 'cook')),
   firstRain: m => onAfter(m, rainMessage(m.before, m.after) !== null),
@@ -120,13 +122,15 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   twoHandfuls: m => onBefore(m, m.action?.type === 'gather' && berries(m.after) - berries(m.before) === 2),
   goldEvening: m => onAfter(m, awake(m) && isInClearing(m.after) && m.before.day === m.after.day
     && daylight(m.before) && !daylight(m.after)),
-  warmSleep: m => onBefore(m, acted(m, 'sleep') && m.after.fireFuel === 0),
+  warmSleep: m => onBefore(m, acted(m, 'sleep') && !livesInHouse(m.before) && warmFuel(m.after) === 0),
   lookoutEvening: m => onAfter(m, awake(m) && m.after.progress.lookoutRepaired && m.after.area === 'camp'
     && within(m.after, LOOKOUT, 2) && atDusk(m.after)),
   hazelnuts: m => onBefore(m, gathered(m, 'hazelnut')),
   pineTea: m => onBefore(m, cooked(m, 'pineTea')),
   salad: m => onBefore(m, cooked(m, 'salad')),
-  wildHoney: m => onBefore(m, gathered(m, 'honey'))
+  wildHoney: m => onBefore(m, gathered(m, 'honey')),
+  // Slept through at home in the house, the fireplace still alight at dawn.
+  fireside: m => onBefore(m, acted(m, 'sleep') && dawn(m) && livesInHouse(m.before) && isAtHome(m.before) && fuelLeft(m.after) > 0)
 };
 
 /**

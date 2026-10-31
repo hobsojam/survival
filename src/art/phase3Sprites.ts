@@ -449,6 +449,64 @@ function fibreStack(g: Grid, stock: StockLevel): void {
   for (const x of [4, 8, 16, 20]) dot(g, x, 4, 'C');
   line(g, 0, 6, 23, 6, 'd'); line(g, 1, 5, 22, 5, 'A');
 }
+function houseSite(g: Grid): void {
+  box(g, 5, 18, 30, 9, 'z');
+  for (const [x, y] of [[3, 16], [35, 16], [3, 26], [35, 26]]) stake(g, x, y);
+  line(g, 5, 17, 35, 17, 'h'); line(g, 5, 27, 35, 27, 'h');
+  line(g, 4, 18, 4, 26, 'h'); line(g, 36, 18, 36, 26, 'h');
+  // A few footing stones already laid along the front, and one set for the chimney.
+  for (const x of [8, 14, 20]) { box(g, x, 24, 4, 2, 'n'); line(g, x, 24, x + 2, 24, 'p'); }
+  box(g, 28, 19, 4, 3, 'n'); line(g, 28, 19, 30, 19, 'p');
+}
+/** A small log house on a stone footing: a shingled roof edged in dark wood, a stone chimney, a door and one window, dark or lit from within. */
+function house(g: Grid, lit: boolean): void {
+  oval(g, 20, 30, 19, 2, 's');
+  // Log walls: dark ends, each course a lit top over a shaded underside.
+  box(g, 3, 14, 34, 14, 'a');
+  for (let y = 15; y < 27; y += 3) { box(g, 4, y, 32, 2, 'c'); line(g, 4, y, 35, y, 'e'); line(g, 4, y + 2, 35, y + 2, 'b'); }
+  for (const x of [3, 36]) for (let y = 15; y < 27; y += 3) dot(g, x, y, 'd');
+  box(g, 2, 27, 36, 3, 'n'); line(g, 2, 27, 37, 27, 'p');
+  for (const x of [7, 13, 19, 25, 31]) dot(g, x, 28, 'm');
+  // The door, a plank step before it, and the window: glass dark by day, warm when the fireplace burns.
+  box(g, 8, 18, 7, 10, 'a'); box(g, 9, 19, 5, 9, 'b'); line(g, 11, 19, 11, 27, 'a'); dot(g, 13, 23, 'e');
+  box(g, 7, 28, 9, 2, 'd'); line(g, 7, 28, 15, 28, 'e');
+  box(g, 22, 18, 8, 7, 'a');
+  box(g, 23, 19, 6, 5, lit ? 'v' : 'a');
+  if (lit) { box(g, 24, 20, 2, 2, 'w'); box(g, 27, 22, 1, 1, 'w'); dot(g, 23, 23, 'u'); dot(g, 28, 23, 'u'); }
+  else { dot(g, 24, 20, 'n'); dot(g, 23, 19, 'o'); }
+  line(g, 26, 19, 26, 23, 'b'); line(g, 23, 21, 28, 21, 'b');
+  box(g, 21, 25, 10, 1, 'd');
+  // The roof: shingle courses under a pale ridge, its rim drawn in the darkest wood so it reads against the camp's earth.
+  for (let y = 2; y <= 13; y++) {
+    const half = Math.min(20, 3 + Math.floor((y - 2) * 1.6));
+    box(g, 20 - half, y, half, 1, 'b'); box(g, 20, y, half, 1, 'c');
+    if (y % 3 === 1) { line(g, 20 - half + 1, y, 19, y, 'a'); line(g, 21, y, 20 + half - 2, y, 'b'); }
+    dot(g, 20 - half - 1, y, 'a'); dot(g, 20 + half, y, 'a');
+  }
+  line(g, 18, 1, 21, 1, 'a'); line(g, 18, 2, 21, 2, 'd');
+  box(g, 0, 13, 40, 1, 'a'); line(g, 1, 12, 38, 12, 'd');
+  // The stone chimney stands through the roof's right slope, wider at its shoulders.
+  box(g, 28, 0, 6, 12, 'm'); box(g, 29, 1, 4, 10, 'n');
+  for (const [x, y] of [[29, 3], [31, 5], [30, 8], [32, 9]]) line(g, x, y, x + 1, y, 'o');
+  box(g, 27, 0, 8, 2, 'o'); line(g, 27, 0, 34, 0, 'p');
+  if (lit) { dot(g, 30, 2, 'u'); dot(g, 31, 2, 'v'); }
+}
+/** The finished shelter once the bed has gone into the house: its door taken off, the front left open and logs stacked inside. */
+function woodshed(g: Grid, stock: StockLevel): void {
+  shelter(g, false, 'finished');
+  // The open front: a dark bay under a lintel, between two posts, where the door and the bed were.
+  box(g, 17, 23, 16, 11, 'a');
+  for (const x of [16, 33]) { box(g, x, 22, 2, 12, 'b'); line(g, x, 22, x, 33, 'd'); }
+  box(g, 16, 21, 19, 2, 'b'); line(g, 16, 21, 34, 21, 'e');
+  const log = (x: number, y: number): void => { box(g, x, y, 4, 3, 'c'); line(g, x, y, x + 3, y, 'e'); dot(g, x + 3, y + 1, 'd'); dot(g, x + 1, y + 1, 'b'); };
+  if (stock === 'empty') return;
+  for (const x of [18, 22, 26, 30]) log(x, 31);
+  log(20, 28); log(24, 28);
+  if (stock !== 'full') return;
+  log(28, 28);
+  for (const x of [18, 22, 26, 30]) log(x, 25);
+  for (const x of [20, 24, 28]) log(x, 23);
+}
 const DIGITS: Record<string, string[]> = {
   2: ['###', '..#', '###', '#..', '###'], 3: ['###', '..#', '.##', '..#', '###'], 4: ['#.#', '#.#', '###', '..#', '..#'],
   5: ['###', '#..', '###', '..#', '###'], 6: ['###', '#..', '###', '#.#', '###'], 7: ['###', '..#', '.#.', '.#.', '.#.'],
@@ -552,6 +610,9 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   woodpile: define(24, 20, campLegend, { empty: g => woodpile(g, 'empty'), some: g => woodpile(g, 'some'), full: g => woodpile(g, 'full') }),
   fibreStackSite: define(24, 16, campLegend, { still: fibreStackSite }),
   fibreStack: define(24, 20, campLegend, { empty: g => fibreStack(g, 'empty'), some: g => fibreStack(g, 'some'), full: g => fibreStack(g, 'full') }),
+  houseSite: define(40, 32, campLegend, { still: houseSite }),
+  house: define(40, 32, campLegend, { dark: g => house(g, false), lit: g => house(g, true) }),
+  woodshed: define(48, 40, campLegend, { empty: g => woodshed(g, 'empty'), some: g => woodshed(g, 'some'), full: g => woodshed(g, 'full') }),
   larderSite: define(24, 16, campLegend, { still: larderSite }),
   larder: define(24, 28, campLegend, { empty: g => larder(g, 'empty'), some: g => larder(g, 'some'), full: g => larder(g, 'full') }),
   pileCount: define(13, 7, countLegend, {

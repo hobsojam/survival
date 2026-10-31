@@ -1,6 +1,7 @@
 import { isColdNight, type GameAction } from '../game/rules';
 import { dawnEffect } from '../game/coldNight';
 import { BALANCE, type GameState } from '../game/state';
+import { livesInHouse } from '../game/home';
 
 // Sleeping through the cold night plays the storm out in a few quick seconds rather than in a blink.
 // The rules have already worked out the morning; this only shows the night on its way there.
@@ -23,8 +24,22 @@ export function replayFrame(before: GameState, after: GameState, elapsedMs: numb
     // Stop just short of dawn, so the night's own end is left to the real morning.
     timeOfDay: Math.min(BALANCE.daySeconds - 0.001, before.timeOfDay + passed),
     fireFuel: Math.max(0, before.fireFuel - passed * BALANCE.coldNightFireBurn),
+    ...fireplaceFrame(before, after, passed),
     player: { ...before.player, warmth }
   };
+}
+
+/** The fireplace partway through the night: burning at the storm rate, drawing a log from the store each time it runs out, as many as the night took. */
+function fireplaceFrame(before: GameState, after: GameState, passed: number): Pick<GameState, 'fireplaceFuel' | 'storedWood'> {
+  if (!livesInHouse(before)) return { fireplaceFuel: before.fireplaceFuel, storedWood: before.storedWood };
+  const logs = before.storedWood - after.storedWood;
+  let fuel = before.fireplaceFuel - passed * BALANCE.coldNightFireBurn;
+  let drawn = 0;
+  while (fuel <= 0 && drawn < logs) {
+    fuel += BALANCE.fireplaceSecondsPerWood;
+    drawn += 1;
+  }
+  return { fireplaceFuel: Math.max(0, fuel), storedWood: before.storedWood - drawn };
 }
 
 /** One sleep through the cold night: each step shows the night as it stands, until the morning takes over. */

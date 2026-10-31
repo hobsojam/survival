@@ -1,11 +1,12 @@
 import { isWinter, nightStart } from './calendar';
 import { takeFromBag } from './food';
+import { fuelLeft } from './home';
 import type { GameState, WolfTake } from './state';
 
 // Wolves come only on winter nights. A visit is saved as the day it happened and what was taken;
 // the message, the tracks and the eyes are all worked out from that and the clock.
 
-/** Below this much fuel on a winter night, wolves gather at the camp edge. */
+/** Below this much fuel on a winter night, wolves gather at the camp edge. In the house, the logs in store count too, since the fireplace draws them itself. */
 export const WOLF_LOW_FUEL = 20;
 
 const MESSAGES: Record<WolfTake, string | null> = {
@@ -20,12 +21,12 @@ const MESSAGES: Record<WolfTake, string | null> = {
 const winterNight = (state: GameState): boolean => isWinter(state.day) && state.timeOfDay >= nightStart(state.day);
 
 export function wolvesClose(state: GameState): boolean {
-  return winterNight(state) && state.fireFuel < WOLF_LOW_FUEL;
+  return winterNight(state) && fuelLeft(state) < WOLF_LOW_FUEL;
 }
 
-/** The first moment of a winter night that the fire is out, a wolf takes a ration, else a berry, unless a friendly wolf sees it off. Mutates advanceTime's working copy. */
+/** The first moment of a winter night that the fire is out (in the house, the fireplace with nothing left in store), a wolf takes a ration, else a berry, unless a friendly wolf sees it off. Mutates advanceTime's working copy. */
 export function wolfVisit(next: GameState): void {
-  if (!winterNight(next) || next.fireFuel > 0 || next.lastWolf?.day === next.day) return;
+  if (!winterNight(next) || fuelLeft(next) > 0 || next.lastWolf?.day === next.day) return;
   if (next.companion.friend === 'wolf') {
     next.lastWolf = { day: next.day, took: 'chased' };
     return;

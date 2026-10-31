@@ -29,7 +29,9 @@ export function journalPageView(state: GameState, page: number): JournalPageView
   const year = Math.floor(index / 4) + 1;
   const s = YEAR[index % 4];
   const first = (year - 1) * YEAR_LENGTH + (index % 4) * SEASON_LENGTH + 1;
-  const order = JOURNAL_PAGES[s].map(entry => entry.id);
+  // The fireside moment waits on the house, so a camp without one keeps its page as it was.
+  const entries = JOURNAL_PAGES[s].filter(entry => entry.id !== 'fireside' || state.structures.house);
+  const order = entries.map(entry => entry.id);
   const written = state.journal
     .filter(entry => entry.year === year && journalSeason(entry.id) === s)
     .sort((a, b) => a.day - b.day || order.indexOf(a.id) - order.indexOf(b.id));
@@ -40,7 +42,7 @@ export function journalPageView(state: GameState, page: number): JournalPageView
       const known = journalEntry(entry.id)!;
       return { icon: journalIconUrl(entry.id), day: `Day ${entry.day}`, line: known.lines[entry.variant] ?? known.lines[0] };
     }),
-    blanks: JOURNAL_PAGES[s].length - written.length,
+    blanks: entries.length - written.length,
     hasPrevious: index > 0,
     hasNext: index < last
   };
