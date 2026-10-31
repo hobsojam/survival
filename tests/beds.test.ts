@@ -6,7 +6,7 @@ import { FOOD_ITEMS, addFood, emptyFood, type FoodStore } from '../src/game/food
 import { TOO_TIRED_MESSAGE, workSeconds } from '../src/game/needs';
 import { rainWindow } from '../src/game/rain';
 import { advanceTime, applyAction, buildStatus, groundBlocker } from '../src/game/rules';
-import { loadGame, saveGame, SAVE_KEY } from '../src/game/save';
+import { loadGame, saveGame, SAVE_KEY, SAVE_VERSION } from '../src/game/save';
 import { newsBetween } from '../src/game/news';
 import { CAMP_STRUCTURES, sceneVisuals } from '../src/scene/visuals';
 import { worldX, worldY } from '../src/scene/art';
@@ -449,7 +449,7 @@ describe('the beds in the save', () => {
     expect(load(planted, 22)).toBe('invalid');
     const storage = new MemoryStorage();
     expect(saveGame(storage, planted).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(23);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(SAVE_VERSION);
   });
 
   it('needs exactly three well-formed beds', () => {

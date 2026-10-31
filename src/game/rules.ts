@@ -15,6 +15,7 @@ import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
 import { logsInStore } from './wood';
 import { settleStores } from './stores';
 import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, cartSpace, countWord, fellingWood, upgradeBlocker, type UpgradeId } from './workshop';
+import { ENDED_MESSAGE, judgeSickDay, markWarmMeal, markWarmRest, sicknessTick } from './sickness';
 import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
@@ -177,7 +178,7 @@ function missingStructurePrerequisite(state: GameState, definition: (typeof BUIL
 }
 
 export function advanceTime(state: GameState, seconds: number, activity: Activity = 'awake'): GameState {
-  if (!Number.isFinite(seconds) || seconds <= 0) return state;
+  if (!Number.isFinite(seconds) || seconds <= 0 || state.ending) return state;
   const next: GameState = {
     ...state,
     player: { ...state.player },
@@ -185,7 +186,7 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
     trees: state.trees.map(tree => ({ ...tree }))
   };
   let remaining = seconds;
-  while (remaining > 0.000001) {
+  while (remaining > 0.000001 && !next.ending) {
     const step = Math.min(remaining, 1, BALANCE.daySeconds - next.timeOfDay);
     const camp = isAtCamp(next);
     const home = isAtHome(next);
@@ -193,6 +194,7 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
     const drain = (activity === 'awake' ? BALANCE.energyDrainPerSecond : 0) + (next.player.hunger <= 0 ? BALANCE.starvingEnergyDrainPerSecond : 0);
     next.player.hunger = Math.max(0, next.player.hunger - hungerLoss(next, step));
     next.player.energy = Math.max(0, next.player.energy - step * drain);
+    sicknessTick(next, step);
     next.player.warmth = Math.max(0, Math.min(100, next.player.warmth + warmthChange(next, step, camp, home, coldNight)));
     next.fireFuel = Math.max(0, next.fireFuel - step * fireBurn(next, coldNight));
     tendFireplace(next, step, coldNight);
@@ -261,6 +263,7 @@ function warmthLossPerSecond(state: GameState, sheltered: boolean, coldNight: bo
 
 /** Starts the next day in place: grows or dries the beds from the day that ended, regrows nodes and settles the cold night if it just ended. */
 function dawn(next: GameState, home: boolean): void {
+  judgeSickDay(next, next.day);
   const stormEnded = next.progress.nextStormDay === next.day;
   const weathered = stormEnded && home && (next.structures.shelter || next.structures.house) && fuelLeft(next) > 0 && next.player.warmth > 20;
   bedsDawn(next, next.day);
@@ -680,7 +683,9 @@ const cook: ActionHandler<'cook'> = (state, action) => {
   const blocker = dishBlocker(state, dish);
   const spent = spendIngredients(state, dish);
   if (blocker || !spent) return refuse(state, blocker ?? 'No food in your bag.');
-  return serveDish(advanceTime(packDish(spent, dish), BALANCE.cookSeconds, 'resting'), dish, state.structures.dryingRack);
+  const served = serveDish(advanceTime(packDish(spent, dish), BALANCE.cookSeconds, 'resting'), dish, state.structures.dryingRack);
+  // Roasted nuts are packed for later, not eaten, so only the other dishes are a warm meal.
+  return dish === 'roastedHazelnuts' ? served : { ...served, state: markWarmMeal(served.state) };
 };
 
 /** A honey cake's extra energy for this rest or sleep, if one was eaten. */
@@ -854,7 +859,7 @@ const build: ActionHandler<'build'> = (state, action) => {
 
 const rest: ActionHandler<'rest'> = state => {
   if (!isAtHome(state)) return refuse(state, livesInHouse(state) ? 'Go home to rest.' : 'Move closer to the fire to rest.');
-  const rested = advanceTime(state, BALANCE.restSeconds, 'resting');
+  const rested = advanceTime(markWarmRest(state), BALANCE.restSeconds, 'resting');
   const bedGain = BALANCE.bedRestEnergyGain + (state.companion.pillow ? BALANCE.pillowEnergyGain : 0);
   const gain = recovery(state, rested.structures.bed ? bedGain : BALANCE.restEnergyGain) + cakeEnergy(state);
   return {
@@ -884,9 +889,10 @@ function fireDiedNote(before: GameState, after: GameState): string {
   return before.fireFuel > 0 && after.fireFuel <= 0 ? ' The fire burned out in the night.' : '';
 }
 
-const sleep: ActionHandler<'sleep'> = state => {
-  const blocked = sleepBlocker(state);
-  if (blocked) return refuse(state, blocked);
+const sleep: ActionHandler<'sleep'> = unmarked => {
+  const blocked = sleepBlocker(unmarked);
+  if (blocked) return refuse(unmarked, blocked);
+  const state = markWarmRest(unmarked);
   const night = BALANCE.daySeconds - state.timeOfDay;
   const alarm = alarmAfter(state);
   if (alarm !== null && alarm < night) {
@@ -935,10 +941,18 @@ const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak
 };
 
+/** An action that carried the survivor into the end of their story says so, in place of its own message. */
+function endingNote(before: GameState, result: ActionResult): ActionResult {
+  if (before.ending || !result.state.ending) return result;
+  const night = result.state.ending.day === before.day && before.timeOfDay >= nightStart(before.day);
+  return { ...result, message: night ? 'Your strength gave out in the night.' : 'Your strength has given out.' };
+}
+
 export function applyAction(state: GameState, action: GameAction): ActionResult {
+  if (state.ending) return refuse(state, ENDED_MESSAGE);
   const handler = HANDLERS[action.type] as ActionHandler<GameAction['type']> | undefined;
   if (!handler) return refuse(state, 'That action is not available yet.');
-  const result = handler(state, action as never);
+  const result = endingNote(state, handler(state, action as never));
   // Anything that moved the survivor or the bag gives the camp stores a chance to take in their materials.
   return result.state === state ? result : { ...result, state: settleStores(result.state) };
 }

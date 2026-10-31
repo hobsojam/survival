@@ -154,6 +154,10 @@ export interface GameState {
   companion: Companion;
   /** How far the camp clearing has been widened, and the step whose trees are being felled. */
   clearing: ClearingState;
+  /** Seconds spent at zero hunger, and the sickness a whole day of them brings: each sick day is judged at dawn. */
+  sickness: { starvedSeconds: number; sick: boolean; sickFromDay: number | null; cared: number; uncared: number; ateWarm: boolean; restedWarm: boolean };
+  /** The day the survivor's story ended, or null while it goes on. */
+  ending: { day: number } | null;
 }
 
 export const BALANCE = {
@@ -234,6 +238,13 @@ export const BALANCE = {
   hungrySleepCap: 50,
   /** Extra energy lost each second at zero hunger, whatever the survivor is doing. */
   starvingEnergyDrainPerSecond: 0.25,
+  /** A whole day at zero hunger makes the survivor sick; sickness then drains energy and warmth each second. */
+  starvedSecondsToSicken: 240,
+  sickEnergyDrainPerSecond: 0.1,
+  sickWarmthDrainPerSecond: 0.05,
+  /** Cared-for days that make a sick survivor well, and days without care that end the run. */
+  sickDaysToRecover: 2,
+  sickDaysToDie: 3,
   fireSecondsPerWood: 90,
   /** Kindling: the same with or without the hearth. */
   fiberFireSeconds: 30,
@@ -352,6 +363,8 @@ export function createGame(): GameState {
     companion: {
       friend: null, since: null, trust: { bird: 0, fox: 0, wolf: 0 }, lastOffer: { bird: 0, fox: 0, wolf: 0 },
       keepsakes: 0, keepsakeLying: false, lastFind: 0, lastGift: 0, pillow: false, cloak: false, alarmDay: 0, foxFled: 0
-    }
+    },
+    sickness: { starvedSeconds: 0, sick: false, sickFromDay: null, cared: 0, uncared: 0, ateWarm: false, restedWarm: false },
+    ending: null
   };
 }

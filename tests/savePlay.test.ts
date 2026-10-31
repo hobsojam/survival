@@ -109,7 +109,8 @@ describe('saving during long random play', () => {
       });
       expect(state.day).toBeGreaterThan(BALANCE.coldNightStartDay);
       const loaded = loadGame(storage);
-      expect(loaded).toEqual({ kind: 'loaded', state });
+      // A survivor who starved to death has no camp left to load: an ended story is never saved.
+      expect(loaded).toEqual(state.ending ? { kind: 'empty' } : { kind: 'loaded', state });
     });
   }
 });

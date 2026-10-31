@@ -4,7 +4,7 @@
 // anything the player had. Loading runs every step a save needs, in order, then validates the result as usual.
 
 /** The saved shape's version. Bump it by one with every change to the shape, and add its upgrade step below. */
-export const SAVE_VERSION = 23;
+export const SAVE_VERSION = 24;
 
 /** The oldest save that can still be brought up to date: earlier formats were never upgraded and don't load. */
 export const OLDEST_UPGRADABLE_VERSION = 23;
@@ -12,8 +12,15 @@ export const OLDEST_UPGRADABLE_VERSION = 23;
 /** Turns a parsed save from one version into the next. It is handed its own copy, so it may change it freely. */
 export type SaveUpgrade = (state: unknown) => unknown;
 
-/** Each step, keyed by the version it upgrades from. There are none yet: version 23 is the first upgradable format. */
-export const SAVE_UPGRADES: Readonly<Record<number, SaveUpgrade>> = {};
+type Upgradable = Record<string, unknown>;
+
+/** Each step, keyed by the version it upgrades from. */
+export const SAVE_UPGRADES: Readonly<Record<number, SaveUpgrade>> = {
+  // Version 24: the survivor can fall sick, and their story can end. An older camp comes in well.
+  23: state => ({ ...(state as Upgradable),
+    sickness: { starvedSeconds: 0, sick: false, sickFromDay: null, cared: 0, uncared: 0, ateWarm: false, restedWarm: false },
+    ending: null })
+};
 
 export type UpgradeResult = { ok: true; state: unknown } | { ok: false; reason: string };
 
