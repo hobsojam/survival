@@ -164,6 +164,19 @@ function sick(name: string, phase: number): string[] {
   });
 }
 
+/** Lying still on the ground, head to the left, eyes closed: the end of the story. */
+function lying(): string[] {
+  const g = blank();
+  box(g, 1, 21, 15, 1, 's'); box(g, 2, 22, 13, 1, 's');
+  box(g, 1, 15, 6, 6, 'a'); box(g, 2, 16, 4, 4, 'w'); box(g, 3, 16, 2, 2, 'x');
+  box(g, 2, 18, 2, 1, 'a');
+  box(g, 6, 16, 2, 5, 'k'); box(g, 6, 17, 2, 3, 'l');
+  box(g, 8, 16, 6, 5, 'f'); box(g, 8, 17, 6, 3, 'h'); box(g, 9, 18, 4, 1, 'i');
+  box(g, 8, 19, 3, 2, 'g'); box(g, 10, 20, 2, 1, 'c');
+  box(g, 14, 17, 2, 3, 'q'); dot(g, 15, 17, 'r');
+  return g.map(row => row.join(''));
+}
+
 function reaching(): string[] {
   const g = blank();
   box(g, 5, 21, 7, 1, 's'); box(g, 3, 22, 11, 1, 's'); box(g, 5, 23, 7, 1, 's');
@@ -193,7 +206,8 @@ const frames: Record<string, string[]> = {
   shiver1: stand('shiver1', 'down', 1, 0, 1, g => { dot(g, 14, 8, 't'); }),
   tired0: tired('tired0', false), tired1: tired('tired1', true),
   hungry0: hungry(0), hungry1: hungry(1),
-  sick0: sick('sick0', 0), sick1: sick('sick1', 1)
+  sick0: sick('sick0', 0), sick1: sick('sick1', 1),
+  lying: lying()
 };
 
 /** How each frame wears the pack: its view, how far it is slumped or seated, and its sideways sway. */

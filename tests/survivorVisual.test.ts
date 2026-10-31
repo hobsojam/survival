@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { effectPose, facingFromInput, needLook, puffDue, selectSurvivorVisual, type SurvivorVisualState } from '../src/scene/survivorVisual';
+import { ENDING_TEXTURE, effectPose, facingFromInput, needLook, puffDue, selectSurvivorVisual, type SurvivorVisualState } from '../src/scene/survivorVisual';
 import { survivorSprite } from '../src/art/survivor';
 
 const state: SurvivorVisualState = { facing: 'down', moving: false, warmth: 80, energy: 80, hunger: 80, sick: false, nowMs: 1000 };
@@ -121,5 +121,12 @@ describe('playing the look on the sprite', () => {
     expect(puffDue(undefined, 0)).toBe(true);
     expect(puffDue(1000, 2400)).toBe(false);
     expect(puffDue(1000, 2500)).toBe(true);
+  });
+});
+
+describe('the end of the story', () => {
+  it('lays the survivor down with a frame the sheet has', () => {
+    expect(ENDING_TEXTURE).toBe('survivor:lying');
+    expect(survivorSprite.frames.lying).toHaveLength(24);
   });
 });

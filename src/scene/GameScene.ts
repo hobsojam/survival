@@ -13,8 +13,9 @@ import { AmbientLife } from './ambientLife';
 import { registerSpriteTextures } from '../art/textures';
 import { season, type Season } from '../game/calendar';
 import { seasonPalette } from '../art/seasonPalette';
-import { effectPose, facingFromInput, puffDue, selectSurvivorVisual, type Facing, type SurvivorAction, type SurvivorPuff } from './survivorVisual';
+import { ENDING_TEXTURE, effectPose, facingFromInput, puffDue, selectSurvivorVisual, type Facing, type SurvivorAction, type SurvivorPuff } from './survivorVisual';
 import { isSick } from '../game/sickness';
+import { ENDING_FADE_MS } from '../ui/ending';
 import { SceneEffects } from './SceneEffects';
 import { SceneLighting } from './SceneLighting';
 import { NightWatch } from './sleepReplay';
@@ -40,6 +41,7 @@ export class GameScene extends Phaser.Scene {
   private facing: Facing = 'down';
   private visualAction?: { kind: SurvivorAction; startedAtMs: number };
   private lastPuffMs?: number;
+  private endingFaded = false;
   private walkTarget?: TapTarget;
   private tapGate: () => boolean = () => true;
   private terrain: Phaser.GameObjects.GameObject[] = [];
@@ -145,6 +147,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private syncPlayerSprite(moving: boolean): void {
+    if (this.state.ending) {
+      this.layDown();
+      return;
+    }
     const { warmth, energy, hunger } = this.state.player;
     const now = this.time.now;
     const visual = selectSurvivorVisual({ facing: this.facing, moving, warmth, energy, hunger, sick: isSick(this.state),
@@ -165,6 +171,16 @@ export class GameScene extends Phaser.Scene {
       this.areaShown = this.state.area;
       this.cameras.main.centerOn(this.playerSprite.x, this.playerSprite.y);
     }
+  }
+
+  /** The story has ended: the survivor lies still and the view fades slowly out. */
+  private layDown(): void {
+    if (this.playerSprite.texture.key !== ENDING_TEXTURE) this.playerSprite.setTexture(ENDING_TEXTURE);
+    this.playerSprite.setRotation(0).setFlipX(false)
+      .setPosition(Math.round(worldX(this.state.player.x)), Math.round(worldY(this.state.player.y)));
+    if (this.endingFaded) return;
+    this.endingFaded = true;
+    this.cameras.main.fadeOut(ENDING_FADE_MS, 23, 51, 38);
   }
 
   /** A small cloud by the survivor's face that drifts up and fades: white breath in the cold, a grey-cream cough when sick. */

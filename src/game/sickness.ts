@@ -8,6 +8,8 @@ import { BALANCE, type GameState } from './state';
 export type Sickness = GameState['sickness'];
 
 export const ENDED_MESSAGE = 'Your story has ended.';
+/** Said when the story ends overnight, as it does at the dawn that judges the last sick day. */
+export const GAVE_OUT_MESSAGE = 'Your strength gave out in the night.';
 export const FALLING_ILL_MESSAGE = "You've gone too long without food, and you're falling ill.";
 
 export function wellSickness(): Sickness {

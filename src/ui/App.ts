@@ -14,7 +14,10 @@ import { gateTap, nextOpenTab, wireSidebarTabs, type DockTab } from './dock';
 import { createPause, wirePause, type PauseControl } from './pause';
 import { journalView } from './journal';
 import { renderRegionOverview } from './regionOverview';
-import { currentPage, journalPageView, renderJournalPage, turnPage } from './yearJournal';
+import { currentPage, journalPageView, journalText, renderJournalPage, turnPage } from './yearJournal';
+import { GAVE_OUT_MESSAGE } from '../game/sickness';
+import { ENDING_FADE_MS, endingMarkup, endingView, showEnding } from './ending';
+import { browserDownloadDoc, downloadText } from './download';
 import { showBuildList, showCampStores } from './showPanels';
 import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
 import type { UpgradeId } from '../game/workshop';
@@ -45,6 +48,7 @@ export class App {
   private previousSave: LoadResult = { kind: 'empty' };
   private lastSaveAt = 0;
   private saveFailures = 0;
+  private endingTimer?: number;
   private openTab: DockTab | null = null;
   /** The journal page being read, or null to follow the current season. */
   private journalPage: number | null = null;
@@ -122,7 +126,7 @@ export class App {
           <div class="dock-tabs"><button type="button" data-tab-button="bag">🎒 Bag</button><button type="button" data-tab-button="build">🔨 Build</button><button type="button" data-tab-button="camp">🌙 Camp</button></div>
         </nav>
         <div id="start-screen" class="start-screen"><div class="start-card"><div class="start-mark">✦</div><p class="eyebrow">A SMALL SURVIVAL STORY</p><h1>Make a little place<br>feel like home.</h1><p class="start-copy">Gather what you need, keep a fire glowing, and build a refuge one day at a time.</p><p id="start-note" class="start-note"></p><div class="start-buttons"><button id="continue-game" class="primary-button" hidden>Continue your camp</button><button id="new-game" class="secondary-button">Start a new game</button></div><small>Single player · Saves in this browser</small></div></div>
-        <div id="lookout-ending" class="lookout-ending hidden" role="dialog" aria-modal="true" aria-labelledby="ending-title"><div class="start-card"><div class="start-mark">✦</div><p class="eyebrow">A VIEW FROM ABOVE</p><h1 id="ending-title">A place to call home.</h1><p class="start-copy">The lookout stands again. Beyond your camp, the old quarry lies to the west with stone among its rubble. Your field journal now shows the areas you can explore.</p><div class="start-buttons"><button id="continue-exploring" class="primary-button">Keep exploring</button></div></div></div>
+        <div id="lookout-ending" class="lookout-ending hidden" role="dialog" aria-modal="true" aria-labelledby="ending-title"><div class="start-card"><div class="start-mark">✦</div><p class="eyebrow">A VIEW FROM ABOVE</p><h1 id="ending-title">A place to call home.</h1><p class="start-copy">The lookout stands again. Beyond your camp, the old quarry lies to the west with stone among its rubble. Your field journal now shows the areas you can explore.</p><div class="start-buttons"><button id="continue-exploring" class="primary-button">Keep exploring</button></div></div></div>${endingMarkup()}
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
@@ -182,6 +186,9 @@ export class App {
       this.root.querySelector('#lookout-ending')?.classList.add('hidden');
       this.game?.scene.resume('GameScene');
     });
+    this.root.querySelector('#download-journal')!.addEventListener('click', () =>
+      downloadText(browserDownloadDoc(document), 'hearthwild-journal.txt', journalText(this.state)));
+    this.root.querySelector('#begin-again')!.addEventListener('click', () => this.beginNewGame());
     window.addEventListener('pagehide', () => { if (this.scene) this.saveCurrent(); });
     document.addEventListener('visibilitychange', () => { if (document.hidden && this.scene) this.saveCurrent(); });
     this.showStartScreen();
@@ -194,6 +201,8 @@ export class App {
     this.game?.destroy(true);
     this.root.querySelector('#start-screen')?.classList.add('hidden');
     this.root.querySelector('#lookout-ending')?.classList.add('hidden');
+    this.root.querySelector('#story-ending')?.classList.add('hidden');
+    window.clearTimeout(this.endingTimer);
     const restart = this.root.querySelector<HTMLButtonElement>('#restart-game');
     if (restart) restart.hidden = false;
     this.setOpenTab(null);
@@ -210,6 +219,7 @@ export class App {
       this.state = next;
       this.soundscape.update(next);
       this.render();
+      if (!previous.ending && next.ending) this.endStory(next, cause === 'action');
       if (cause === 'action' && !previous.progress.lookoutRepaired && next.progress.lookoutRepaired) {
         this.root.querySelector('#lookout-ending')?.classList.remove('hidden');
         this.game?.scene.pause('GameScene');
@@ -262,6 +272,14 @@ export class App {
     this.render();
   }
 
+  /** Sickness has won: the save goes, and once the view has faded the ending card offers the journal and a new start. */
+  private endStory(ended: GameState, byAction: boolean): void {
+    this.saveCurrent();
+    // An action that ended the story already said so; the passing night says it here.
+    if (!byAction) this.setMessage(GAVE_OUT_MESSAGE);
+    this.endingTimer = window.setTimeout(() => showEnding(selector => this.root.querySelector(selector), endingView(ended)), ENDING_FADE_MS);
+  }
+
   private showStartScreen(): void {
     const note = this.root.querySelector<HTMLElement>('#start-note');
     const continueButton = this.root.querySelector<HTMLButtonElement>('#continue-game');
@@ -294,7 +312,8 @@ export class App {
     this.lastSaveAt = Date.now();
     const status = this.root.querySelector<HTMLElement>('#save-status');
     if (result.ok) {
-      this.previousSave = { kind: 'loaded', state: this.state };
+      // An ended story leaves no save behind, so beginning again asks nothing.
+      this.previousSave = this.state.ending ? { kind: 'empty' } : { kind: 'loaded', state: this.state };
       this.saveFailures = 0;
       this.setText('save-status', 'Saved locally');
       status?.removeAttribute('title');

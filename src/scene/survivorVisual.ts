@@ -49,6 +49,9 @@ const actionDurationMs: Record<SurvivorAction, number> = {
   gather: 600, rest: 1200, cook: 1400, stargaze: 1600
 };
 
+/** The survivor's last pose, once the story has ended. */
+export const ENDING_TEXTURE = 'survivor:lying';
+
 export function facingFromInput(horizontal: number, vertical: number, previous: Facing): Facing {
   if (Math.abs(horizontal) >= Math.abs(vertical) && horizontal !== 0) return horizontal < 0 ? 'left' : 'right';
   if (vertical !== 0) return vertical < 0 ? 'up' : 'down';

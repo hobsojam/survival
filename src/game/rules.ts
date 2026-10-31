@@ -16,7 +16,7 @@ import { logsInStore } from './wood';
 import { settleStores } from './stores';
 import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, cartSpace, countWord, fellingWood, upgradeBlocker, type UpgradeId } from './workshop';
 import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishingSecondsFor, validRoll } from './fishing';
-import { ENDED_MESSAGE, judgeSickDay, markWarmMeal, markWarmRest, sicknessTick } from './sickness';
+import { ENDED_MESSAGE, GAVE_OUT_MESSAGE, judgeSickDay, markWarmMeal, markWarmRest, sicknessTick } from './sickness';
 import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
@@ -969,7 +969,7 @@ const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
 function endingNote(before: GameState, result: ActionResult): ActionResult {
   if (before.ending || !result.state.ending) return result;
   const night = result.state.ending.day === before.day && before.timeOfDay >= nightStart(before.day);
-  return { ...result, message: night ? 'Your strength gave out in the night.' : 'Your strength has given out.' };
+  return { ...result, message: night ? GAVE_OUT_MESSAGE : 'Your strength has given out.' };
 }
 
 export function applyAction(state: GameState, action: GameAction): ActionResult {

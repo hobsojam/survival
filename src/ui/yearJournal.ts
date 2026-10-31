@@ -105,3 +105,11 @@ export function renderJournalPage(root: JournalRoot, view: JournalPageView, make
   find('#year-journal-entries')?.replaceChildren(...view.entries.map(entry => row(make, entry)),
     ...Array.from({ length: view.blanks }, () => row(make, null)));
 }
+
+/** The journal written so far as plain text, to keep: a heading per written page, then a line per entry. Blank pages are left out. */
+export function journalText(state: GameState): string {
+  const pages = Array.from({ length: currentPage(state.day) + 1 }, (_, page) => journalPageView(state, page));
+  return pages.filter(page => page.entries.length > 0)
+    .map(page => [page.title, ...page.entries.map(entry => `${entry.day} · ${entry.line}`), ''].join('\n'))
+    .join('\n');
+}
