@@ -134,6 +134,8 @@ function shelterSite(g: Grid): void {
   line(g, 6, 19, 42, 19, 'h'); line(g, 6, 27, 42, 27, 'h');
   line(g, 5, 20, 5, 27, 'h'); line(g, 43, 20, 43, 27, 'h');
 }
+/** How full a camp store looks: the larder, woodpile and fibre stack share these frames. */
+export type StockLevel = 'empty' | 'some' | 'full';
 type ShelterStage = 'plain' | 'thatched' | 'stonework' | 'porch' | 'finished';
 function shelter(g: Grid, bed: boolean, stage: ShelterStage = 'plain'): void {
   oval(g, 24, 36, 21, 3, 's');
@@ -172,17 +174,6 @@ function shelter(g: Grid, bed: boolean, stage: ShelterStage = 'plain'): void {
     box(g, 10, 21, 5, 4, 'a'); box(g, 11, 22, 3, 2, 'j'); line(g, 12, 22, 12, 24, 'b');
     box(g, 34, 21, 4, 4, 'a'); box(g, 35, 22, 2, 2, 'j'); line(g, 36, 22, 36, 24, 'b');
   }
-}
-function crateSite(g: Grid): void {
-  for (const [x, y] of [[2, 9], [12, 9], [2, 13], [12, 13]]) stake(g, x, y);
-  line(g, 4, 11, 11, 11, 'j'); line(g, 7, 8, 7, 13, 'j');
-}
-function crate(g: Grid): void {
-  oval(g, 8, 13, 6, 2, 's');
-  box(g, 2, 5, 12, 8, 'a'); box(g, 3, 6, 10, 6, 'c');
-  box(g, 2, 4, 12, 3, 'd'); box(g, 3, 4, 10, 1, 'e');
-  line(g, 5, 5, 5, 12, 'b'); line(g, 10, 5, 10, 12, 'b');
-  line(g, 3, 9, 12, 9, 'a'); dot(g, 3, 8, 'e'); dot(g, 12, 8, 'e');
 }
 function rackSite(g: Grid): void {
   for (const x of [3, 27]) for (const y of [7, 12]) stake(g, x, y);
@@ -387,7 +378,7 @@ function larderSite(g: Grid): void {
   line(g, 10, 9, 14, 9, 'z');
 }
 /** A raised cache on four legs with a little ladder: a plank box under a lit roof, its open front showing what is kept. */
-function larder(g: Grid, stock: 'empty' | 'some' | 'full'): void {
+function larder(g: Grid, stock: StockLevel): void {
   oval(g, 12, 26, 10, 2, 's');
   for (const x of [7, 17]) box(g, x, 13, 1, 11, 'a');
   for (const x of [3, 19]) { box(g, x, 13, 2, 14, 'b'); line(g, x, 13, x, 25, 'd'); }
@@ -413,7 +404,7 @@ function woodpileSite(g: Grid): void {
   line(g, 10, 10, 14, 10, 'z');
 }
 /** Split logs stacked in rows under a little lean-to roof; the roof is drawn last so the logs peek out beneath it. */
-function woodpile(g: Grid, stock: 'empty' | 'some' | 'full'): void {
+function woodpile(g: Grid, stock: StockLevel): void {
   oval(g, 12, 18, 10, 2, 's');
   for (const x of [2, 20]) { box(g, x, 5, 2, 13, 'b'); line(g, x, 5, x, 17, 'd'); }
   box(g, 4, 16, 16, 2, 'a'); line(g, 4, 17, 19, 17, 'b');
@@ -431,6 +422,32 @@ function woodpile(g: Grid, stock: 'empty' | 'some' | 'full'): void {
     log(12, 7);
   }
   box(g, 0, 2, 24, 3, 'd'); box(g, 1, 2, 12, 1, 'e'); line(g, 0, 4, 23, 4, 'b');
+}
+function fibreStackSite(g: Grid): void {
+  for (const [x, y] of [[3, 7], [20, 7], [3, 11], [20, 11]]) stake(g, x, y);
+  line(g, 5, 8, 19, 8, 'h'); line(g, 5, 12, 19, 12, 'h');
+  line(g, 10, 10, 14, 10, 'i');
+}
+/** A small rick of pale fibre bundles on a log base, under a thatched cap on two posts; the cap is drawn last so it overhangs the bundles. */
+function fibreStack(g: Grid, stock: StockLevel): void {
+  oval(g, 12, 18, 10, 2, 's');
+  for (const x of [3, 19]) { box(g, x, 6, 2, 12, 'b'); line(g, x, 6, x, 17, 'd'); }
+  box(g, 5, 16, 14, 2, 'a'); line(g, 5, 16, 18, 16, 'c');
+  // Each bundle stands upright: pale stalks bound at the waist with a twist of darker fibre.
+  const bundle = (x: number, y: number): void => {
+    box(g, x, y, 3, 4, 'h'); line(g, x, y, x + 2, y, 'j'); dot(g, x + 1, y + 1, 'i'); line(g, x, y + 2, x + 2, y + 2, 'b');
+  };
+  if (stock !== 'empty') for (const x of [6, 10, 14]) bundle(x, 12);
+  if (stock === 'full') for (const x of [8, 12]) bundle(x, 8);
+  // The thatch is lighter than the trodden camp earth and edged in dark wood, so the cap reads against the ground.
+  for (let y = 1; y <= 5; y++) {
+    const half = Math.min(11, 3 + (y - 1) * 2);
+    box(g, 12 - half, y, half, 1, 'z'); box(g, 12, y, half, 1, 'B');
+    dot(g, 12 - half - 1, y, 'd'); dot(g, 12 + half, y, 'd');
+  }
+  line(g, 11, 0, 12, 0, 'd');
+  for (const x of [4, 8, 16, 20]) dot(g, x, 4, 'C');
+  line(g, 0, 6, 23, 6, 'd'); line(g, 1, 5, 22, 5, 'A');
 }
 const DIGITS: Record<string, string[]> = {
   2: ['###', '..#', '###', '#..', '###'], 3: ['###', '..#', '.##', '..#', '###'], 4: ['#.#', '#.#', '###', '..#', '..#'],
@@ -515,8 +532,6 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   gardenSite: define(48, 24, campLegend, { still: gardenBed }),
   garden: define(48, 24, campLegend, { built: gardenBed }),
   gardenPlant: define(16, 16, nodeLegend, { seedling: g => gardenPlant(g, 'seedling'), growing: g => gardenPlant(g, 'growing'), ripe: g => gardenPlant(g, 'ripe'), dormant: g => gardenPlant(g, 'dormant') }),
-  crateSite: define(16, 16, campLegend, { still: crateSite }),
-  crate: define(16, 16, campLegend, { built: crate }),
   dryingRackSite: define(32, 16, campLegend, { still: rackSite }),
   dryingRack: define(32, 32, campLegend, { built: rack }),
   windbreakSite: define(48, 16, campLegend, { still: windbreakSite }),
@@ -535,6 +550,8 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   toolshed: define(24, 28, campLegend, { built: toolshed }),
   woodpileSite: define(24, 16, campLegend, { still: woodpileSite }),
   woodpile: define(24, 20, campLegend, { empty: g => woodpile(g, 'empty'), some: g => woodpile(g, 'some'), full: g => woodpile(g, 'full') }),
+  fibreStackSite: define(24, 16, campLegend, { still: fibreStackSite }),
+  fibreStack: define(24, 20, campLegend, { empty: g => fibreStack(g, 'empty'), some: g => fibreStack(g, 'some'), full: g => fibreStack(g, 'full') }),
   larderSite: define(24, 16, campLegend, { still: larderSite }),
   larder: define(24, 28, campLegend, { empty: g => larder(g, 'empty'), some: g => larder(g, 'some'), full: g => larder(g, 'full') }),
   pileCount: define(13, 7, countLegend, {

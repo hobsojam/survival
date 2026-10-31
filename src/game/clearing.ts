@@ -1,6 +1,7 @@
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { BALANCE, BUILDINGS, type GameState, type ResourceNode, type TreeNode } from './state';
 import { availableWood } from './wood';
+import { availableFiber } from './fiber';
 
 // The camp clearing starts as the ring round the fire and widens one side at a time. Each side has a near and a far step;
 // every step names the trees that stand in its way and the building the cleared ground makes room for.
@@ -200,7 +201,7 @@ export function clearGroundBlocker(state: GameState): string | null {
   if (!isInClearing(state)) return 'Return to camp to clear land.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   const { wood, fiber } = CLEARING_STEPS[marked].cost;
-  if (availableWood(state) < wood || state.inventory.fiber < fiber) return `Need ${wood} wood and ${fiber} fiber to clear this.`;
+  if (availableWood(state) < wood || availableFiber(state) < fiber) return `Need ${wood} wood and ${fiber} fiber to clear this.`;
   return null;
 }
 

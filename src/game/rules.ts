@@ -3,14 +3,14 @@ import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } 
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
-import { availableStone, availableWood, spendWood, bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
+import { availableFiber, availableStone, availableWood, spendFiber, spendWood, bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
 import { POT_COST, cookBlocker, defaultDish, dishBlocker, foodWord, packDish, potBlocker, serveDish, spendIngredients, type DishId } from './cooking';
 import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
 import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, type StepId } from './clearing';
 import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
 import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
-import { BALANCE, BUILDINGS, LOOKOUT, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
+import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
   | { type: 'gather'; nodeId: string }
@@ -26,7 +26,7 @@ export type GameAction =
   | { type: 'storeFood'; item: FoodItem }
   | { type: 'takeFood'; item: FoodItem }
   | { type: 'cook'; dish?: DishId }
-  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'storeWood' | 'takeWood' | 'befriend' | 'craftPillow' | 'craftCloak' }
+  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'storeWood' | 'takeWood' | 'storeFiber' | 'takeFiber' | 'befriend' | 'craftPillow' | 'craftCloak' }
   | { type: 'pickUpStone'; pileId: string };
 
 /** Awake time tires the survivor; work already costs energy, and resting doesn't. */
@@ -43,7 +43,7 @@ function near(x1: number, y1: number, x2: number, y2: number, radius: number = B
 
 export const FULL_BAG_MESSAGE = 'Your bag is full. Eat, burn, or set something down at camp to make room.';
 
-export { availableStone, availableWood, spendWood, bagCapacity, carriedCount, cookBlocker, freeSpaces, isAtCamp, isInClearing, spaceFor };
+export { availableFiber, availableStone, availableWood, spendFiber, spendWood, bagCapacity, carriedCount, cookBlocker, freeSpaces, isAtCamp, isInClearing, spaceFor };
 
 /** Pays stone from the bag first, then from the camp pile. */
 export function spendStone(state: GameState, amount: number): GameState {
@@ -68,9 +68,9 @@ export function lookoutRepairBlocker(state: GameState): string | null {
   if (!near(state.player.x, state.player.y, LOOKOUT.x, LOOKOUT.y)) return 'Stand beside the lookout to repair it.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   const { wood, fiber, stone } = LOOKOUT.cost;
-  if (availableWood(state) < wood || state.inventory.fiber < fiber || availableStone(state) < stone) {
+  if (availableWood(state) < wood || availableFiber(state) < fiber || availableStone(state) < stone) {
     const needed = [availableWood(state) < wood ? `${wood} wood` : null,
-      state.inventory.fiber < fiber ? `${fiber} fiber` : null,
+      availableFiber(state) < fiber ? `${fiber} fiber` : null,
       availableStone(state) < stone ? `${stone} stone` : null].filter(Boolean).join(' and ');
     return `Need ${needed} to repair the lookout.`;
   }
@@ -114,8 +114,19 @@ export function pickaxeBlocker(state: GameState): string | null {
   if (!isInClearing(state)) return 'Return to camp to craft the pickaxe.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   const { wood, fiber, stone } = PICKAXE.cost;
-  if (availableWood(state) < wood || state.inventory.fiber < fiber || availableStone(state) < stone)
+  if (availableWood(state) < wood || availableFiber(state) < fiber || availableStone(state) < stone)
     return `Need ${wood} wood, ${fiber} fiber, and ${stone} stone for the pickaxe.`;
+  return null;
+}
+
+/** Why the woven pack can't be made right now, or null if it can. Wood and fiber can come from their camp stores. */
+export function packBlocker(state: GameState): string | null {
+  if (state.progress.packWoven) return 'You already have a woven pack.';
+  if (!state.structures.toolshed) return 'Build a toolshed first.';
+  if (!isInClearing(state)) return 'Return to camp to weave the pack.';
+  if (isExhausted(state)) return TOO_TIRED_MESSAGE;
+  const { wood, fiber } = PACK.cost;
+  if (availableWood(state) < wood || availableFiber(state) < fiber) return `Need ${wood} wood and ${fiber} fiber for the pack.`;
   return null;
 }
 
@@ -140,7 +151,7 @@ export function buildStatus(state: GameState, id: StructureId): BuildStatus {
   if (groundBlocker(state, id)) return 'needsGround';
   const cost = definition.cost;
   const stoneCost = 'stone' in cost ? cost.stone : 0;
-  const affordable = availableWood(state) >= cost.wood && state.inventory.fiber >= cost.fiber && availableStone(state) >= stoneCost;
+  const affordable = availableWood(state) >= cost.wood && availableFiber(state) >= cost.fiber && availableStone(state) >= stoneCost;
   return affordable && isInClearing(state) && !isExhausted(state) ? 'ready' : 'unavailable';
 }
 
@@ -265,12 +276,11 @@ function tire(state: GameState, cost: number): GameState['player'] {
   return { ...state.player, energy: Math.max(0, state.player.energy - cost) };
 }
 
-/** Pays fiber from the bag and wood and stone from the bag or their stores, then spends build time. */
+/** Pays wood, fiber and stone from the bag first, then from their stores, then spends build time. */
 function payAndBuild(state: GameState, cost: { wood: number; fiber: number; stone: number }, changes: Partial<GameState>): GameState {
-  const paid = spendWood(spendStone(state, cost.stone), cost.wood);
+  const paid = spendFiber(spendWood(spendStone(state, cost.stone), cost.wood), cost.fiber);
   return advanceTime({
     ...paid,
-    inventory: { ...paid.inventory, fiber: state.inventory.fiber - cost.fiber },
     player: tire(state, BALANCE.buildEnergyCost),
     ...changes
   }, workSeconds(state, BALANCE.buildSeconds), 'working');
@@ -351,7 +361,7 @@ export function axeBlocker(state: GameState): string | null {
   if (!state.structures.toolshed) return 'Build a toolshed first.';
   if (!isInClearing(state)) return 'Return to camp to craft the axe.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
-  if (availableWood(state) < 1 || state.inventory.fiber < 1 || availableStone(state) < 1) return 'Need 1 wood, 1 fiber, and 1 stone for the axe.';
+  if (availableWood(state) < 1 || availableFiber(state) < 1 || availableStone(state) < 1) return 'Need 1 wood, 1 fiber, and 1 stone for the axe.';
   return null;
 }
 
@@ -379,6 +389,15 @@ const craftPot: ActionHandler<'craftPot'> = state => {
   return {
     state: payAndBuild(state, POT_COST, { progress: { ...state.progress, potCrafted: true } }),
     message: 'Made a cooking pot. It hangs over the fire on a little tripod.'
+  };
+};
+
+const craftPack: ActionHandler<'craftPack'> = state => {
+  const blocker = packBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  return {
+    state: payAndBuild(state, PACK.cost, { progress: { ...state.progress, packWoven: true } }),
+    message: 'You wove a pack. There\'s room for twice as much now.'
   };
 };
 
@@ -542,6 +561,28 @@ const takeWood: ActionHandler<'takeWood'> = state => {
   return { state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood + 1 }, storedWood: state.storedWood - 1 }, message: 'Took a log from the woodpile.' };
 };
 
+function fibreStackBlocker(state: GameState): string | null {
+  if (!state.structures.fibreStack) return 'Build a fibre stack first.';
+  if (!isInClearing(state)) return 'Return to camp to use the fibre stack.';
+  return null;
+}
+
+const storeFiber: ActionHandler<'storeFiber'> = state => {
+  const blocker = fibreStackBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  if (state.inventory.fiber < 1) return refuse(state, 'You have no fiber to store.');
+  if (state.storedFiber >= BALANCE.fibreStackCapacity) return refuse(state, 'The fibre stack is full.');
+  return { state: { ...state, inventory: { ...state.inventory, fiber: state.inventory.fiber - 1 }, storedFiber: state.storedFiber + 1 }, message: 'Tucked a bundle of fiber under the thatch.' };
+};
+
+const takeFiber: ActionHandler<'takeFiber'> = state => {
+  const blocker = fibreStackBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  if (state.storedFiber < 1) return refuse(state, 'The fibre stack is empty.');
+  if (freeSpaces(state) < spaceFor('fiber')) return refuse(state, FULL_BAG_MESSAGE);
+  return { state: { ...state, inventory: { ...state.inventory, fiber: state.inventory.fiber + 1 }, storedFiber: state.storedFiber - 1 }, message: 'Took a bundle of fiber from the stack.' };
+};
+
 function larderBlocker(state: GameState): string | null {
   if (!state.structures.larder) return 'Build a larder first.';
   if (!isInClearing(state)) return 'Return to camp to use the larder.';
@@ -616,9 +657,9 @@ const pickUpStone: ActionHandler<'pickUpStone'> = (state, action) => {
 
 const burnFiber: ActionHandler<'burnFiber'> = state => {
   if (!isAtCamp(state)) return refuse(state, 'Move closer to the fire to tend it.');
-  if (state.inventory.fiber < 1) return refuse(state, 'You have no fiber to burn.');
+  if (availableFiber(state) < 1) return refuse(state, 'You have no fiber to burn.');
   return {
-    state: { ...state, inventory: { ...state.inventory, fiber: state.inventory.fiber - 1 }, fireFuel: state.fireFuel + BALANCE.fiberFireSeconds },
+    state: { ...spendFiber(state, 1), fireFuel: state.fireFuel + BALANCE.fiberFireSeconds },
     message: 'The kindling flares up.'
   };
 };
@@ -766,7 +807,7 @@ const harvestGarden: ActionHandler<'harvestGarden'> = (state, action) => {
 function missingCost(state: GameState, cost: { wood: number; fiber: number; stone: number }): string | null {
   const needed = [
     availableWood(state) < cost.wood ? `${cost.wood} wood` : null,
-    state.inventory.fiber < cost.fiber ? `${cost.fiber} fiber` : null,
+    availableFiber(state) < cost.fiber ? `${cost.fiber} fiber` : null,
     availableStone(state) < cost.stone ? `${cost.stone} stone` : null
   ].filter(Boolean);
   return needed.length ? `Need ${needed.join(' and ')} to build this.` : null;
@@ -862,8 +903,8 @@ const craftCloak: ActionHandler<'craftCloak'> = state =>
   craftKeepsake(state, 'cloak', cloakBlocker(state), 'You made a fur cloak. The nights will bite a little less.');
 
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
-  move, cross, gather, craftAxe, craftPickaxe, craftPot, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
-  storeStone, takeStone, storeWood, takeWood, storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
+  move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
+  storeStone, takeStone, storeWood, takeWood, storeFiber, takeFiber, storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
   cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, rest, sleep, befriend, craftPillow, craftCloak
 };
 

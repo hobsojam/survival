@@ -3,6 +3,7 @@ import { BALANCE, type GameState } from './state';
 
 export { isInClearing } from './clearing';
 export { availableWood, spendWood } from './wood';
+export { availableFiber, spendFiber } from './fiber';
 
 // Where the survivor is and what their bag holds: plain reads of the state that the rules and the companion both use.
 
@@ -22,7 +23,7 @@ export function carriedCount(state: GameState): number {
 }
 
 export function bagCapacity(state: GameState): number {
-  return state.structures.crate ? BALANCE.crateCapacity : BALANCE.baseCapacity;
+  return state.progress.packWoven ? BALANCE.packCapacity : BALANCE.baseCapacity;
 }
 
 export function freeSpaces(state: GameState): number {

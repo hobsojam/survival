@@ -6,7 +6,7 @@ import { advanceTime, applyAction, buildStatus } from '../src/game/rules';
 import { ALL_NEED_ALERTS, isExhausted, isLowMeter, isHungry, isStarving, isTired, needAlerts, needsMessage } from '../src/game/needs';
 import { stock } from './stock';
 
-/** A survivor at the fire with the given energy and hunger, wood for a crate, berries, and room in the bag. */
+/** A survivor at the fire with the given energy and hunger, wood for a drying rack, berries, and room in the bag. */
 function camp(energy: number, hunger = 100): GameState {
   const state = createGame();
   state.player = { ...state.player, x: BALANCE.campX, y: BALANCE.campY, energy, hunger };
@@ -42,7 +42,7 @@ describe('tired work', () => {
 
   it('slows building and preparing rations too', () => {
     const tired = camp(20);
-    const built = applyAction(tired, { type: 'build', structureId: 'crate' }).state;
+    const built = applyAction(tired, { type: 'build', structureId: 'dryingRack' }).state;
     expect(elapsed(tired, built)).toBeCloseTo(BALANCE.buildSeconds * BALANCE.tiredWorkFactor);
     const rack = { ...camp(20), structures: { ...camp(20).structures, dryingRack: true } };
     expect(elapsed(rack, applyAction(rack, { type: 'prepareTrailFood' }).state)).toBeCloseTo(BALANCE.trailFoodSeconds * BALANCE.tiredWorkFactor);
@@ -56,13 +56,13 @@ describe('exhaustion', () => {
     const state = camp(9);
     state.structures = { ...state.structures, shelter: true, toolshed: true };
     state.progress = { ...state.progress, hearthUnlocked: true, nextStormDay: null, quarryFound: true };
-    expect(applyAction(state, { type: 'build', structureId: 'crate' })).toMatchObject({ state, message: expect.stringMatching(tooTired) });
+    expect(applyAction(state, { type: 'build', structureId: 'dryingRack' })).toMatchObject({ state, message: expect.stringMatching(tooTired) });
     expect(applyAction(state, { type: 'craftAxe' }).message).toMatch(tooTired);
     expect(applyAction(state, { type: 'craftPickaxe' }).message).toMatch(tooTired);
     const atLookout = { ...state, player: { ...state.player, x: LOOKOUT.x, y: LOOKOUT.y } };
     expect(applyAction(atLookout, { type: 'repairLookout' }).message).toMatch(tooTired);
-    expect(buildStatus(state, 'crate')).toBe('unavailable');
-    expect(buildStatus({ ...state, player: { ...state.player, energy: 10 } }, 'crate')).toBe('ready');
+    expect(buildStatus(state, 'dryingRack')).toBe('unavailable');
+    expect(buildStatus({ ...state, player: { ...state.player, energy: 10 } }, 'dryingRack')).toBe('ready');
   });
 
   it('refuses chopping and digging', () => {

@@ -4,7 +4,7 @@ import { foodIconUrl } from '../art/foodIcons';
 import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { workSeconds } from '../game/needs';
-import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
+import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
 import { CLEARING_STEPS, clearGroundBlocker, markBlocker, nextStep, roomLine, type Side } from '../game/clearing';
@@ -93,6 +93,14 @@ export function potView(state: GameState): ActionPanelView {
   }
   const blocker = potBlocker(state);
   return { title: 'Cooking pot', copy: blocker ?? 'A pot on a little tripod, for tea, salad, roasted nuts and honey cake.', cost: '1 wood · 2 stone', disabled: false, ready: !blocker };
+}
+
+export function packView(state: GameState): ActionPanelView {
+  if (state.progress.packWoven) {
+    return { title: 'Woven pack', copy: `You wear it on your back. It carries ${BALANCE.packCapacity}.`, cost: 'Made', disabled: true, ready: false };
+  }
+  const blocker = packBlocker(state);
+  return { title: 'Woven pack', copy: blocker ?? `A pack of woven fiber on a wooden frame, to carry ${BALANCE.packCapacity}.`, cost: '2 wood · 4 fiber', disabled: false, ready: !blocker };
 }
 
 export interface DishView { dish: Exclude<DishId, 'berries'>; name: string; icon: string; cost: string; disabled: boolean; title: string }
@@ -231,7 +239,7 @@ export function bagFoodMarkup(): string {
 export const EATABLE_FOODS = ['berry', 'trailFood', ...BAG_FOODS.filter(cell => cell.eat).map(cell => cell.item)] as const satisfies readonly FoodItem[];
 export type EatableFood = (typeof EATABLE_FOODS)[number];
 
-export interface BagView { foods: Record<BagFood, { count: number; shown: boolean; note: string }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; prepareReady: boolean; prepareHint: string; pileShown: boolean; storedAtCamp: string; pileStored: string; woodShown: boolean; woodAtCamp: string; woodStored: string; fire: string }
+export interface BagView { foods: Record<BagFood, { count: number; shown: boolean; note: string }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; spacesLabel: string; packHint: string; prepareReady: boolean; prepareHint: string; pileShown: boolean; storedAtCamp: string; pileStored: string; woodShown: boolean; woodAtCamp: string; woodStored: string; fiberShown: boolean; fiberAtCamp: string; fiberStored: string; fire: string }
 
 export function bagView(state: GameState): BagView {
   const prepareBlocker = trailFoodBlocker(state);
@@ -252,6 +260,8 @@ export function bagView(state: GameState): BagView {
     eatable,
     berries: `Berries ${foodCount(state.inventory.food, 'berry')}${softNote('berry')}`,
     spaces: `${carriedCount(state)}/${bagCapacity(state)}`,
+    spacesLabel: state.progress.packWoven ? 'Carried · woven pack' : 'Carried',
+    packHint: state.progress.packWoven ? '' : `Weave a pack at the toolshed to carry ${BALANCE.packCapacity}.`,
     prepareReady: !prepareBlocker,
     prepareHint: prepareBlocker ?? `1 berry · ${workSeconds(state, BALANCE.trailFoodSeconds)} seconds · 1 ration`,
     pileShown: pile,
@@ -260,6 +270,9 @@ export function bagView(state: GameState): BagView {
     woodShown: state.structures.woodpile,
     woodAtCamp: state.structures.woodpile ? `+${state.storedWood} at camp` : '',
     woodStored: `Stored wood ${state.storedWood}/${BALANCE.woodpileCapacity}`,
+    fiberShown: state.structures.fibreStack,
+    fiberAtCamp: state.structures.fibreStack ? `+${state.storedFiber} at camp` : '',
+    fiberStored: `Stored fiber ${state.storedFiber}/${BALANCE.fibreStackCapacity}`,
     fire: state.fireFuel > 0 ? `Fire burning · ${Math.ceil(state.fireFuel)}s of warmth` : 'The fire is unlit'
   };
 }
