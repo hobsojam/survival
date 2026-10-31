@@ -437,12 +437,15 @@ function fibreStack(g: Grid, stock: 'empty' | 'some' | 'full'): void {
   };
   if (stock !== 'empty') for (const x of [6, 10, 14]) bundle(x, 12);
   if (stock === 'full') for (const x of [8, 12]) bundle(x, 8);
+  // The thatch is lighter than the trodden camp earth and edged in dark wood, so the cap reads against the ground.
   for (let y = 1; y <= 5; y++) {
     const half = Math.min(11, 3 + (y - 1) * 2);
-    box(g, 12 - half, y, half, 1, 'A'); box(g, 12, y, half, 1, 'B');
+    box(g, 12 - half, y, half, 1, 'z'); box(g, 12, y, half, 1, 'B');
+    dot(g, 12 - half - 1, y, 'd'); dot(g, 12 + half, y, 'd');
   }
-  for (const x of [4, 8, 16, 20]) dot(g, x, 5, 'C');
-  line(g, 1, 5, 22, 5, 'A');
+  line(g, 11, 0, 12, 0, 'd');
+  for (const x of [4, 8, 16, 20]) dot(g, x, 4, 'C');
+  line(g, 0, 6, 23, 6, 'd'); line(g, 1, 5, 22, 5, 'A');
 }
 const DIGITS: Record<string, string[]> = {
   2: ['###', '..#', '###', '#..', '###'], 3: ['###', '..#', '.##', '..#', '###'], 4: ['#.#', '#.#', '###', '..#', '..#'],
