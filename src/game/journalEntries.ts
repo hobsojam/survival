@@ -110,7 +110,7 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   frozenSpring: m => onBefore(m, atSpring(m)),
   // Slept through at camp: a fire still burning at dawn never went out in the sleep, since nobody fed it.
   // Before lying down, a fire that went out brought a wolf (or the friend's chase); a ration left out says nothing either way.
-  winterFire: m => onBefore(m, acted(m, 'sleep') && dawn(m) && isAtHome(m.before) && warmFuel(m.after) > 0
+  winterFire: m => onBefore(m, acted(m, 'sleep') && dawn(m) && isAtHome(m.before) && fuelLeft(m.after) > 0
     && (m.before.lastWolf?.day !== m.before.day || m.before.lastWolf.took === 'offered')),
   winterCooking: m => onBefore(m, acted(m, 'cook')),
   firstRain: m => onAfter(m, rainMessage(m.before, m.after) !== null),
@@ -122,7 +122,7 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   twoHandfuls: m => onBefore(m, m.action?.type === 'gather' && berries(m.after) - berries(m.before) === 2),
   goldEvening: m => onAfter(m, awake(m) && isInClearing(m.after) && m.before.day === m.after.day
     && daylight(m.before) && !daylight(m.after)),
-  warmSleep: m => onBefore(m, acted(m, 'sleep') && warmFuel(m.after) === 0),
+  warmSleep: m => onBefore(m, acted(m, 'sleep') && !livesInHouse(m.before) && warmFuel(m.after) === 0),
   lookoutEvening: m => onAfter(m, awake(m) && m.after.progress.lookoutRepaired && m.after.area === 'camp'
     && within(m.after, LOOKOUT, 2) && atDusk(m.after)),
   hazelnuts: m => onBefore(m, gathered(m, 'hazelnut')),
@@ -130,7 +130,7 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   salad: m => onBefore(m, cooked(m, 'salad')),
   wildHoney: m => onBefore(m, gathered(m, 'honey')),
   // Slept through at home in the house, the fireplace still alight at dawn.
-  fireside: m => onBefore(m, acted(m, 'sleep') && dawn(m) && livesInHouse(m.before) && isAtHome(m.before) && m.after.fireplaceFuel > 0)
+  fireside: m => onBefore(m, acted(m, 'sleep') && dawn(m) && livesInHouse(m.before) && isAtHome(m.before) && fuelLeft(m.after) > 0)
 };
 
 /**

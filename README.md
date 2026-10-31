@@ -25,7 +25,7 @@ Open the local address printed by Vite, usually <http://localhost:5173/>. For a 
 | R | Rest at camp for a short break |
 | Z | Sleep until morning (at night, at camp, once the shelter is built) |
 | Q | Eat: the fresh food nearest to going soft (berries first if it's a tie), then a hazelnut, honey, or roasted hazelnuts. Never pine needles or rations |
-| C | Cook at a lit campfire after dark: one berry, or with the pot the first dish you have the food for |
+| C | Cook at a lit campfire after dark (once you live in the house, at home by the fireplace): one berry, or with the pot the first dish you have the food for |
 | G | Watch the stars at camp after dark |
 | P | Dry one berry into a trail ration at a built drying rack |
 | T | Eat one trail ration, anywhere |
@@ -55,7 +55,7 @@ When energy, hunger, or warmth falls to 20, its bar turns amber and you walk mor
 
 Your bag holds eight spaces at first. To build, stand anywhere in the clearing (it grows; see **Clearing more land**) and click an upgrade in the “Little improvements” panel. Shelter costs six wood and two fiber; bed costs four wood and one fiber after shelter. Wood, food, fiber, and trail rations take one space each, but **stone is heavy and takes two**, so the bag's Carried count shows spaces used. Gather the pale seed heads for fiber and collect stone from the three rocks in camp, then choose what to carry home. Branches, berries, and fiber come back at dawn, but each rock gives **one stone, once**, and then stays as pebbles. Stone never runs out for good, though: the quarry beyond the west path always gives more (see **Beyond camp**). Every supply in the bag has a button that suits it: **Eat** a berry or a ration, **Burn** wood (the same as feeding the fire) or fiber (30 seconds of kindling) while at camp, or **Drop** a stone. A dropped stone stays on the ground where you stood, joining any loose pile within a tile, and you can pick it back up (E or a tap) when you have two free spaces. The bed improves resting. A **woven pack**, made at the toolshed from the Forest tools panel, raises carrying capacity to sixteen; until then the Bag panel says "Weave a pack at the toolshed to carry 16.", and once you wear it the Carried count reads, say, "6/16" and its label becomes "Carried · woven pack".
 
-The **Forest tools** panel also has a **woven pack**, for two wood and four fiber; it needs only the toolshed, not the axe or the cold night. Weave it standing in the clearing; wood from the woodpile and fiber from the fibre stack count, and the bag's are spent first. It doubles what you can carry, from eight spaces to sixteen, and you can see it on the survivor's back from then on. A drying rack costs four wood, makes cooked berries more filling, and lets you prepare trail rations. A windbreak costs five wood and halves warmth loss at camp on unlit nights, including cold nights. A **stone pile** costs three wood and keeps up to twelve stone at camp outside your bag; use **Store 1** and **Take 1** beside it in the build list. A **toolshed** costs five wood and two fiber after the shelter; every tool is made there. The hearth, the stone axe, the pickaxe, and the lookout repair can all use stone from the pile as well as from your bag, spending bag stone first. All of these add visible structures to camp. The game has two fixed areas, camp and the quarry, and no combat.
+The **Forest tools** panel also has a **woven pack**, for two wood and four fiber; it needs only the toolshed, not the axe or the cold night. Weave it standing in the clearing; wood from the woodpile and fiber from the fibre stack count, and the bag's are spent first. It doubles what you can carry, from eight spaces to sixteen, and you can see it on the survivor's back from then on. A drying rack costs four wood, makes cooked berries more filling, and lets you prepare trail rations. A windbreak costs five wood and halves warmth loss at camp (and at home in the house) on unlit nights, including cold nights. A **stone pile** costs three wood and keeps up to twelve stone at camp outside your bag; use **Store 1** and **Take 1** beside it in the build list. A **toolshed** costs five wood and two fiber after the shelter; every tool is made there. The hearth, the stone axe, the pickaxe, and the lookout repair can all use stone from the pile as well as from your bag, spending bag stone first. All of these add visible structures to camp. The game has two fixed areas, camp and the quarry, and no combat.
 
 ### The seasons
 
@@ -132,7 +132,7 @@ Once the drying rack is built, you can dry one berry at camp into a **trail rati
 
 ### Cooking
 
-After nightfall, at a lit campfire, C (or **Cook a berry** in the After dark panel) toasts one berry for 35 hunger (50 with the drying rack) and 10 warmth. It takes eight seconds.
+After nightfall, at a lit campfire (or, once you live in the house, at home by the lit fireplace), C (or **Cook a berry** in the After dark panel) toasts one berry for 35 hunger (50 with the drying rack) and 10 warmth. It takes eight seconds.
 
 Once the toolshed is built, you can make a **cooking pot** in the Forest tools panel for one wood and two stone (the stone can come from the camp stone pile). It hangs over the fire on a little tripod, steaming while the fire burns. With the pot, the After dark panel offers a button for each dish, and C cooks the first one you have the food for, in this order:
 
@@ -174,7 +174,7 @@ Progress is saved in this browser's local storage under `hearthwild.save` after 
 
 Once the stone axe is crafted, the **Clear the land** group appears under the build list. The clearing has four sides, north, east, south and west, and each side has a **near** step and then a **far** step. Choose a side to mark its trees, fell every marked tree with the axe, then press **Clear the ground** to widen the clearing there. A near step costs four wood and two fiber; a far step costs six wood and three fiber and needs the near step cleared first. Near steps mark four trees and far steps six, except the west side's near step, which marks only **two**. Stumps of felled marked trees stay until their ground is cleared, and they never regrow. Once you have felled a tree on one side you must finish that side before choosing another. Each cleared step shows the buildings it makes room for: the north side's near ground has room for a larder, the north side's far ground for a house, and the east side's near ground for a woodpile and a fibre stack.
 
-You can build anywhere in the clearing, however far it has grown, but the fire's warmth, resting and sleeping still work only within the old circle around the fire, so the warmth falls away on the new ground at night. Branch piles that the wider clearing swallows move out to the new edge.
+You can build anywhere in the clearing, however far it has grown, but the fire's warmth, resting and sleeping still work only within the old circle around the fire (or, once you live in the house, at home by the house), so the warmth falls away on the new ground at night. Branch piles that the wider clearing swallows move out to the new edge.
 
 ### Changing the save format
 

@@ -137,6 +137,24 @@ describe('warmth with the house', () => {
     const after = advanceTime(atFire(housed({ ...night(), fireFuel: 100, fireplaceFuel: 0, storedWood: 0 })), 2);
     expect(after.player.warmth).toBeCloseTo(51);
   });
+
+  it('keeps the windbreak at home, so a cold house is never colder than the shelter', () => {
+    const empty = { ...night(WINTER), fireFuel: 0, fireplaceFuel: 0, storedWood: 0 };
+    const rest = daySeconds - nightStart(WINTER) - 1;
+    const atHouse = advanceTime(housed(empty, { windbreak: true }), rest);
+    const inShelter = advanceTime(atFire(camp({ ...FINISHED_SHELTER, windbreak: true }, empty)), rest);
+    expect(atHouse.player.warmth).toBeLessThan(50);
+    expect(atHouse.player.warmth).toBeGreaterThanOrEqual(inShelter.player.warmth);
+  });
+
+  it('keeps the woodshed roof over camp in a spring shower by day', () => {
+    // Day 22's shower runs from 30 s to 76 s.
+    const shower = { day: 22, timeOfDay: 30, fireFuel: 0 };
+    const withHouse = advanceTime(atFire(housed(shower)), 40);
+    const withoutHouse = advanceTime(atFire(unhoused(shower)), 40);
+    expect(withHouse.player.warmth).toBeCloseTo(withoutHouse.player.warmth);
+    expect(withHouse.player.warmth).toBeCloseTo(54);
+  });
 });
 
 describe('sleeping and resting at home', () => {

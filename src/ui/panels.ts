@@ -171,7 +171,7 @@ function winterForecast(state: GameState): ForecastView {
   return {
     active, shown: true,
     title: active ? 'A bitter night' : 'Winter nights',
-    copy: 'Winter nights are bitter. Keep the fire alive until dawn, or the wolves will come close.',
+    copy: `Winter nights are bitter. Keep the ${livesInHouse(state) ? 'fireplace' : 'fire'} alive until dawn, or the wolves will come close.`,
     shelter: state.structures.shelter ? '✓ Shelter ready' : '○ Shelter needed',
     fire: forecastFireCheck(state)
   };

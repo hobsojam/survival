@@ -194,7 +194,16 @@ describe('the wood store', () => {
 
 describe('the woodshed', () => {
   it('draws the shelter as a woodshed once the house stands, showing its logs', () => {
-    for (const stored of [0, 3, 24]) expect(shelterTexture(housed({}, { storedWood: stored }))).toBe(`woodshed:${stockFrame(stored)}`);
+    expect(shelterTexture(housed({}, { storedWood: 0 }))).toBe('woodshed:empty');
+    expect(shelterTexture(housed({}, { storedWood: 11 }))).toBe('woodshed:some');
+    expect(shelterTexture(housed({}, { storedWood: 12 }))).toBe('woodshed:full');
+    expect(shelterTexture(housed({}, { storedWood: 24 }))).toBe('woodshed:full');
+  });
+
+  it('fills the woodshed by its share of the whole store, woodpile included', () => {
+    expect(shelterTexture(housed({ woodpile: true }, { storedWood: 17 }))).toBe('woodshed:some');
+    expect(shelterTexture(housed({ woodpile: true }, { storedWood: 18 }))).toBe('woodshed:full');
+    expect(sceneVisuals(housed({ woodpile: true }, { storedWood: 7 }), 0).find(visual => visual.id === 'woodpile')?.texture).toBe(`woodpile:${stockFrame(7)}`);
   });
 
   it('keeps the shelter as it was without the house', () => {

@@ -228,7 +228,8 @@ function fireBurn(state: GameState, coldNight: boolean): number {
  * a lit campfire still warms whoever stands at it.
  */
 function warmthChange(state: GameState, step: number, camp: boolean, home: boolean, coldNight: boolean): number {
-  const sheltered = home && (state.structures.shelter || state.structures.house);
+  // The shelter keeps its roof as a woodshed, so rain at camp still finds cover under it.
+  const sheltered = (home && (state.structures.shelter || state.structures.house)) || (camp && state.structures.shelter);
   if (state.timeOfDay < nightStart(state.day) && !(isRaining(state) && !sheltered)) return step / 10;
   const lit = (home && fuelLeft(state) > 0) || (camp && state.fireFuel > 0);
   if (lit) return step / 2;
@@ -240,7 +241,8 @@ function warmthChange(state: GameState, step: number, camp: boolean, home: boole
   } else if (sheltered) {
     change = -step * (state.structures.shelterThatched ? BALANCE.thatchedShelteredWarmthLossPerSecond : 0.25);
   }
-  if (camp && !lit && state.structures.windbreak) change *= 0.5;
+  // The windbreak shelters the house too, so moving in never leaves the survivor colder.
+  if ((camp || home) && !lit && state.structures.windbreak) change *= 0.5;
   // A fur cloak keeps a quarter of the night's chill off, wherever the survivor is.
   if (state.companion.cloak && state.timeOfDay >= nightStart(state.day)) change *= BALANCE.cloakWarmthLoss;
   // Summer nights are warm, except the forecast cold night.
