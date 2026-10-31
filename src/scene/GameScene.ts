@@ -13,7 +13,8 @@ import { AmbientLife } from './ambientLife';
 import { registerSpriteTextures } from '../art/textures';
 import { season, type Season } from '../game/calendar';
 import { seasonPalette } from '../art/seasonPalette';
-import { facingFromInput, selectSurvivorVisual, type Facing, type SurvivorAction } from './survivorVisual';
+import { effectPose, facingFromInput, puffDue, selectSurvivorVisual, type Facing, type SurvivorAction, type SurvivorPuff } from './survivorVisual';
+import { isSick } from '../game/sickness';
 import { SceneEffects } from './SceneEffects';
 import { SceneLighting } from './SceneLighting';
 import { NightWatch } from './sleepReplay';
@@ -38,6 +39,7 @@ export class GameScene extends Phaser.Scene {
   private hudElapsed = 0;
   private facing: Facing = 'down';
   private visualAction?: { kind: SurvivorAction; startedAtMs: number };
+  private lastPuffMs?: number;
   private walkTarget?: TapTarget;
   private tapGate: () => boolean = () => true;
   private terrain: Phaser.GameObjects.GameObject[] = [];
@@ -144,10 +146,18 @@ export class GameScene extends Phaser.Scene {
 
   private syncPlayerSprite(moving: boolean): void {
     const { warmth, energy, hunger } = this.state.player;
-    const visual = selectSurvivorVisual({ facing: this.facing, moving, warmth, energy, hunger,
-      nowMs: this.time.now, action: this.visualAction, packed: this.state.progress.packWoven });
+    const now = this.time.now;
+    const visual = selectSurvivorVisual({ facing: this.facing, moving, warmth, energy, hunger, sick: isSick(this.state),
+      nowMs: now, action: this.visualAction, packed: this.state.progress.packWoven });
     if (this.playerSprite.texture.key !== visual.texture) this.playerSprite.setTexture(visual.texture);
-    this.playerSprite.setPosition(Math.round(worldX(this.state.player.x)), Math.round(worldY(this.state.player.y)));
+    // How the survivor feels plays on top of every pose, walking included.
+    const nudge = effectPose(visual.effect, now);
+    this.playerSprite.setPosition(Math.round(worldX(this.state.player.x)) + nudge.dx, Math.round(worldY(this.state.player.y)) + nudge.dy);
+    this.playerSprite.setRotation(nudge.rotation);
+    if (visual.puff && puffDue(this.lastPuffMs, now)) {
+      this.lastPuffMs = now;
+      this.letOutPuff(visual.puff);
+    }
     this.playerSprite.setDepth(playerVisualDepth(this.state));
     this.playerSprite.setFlipX(visual.flipX);
     if (this.state.area !== this.areaShown) {
@@ -155,6 +165,14 @@ export class GameScene extends Phaser.Scene {
       this.areaShown = this.state.area;
       this.cameras.main.centerOn(this.playerSprite.x, this.playerSprite.y);
     }
+  }
+
+  /** A small cloud by the survivor's face that drifts up and fades: white breath in the cold, a grey-cream cough when sick. */
+  private letOutPuff(kind: SurvivorPuff): void {
+    const side = this.playerSprite.flipX ? -1 : 1;
+    const puff = this.add.circle(this.playerSprite.x + 3 * side, this.playerSprite.y - 15, kind === 'cough' ? 2 : 1.5, kind === 'cough' ? 0xd9d0b8 : 0xffffff, 0.8)
+      .setDepth(this.playerSprite.depth + 1);
+    this.tweens.add({ targets: puff, alpha: 0, y: puff.y - 6, x: puff.x + 2 * side, scale: 1.6, duration: 900, onComplete: () => puff.destroy() });
   }
 
   perform(requested: GameAction, announce = true): void {

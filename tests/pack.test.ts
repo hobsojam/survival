@@ -116,8 +116,8 @@ describe('the survivor wearing the pack', () => {
     const actions: (SurvivorAction | undefined)[] = [undefined, 'gather', 'rest', 'cook', 'stargaze'];
     const meters = [80, 10];
     for (const facing of facings) for (const moving of [false, true]) for (const kind of actions)
-      for (const warmth of meters) for (const energy of meters) for (const hunger of meters) for (const nowMs of [0, 260, 510, 760, 1100]) {
-        const state: SurvivorVisualState = { facing, moving, warmth, energy, hunger, nowMs, packed: true,
+      for (const warmth of meters) for (const energy of meters) for (const hunger of meters) for (const sick of [false, true]) for (const nowMs of [0, 260, 510, 760, 1100]) {
+        const state: SurvivorVisualState = { facing, moving, warmth, energy, hunger, sick, nowMs, packed: true,
           action: kind ? { kind, startedAtMs: 0 } : undefined };
         const { texture } = selectSurvivorVisual(state);
         expect(texture).toMatch(/Pack$/);
