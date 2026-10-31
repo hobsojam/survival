@@ -9,10 +9,10 @@ export type { FoodStore } from './foodStore';
 // kept food is just a count. Every eater goes through availableFood and spendFood, which reach into the larder at camp.
 
 export type FreshFood = 'berry' | 'greens';
-export type KeptFood = 'hazelnut' | 'honey' | 'pineNeedles' | 'roastedHazelnuts' | 'trailFood';
+export type KeptFood = 'hazelnut' | 'honey' | 'pineNeedles' | 'roastedHazelnuts' | 'trailFood' | 'vegetables';
 export type FoodItem = FreshFood | KeptFood;
 
-export const FOOD_ITEMS: readonly FoodItem[] = ['berry', 'greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood'];
+export const FOOD_ITEMS: readonly FoodItem[] = ['berry', 'greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood', 'vegetables'];
 
 export function isFresh(item: FoodItem): item is FreshFood {
   return item === 'berry' || item === 'greens';
@@ -22,9 +22,9 @@ export function foodCount(store: FoodStore, item: FoodItem): number {
   return isFresh(item) ? store[item].length : store[item];
 }
 
-const KEPT_FOODS: readonly KeptFood[] = ['hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood'];
+const KEPT_FOODS: readonly KeptFood[] = ['hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood', 'vegetables'];
 
-/** Kept food held, bag and larder together, wherever the survivor is: hazelnuts, honey, pine needles, roasted hazelnuts, rations. */
+/** Kept food held, bag and larder together, wherever the survivor is: hazelnuts, honey, pine needles, roasted hazelnuts, rations, vegetables. */
 export function keptFoodTotal(state: GameState): number {
   return KEPT_FOODS.reduce((total, item) => total + foodCount(state.inventory.food, item) + foodCount(state.larder, item), 0);
 }
@@ -92,7 +92,7 @@ export function takeFromBag(state: GameState, item: FoodItem, n: number): GameSt
 }
 
 /** Food eaten as it is. Pine needles are for tea, and rations have their own key. */
-export type EdibleFood = 'berry' | 'greens' | 'hazelnut' | 'honey' | 'roastedHazelnuts';
+export type EdibleFood = 'berry' | 'greens' | 'hazelnut' | 'honey' | 'roastedHazelnuts' | 'vegetables';
 
 /** What eating one of each gives, as BALANCE keys: state.ts loads this module first, so BALANCE is read only when eating. */
 const EAT_EFFECTS: Record<EdibleFood, { hunger: keyof typeof BALANCE; energy?: keyof typeof BALANCE; message: string }> = {
@@ -100,7 +100,8 @@ const EAT_EFFECTS: Record<EdibleFood, { hunger: keyof typeof BALANCE; energy?: k
   greens: { hunger: 'greensHunger', message: 'Ate a handful of greens.' },
   hazelnut: { hunger: 'hazelnutHunger', message: 'Ate a hazelnut.' },
   honey: { hunger: 'honeyHunger', energy: 'honeyEnergy', message: 'Ate some honey.' },
-  roastedHazelnuts: { hunger: 'roastedHazelnutHunger', message: 'Ate the roasted hazelnuts.' }
+  roastedHazelnuts: { hunger: 'roastedHazelnutHunger', message: 'Ate the roasted hazelnuts.' },
+  vegetables: { hunger: 'vegetableHunger', message: 'Ate some raw vegetables.' }
 };
 
 /** The hunger and energy one of an item gives, and the line said on eating it. */
@@ -120,12 +121,12 @@ function oldestPick(state: GameState, item: FreshFood): number | null {
   return picks.length > 0 ? Math.min(...picks) : null;
 }
 
-/** What Q eats: the fresh item nearest to going soft (berry wins a tie), then hazelnut, honey, roasted hazelnuts. Never pine needles or rations. */
+/** What Q eats: the fresh item nearest to going soft (berry wins a tie), then hazelnut, honey, roasted hazelnuts, vegetables. Never pine needles or rations. */
 export function quickEatItem(state: GameState): FoodItem | null {
   const berry = oldestPick(state, 'berry'), greens = oldestPick(state, 'greens');
   if (berry !== null && (greens === null || berry <= greens)) return 'berry';
   if (greens !== null) return 'greens';
-  return (['hazelnut', 'honey', 'roastedHazelnuts'] as const).find(item => availableFood(state, item) > 0) ?? null;
+  return (['hazelnut', 'honey', 'roastedHazelnuts', 'vegetables'] as const).find(item => availableFood(state, item) > 0) ?? null;
 }
 
 /** Fresh food is gone at a dawn once it has been kept for keepDays or more. */

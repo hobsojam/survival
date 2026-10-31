@@ -8,9 +8,10 @@ import { KEEPSAKES_NEEDED, TRUST_TARGET } from './companion';
 import { FOOD_ITEMS, isFresh, storeTotal, type FoodStore } from './food';
 import { FORAGE, isForage } from './forage';
 import { woodStoreCapacity } from './home';
+import { BED_CROPS, MAX_DRY_DAYS } from './beds';
 
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 21;
+const SAVE_VERSION = 22;
 export type SaveResult = { ok: true } | { ok: false; error: string };
 export type LoadResult = { kind: 'empty' } | { kind: 'loaded'; state: GameState } | { kind: 'invalid'; reason: string };
 
@@ -120,6 +121,20 @@ function validGarden({ gardenPlots, structures, day }: SaveShape): boolean {
     if (plot.harvestReady && (plantedYear === null || plantedYear >= yearOf(day as number) || harvestedYear === yearOf(day as number) || !structures.garden)) return false;
     if (plantedYear !== null && !structures.garden) return false;
     return true;
+  });
+}
+
+/** Three beds, each empty and bare or sown with its growth and dryness in range, watered no later than today, and sown only once the beds are built. */
+function validBeds({ beds, structures, day }: SaveShape): boolean {
+  if (!Array.isArray(beds) || beds.length !== BED_CROPS.length) return false;
+  return beds.every(bed => {
+    if (!object(bed) || !bool(bed.sown) || !count(bed.grown) || !count(bed.dryDays)) return false;
+    if (bed.grown > BALANCE.cropGrowDays || bed.dryDays > MAX_DRY_DAYS) return false;
+    if (bed.wateredDay !== null && !readyBy(bed.wateredDay, day as number)) return false;
+    if (!bed.sown) return bed.grown === 0 && bed.dryDays === 0;
+    // A ripe crop never dries out: ripening resets its dryness.
+    if (bed.grown >= BALANCE.cropGrowDays && bed.dryDays > 0) return false;
+    return structures.vegetableBeds === true;
   });
 }
 
@@ -245,10 +260,10 @@ function validCompanion({ companion, day, structures }: SaveShape): boolean {
   return validBefriendedCompanion(companion, day as number, structures);
 }
 
-/** Checks a version 21 save: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, shelter upgrades, garden plots, tools, quarry timers, the year journal and companion. */
+/** Checks a version 22 save: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, shelter upgrades, garden plots, vegetable beds, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion];
+  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

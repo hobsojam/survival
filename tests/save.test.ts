@@ -22,7 +22,7 @@ describe('local save', () => {
     const state = createGame();
     const old = [[22, 15], [18, 16], [21, 18], [16, 14], [24, 13], [13, 7]];
     const saved = { ...state, nodes: state.nodes.map((node, index) => index < old.length ? { ...node, x: old[index][0], y: old[index][1], amount: 0 } : node) };
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 21, state: saved }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 22, state: saved }));
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind !== 'loaded') return;
@@ -74,6 +74,15 @@ describe('local save', () => {
     expect(loadGame(storage).kind).toBe('invalid');
   });
 
+  it('rejects a version 21 save, from before the vegetable beds', () => {
+    const storage = new MemoryStorage();
+    const { beds: _beds, ...older } = createGame();
+    const { vegetableBeds: _vegetableBeds, ...structures } = older.structures;
+    const { vegetables: _vegetables, ...food } = older.inventory.food;
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 21, state: { ...older, structures, inventory: { ...older.inventory, food } } }));
+    expect(loadGame(storage).kind).toBe('invalid');
+  });
+
   it('round-trips progression across a page reload', () => {
     const storage = new MemoryStorage();
     const state = createGame();
@@ -95,7 +104,7 @@ describe('local save', () => {
     state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
     state.nodes.find(node => node.kind === 'fiber')!.readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(21);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(22);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);
@@ -405,7 +414,7 @@ describe('garden plots in saves', () => {
 });
 
 describe('the year journal in the save', () => {
-  const store = (state: ReturnType<typeof createGame>, version = 21) => {
+  const store = (state: ReturnType<typeof createGame>, version = 22) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;
@@ -449,7 +458,7 @@ describe('the year journal in the save', () => {
 });
 
 describe('the companion in the save', () => {
-  const store = (state: unknown, version = 21) => {
+  const store = (state: unknown, version = 22) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;
@@ -496,7 +505,7 @@ describe('the companion in the save', () => {
 describe('the spoiled-food note in the save', () => {
   const accepts = (lastSpoiled: unknown) => {
     const storage = new MemoryStorage();
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 21, state: { ...createGame(), day: 6, lastSpoiled, progress: { ...createGame().progress, nextStormDay: null, hearthUnlocked: true } } }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 22, state: { ...createGame(), day: 6, lastSpoiled, progress: { ...createGame().progress, nextStormDay: null, hearthUnlocked: true } } }));
     return loadGame(storage).kind === 'loaded';
   };
 
@@ -513,7 +522,7 @@ describe('the spoiled-food note in the save', () => {
 });
 
 describe('the clearing in the save', () => {
-  const accepts = (state: unknown, version = 21) => {
+  const accepts = (state: unknown, version = 22) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind === 'loaded';
@@ -569,7 +578,7 @@ describe('forage regrowth in the save', () => {
     const node = state.nodes.find(item => item.id === id)!;
     node.amount = 0;
     node.readyDay = readyDay;
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 21, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 22, state }));
     return loadGame(storage).kind;
   };
 
@@ -604,7 +613,7 @@ describe('the cooking pot in the save', () => {
     const storage = new MemoryStorage();
     const state = createGame();
     change(state);
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 21, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 22, state }));
     return loadGame(storage).kind === 'loaded';
   };
 
@@ -631,7 +640,7 @@ describe('the larder in the save', () => {
     state.nodes = state.nodes.map((node, i) => ({ ...node, x: placed[i].x, y: placed[i].y }));
     state.clearing = { cleared: ['north-near'], marked: null, felled: [] };
     change(state);
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 21, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 22, state }));
     return loadGame(storage).kind === 'loaded';
   };
 

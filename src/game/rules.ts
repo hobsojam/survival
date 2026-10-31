@@ -10,6 +10,7 @@ import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, ma
 import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
 import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
+import { BED_CROPS, bedsDawn, drawWaterBlocker, emptyBed, harvestBedBlocker, needsWater, sowBedBlocker } from './beds';
 import { fuelLeft, hasWoodStore, isAtHome, livesInHouse, tendFireplace, woodStoreCapacity } from './home';
 import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
 
@@ -23,6 +24,9 @@ export type GameAction =
   | { type: 'move'; dx: number; dy: number }
   | { type: 'plantGarden'; plotIndex: number }
   | { type: 'harvestGarden'; plotIndex: number }
+  | { type: 'sowBed'; index: number }
+  | { type: 'harvestBed'; index: number }
+  | { type: 'drawWater' }
   | { type: 'eat'; item?: FoodItem }
   | { type: 'storeFood'; item: FoodItem }
   | { type: 'takeFood'; item: FoodItem }
@@ -251,10 +255,11 @@ function warmthLossPerSecond(state: GameState, sheltered: boolean, coldNight: bo
   return 0.5;
 }
 
-/** Starts the next day in place: regrows nodes and settles the cold night if it just ended. */
+/** Starts the next day in place: grows or dries the beds from the day that ended, regrows nodes and settles the cold night if it just ended. */
 function dawn(next: GameState, home: boolean): void {
   const stormEnded = next.progress.nextStormDay === next.day;
   const weathered = stormEnded && home && (next.structures.shelter || next.structures.house) && fuelLeft(next) > 0 && next.player.warmth > 20;
+  bedsDawn(next, next.day);
   next.day += 1;
   next.timeOfDay = 0;
   next.gardenPlots = gardenDawn(next);
@@ -822,6 +827,41 @@ const harvestGarden: ActionHandler<'harvestGarden'> = (state, action) => {
   return { state: advanceTime(harvested, workSeconds(state, BALANCE.gatherSeconds), 'working'), message: 'Picked 2 berries from the garden.' };
 };
 
+/** Sowing costs nothing: each bed keeps its own seed. It takes the time and energy of planting a bush. */
+const sowBed: ActionHandler<'sowBed'> = (state, action) => {
+  const blocker = sowBedBlocker(state, action.index);
+  if (blocker) return refuse(state, blocker);
+  const beds = state.beds.map((bed, index) => index === action.index ? { ...emptyBed(), sown: true } : bed);
+  return {
+    state: advanceTime({ ...state, beds, player: tire(state, BALANCE.gatherEnergyCost) }, workSeconds(state, BALANCE.gatherSeconds), 'working'),
+    message: `Sowed the ${BED_CROPS[action.index]}.`
+  };
+};
+
+const harvestBed: ActionHandler<'harvestBed'> = (state, action) => {
+  const blocker = harvestBedBlocker(state, action.index);
+  if (blocker) return refuse(state, blocker);
+  const beds = state.beds.map((bed, index) => index === action.index ? emptyBed() : bed);
+  const harvested = {
+    ...state,
+    inventory: { ...state.inventory, food: addFood(state.inventory.food, 'vegetables', BALANCE.cropYield, state.day) },
+    beds,
+    player: tire(state, BALANCE.gatherEnergyCost)
+  };
+  return { state: advanceTime(harvested, workSeconds(state, BALANCE.gatherSeconds), 'working'), message: `Harvested the ${BED_CROPS[action.index]}.` };
+};
+
+/** One bucket from the well waters every bed still growing, for today. It takes the time and energy of gathering. */
+const drawWater: ActionHandler<'drawWater'> = state => {
+  const blocker = drawWaterBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  const beds = state.beds.map(bed => needsWater(bed) ? { ...bed, wateredDay: state.day } : bed);
+  return {
+    state: advanceTime({ ...state, beds, player: tire(state, BALANCE.gatherEnergyCost) }, workSeconds(state, BALANCE.gatherSeconds), 'working'),
+    message: 'You draw a bucket and water the beds.'
+  };
+};
+
 function missingCost(state: GameState, cost: { wood: number; fiber: number; stone: number }): string | null {
   const needed = [
     availableWood(state) < cost.wood ? `${cost.wood} wood` : null,
@@ -933,7 +973,7 @@ const craftCloak: ActionHandler<'craftCloak'> = state =>
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
   storeStone, takeStone, storeWood, takeWood, storeFiber, takeFiber, storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, rest, sleep, befriend, craftPillow, craftCloak
+  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, rest, sleep, befriend, craftPillow, craftCloak
 };
 
 export function applyAction(state: GameState, action: GameAction): ActionResult {

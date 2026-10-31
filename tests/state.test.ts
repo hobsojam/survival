@@ -14,7 +14,7 @@ describe('new game', () => {
     expect(game.player.y).toBeLessThan(30);
     expect(game.inventory).toEqual({ wood: 0, fiber: 0, stone: 0, food: emptyFood() });
     expect(game.structures).toEqual({ shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false,
-      bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false, house: false });
+      bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false, vegetableBeds: false, well: false, house: false });
     expect(game.gardenPlots).toEqual(Array.from({ length: 3 }, () => ({ plantedYear: null, harvestedYear: null, harvestReady: false })));
     expect(BUILDINGS.dryingRack.cost).toEqual({ wood: 4, fiber: 0 });
     expect(BUILDINGS.windbreak.cost).toEqual({ wood: 5, fiber: 0 });

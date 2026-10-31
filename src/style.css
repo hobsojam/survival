@@ -351,8 +351,13 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
   .save-status { display: none; }
 }
 
-.garden-panel .garden-hint { margin-bottom: .8rem; }
+.garden-panel .garden-hint, .beds-panel .garden-hint { margin-bottom: .8rem; }
 .garden-plot { display: flex; align-items: center; gap: .35rem; padding: .55rem 0; border-top: 1px solid var(--line, #d9d2c3); }
 .garden-plot > span { display: grid; flex: 1; gap: .15rem; }
 .garden-plot small { opacity: .75; }
 .garden-plot button { padding: .35rem .5rem; }
+.beds-panel .tool-row { margin-top: 12px; }
+.beds-panel .tool-row button { width: 100%; border: 1px solid #bbd0b6; border-bottom-width: 2px; border-radius: 9px; background: #e7f0e2; color: #426447; padding: 10px; font-size: 12px; font-weight: 700; }
+.beds-panel .tool-row button.ready { background: #517d5b; border-color: #42724d; color: #fffdf7; }
+.beds-panel .tool-row button:disabled { opacity: .55; cursor: default; }
+.beds-panel .tool-row small { display: block; margin-top: 7px; color: #4f6655; text-align: center; font-size: 11px; }

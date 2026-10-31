@@ -25,8 +25,8 @@ function lateNight(larder: Partial<Record<FoodItem, number>>, bag: Partial<Recor
     day,
     timeOfDay: daySeconds - 3,
     fireFuel: 100,
-    clearing: { cleared: ['north-near', 'east-near'], marked: null, felled: [] },
-    structures: { ...base.structures, shelter: true, toolshed: true, dryingRack: true, garden: true, larder: true, woodpile: true },
+    clearing: { cleared: ['north-near', 'east-near', 'west-near', 'west-far'], marked: null, felled: [] },
+    structures: { ...base.structures, shelter: true, toolshed: true, dryingRack: true, garden: true, larder: true, woodpile: true, vegetableBeds: true, well: true },
     progress: { ...base.progress, potCrafted: true, hearthUnlocked: true, nextStormDay: null },
     companion: { ...base.companion, friend: 'fox', since: 1, trust: { ...base.companion.trust, fox: 3 }, lastGift: GIFT_DAWN - 3, lastFind: GIFT_DAWN },
     player: { ...base.player, x: campX, y: campY, energy: 80, hunger: 50, warmth: 60 },
@@ -61,7 +61,7 @@ describe('the bag across a dawn with the fox\'s gift due', () => {
   });
 
   it.each(DISH_ORDER)('cooks %s from the larder without overfilling the bag', dish => {
-    const state = lateNight({ berry: 1, greens: 1, pineNeedles: 1, hazelnut: 2, honey: 1 });
+    const state = lateNight({ berry: 1, greens: 1, pineNeedles: 1, hazelnut: 2, honey: 1, vegetables: 2 });
     expectWithinBag(state, { type: 'cook', dish });
   });
 
