@@ -134,6 +134,8 @@ function shelterSite(g: Grid): void {
   line(g, 6, 19, 42, 19, 'h'); line(g, 6, 27, 42, 27, 'h');
   line(g, 5, 20, 5, 27, 'h'); line(g, 43, 20, 43, 27, 'h');
 }
+/** How full a camp store looks: the larder, woodpile and fibre stack share these frames. */
+export type StockLevel = 'empty' | 'some' | 'full';
 type ShelterStage = 'plain' | 'thatched' | 'stonework' | 'porch' | 'finished';
 function shelter(g: Grid, bed: boolean, stage: ShelterStage = 'plain'): void {
   oval(g, 24, 36, 21, 3, 's');
@@ -376,7 +378,7 @@ function larderSite(g: Grid): void {
   line(g, 10, 9, 14, 9, 'z');
 }
 /** A raised cache on four legs with a little ladder: a plank box under a lit roof, its open front showing what is kept. */
-function larder(g: Grid, stock: 'empty' | 'some' | 'full'): void {
+function larder(g: Grid, stock: StockLevel): void {
   oval(g, 12, 26, 10, 2, 's');
   for (const x of [7, 17]) box(g, x, 13, 1, 11, 'a');
   for (const x of [3, 19]) { box(g, x, 13, 2, 14, 'b'); line(g, x, 13, x, 25, 'd'); }
@@ -402,7 +404,7 @@ function woodpileSite(g: Grid): void {
   line(g, 10, 10, 14, 10, 'z');
 }
 /** Split logs stacked in rows under a little lean-to roof; the roof is drawn last so the logs peek out beneath it. */
-function woodpile(g: Grid, stock: 'empty' | 'some' | 'full'): void {
+function woodpile(g: Grid, stock: StockLevel): void {
   oval(g, 12, 18, 10, 2, 's');
   for (const x of [2, 20]) { box(g, x, 5, 2, 13, 'b'); line(g, x, 5, x, 17, 'd'); }
   box(g, 4, 16, 16, 2, 'a'); line(g, 4, 17, 19, 17, 'b');
@@ -427,7 +429,7 @@ function fibreStackSite(g: Grid): void {
   line(g, 10, 10, 14, 10, 'i');
 }
 /** A small rick of pale fibre bundles on a log base, under a thatched cap on two posts; the cap is drawn last so it overhangs the bundles. */
-function fibreStack(g: Grid, stock: 'empty' | 'some' | 'full'): void {
+function fibreStack(g: Grid, stock: StockLevel): void {
   oval(g, 12, 18, 10, 2, 's');
   for (const x of [3, 19]) { box(g, x, 6, 2, 12, 'b'); line(g, x, 6, x, 17, 'd'); }
   box(g, 5, 16, 14, 2, 'a'); line(g, 5, 16, 18, 16, 'c');
