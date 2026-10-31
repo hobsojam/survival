@@ -418,8 +418,18 @@ function woodpile(g: Grid, stock: 'empty' | 'some' | 'full'): void {
   for (const x of [2, 20]) { box(g, x, 5, 2, 13, 'b'); line(g, x, 5, x, 17, 'd'); }
   box(g, 4, 16, 16, 2, 'a'); line(g, 4, 17, 19, 17, 'b');
   const log = (x: number, y: number): void => { box(g, x, y, 4, 3, 'c'); line(g, x, y, x + 3, y, 'e'); dot(g, x + 3, y + 1, 'd'); };
-  if (stock !== 'empty') for (const x of [4, 8, 12, 16]) log(x, 13);
-  if (stock === 'full') { for (const x of [6, 10, 14]) log(x, 10); log(8, 7); log(12, 7); }
+  if (stock !== 'empty') {
+    for (const x of [4, 8, 12, 16]) {
+      log(x, 13);
+    }
+  }
+  if (stock === 'full') {
+    for (const x of [6, 10, 14]) {
+      log(x, 10);
+    }
+    log(8, 7);
+    log(12, 7);
+  }
   box(g, 0, 2, 24, 3, 'd'); box(g, 1, 2, 12, 1, 'e'); line(g, 0, 4, 23, 4, 'b');
 }
 const DIGITS: Record<string, string[]> = {
