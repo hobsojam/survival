@@ -233,20 +233,22 @@ function warmthChange(state: GameState, step: number, camp: boolean, home: boole
   if (state.timeOfDay < nightStart(state.day) && !(isRaining(state) && !sheltered)) return step / 10;
   const lit = (home && fuelLeft(state) > 0) || (camp && state.fireFuel > 0);
   if (lit) return step / 2;
-  let change = -step / 2;
-  if (coldNight) {
-    change = -step * (sheltered
-      ? BALANCE.coldNightShelteredWarmthLossPerSecond
-      : BALANCE.coldNightOutdoorWarmthLossPerSecond);
-  } else if (sheltered) {
-    change = -step * (state.structures.shelterThatched ? BALANCE.thatchedShelteredWarmthLossPerSecond : 0.25);
-  }
+  let change = -step * warmthLossPerSecond(state, sheltered, coldNight);
   // The windbreak shelters the house too, so moving in never leaves the survivor colder.
   if ((camp || home) && !lit && state.structures.windbreak) change *= 0.5;
   // A fur cloak keeps a quarter of the night's chill off, wherever the survivor is.
   if (state.companion.cloak && state.timeOfDay >= nightStart(state.day)) change *= BALANCE.cloakWarmthLoss;
   // Summer nights are warm, except the forecast cold night.
   return isSummer(state.day) && !coldNight ? Math.max(0, change) : change;
+}
+
+/** Shelter and cold weather set the chill before windbreak and cloak protection. */
+function warmthLossPerSecond(state: GameState, sheltered: boolean, coldNight: boolean): number {
+  if (coldNight) return sheltered
+    ? BALANCE.coldNightShelteredWarmthLossPerSecond
+    : BALANCE.coldNightOutdoorWarmthLossPerSecond;
+  if (sheltered) return state.structures.shelterThatched ? BALANCE.thatchedShelteredWarmthLossPerSecond : 0.25;
+  return 0.5;
 }
 
 /** Starts the next day in place: regrows nodes and settles the cold night if it just ended. */

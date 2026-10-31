@@ -33,7 +33,9 @@ export function wolfVisit(next: GameState): void {
   }
   const ration = takeFromBag(next, 'trailFood', 1);
   const berry = ration ? null : takeFromBag(next, 'berry', 1);
-  const took: WolfTake = ration ? 'ration' : berry ? 'berry' : 'nothing';
+  let took: WolfTake = 'nothing';
+  if (ration) took = 'ration';
+  else if (berry) took = 'berry';
   next.inventory = (ration ?? berry ?? next).inventory;
   next.lastWolf = { day: next.day, took };
 }

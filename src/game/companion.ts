@@ -19,8 +19,11 @@ function foxFood(state: GameState): 'hazelnut' | 'berry' | null {
 }
 
 /** What is spent on an offering to this animal. */
-const offeringFood = (state: GameState, animal: Friend): FoodItem =>
-  animal === 'wolf' ? 'trailFood' : animal === 'fox' ? foxFood(state) ?? 'berry' : 'berry';
+function offeringFood(state: GameState, animal: Friend): FoodItem {
+  if (animal === 'wolf') return 'trailFood';
+  if (animal === 'fox') return foxFood(state) ?? 'berry';
+  return 'berry';
+}
 
 export function offerPrompt(state: GameState, animal: Friend): string {
   if (animal === 'bird') return 'Scatter a berry for the birds';

@@ -6,6 +6,15 @@ import { BALANCE, type GameState } from './state';
 const MUTE_KEY = 'hearthwild.sound-muted';
 const MASTER_VOLUME = 0.34;
 
+function birdAmbienceVolume(state: GameState, isNight: boolean, inQuarry: boolean, winter: boolean): number {
+  // The birds leave for winter, except a friend; a friend sings loud at spring dawns.
+  if (isNight) return 0;
+  if (inQuarry) return winter ? 0 : 0.16;
+  if (winter) return state.companion?.friend === 'bird' ? 0.16 : 0;
+  if (state.companion?.friend === 'bird' && isSpring(state.day) && state.timeOfDay < 25) return 0.8;
+  return 0.48;
+}
+
 export type SoundCue = 'gather' | 'build' | 'wolfChorus';
 
 /** The browser's audio, or nothing where there is none. */
@@ -162,24 +171,17 @@ export class Soundscape {
     if (!this.context || !this.state) return;
     const isNight = this.state.timeOfDay >= nightStart(this.state.day);
     const inQuarry = this.state.area === 'quarry';
+    const winter = isWinter(this.state.day);
     const distance = Math.hypot(this.state.player.x - BALANCE.campX, this.state.player.y - BALANCE.campY);
     const campVolume = Math.max(0, 1 - distance / (BALANCE.campRadius + 4));
-    // The birds leave for the winter, except a friend; a friend sings loud at spring dawns.
-    const friendlyBird = this.state.companion?.friend === 'bird';
-    let birdVolume = isWinter(this.state.day) ? 0 : 0.48;
-    if (friendlyBird && isWinter(this.state.day)) birdVolume = 0.16;
-    if (friendlyBird && isSpring(this.state.day) && this.state.timeOfDay < 25) birdVolume = 0.8;
+    const birdVolume = birdAmbienceVolume(this.state, isNight, inQuarry, winter);
     let cricketVolume = 0;
+    // No crickets in the snow.
+    if (isNight && !winter) {
+      cricketVolume = inQuarry ? 0.22 : 0.34;
+    }
     let quarryVolume = 0;
-    if (isNight) {
-      birdVolume = 0;
-      // No crickets in the snow.
-      cricketVolume = isWinter(this.state.day) ? 0 : inQuarry ? 0.22 : 0.34;
-    }
-    if (inQuarry) {
-      birdVolume = isNight || isWinter(this.state.day) ? 0 : 0.16;
-      quarryVolume = isNight ? 0.72 : 0.48;
-    }
+    if (inQuarry) quarryVolume = isNight ? 0.72 : 0.48;
     this.setGain(this.birds, birdVolume);
     this.setGain(this.crickets, cricketVolume);
     this.setGain(this.fire, !inQuarry && this.state.fireFuel > 0 ? campVolume * 0.55 : 0);

@@ -33,6 +33,26 @@ describe('native-size scene art', () => {
     }
   });
 
+  it('draws each shelter upgrade and adds the bed to the current stage', () => {
+    const state = createGame();
+    const shelter = () => sceneVisuals(state, 0).find(item => item.id === 'shelter')!;
+    expect(shelter()).toMatchObject({ texture: 'shelterSite:still', depth: GROUND_DECAL_DEPTH });
+
+    state.structures.shelter = true;
+    for (const [upgrade, texture] of [
+      ['shelterThatched', 'shelter:thatched'],
+      ['shelterStonework', 'shelter:stonework'],
+      ['shelterPorch', 'shelter:porch'],
+      ['shelterFinished', 'shelter:finished']
+    ] as const) {
+      state.structures[upgrade] = true;
+      expect(shelter().texture).toBe(texture);
+      expect(shelter().depth).toBe(shelter().y);
+    }
+    state.structures.bed = true;
+    expect(shelter().texture).toBe('shelter:finishedBed');
+  });
+
   it('draws forage spots only in their season', () => {
     const ids = (day: number) => new Set(sceneVisuals({ ...createGame(), day }, 0).map(item => item.id));
     const autumn = ids(1), winter = ids(11), summer = ids(31);
