@@ -34,4 +34,4 @@
 
 - [x] Run the full test suite, lint, build, and diff checks.
 - [x] Review the combined changes.
-- [ ] Verify SonarCloud after opening the PR.
+- [x] Verify SonarCloud after opening the PR (PR #105: zero `typescript:S3776` issues).
