@@ -118,12 +118,29 @@ describe('native-size scene art', () => {
 
   it('shows chop targets as standing trees or stumps based on regrowth day', () => {
     const state = createGame();
-    const tree = state.trees[0];
-    expect(sceneVisuals(state, 0).find(item => item.id === tree.id)?.texture).toBe(`${tree.sprite}:still`);
-    tree.readyDay = 4;
-    expect(sceneVisuals(state, 0).find(item => item.id === tree.id)?.texture).toBe('stump:still');
-    state.day = 4;
-    expect(sceneVisuals(state, 0).find(item => item.id === tree.id)?.texture).toBe(`${tree.sprite}:still`);
+    for (const tree of [state.trees[0], state.trees[3]]) {
+      expect(sceneVisuals(state, 0).find(item => item.id === tree.id)?.texture).toBe(`${tree.sprite}:mature`);
+      tree.readyDay = 4;
+      expect(sceneVisuals(state, 0).find(item => item.id === tree.id)?.texture).toBe('stump:still');
+      state.day = 4;
+      expect(sceneVisuals(state, 0).find(item => item.id === tree.id)?.texture).toBe(`${tree.sprite}:mature`);
+      state.day = 1;
+      tree.readyDay = 1;
+    }
+  });
+
+  it('gives choppable broadleaf and pine trees wider trunks and visible roots', () => {
+    for (const name of ['treeBroadleaf', 'treePine']) {
+      const def = sprites[name];
+      const { still, mature, marked } = def.frames;
+      expect(mature, name).toBeDefined();
+      expect(() => validateSprite(def), name).not.toThrow();
+      const woodWidth = (row: string) => [...row].filter(pixel => 'fghij'.includes(pixel)).length;
+      expect(woodWidth(mature[43]), name).toBeGreaterThan(woodWidth(still[43]));
+      expect(woodWidth(mature[44]), name).toBeGreaterThan(woodWidth(mature[43]));
+      expect(marked[43], name).toBe(mature[43]);
+      expect(marked[41], name).toContain('jjjjjjj');
+    }
   });
 
   it('shows marked trees with a tie and felled ones as stumps', () => {
