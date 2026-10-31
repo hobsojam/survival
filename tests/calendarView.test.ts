@@ -47,6 +47,32 @@ describe('the day pill on the cold night', () => {
   });
 });
 
+describe('the winter warning on the day pill', () => {
+  it('counts down autumn\'s last three days to winter', () => {
+    expect(dayPillView(at(8, 0)).winterIn).toBe('Winter in 3 days');
+    expect(dayPillView(at(9, 0)).winterIn).toBe('Winter in 2 days');
+    expect(dayPillView(at(10, 0)).winterIn).toBe('Winter in 1 day');
+    expect(dayPillView(at(48, 0)).winterIn).toBe('Winter in 3 days');
+  });
+
+  it('says nothing earlier in autumn or once winter has come', () => {
+    expect(dayPillView(at(7, 0)).winterIn).toBe('');
+    expect(dayPillView(at(11, 0)).winterIn).toBe('');
+    expect(dayPillView(at(38, 0)).winterIn).toBe('');
+  });
+
+  it('shows the warning on the pill, and hides it when there is none', () => {
+    const root = fakeRoot();
+    const get = (selector: string) => root.elements.get(selector)!;
+    renderDayPill(root, dayPillView(at(9, 0)));
+    expect(get('#day-winter').textContent).toBe('Winter in 2 days');
+    expect(get('#day-pill').classes.has('winter-soon')).toBe(true);
+    renderDayPill(root, dayPillView(at(11, 0)));
+    expect(get('#day-winter').textContent).toBe('');
+    expect(get('#day-pill').classes.has('winter-soon')).toBe(false);
+  });
+});
+
 describe('the year wheel', () => {
   it('starts the year at the top in autumn', () => {
     expect(yearWheelView(1, 0)).toMatchObject({ angle: 0, label: 'Autumn · 10 days left' });

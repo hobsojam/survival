@@ -18,6 +18,15 @@ export interface DayPillView {
   frosty: boolean;
   handPercent: number;
   nightPercent: number;
+  /** In autumn's last three days, how long until winter; otherwise empty. */
+  winterIn: string;
+}
+
+/** The countdown to winter for the day pill, over autumn's last three days. */
+function winterIn(day: number): string {
+  const left = daysLeftInSeason(day);
+  if (season(day) !== 'autumn' || left > 3) return '';
+  return `Winter in ${left} ${left === 1 ? 'day' : 'days'}`;
 }
 
 export function dayPillView(state: GameState): DayPillView {
@@ -33,7 +42,8 @@ export function dayPillView(state: GameState): DayPillView {
     cold,
     frosty: isFreezingNight(state),
     handPercent: state.timeOfDay / BALANCE.daySeconds * 100,
-    nightPercent: nightStart(state.day) / BALANCE.daySeconds * 100
+    nightPercent: nightStart(state.day) / BALANCE.daySeconds * 100,
+    winterIn: winterIn(state.day)
   };
 }
 
@@ -77,6 +87,9 @@ export function renderDayPill(root: CalendarRoot, view: DayPillView): void {
   root.querySelector('#day-pill')?.classList.toggle('night', view.night);
   root.querySelector('#day-pill')?.classList.toggle('cold', view.cold);
   root.querySelector('.game-frame')?.classList.toggle('frosty', view.frosty);
+  // The pill's class shows the countdown; with no text it stays hidden.
+  setText(root, '#day-winter', view.winterIn);
+  root.querySelector('#day-pill')?.classList.toggle('winter-soon', view.winterIn !== '');
   // The snowflake shows on phones too, where the phase's name is hidden for room.
   if (view.cold) root.querySelector('#day-cold')?.setAttribute('style', `background-image: url("${journalIconUrl('coldFront')}")`);
   const hand = root.querySelector('#day-dial-hand');

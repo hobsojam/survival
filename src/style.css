@@ -58,6 +58,9 @@ button:focus-visible { outline: 3px solid #d69c5d; outline-offset: 3px; }
   background: radial-gradient(ellipse at center, transparent 58%, #d8eef055 80%, #eef8fbcc 100%); }
 .game-frame.frosty::after { opacity: 1; }
 .day-countdown { min-width: 86px; font-weight: 600; opacity: .85; }
+/* Autumn's last three days: the pill counts down to winter, on phones too. */
+.day-winter { display: none; flex: none; padding: 2px 7px; border-radius: 999px; background: #e3eef2; color: #34576b; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.day-pill.winter-soon .day-winter { display: inline-block; }
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
 .game-panel, .panel { background: #fffdf7; border: 1px solid #e3e5d9; box-shadow: 0 10px 30px #38503c15, 0 2px 5px #38503c08; }
 .game-panel { border-radius: 20px; padding: 10px; overflow: hidden; }
@@ -94,6 +97,7 @@ kbd { display: inline-block; border: 1px solid #d4ddce; border-bottom-width: 2px
 .forecast-copy { margin: 0 0 12px; color: #58706e; font-size: 12px; line-height: 1.45; }
 .forecast-checks { display: grid; gap: 5px; color: #46645f; font-size: 11px; font-weight: 700; }
 .forecast-checks span { padding: 7px 9px; border: 1px solid #d8e5e1; border-radius: 7px; background: #ffffffa8; }
+.forecast-checks span:empty { display: none; }
 .lookout-panel { background: linear-gradient(145deg, #f5efe1, #fffdf7 72%); border-color: #e7d9bd; }
 .lookout-panel h2 { margin-bottom: 7px; }
 .lookout-copy { min-height: 48px; margin: 0 0 12px; color: #6d725e; font-size: 12px; line-height: 1.45; }

@@ -1,5 +1,5 @@
-import { daysLeftInSeason, isSpring, isWinter, nightStart, season } from '../game/calendar';
-import { FOOD_ITEMS, availableFood, foodCount, goingSoft, isFresh, keptFoodTotal, storeTotal, type FoodItem } from '../game/food';
+import { SEASON_LENGTH, daysLeftInSeason, isSpring, isWinter, nightStart, season } from '../game/calendar';
+import { FOOD_ITEMS, availableFood, foodCount, goingSoft, isFresh, storeTotal, type FoodItem, type KeptFood } from '../game/food';
 import { foodIconUrl } from '../art/foodIcons';
 import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
@@ -245,6 +245,8 @@ export function nightHint(state: GameState): string {
 }
 
 export interface ForecastView { active: boolean; title: string; copy: string; shelter: string; fire: string;
+  /** How much food is laid by for winter, in autumn's last three days; otherwise empty. */
+  food: string;
   /** Shown only while a cold night is due or under way, or in winter: otherwise there is nothing to forecast. */
   shown: boolean }
 
@@ -259,30 +261,55 @@ function winterForecast(state: GameState): ForecastView {
     title: active ? 'A bitter night' : 'Winter nights',
     copy: `Winter nights are bitter. Keep the ${livesInHouse(state) ? 'fireplace' : 'fire'} alive until dawn, or the wolves will come close.`,
     shelter: state.structures.shelter ? '✓ Shelter ready' : '○ Shelter needed',
-    fire: forecastFireCheck(state)
+    fire: forecastFireCheck(state),
+    food: ''
   };
 }
 
-/** Autumn's last three days, with no cold night to warn of instead: the bushes are about to go bare. */
-function lateAutumnForecast(state: GameState): ForecastView | null {
+/** Hunger a day of winter burns: an eighth of a point a second, over a 240 s day. */
+const HUNGER_A_DAY = 30;
+
+/** The hunger each kept food fills, for the food laid by: a fish counts as the cooked meal it makes, and pine needles make tea, not meals. */
+const LAID_BY_HUNGER: Record<KeptFood, number> = {
+  hazelnut: BALANCE.hazelnutHunger, honey: BALANCE.honeyHunger, pineNeedles: 0, roastedHazelnuts: BALANCE.roastedHazelnutHunger,
+  trailFood: BALANCE.trailFoodHungerGain, vegetables: BALANCE.vegetableHunger, fish: BALANCE.cookedFishHunger
+};
+
+/** Whole days of winter hunger the kept food in the bag and the larder would fill, up to the season's ten. */
+export function foodLaidByDays(state: GameState): number {
+  const hunger = (Object.keys(LAID_BY_HUNGER) as KeptFood[])
+    .reduce((total, item) => total + (state.inventory.food[item] + state.larder[item]) * LAID_BY_HUNGER[item], 0);
+  return Math.min(SEASON_LENGTH, Math.floor(hunger / HUNGER_A_DAY));
+}
+
+const isLateAutumn = (day: number): boolean => season(day) === 'autumn' && daysLeftInSeason(day) <= 3;
+
+/** The food laid by for winter, shown on every forecast card in autumn's last three days. */
+function foodLaidByLine(state: GameState): string {
+  if (!isLateAutumn(state.day)) return '';
+  const days = foodLaidByDays(state);
+  return `${days >= SEASON_LENGTH ? '✓' : '○'} Food laid by: enough for ${days} of ${SEASON_LENGTH} days`;
+}
+
+/** Autumn's last three days, with no cold night to warn of instead: winter is coming, and the bushes stay bare through it. */
+function winterComingForecast(state: GameState): ForecastView | null {
   const coldNightDue = !state.progress.hearthUnlocked && state.progress.nextStormDay !== null;
-  if (coldNightDue || season(state.day) !== 'autumn' || daysLeftInSeason(state.day) > 3) return null;
+  if (coldNightDue || !isLateAutumn(state.day)) return null;
   return {
     active: false, shown: true,
-    title: 'The bushes will soon be bare',
-    copy: 'Berries go soft in a few days, and the bushes stay bare all winter. Dry rations and gather hazelnuts before the snow comes.',
-    shelter: `Food that keeps: ${keptFoodTotal(state)}`,
-    fire: ''
+    title: 'Winter is coming',
+    copy: 'The bushes stay bare all winter. Lay by food that keeps: dry rations and gather hazelnuts. The quiet spring freezes in winter, and a fishing line could see you through.',
+    shelter: '', fire: '', food: foodLaidByLine(state)
   };
 }
 
 export function forecastView(state: GameState): ForecastView {
-  const lateAutumn = lateAutumnForecast(state);
-  if (lateAutumn) return lateAutumn;
+  const winterComing = winterComingForecast(state);
+  if (winterComing) return winterComing;
   const storm = isColdNight(state);
   if (state.progress.hearthUnlocked) {
     // With the cold night weathered, only winter's nights are left to forecast.
-    return isWinter(state.day) ? winterForecast(state) : { active: false, shown: false, title: '', copy: '', shelter: '', fire: '' };
+    return isWinter(state.day) ? winterForecast(state) : { active: false, shown: false, title: '', copy: '', shelter: '', fire: '', food: '' };
   }
   const day = state.progress.nextStormDay!;
   const sheltered = state.structures.shelter;
@@ -291,7 +318,8 @@ export function forecastView(state: GameState): ForecastView {
     title: storm ? 'The cold night is here' : `Cold night · day ${day}`,
     copy: storm ? 'Stay at camp and keep the fire alive until dawn.' : `Build a shelter and bring ${LOG_WORDS[logsForColdNight(day)]} logs to camp before nightfall on day ${day}.`,
     shelter: sheltered ? '✓ Shelter ready' : '○ Shelter needed',
-    fire: forecastFireCheck(state)
+    fire: forecastFireCheck(state),
+    food: foodLaidByLine(state)
   };
 }
 
