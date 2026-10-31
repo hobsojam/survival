@@ -4,7 +4,7 @@ import { foodIconUrl } from '../art/foodIcons';
 import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { workSeconds } from '../game/needs';
-import { livesInHouse, woodStoreCapacity } from '../game/home';
+import { hasWoodStore, livesInHouse, woodStoreCapacity } from '../game/home';
 import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
@@ -246,7 +246,7 @@ export function bagView(state: GameState): BagView {
   const prepareBlocker = trailFoodBlocker(state);
   const pile = state.structures.stonePile;
   // The woodpile and, once the house stands, the woodshed keep one wood store between them.
-  const woodStore = state.structures.woodpile || state.structures.house;
+  const woodStore = hasWoodStore(state);
   /** "(2 going soft)" for the bag's fresh pieces gone at the next dawn, or nothing. */
   const softNote = (item: FoodItem): string => {
     const soft = isFresh(item) ? goingSoft(state.inventory.food, item, state.day, BALANCE.bagFreshDays) : 0;

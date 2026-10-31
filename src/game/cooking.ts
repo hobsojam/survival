@@ -1,6 +1,6 @@
 import { nightStart } from './calendar';
 import { availableStone, availableWood, freeSpaces, isAtCamp, isInClearing } from './camp';
-import { isAtHome, livesInHouse } from './home';
+import { fuelLeft, isAtHome, livesInHouse } from './home';
 import { addFood, availableFood, spendFood, type FoodItem } from './food';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { BALANCE, type GameState } from './state';
@@ -36,7 +36,7 @@ export function potBlocker(state: GameState): string | null {
 function cookingFireBlocker(state: GameState): string | null {
   if (livesInHouse(state)) {
     if (!isAtHome(state)) return 'Go home to cook.';
-    return state.fireplaceFuel <= 0 ? 'The fireplace is out. Stock the wood store.' : null;
+    return fuelLeft(state) <= 0 ? 'The fireplace is out. Stock the wood store.' : null;
   }
   if (!isAtCamp(state)) return 'Return to camp to cook.';
   return state.fireFuel <= 0 ? 'Light the campfire before cooking.' : null;

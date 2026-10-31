@@ -40,10 +40,10 @@ describe('clearingReach', () => {
     expect(clearingReach(...at(180), cleared)).toBe(4);
   });
 
-  it('reaches furthest east and west once every step is done', () => {
+  it('reaches furthest north, east and west once every step is done', () => {
     expect(clearingReach(...at(0), STEP_IDS)).toBe(9);
     expect(clearingReach(...at(180), STEP_IDS)).toBe(9);
-    expect(clearingReach(...at(-90), STEP_IDS)).toBe(8);
+    expect(clearingReach(...at(-90), STEP_IDS)).toBe(9);
     expect(clearingReach(...at(90), STEP_IDS)).toBe(8);
   });
 

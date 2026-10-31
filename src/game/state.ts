@@ -275,12 +275,12 @@ const fiberPositions = [
 const stonePositions = [[31, 10], [11, 22], [29, 21]];
 // Seasonal forage. Hazels stand at the foot of broadleaf trees and pines out in the woods; greens grow by the spring and in
 // the open meadow, and the last two patches come up only after a spring shower. The hollow tree keeps a bees' nest.
-const hazelPositions = [[17.5, 4.5], [25.5, 5.5], [26.75, 6.5]];
+const hazelPositions = [[15, 5], [25.5, 5.5], [26.75, 6.5]];
 const pinePositions = [[9.5, 12.5], [23, 5.5], [19.5, 25]];
 const greensPositions = [[9.5, 17.5], [12.5, 21.5], [27, 22.5], [30.5, 16.5], [12.5, 8]];
 const honeyPositions = [[16, 6.5]];
 const treePositions = [
-  [20, 7, 'treeBroadleaf'], [17, 9, 'treeBroadleaf'], [27, 5, 'treeBroadleaf'],
+  [20, 5, 'treeBroadleaf'], [17, 9, 'treeBroadleaf'], [27, 5, 'treeBroadleaf'],
   [22, 23, 'treePine'], [32, 14, 'treePine'], [15, 24, 'treePine']
 ] as const;
 

@@ -78,26 +78,34 @@ describe('the fireplace burning', () => {
     expect(after.fireplaceFuel).toBeCloseTo(BALANCE.fireplaceSecondsPerWood - 1);
   });
 
-  it('draws logs one at a time through a whole night, never from the bag', () => {
-    let state = housed({ ...night(), storedWood: 5, fireplaceFuel: 3, inventory: { ...createGame().inventory, wood: 4 } });
+  it('draws logs one at a time through several freezing nights, never from the bag', () => {
+    let state = housed({ ...night(WINTER), storedWood: 10, fireplaceFuel: 0, inventory: { ...createGame().inventory, wood: 4 } });
     const drawn: number[] = [];
-    while (state.day === AUTUMN) {
+    let nightSeconds = 0;
+    while (state.day < WINTER + 3) {
+      if (state.timeOfDay >= nightStart(state.day)) nightSeconds++;
       const next = advanceTime(state, 1);
       drawn.push(state.storedWood - next.storedWood);
       state = next;
     }
+    // Each log keeps a freezing night going for fireplaceSecondsPerWood / coldNightFireBurn seconds, and is drawn the moment the last one is spent.
+    const logs = Math.ceil(nightSeconds * BALANCE.coldNightFireBurn / BALANCE.fireplaceSecondsPerWood);
+    expect(logs).toBeGreaterThanOrEqual(3);
     expect(drawn.every(n => n === 0 || n === 1)).toBe(true);
-    expect(drawn.filter(n => n === 1)).toHaveLength(1);
-    expect(state.storedWood).toBe(4);
+    expect(drawn.filter(n => n === 1)).toHaveLength(logs);
+    expect(state.storedWood).toBe(10 - logs);
     expect(state.inventory.wood).toBe(4);
-    expect(state.fireplaceFuel).toBeGreaterThan(0);
   });
 
   it('goes out and stays out when the store is empty', () => {
-    const out = advanceTime(housed({ ...night(), storedWood: 0, fireplaceFuel: 30 }), 40);
+    const before = housed({ ...night(), storedWood: 0, fireplaceFuel: 30, inventory: { ...createGame().inventory, wood: 3 } });
+    const out = advanceTime(before, 40);
     expect(out.fireplaceFuel).toBe(0);
     expect(out.storedWood).toBe(0);
-    expect(advanceTime(out, daySeconds).fireplaceFuel).toBe(0);
+    expect(out.inventory.wood).toBe(3);
+    const later = advanceTime(out, daySeconds);
+    expect(later.fireplaceFuel).toBe(0);
+    expect(later.inventory.wood).toBe(3);
   });
 
   it('burns fast on a freezing night', () => {
@@ -183,6 +191,12 @@ describe('cooking at home', () => {
     expect(cookBlocker(lit)).toBeNull();
     expect(dishBlocker(lit, 'berries')).toBeNull();
   });
+
+  it('still cooks between logs while the store holds wood', () => {
+    const between = pot(housed({ ...night(), ...food, fireFuel: 0, fireplaceFuel: 0, storedWood: 3 }));
+    expect(cookBlocker(between)).toBeNull();
+    expect(dishBlocker(between, 'berries')).toBeNull();
+  });
 });
 
 describe('wolves and the house', () => {
@@ -215,10 +229,17 @@ describe('the bird and the forecast with the house', () => {
     expect(fuelLeft(unhoused({ fireFuel: 40, storedWood: 3 }))).toBe(40);
   });
 
+  const bird = (state: GameState): GameState => ({ ...state, companion: { ...state.companion, friend: 'bird' } });
+
   it('lets the bird sleep on while the store holds wood', () => {
-    const bird = (state: GameState): GameState => ({ ...state, companion: { ...state.companion, friend: 'bird' } });
     expect(alarmAfter(bird(housed({ ...night(WINTER), fireplaceFuel: 30, storedWood: 5 })))).toBeGreaterThan(daySeconds);
     expect(alarmAfter(bird(housed({ ...night(WINTER), fireplaceFuel: 30, storedWood: 0 })))).toBeCloseTo(5);
+  });
+
+  it('has the bird wake the sleeper to the fireplace, not the fire', () => {
+    const woken = act(bird(housed({ ...night(WINTER), fireplaceFuel: 30, storedWood: 0 })), { type: 'sleep' });
+    expect(woken.message).toBe('Your bird woke you. The fireplace is nearly out.');
+    expect(woken.state.day).toBe(WINTER);
   });
 
   it('reads the fireplace and the wood store for the cold night', () => {
@@ -284,6 +305,13 @@ describe('the house by night', () => {
     expect(house(lit)).toBe('house:lit');
     expect(chimney(lit).length).toBeGreaterThan(0);
     expect(houseGlow(lit)).not.toBeNull();
+  });
+
+  it('stays lit between logs while the store holds wood', () => {
+    const between = housed({ ...night(), fireplaceFuel: 0, storedWood: 3 });
+    expect(house(between)).toBe('house:lit');
+    expect(chimney(between).length).toBeGreaterThan(0);
+    expect(houseGlow(between)).not.toBeNull();
   });
 
   it('stays dark by day and once the fire is out', () => {

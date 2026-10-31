@@ -5,6 +5,7 @@ import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WID
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
 import { availableFiber, availableWood, cookBlocker, isAtCamp, isInClearing, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { nextStep, type Side } from '../game/clearing';
+import { hasWoodStore } from '../game/home';
 import { offerBlocker } from '../game/companion';
 import { defaultDish, type DishId } from '../game/cooking';
 import { foodCount, type FoodItem } from '../game/food';
@@ -65,7 +66,7 @@ export class App {
       const groupHeading = id === 'shelterThatched' ? '<h3 class="build-group-heading">Shelter upgrades</h3>' : '';
       let extraControls = '';
       if (id === 'stonePile') extraControls = `<div id="stone-pile-controls" class="stone-pile-controls" hidden><span id="stone-pile-stored">Stored stone 0/${BALANCE.stonePileCapacity}</span><button type="button" data-action="storeStone">Store 1</button><button type="button" data-action="takeStone">Take 1</button></div>`;
-      if (id === 'woodpile') extraControls = `<div id="wood-pile-controls" class="stone-pile-controls" hidden><span id="wood-pile-stored">Stored wood 0/${BALANCE.woodpileCapacity}</span><button type="button" data-action="storeWood">Store 1</button><button type="button" data-action="takeWood">Take 1</button></div>`;
+      if (id === 'woodpile') extraControls = `<div id="wood-pile-controls" class="stone-pile-controls" hidden><span id="wood-pile-stored">Stored wood 0/0</span><button type="button" data-action="storeWood">Store 1</button><button type="button" data-action="takeWood">Take 1</button></div>`;
       if (id === 'fibreStack') extraControls = `<div id="fibre-stack-controls" class="stone-pile-controls" hidden><span id="fibre-stack-stored">Stored fiber 0/${BALANCE.fibreStackCapacity}</span><button type="button" data-action="storeFiber">Store 1</button><button type="button" data-action="takeFiber">Take 1</button></div>`;
       if (id === 'larder') extraControls = larderMarkup();
       return groupHeading + `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>` + extraControls;
@@ -399,7 +400,7 @@ export class App {
     if (woodControls) {
       woodControls.hidden = !bag.woodShown;
       // The wood store's controls sit under the woodpile, or under the house while its woodshed is the only store.
-      const holder = this.state.structures.woodpile || !this.state.structures.house ? 'woodpile' : 'house';
+      const holder = this.state.structures.woodpile || !hasWoodStore(this.state) ? 'woodpile' : 'house';
       const button = this.root.querySelector(`[data-build="${holder}"]`);
       if (button && button.nextElementSibling !== woodControls) button.after(woodControls);
     }

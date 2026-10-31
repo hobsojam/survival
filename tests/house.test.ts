@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, BUILDINGS, createGame, type GameState } from '../src/game/state';
-import { CLEARING_STEPS, STEP_IDS, inClearing, placeBranches } from '../src/game/clearing';
+import { CLEARING_STEPS, STEP_IDS, clearingReach, inClearing, placeBranches } from '../src/game/clearing';
 import { applyAction, buildStatus, groundBlocker } from '../src/game/rules';
 import { workSeconds } from '../src/game/needs';
 import { HOUSE_SPOT, livesInHouse, woodStoreCapacity } from '../src/game/home';
@@ -57,7 +57,7 @@ describe('the house', () => {
     expect(BALANCE).toMatchObject({ houseBuildSeconds: 24, woodshedCapacity: 24, fireplaceSecondsPerWood: 200, homeRadius: 2.5 });
     expect(createGame().fireplaceFuel).toBe(0);
     expect(createGame().structures.house).toBe(false);
-    expect(HOUSE_SPOT).toEqual({ x: campX + 4.5, y: campY - 6.5 });
+    expect(HOUSE_SPOT).toEqual({ x: campX - 0.5, y: campY - 6.5 });
   });
 
   it("waits for the north side's far ground", () => {
@@ -101,17 +101,28 @@ describe('the house', () => {
 });
 
 describe('where the house stands', () => {
-  const SPOT = { x: 24.5, y: 8.5 };
+  const SPOT = { x: 19.5, y: 8.5 };
+  const NORTH: Cleared = ['north-near', 'north-far'];
 
   it("stands on the north side's far ground, beyond the near ground", () => {
     expect(HOUSE_SPOT).toEqual(SPOT);
-    expect(CAMP_STRUCTURES).toContainEqual(['house', 4.5, -6.5]);
-    expect(inClearing(SPOT.x, SPOT.y, ['north-near', 'north-far'])).toBe(true);
+    expect(CAMP_STRUCTURES).toContainEqual(['house', -0.5, -6.5]);
+    expect(inClearing(SPOT.x, SPOT.y, NORTH)).toBe(true);
     expect(inClearing(SPOT.x, SPOT.y, ['north-near'])).toBe(false);
   });
 
+  it('sits wholly on cleared earth, every corner of its footprint well inside the north ground', () => {
+    // The 40x32 sprite, anchored at [20, 30], spans 1.25 tiles either side of the tile centre, 1.9 above it and 0.2 below.
+    const cx = SPOT.x + 0.5, cy = SPOT.y + 0.5;
+    const corners = [[cx - 1.25, cy - 1.9], [cx + 1.25, cy - 1.9], [cx - 1.25, cy + 0.2], [cx + 1.25, cy + 0.2]];
+    for (const [x, y] of corners) {
+      const spare = clearingReach(x, y, NORTH) - Math.hypot(x - campX, y - campY);
+      expect(spare, `corner at ${x},${y}`).toBeGreaterThanOrEqual(0.4);
+    }
+  });
+
   it('keeps clear of nodes, trees and paths', () => {
-    for (const node of placeBranches(createGame().nodes, ['north-near', 'north-far'])) expect(distance(SPOT, node), node.id).toBeGreaterThanOrEqual(2);
+    for (const node of placeBranches(createGame().nodes, NORTH)) expect(distance(SPOT, node), node.id).toBeGreaterThanOrEqual(2);
     for (const tree of createGame().trees) expect(distance(SPOT, tree), tree.id).toBeGreaterThanOrEqual(2);
     for (const id of STEP_IDS.filter(step => step !== 'north-near' && step !== 'north-far')) {
       for (const tree of CLEARING_STEPS[id].trees) expect(distance(SPOT, tree), id).toBeGreaterThanOrEqual(2);
@@ -152,8 +163,22 @@ describe('the wood store', () => {
   it('stores and takes wood with only the house built', () => {
     const stored = applyAction(withBag(housed(), { wood: 2 }), { type: 'storeWood' });
     expect(stored.state).toMatchObject({ storedWood: 1, inventory: { wood: 1 } });
+    expect(stored.message).toBe('Stacked a log on the woodshed.');
     const taken = applyAction(stored.state, { type: 'takeWood' });
     expect(taken.state).toMatchObject({ storedWood: 0, inventory: { wood: 2 } });
+    expect(taken.message).toBe('Took a log from the woodshed.');
+    expect(applyAction(taken.state, { type: 'takeWood' }).message).toBe('The woodshed is empty.');
+  });
+
+  it('names the woodshed when the survivor is away from camp', () => {
+    const away = withBag(housed({}, { area: 'quarry', storedWood: 3 }), { wood: 2 });
+    for (const type of ['storeWood', 'takeWood'] as const) expect(applyAction(away, { type })).toEqual({ state: away, message: 'Return to camp to use the woodshed.' });
+  });
+
+  it('keeps naming the woodpile while it stands beside the woodshed', () => {
+    const both = withBag(housed({ woodpile: true }), { wood: 2 });
+    expect(applyAction(both, { type: 'storeWood' }).message).toBe('Stacked a log on the woodpile.');
+    expect(applyAction(both, { type: 'takeWood' }).message).toBe('The woodpile is empty.');
   });
 
   it('still asks for a woodpile with neither built', () => {

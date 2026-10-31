@@ -10,7 +10,7 @@ import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, ma
 import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
 import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
-import { fuelLeft, isAtHome, livesInHouse, tendFireplace, woodStoreCapacity } from './home';
+import { fuelLeft, hasWoodStore, isAtHome, livesInHouse, tendFireplace, woodStoreCapacity } from './home';
 import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
@@ -554,7 +554,7 @@ function woodStoreName(state: GameState): string {
 }
 
 function woodStoreBlocker(state: GameState): string | null {
-  if (!state.structures.woodpile && !state.structures.house) return 'Build a woodpile first.';
+  if (!hasWoodStore(state)) return 'Build a woodpile first.';
   if (!isInClearing(state)) return `Return to camp to use the ${woodStoreName(state)}.`;
   return null;
 }
@@ -854,7 +854,7 @@ const build: ActionHandler<'build'> = (state, action) => {
   const house = action.structureId === 'house';
   return {
     state: payAndBuild(state, buildingCost(action.structureId), { structures: { ...state.structures, [action.structureId]: true } },
-      house ? BALANCE.houseBuildSeconds : BALANCE.buildSeconds),
+      house ? BALANCE.houseBuildSeconds : undefined),
     message: house ? MOVING_IN_MESSAGE : `Built the ${BUILDINGS[action.structureId].name.toLowerCase()}.`
   };
 };
@@ -879,7 +879,8 @@ function sleptEnergy(state: GameState): number {
   return Math.max(energy, Math.min(cap, energy + (rested - energy) * BALANCE.hungryRecoveryFactor));
 }
 
-const ALARM_MESSAGE = 'Your bird woke you. The fire is nearly out.';
+/** The bird's alarm names the fire that keeps the survivor warm: the fireplace once they live in the house. */
+const alarmMessage = (state: GameState): string => `Your bird woke you. The ${livesInHouse(state) ? 'fireplace' : 'fire'} is nearly out.`;
 
 /** What the night did to the fire that keeps the survivor warm: in the house, the fireplace, which went out only if it burned and the store ran dry. */
 function fireDiedNote(before: GameState, after: GameState): string {
@@ -899,7 +900,7 @@ const sleep: ActionHandler<'sleep'> = state => {
     // Woken early, the survivor gets the share of the night's rest they slept.
     const energy = Math.min(100, state.player.energy + (sleptEnergy(state) - state.player.energy) * alarm / night + cakeEnergy(state));
     const woken = advanceTime({ ...state, player: { ...state.player, energy }, cakeBonus: false }, alarm, 'resting');
-    return { state: { ...woken, companion: { ...woken.companion, alarmDay: state.day } }, message: ALARM_MESSAGE };
+    return { state: { ...woken, companion: { ...woken.companion, alarmDay: state.day } }, message: alarmMessage(state) };
   }
   const slept = advanceTime({ ...state, player: { ...state.player, energy: Math.min(100, sleptEnergy(state) + cakeEnergy(state)) }, cakeBonus: false }, night, 'resting');
   return { state: slept, message: `You sleep until morning.${fireDiedNote(state, slept)}` };

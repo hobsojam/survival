@@ -5,12 +5,17 @@ import { BALANCE, type GameState } from './state';
 // Living in the house: where it stands, whether the survivor has moved in, the wood store it adds,
 // and the fireplace that feeds itself from that store at night and takes over the campfire's work.
 
-/** Where the house stands: on the north side's far ground, up and to the right of the fire. */
-export const HOUSE_SPOT = { x: BALANCE.campX + 4.5, y: BALANCE.campY - 6.5 } as const;
+/** Where the house stands: on the north side's far ground, straight up from the fire. */
+export const HOUSE_SPOT = { x: BALANCE.campX - 0.5, y: BALANCE.campY - 6.5 } as const;
 
 /** The survivor moves in the moment the house is built. */
 export function livesInHouse(state: GameState): boolean {
   return state.structures.house;
+}
+
+/** Whether there is a wood store at all: the woodpile, or the woodshed once the house stands. */
+export function hasWoodStore(state: GameState): boolean {
+  return state.structures.woodpile || state.structures.house;
 }
 
 /** The single wood store: the woodpile's share if it is built, and the woodshed's once the house stands. */
@@ -45,7 +50,7 @@ export function tendFireplace(next: GameState, step: number, coldNight: boolean)
   next.fireplaceFuel = Math.max(0, next.fireplaceFuel - step * (coldNight ? BALANCE.coldNightFireBurn : 1));
 }
 
-/** Whether the fireplace is alight now: only at night, while it has fuel. */
+/** Whether the fireplace is alight now: only at night, while it has fuel or a log in store to draw next. */
 export function fireplaceBurning(state: GameState): boolean {
-  return livesInHouse(state) && state.fireplaceFuel > 0 && state.timeOfDay >= nightStart(state.day);
+  return livesInHouse(state) && fuelLeft(state) > 0 && state.timeOfDay >= nightStart(state.day);
 }
