@@ -1,5 +1,6 @@
 import { isWinter, nightStart } from '../game/calendar';
 import { gardenPlotStage } from '../game/garden';
+import { BED_CROPS, bedSoil, bedStage } from '../game/beds';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceNode } from '../game/state';
 import { groundBlocker, isFreezingNight } from '../game/rules';
 import { storeTotal } from '../game/food';
@@ -114,7 +115,7 @@ function addPuddles(state: GameState, add: AddVisual): void {
 }
 
 /** Small camp structures: where each stands from the fire, drawn as a flat site until built; one on cleared ground only once it is clear. */
-export const CAMP_STRUCTURES = [['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3], ['larder', 2.5, -4.5], ['woodpile', 5.5, -1.5], ['fibreStack', 5.5, 1.5], ['house', -0.5, -6.5]] as const;
+export const CAMP_STRUCTURES = [['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3], ['larder', 2.5, -4.5], ['woodpile', 5.5, -1.5], ['fibreStack', 5.5, 1.5], ['house', -0.5, -6.5], ['vegetableBeds', -4.5, 0]] as const;
 
 /** A camp store shows how much it holds: nothing, some (1 to 6) or plenty (7 and up); the larder, woodpile and fibre stack share it. */
 export function stockFrame(stored: number): StockLevel {
@@ -148,10 +149,24 @@ function shelterTexture(state: GameState): string {
   return structures.bed ? `shelter:${stage}Bed` : `shelter:${stage}`;
 }
 
+/** How far apart the three vegetable beds stand, in tiles, either side of the middle one. */
+const BED_SPACING = 0.9;
+
+/** The built beds, one per crop, each drawn at its stage of growth and the state of its soil. */
+function addVegetableBeds(state: GameState, add: AddVisual, x: number, y: number): void {
+  state.beds.forEach((bed, index) => {
+    add(`vegBed-${index}`, `vegBed:${BED_CROPS[index]}-${bedStage(bed)}-${bedSoil(state, bed)}`, x + (index - 1) * BED_SPACING, y);
+  });
+}
+
 function addBuildableStructures(state: GameState, add: AddVisual, x: number, y: number): void {
   const { structures } = state;
   for (const [id, dx, dy] of CAMP_STRUCTURES) {
     if (groundBlocker(state, id)) continue;
+    if (id === 'vegetableBeds' && structures.vegetableBeds) {
+      addVegetableBeds(state, add, x + dx, y + dy);
+      continue;
+    }
     add(id, structures[id] ? builtTexture(state, id) : `${id}Site:still`, x + dx, y + dy, structures[id] ? undefined : GROUND_DECAL_DEPTH);
   }
 }

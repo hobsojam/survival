@@ -1,6 +1,7 @@
 import type { JournalEntry } from './journalEntries';
 import type { ClearingState } from './clearing';
 import { emptyFood, type FoodStore } from './foodStore';
+import type { Bed } from './beds';
 export type ResourceKind = 'branch' | 'berry' | 'fiber' | 'stone' | 'hazel' | 'pine' | 'greens' | 'honey';
 
 export const BUILDINGS = {
@@ -20,6 +21,7 @@ export const BUILDINGS = {
   larder: { name: 'Larder', description: 'Keep up to 10 food raised off the ground', symbol: '▥', cost: { wood: 5, fiber: 2, stone: 2 }, prerequisite: null, ground: 'north-near' },
   woodpile: { name: 'Woodpile', description: 'Keep up to 12 wood split and dry', symbol: '▤', cost: { wood: 3, fiber: 1 }, prerequisite: null, ground: 'east-near' },
   fibreStack: { name: 'Fibre stack', description: 'Keep up to 12 fiber dry under thatch', symbol: '≋', cost: { wood: 2, fiber: 3 }, prerequisite: null, ground: 'east-near' },
+  vegetableBeds: { name: 'Vegetable beds', description: 'Three raised beds for potatoes, beans and carrots', symbol: '▦', cost: { wood: 6, fiber: 2 }, prerequisite: null, ground: 'west-near' },
   /** The survivor moves in the moment it is built, and the shelter becomes a woodshed. */
   house: { name: 'House', description: 'A home with a fireplace of its own', symbol: '⌂', cost: { wood: 12, fiber: 6, stone: 8 }, prerequisite: 'shelterFinished', alsoRequires: 'bed', ground: 'north-far' }
 } as const;
@@ -119,6 +121,8 @@ export interface GameState {
   trees: TreeNode[];
   stonePiles: StonePile[];
   gardenPlots: GardenPlot[];
+  /** The three raised vegetable beds: potatoes, beans and carrots, in that order. */
+  beds: Bed[];
   /** Stone kept in the camp stone pile, outside the bag. */
   storedStone: number;
   /** Wood split and stacked on the woodpile, outside the bag: it counts for building and the fire, from anywhere. */
@@ -173,6 +177,8 @@ export const BALANCE = {
   greensHunger: 15,
   hazelnutHunger: 15,
   honeyHunger: 20,
+  /** Vegetables from the beds, eaten raw. */
+  vegetableHunger: 20,
   honeyEnergy: 5,
   roastedHazelnutHunger: 50,
   /** Dawns before the hollow tree has honey again. */
@@ -245,6 +251,9 @@ export const BALANCE = {
   summerHeatStart: 60,
   summerHeatEnd: 130,
   summerHeatHunger: 1.25,
+  /** Days a bed's crop grows before it is ripe, and the vegetables a ripe bed gives. */
+  cropGrowDays: 3,
+  cropYield: 2,
   /** Berries a summer bush gives with each gather. */
   summerBerries: 2,
   thatchedShelteredWarmthLossPerSecond: 0.2,
@@ -304,7 +313,7 @@ export function createGame(): GameState {
     inventory: { wood: 0, fiber: 0, stone: 0, food: emptyFood() },
     fireFuel: 0,
     fireplaceFuel: 0,
-    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false, house: false },
+    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false, vegetableBeds: false, house: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
       quarryFound: false, pickaxeCrafted: false, potCrafted: false, packWoven: false,
       discoveries: { basket: false, spring: false, cairn: false } },
@@ -312,6 +321,7 @@ export function createGame(): GameState {
     trees,
     stonePiles: [],
     gardenPlots: Array.from({ length: 3 }, () => ({ plantedYear: null, harvestedYear: null, harvestReady: false })),
+    beds: Array.from({ length: 3 }, () => ({ sown: false, grown: 0, dryDays: 0, wateredDay: null })),
     storedStone: 0,
     storedWood: 0,
     storedFiber: 0,

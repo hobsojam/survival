@@ -16,7 +16,7 @@ import { createPause, wirePause, type PauseControl } from './pause';
 import { journalView } from './journal';
 import { renderRegionOverview } from './regionOverview';
 import { currentPage, journalPageView, renderJournalPage, turnPage } from './yearJournal';
-import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, type EatableFood, larderMarkup, larderView, clearingView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, type ActionPanelView } from './panels';
+import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, type EatableFood, larderMarkup, larderView, clearingView, cloakView, forecastView, bedMarkup, bedsPanelView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, type ActionPanelView } from './panels';
 import { Soundscape } from '../game/soundscape';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
@@ -117,6 +117,7 @@ export class App {
                 <div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small id="space-label">Carried</small></div>${bagFoodMarkup()}
               </div><p class="keepsake-line" id="pack-hint" hidden></p><p class="keepsake-line" id="keepsake-line" hidden></p><div class="fire-status" id="fire-status">The fire is unlit</div></section>
               <section class="panel garden-panel" data-tab="camp"><p class="eyebrow">GROW WITH THE SEASONS</p><h2>Berry garden</h2><p class="garden-hint" id="garden-hint"></p><div id="garden-plots"></div></section>
+              <section class="panel beds-panel" data-tab="camp" hidden><p class="eyebrow">THE WEST GROUND</p><h2>Vegetable beds</h2><p class="garden-hint" id="beds-hint"></p><div id="bed-list"></div></section>
               <section class="panel night-panel" data-tab="camp"><p class="eyebrow">AFTER DARK</p><h2>A little time for yourself</h2><p class="night-hint" id="night-hint">These small moments are waiting for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" data-dish="berries" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button>${nightDishMarkup()}</div></section>
               <section class="panel build-panel" data-tab="build"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand anywhere in the clearing to build.</p><div id="build-list">${buildMarkup}</div><div id="clearing-group" hidden><h3 class="build-group-heading">Clear the land</h3><div id="clearing-sides">${clearingMarkup}</div><div class="tool-row"><h3 id="clear-title">Clear the ground</h3><p id="clear-copy" class="lookout-copy"></p><button type="button" id="clear-button" data-action="clearGround">Clear the ground</button><small id="clear-cost"></small></div></div></section>
               <section class="panel phone-only" data-tab="camp"><p class="eyebrow">THIS CAMP</p><button type="button" id="phone-new-game" class="secondary-button">Start a new game</button></section>
@@ -146,6 +147,12 @@ export class App {
       if (!button) return;
       const type = button.dataset.action as 'plantGarden' | 'harvestGarden';
       this.scene?.perform({ type, plotIndex: Number(button.dataset.plotIndex) });
+    });
+    this.root.addEventListener('click', event => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-action="sowBed"], [data-action="harvestBed"]');
+      if (!button) return;
+      const type = button.dataset.action as 'sowBed' | 'harvestBed';
+      this.scene?.perform({ type, index: Number(button.dataset.bedIndex) });
     });
     this.root.querySelector('#build-list')!.addEventListener('click', event => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-build]');
@@ -336,6 +343,7 @@ export class App {
     this.renderForecast();
     this.renderBuild();
     this.renderGarden();
+    this.renderBeds();
   }
 
   private renderClock(): void {
@@ -544,6 +552,15 @@ export class App {
     this.setText('garden-hint', view.hint);
     const plots = this.root.querySelector<HTMLElement>('#garden-plots');
     if (plots) plots.innerHTML = view.plots.map((plot, index) => gardenPlotMarkup(plot, index)).join('');
+  }
+
+  private renderBeds(): void {
+    const view = bedsPanelView(this.state);
+    const panel = this.root.querySelector<HTMLElement>('.beds-panel');
+    if (panel) panel.hidden = !view.shown;
+    this.setText('beds-hint', view.hint);
+    const list = this.root.querySelector<HTMLElement>('#bed-list');
+    if (list) list.innerHTML = view.beds.map((bed, index) => bedMarkup(bed, index)).join('');
   }
 
   private renderBuild(): void {

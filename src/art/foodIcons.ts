@@ -2,7 +2,7 @@ import { iconUrl, type JournalIcon } from './journalIcons';
 
 // The Bag panel's little pictures of foraged food and what the camp makes from it, on the journal icons' 10×10 grid.
 
-type FoodIconId = 'greens' | 'hazelnut' | 'honey' | 'pineNeedles' | 'roastedHazelnuts' | 'pineTea' | 'salad' | 'honeyCake';
+type FoodIconId = 'greens' | 'hazelnut' | 'honey' | 'pineNeedles' | 'roastedHazelnuts' | 'vegetables' | 'pineTea' | 'salad' | 'honeyCake';
 
 export const FOOD_ICONS: Record<FoodIconId, JournalIcon> = {
   greens: { legend: { d: 'leaf1', g: 'leaf2', G: 'leaf3', L: 'leaf4' }, rows: [
@@ -64,6 +64,18 @@ export const FOOD_ICONS: Record<FoodIconId, JournalIcon> = {
     'nNNnkk.k..',
     '.nnk..o...',
     '..........'
+  ] },
+  vegetables: { legend: { g: 'leaf3', G: 'leaf4', o: 'fire2', O: 'fire3', b: 'leaf2', B: 'leaf4', p: 'earth3', P: 'earth4', k: 'earth2' }, rows: [
+    '..G.......',
+    '.gGg......',
+    '..oO...bB.',
+    '..oO..bBb.',
+    '..oo.bBb..',
+    '...o.bb...',
+    '..kppk....',
+    '.kpPPpk...',
+    '.kppPpk...',
+    '..kkkk....'
   ] },
   pineTea: { legend: { c: 'stone2', C: 'stone3', t: 'scarf1', T: 'scarf2', l: 'leaf3', s: 'frost' }, rows: [
     '...s..s...',

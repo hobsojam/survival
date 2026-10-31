@@ -3,6 +3,7 @@ import { FOOD_ITEMS, availableFood, foodCount, goingSoft, isFresh, keptFoodTotal
 import { foodIconUrl } from '../art/foodIcons';
 import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
+import { BED_CROPS, bedSoil, bedStage, harvestBedBlocker, sowBedBlocker, type BedSoil, type BedStage } from '../game/beds';
 import { workSeconds } from '../game/needs';
 import { hasWoodStore, livesInHouse, woodStoreCapacity } from '../game/home';
 import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
@@ -45,6 +46,32 @@ export function gardenPlotMarkup(plot: GardenPlotPanelView, index: number): stri
   const plantDisabled = plot.plantDisabled ? ` disabled title="${plot.plantTitle}"` : '';
   const harvestDisabled = plot.harvestDisabled ? ` disabled title="${plot.harvestTitle}"` : '';
   return `<div class="garden-plot"><span><strong>Plot ${index + 1}</strong><small>${plot.label}</small></span><button type="button" data-action="plantGarden" data-plot-index="${index}"${plantDisabled}>Plant</button><button type="button" data-action="harvestGarden" data-plot-index="${index}"${harvestDisabled}>Pick</button></div>`;
+}
+
+const BED_STAGE_WORDS: Record<BedStage, string> = { empty: 'Empty, ready to sow', sprout: 'Sprouting', growing: 'Growing', ripe: 'Ready to harvest' };
+const BED_SOIL_WORDS: Record<BedSoil, string | null> = { fresh: null, dry: 'Dry, water soon', wilted: 'Wilting, water today', frost: 'Resting under the frost' };
+
+export interface BedPanelView { label: string; action: 'sowBed' | 'harvestBed'; verb: string; disabled: boolean; title: string }
+
+/** The Vegetable beds panel, once built: a line per bed naming its crop, how far it has grown and how its soil is, with Sow or Harvest. */
+export function bedsPanelView(state: GameState): { shown: boolean; hint: string; beds: BedPanelView[] } {
+  const beds = state.beds.map((bed, index) => {
+    const crop = BED_CROPS[index];
+    const label = [capitalised(crop), BED_STAGE_WORDS[bedStage(bed)], BED_SOIL_WORDS[bedSoil(state, bed)]].filter(Boolean).join(' · ');
+    if (!bed.sown) {
+      const blocker = sowBedBlocker(state, index);
+      return { label, action: 'sowBed' as const, verb: 'Sow', disabled: Boolean(blocker), title: blocker ?? `Sow the ${crop}.` };
+    }
+    const blocker = harvestBedBlocker(state, index);
+    return { label, action: 'harvestBed' as const, verb: 'Harvest', disabled: Boolean(blocker), title: blocker ?? `Harvest ${BALANCE.cropYield} vegetables.` };
+  });
+  const hint = 'Each bed keeps its own seed, so sowing costs nothing. Rain waters the beds; left dry for a few days, a crop wilts and then withers. A ripe crop waits safely until you harvest it.';
+  return { shown: state.structures.vegetableBeds, hint, beds };
+}
+
+export function bedMarkup(bed: BedPanelView, index: number): string {
+  const disabled = bed.disabled ? ' disabled' : '';
+  return `<div class="garden-plot"><span><small>${bed.label}</small></span><button type="button" data-action="${bed.action}" data-bed-index="${index}" title="${bed.title}"${disabled}>${bed.verb}</button></div>`;
 }
 
 /** What a panel with one action button shows: its heading, its copy, its price line and its button state. */
@@ -223,7 +250,8 @@ export const BAG_FOODS = [
   { item: 'hazelnut', label: 'Hazelnuts', eat: 'Eat a hazelnut' },
   { item: 'honey', label: 'Honey', eat: 'Eat some honey' },
   { item: 'pineNeedles', label: 'Pine needles', eat: null },
-  { item: 'roastedHazelnuts', label: 'Roasted hazelnuts', eat: 'Eat the roasted hazelnuts' }
+  { item: 'roastedHazelnuts', label: 'Roasted hazelnuts', eat: 'Eat the roasted hazelnuts' },
+  { item: 'vegetables', label: 'Vegetables', eat: 'Eat some raw vegetables' }
 ] as const;
 export type BagFood = (typeof BAG_FOODS)[number]['item'];
 
@@ -291,7 +319,7 @@ function fireLine(state: GameState): string {
 }
 
 const LARDER_LABELS: Record<FoodItem, string> = {
-  berry: 'Berries', greens: 'Greens', hazelnut: 'Hazelnuts', honey: 'Honey', pineNeedles: 'Pine needles', roastedHazelnuts: 'Roasted hazelnuts', trailFood: 'Rations'
+  berry: 'Berries', greens: 'Greens', hazelnut: 'Hazelnuts', honey: 'Honey', pineNeedles: 'Pine needles', roastedHazelnuts: 'Roasted hazelnuts', trailFood: 'Rations', vegetables: 'Vegetables'
 };
 
 export interface LarderRowView { item: FoodItem; label: string; kept: number; storeDisabled: boolean; storeTitle: string; takeDisabled: boolean; takeTitle: string }

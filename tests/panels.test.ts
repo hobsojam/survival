@@ -239,7 +239,7 @@ describe('bag panel', () => {
   });
 
   it('draws each forage cell with its icon, and an Eat button for all but pine needles', () => {
-    expect(BAG_FOODS.map(cell => cell.item)).toEqual(['greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts']);
+    expect(BAG_FOODS.map(cell => cell.item)).toEqual(['greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'vegetables']);
     const markup = bagFoodMarkup();
     for (const { item } of BAG_FOODS) {
       const cell = markup.split('</div>').find(part => part.includes(`data-food="${item}"`))!;
@@ -351,7 +351,7 @@ describe('clearing panel', () => {
     const { sides } = clearingView(withAxe());
     expect(sides.map(side => side.label)).toEqual(['North · near', 'East · near', 'South · near', 'West · near']);
     expect(sides[0]).toMatchObject({ detail: "4 trees, then 4 wood and 2 fiber. There's room for a larder now.", disabled: false, done: false });
-    expect(sides[3].detail).toBe('2 trees, then 4 wood and 2 fiber');
+    expect(sides[3].detail).toBe("2 trees, then 4 wood and 2 fiber. There's room for vegetable beds now.");
   });
 
   it('moves a side on to its far step, and marks it cleared when both are done', () => {
@@ -425,7 +425,7 @@ describe('eating from the bag panel with a larder', () => {
 
   it('enables Eat for food within reach, the larder included in the clearing', () => {
     const view = bagView(atCamp);
-    expect(view.eatable).toEqual({ berry: true, trailFood: true, greens: false, hazelnut: true, honey: false, roastedHazelnuts: false });
+    expect(view.eatable).toEqual({ berry: true, trailFood: true, greens: false, hazelnut: true, honey: false, roastedHazelnuts: false, vegetables: false });
     expect(view.foods.hazelnut).toEqual({ count: 0, shown: true, note: '' });
     expect(view.foods.pineNeedles.shown).toBe(false);
   });
@@ -433,7 +433,7 @@ describe('eating from the bag panel with a larder', () => {
   it('follows the bag alone away from camp', () => {
     const away = { ...atCamp, player: { ...atCamp.player, x: 5, y: 5 }, inventory: { ...atCamp.inventory, food: addFood(emptyFood(), 'honey', 1, 1) } };
     const view = bagView(away);
-    expect(view.eatable).toEqual({ berry: false, trailFood: false, greens: false, hazelnut: false, honey: true, roastedHazelnuts: false });
+    expect(view.eatable).toEqual({ berry: false, trailFood: false, greens: false, hazelnut: false, honey: true, roastedHazelnuts: false, vegetables: false });
     expect(view.foods.hazelnut.shown).toBe(false);
   });
 });
@@ -466,7 +466,7 @@ describe('larder controls', () => {
     const markup = larderMarkup();
     expect(markup).toContain('id="larder-controls"');
     expect(markup).toContain('id="larder-stored">Stored food 0/10');
-    for (const item of ['berry', 'greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood']) {
+    for (const item of ['berry', 'greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood', 'vegetables']) {
       expect(markup).toContain(`data-action="storeFood" data-item="${item}"`);
       expect(markup).toContain(`data-action="takeFood" data-item="${item}"`);
       expect(markup).toContain(`data-larder-item="${item}" hidden`);

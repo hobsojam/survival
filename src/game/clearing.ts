@@ -241,9 +241,14 @@ function buildingName(id: string): string {
   return id.replace(/([A-Z])/g, ' $1').toLowerCase();
 }
 
+/** "a larder", or, for a building named in the plural, just "vegetable beds". */
+function withArticle(name: string): string {
+  return name.endsWith('s') ? name : `a ${name}`;
+}
+
 /** The sentence about what a cleared step makes room for, leading space included, or nothing if it is built or has none. */
 export function roomLine(step: StepId, structures: Partial<Record<string, boolean>>, known: (id: string) => boolean): string {
   const open = CLEARING_STEPS[step].room.filter(id => known(id) && !structures[id]);
   if (open.length === 0) return '';
-  return ` There's room for ${open.map(id => `a ${buildingName(id)}`).join(' and ')} now.`;
+  return ` There's room for ${open.map(id => withArticle(buildingName(id))).join(' and ')} now.`;
 }

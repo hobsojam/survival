@@ -11,7 +11,7 @@ const withFood = (state: GameState, food: GameState['inventory']['food']): GameS
 
 describe('the food store', () => {
   it('lists every item, fresh ones first', () => {
-    expect(FOOD_ITEMS).toEqual(['berry', 'greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood']);
+    expect(FOOD_ITEMS).toEqual(['berry', 'greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood', 'vegetables']);
     expect(FOOD_ITEMS.filter(isFresh)).toEqual(['berry', 'greens']);
   });
 
