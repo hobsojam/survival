@@ -191,8 +191,14 @@ const PACK_FIT: Record<string, [PackView, number, number]> = {
 function packFit(name: string): [PackView, number, number] {
   const fit = PACK_FIT[name];
   if (fit) return fit;
-  const pose: Pose = name.startsWith('walkUp') ? 'up' : name.startsWith('walkSide') || name.startsWith('gather') ? 'side' : 'down';
-  return [PACK_VIEW[pose], STANDING_LEAN[name] ?? 0, 0];
+  return [PACK_VIEW[standingPose(name)], STANDING_LEAN[name] ?? 0, 0];
+}
+
+/** Which way a standing frame faces, read from its name. */
+function standingPose(name: string): Pose {
+  if (name.startsWith('walkUp')) return 'up';
+  if (name.startsWith('walkSide') || name.startsWith('gather')) return 'side';
+  return 'down';
 }
 
 // Every frame has a twin with the woven pack on, named `${name}Pack`; the scene picks it once the pack is woven.
