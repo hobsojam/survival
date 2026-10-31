@@ -9,6 +9,7 @@ import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 import { markedTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
+import { fireplaceBurning, woodStoreCapacity } from '../game/home';
 import type { StockLevel } from '../art/phase3Sprites';
 
 export const NIGHT_DEPTH = BALANCE.mapHeight * TILE + 1;
@@ -113,7 +114,7 @@ function addPuddles(state: GameState, add: AddVisual): void {
 }
 
 /** Small camp structures: where each stands from the fire, drawn as a flat site until built; one on cleared ground only once it is clear. */
-export const CAMP_STRUCTURES = [['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3], ['larder', 2.5, -4.5], ['woodpile', 5.5, -1.5], ['fibreStack', 5.5, 1.5]] as const;
+export const CAMP_STRUCTURES = [['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3], ['larder', 2.5, -4.5], ['woodpile', 5.5, -1.5], ['fibreStack', 5.5, 1.5], ['house', -0.5, -6.5]] as const;
 
 /** A camp store shows how much it holds: nothing, some (1 to 6) or plenty (7 and up); the larder, woodpile and fibre stack share it. */
 export function stockFrame(stored: number): StockLevel {
@@ -121,9 +122,16 @@ export function stockFrame(stored: number): StockLevel {
   return stored <= 6 ? 'some' : 'full';
 }
 
+/** The woodshed shows its share of the whole wood store: empty at nothing, full from half the capacity up, otherwise some. */
+export function woodshedFrame(state: GameState): StockLevel {
+  if (state.storedWood === 0) return 'empty';
+  return state.storedWood >= woodStoreCapacity(state) / 2 ? 'full' : 'some';
+}
+
 function builtTexture(state: GameState, id: (typeof CAMP_STRUCTURES)[number][0]): string {
   if (id === 'woodpile') return `woodpile:${stockFrame(state.storedWood)}`;
   if (id === 'fibreStack') return `fibreStack:${stockFrame(state.storedFiber)}`;
+  if (id === 'house') return fireplaceBurning(state) ? 'house:lit' : 'house:dark';
   return id === 'larder' ? `larder:${stockFrame(storeTotal(state.larder))}` : `${id}:built`;
 }
 
@@ -139,6 +147,8 @@ function addCamp(state: GameState, add: AddVisual): void {
     if (structures.shelterFinished) stage = 'finished';
     shelterTexture = structures.bed ? `shelter:${stage}Bed` : `shelter:${stage}`;
   }
+  // Once the house stands, the bed has gone indoors and the shelter keeps the wood store as a woodshed.
+  if (structures.house) shelterTexture = `woodshed:${woodshedFrame(state)}`;
   add('shelter', shelterTexture, x - 3, y - 2, structures.shelter ? undefined : GROUND_DECAL_DEPTH);
   for (const [id, dx, dy] of CAMP_STRUCTURES) {
     if (groundBlocker(state, id)) continue;

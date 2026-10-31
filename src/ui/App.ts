@@ -5,6 +5,7 @@ import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WID
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
 import { availableFiber, availableWood, cookBlocker, isAtCamp, isInClearing, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { nextStep, type Side } from '../game/clearing';
+import { hasWoodStore } from '../game/home';
 import { offerBlocker } from '../game/companion';
 import { defaultDish, type DishId } from '../game/cooking';
 import { foodCount, type FoodItem } from '../game/food';
@@ -396,7 +397,13 @@ export class App {
     this.setText('stone-pile-stored', bag.pileStored);
     this.setText('wood-stored', bag.woodAtCamp);
     const woodControls = this.root.querySelector<HTMLElement>('#wood-pile-controls');
-    if (woodControls) woodControls.hidden = !bag.woodShown;
+    if (woodControls) {
+      woodControls.hidden = !bag.woodShown;
+      // The wood store's controls sit under the woodpile, or under the house while its woodshed is the only store.
+      const holder = this.state.structures.woodpile || !hasWoodStore(this.state) ? 'woodpile' : 'house';
+      const button = this.root.querySelector(`[data-build="${holder}"]`);
+      if (button && button.nextElementSibling !== woodControls) button.after(woodControls);
+    }
     this.setText('wood-pile-stored', bag.woodStored);
     this.setText('fiber-stored', bag.fiberAtCamp);
     const fiberControls = this.root.querySelector<HTMLElement>('#fibre-stack-controls');

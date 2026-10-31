@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
 import type { GameState } from '../game/state';
 import { BALANCE } from '../game/state';
+import { HOUSE_SPOT } from '../game/home';
 import { FIREFLY_HOMES, fireflyGlow, fireflyOffset } from './ambient';
 import { firefliesOut } from '../game/calendar';
 import { worldX, worldY } from './art';
-import { fireGlow, lightMaskPixels, lightScreenPosition, lightingTint, withSunrise, type LightRadii } from './lighting';
+import { HOUSE_WINDOW_OFFSET, fireGlow, houseGlow, lightMaskPixels, lightScreenPosition, lightingTint, withSunrise, type LightRadii } from './lighting';
 import { NIGHT_DEPTH } from './visuals';
 
 /** One screen-sized tint with palette-aware, stepped light holes erased from it. */
@@ -35,6 +36,11 @@ export class SceneLighting {
     if (radii) {
       const position = lightScreenPosition(worldX(BALANCE.campX), worldY(BALANCE.campY), camera.scrollX, camera.scrollY);
       this.layer.erase(this.mask(radii), position.x, position.y);
+    }
+    const house = houseGlow(state);
+    if (house) {
+      const position = lightScreenPosition(worldX(HOUSE_SPOT.x) + HOUSE_WINDOW_OFFSET.x, worldY(HOUSE_SPOT.y) + HOUSE_WINDOW_OFFSET.y, camera.scrollX, camera.scrollY);
+      this.layer.erase(this.mask(house), position.x, position.y);
     }
     // Fireflies live at camp and only come out in summer.
     if (state.area === 'camp' && firefliesOut(state.day)) FIREFLY_HOMES.forEach((home, index) => {

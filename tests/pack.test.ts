@@ -134,7 +134,7 @@ describe('the woven pack in the save', () => {
       removeItem: (key: string) => { data.delete(key); } } as unknown as Storage;
     const state = createGame();
     change(state);
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 20, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 21, state }));
     return loadGame(storage).kind;
   };
   const withShed = (state: GameState): void => { state.structures.shelter = true; state.structures.toolshed = true; };

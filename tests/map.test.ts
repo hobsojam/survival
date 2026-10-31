@@ -363,10 +363,11 @@ describe('the grown clearing', () => {
   });
 
   it('shares one sprite between identical edge tiles', () => {
-    const map = buildMap(nodes, 'camp', 'summer', grown(farCleared));
+    // With the north and south near ground cleared, a few edge tiles come out pixel for pixel alike.
+    const map = buildMap(nodes, 'camp', 'summer', grown(['north-near', 'south-near']));
     const names = new Set(map.campEdges.map(edge => edge.sprite));
     expect(names.size).toBeLessThan(map.campEdges.length);
-    for (const name of names) expect(terrainSprites[name]).toBeDefined();
+    for (const edge of buildMap(nodes, 'camp', 'summer', grown(farCleared)).campEdges) expect(terrainSprites[edge.sprite]).toBeDefined();
   });
 
   it('rings the grown edge with rim stones', () => {

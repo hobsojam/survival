@@ -5,6 +5,7 @@ import { LIGHT_DEPTH } from './visuals';
 import { sprites } from '../art/sprites';
 import { firefliesOut, isSpring, isWinter, leavesFalling } from '../game/calendar';
 import { wolvesClose } from '../game/wolves';
+import { fuelLeft } from '../game/home';
 import { KEEPSAKE_SPOT, keepsakeKind, sceneryKeepsake } from '../game/companion';
 import { CHORUS_SECONDS, chorusNight, companionPose, type CompanionPose } from './companionPose';
 import type { SoundCue } from '../game/soundscape';
@@ -349,7 +350,7 @@ export class AmbientLife {
 
   /** Wolf eyes at the camp edge on winter nights while the fire burns low, fading as it is fed. */
   private updateWolves(state: GameState, dark: number, seconds: number, timeMs: number): void {
-    const target = state.area === 'camp' && wolvesClose(state) ? wolfWatch(state.fireFuel) : 0;
+    const target = state.area === 'camp' && wolvesClose(state) ? wolfWatch(fuelLeft(state)) : 0;
     this.wolfPresence += Math.max(-seconds, Math.min(seconds, target - this.wolfPresence));
     const count = wolfCount(state.day);
     this.wolfEyes.forEach((image, index) => {
