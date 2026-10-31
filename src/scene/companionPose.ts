@@ -64,16 +64,9 @@ function fireside(state: GameState, friend: Friend, timeMs: number): CompanionPo
   return state.structures.shelter ? { ...EAVES, height: 1.4, frame: 'bird:idle', facing: 1 } : { ...spot, height: 0.4, frame: 'bird:idle' };
 }
 
-/**
- * The friend's pose: by the fire at night or while the survivor is away from camp,
- * and by day close by, each in its own way.
- */
-export function companionPose(state: GameState, timeMs: number, stillSeconds: number, facing: 1 | -1): CompanionPose | null {
-  const friend = state.companion.friend;
-  if (!friend) return null;
+/** By day, the friend follows the survivor or finds a nearby perch. */
+function daytimePose(state: GameState, friend: Friend, timeMs: number, stillSeconds: number, facing: 1 | -1): CompanionPose {
   const { x, y } = state.player;
-  const away = state.area !== 'camp' || Math.hypot(x - campX, y - campY) > BALANCE.campRadius + 4;
-  if (away || state.timeOfDay >= nightStart(state.day)) return fireside(state, friend, timeMs);
   const still = stillSeconds > 0.5;
   const seconds = timeMs / 1000;
   if (friend === 'wolf') {
@@ -91,4 +84,17 @@ export function companionPose(state: GameState, timeMs: number, stillSeconds: nu
   const perch = perchAhead(state, facing);
   if (perch) return { ...perch, frame: 'bird:idle', facing: x < perch.x ? -1 : 1 };
   return { x: x + facing * 0.9, y: y - 0.3, height: 0.6 + Math.abs(Math.sin(seconds * 3)) * 0.3, frame: 'bird:hop', facing };
+}
+
+/**
+ * The friend's pose: by the fire at night or while the survivor is away from camp,
+ * and by day close by, each in its own way.
+ */
+export function companionPose(state: GameState, timeMs: number, stillSeconds: number, facing: 1 | -1): CompanionPose | null {
+  const friend = state.companion.friend;
+  if (!friend) return null;
+  const { x, y } = state.player;
+  const away = state.area !== 'camp' || Math.hypot(x - campX, y - campY) > BALANCE.campRadius + 4;
+  if (away || state.timeOfDay >= nightStart(state.day)) return fireside(state, friend, timeMs);
+  return daytimePose(state, friend, timeMs, stillSeconds, facing);
 }

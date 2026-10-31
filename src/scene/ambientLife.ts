@@ -120,6 +120,11 @@ export class AmbientLife {
       for (const image of [...this.birds.map(bird => bird.image), this.fox, ...this.fireflies, ...this.leaves, ...this.rabbits.map(rabbit => rabbit.image)]) image.setVisible(false);
       return;
     }
+    this.updateCampLife(state, dark, seconds, timeMs);
+  }
+
+  /** The camp's seasonal animals and effects stay hidden while the survivor is in another area. */
+  private updateCampLife(state: GameState, dark: number, seconds: number, timeMs: number): void {
     // Rabbits are out on spring days.
     const rabbitsOut = isSpring(state.day) && dark < 0.3;
     for (const rabbit of this.rabbits) this.updateRabbit(rabbit, state, rabbitsOut && rabbit.index < rabbitCount(state.day), seconds, timeMs);
