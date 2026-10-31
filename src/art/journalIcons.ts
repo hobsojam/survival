@@ -240,6 +240,18 @@ export const JOURNAL_ICONS: Record<JournalId, JournalIcon> = {
     '...mmmm...',
     '..........'
   ] },
+  fireside: { legend: { ...flame, d: 'wood1', w: 'wood2', s: 'stone1' }, rows: [
+    '......ss..',
+    '...dd.ss..',
+    '..dwwdss..',
+    '.dwwwwdd..',
+    'dwwwwwwwd.',
+    '.wwwwwwww.',
+    '.wwroOwww.',
+    '.wwoWOwww.',
+    '.wwwwwwww.',
+    '.dddddddd.'
+  ] },
   lookoutEvening: { legend: { w: 'wood2', W: 'wood3', d: 'wood1' }, rows: [
     '....ww....',
     '..wwWWww..',

@@ -2,6 +2,7 @@ import { nightStart } from './calendar';
 import { BALANCE, type GameState } from './state';
 import { isFreezingNight } from './rules';
 import { availableWood } from './camp';
+import { fuelLeft, livesInHouse } from './home';
 import { rainWindow } from './rain';
 
 export interface StormReadiness {
@@ -20,8 +21,10 @@ export function logsForColdNight(day: number): number {
   return Math.ceil((BALANCE.daySeconds - nightStart(day)) * BALANCE.coldNightFireBurn / BALANCE.fireSecondsPerWood);
 }
 
-export const secondsPerLog = (state: GameState) =>
-  state.structures.hearth ? BALANCE.hearthFireSecondsPerWood : BALANCE.fireSecondsPerWood;
+export const secondsPerLog = (state: GameState) => {
+  if (livesInHouse(state)) return BALANCE.fireplaceSecondsPerWood;
+  return state.structures.hearth ? BALANCE.hearthFireSecondsPerWood : BALANCE.fireSecondsPerWood;
+};
 
 /** The freezing night the forecast plans for: the cold night while one is pending, otherwise tonight's. */
 const plannedNight = (state: GameState): number => state.progress.nextStormDay ?? state.day;
@@ -34,15 +37,19 @@ function burnUntilNightfall(state: GameState): number {
   return night - state.timeOfDay + wet * (BALANCE.rainFireBurn - 1);
 }
 
-/** Whether the camp fire already has enough fuel to last through the freezing night. */
+/** Whether the camp fire already has enough fuel to last through the freezing night. In the house, the fireplace and the logs in store count, and carried wood is what could still be stored. */
 export function stormReadiness(state: GameState): StormReadiness {
   const perLog = secondsPerLog(state);
   const storm = isFreezingNight(state);
   const night = plannedNight(state);
-  const carried = availableWood(state) * perLog;
+  const house = livesInHouse(state);
+  const carried = (house ? state.inventory.wood : availableWood(state)) * perLog;
   let fuel: number;
   let needed: number;
-  if (storm) {
+  if (house) {
+    fuel = fuelLeft(state);
+    needed = storm ? Math.ceil((BALANCE.daySeconds - state.timeOfDay) * BALANCE.coldNightFireBurn) : (BALANCE.daySeconds - nightStart(night)) * BALANCE.coldNightFireBurn;
+  } else if (storm) {
     fuel = state.fireFuel;
     needed = Math.ceil((BALANCE.daySeconds - state.timeOfDay) * BALANCE.coldNightFireBurn);
   } else {
@@ -62,7 +69,8 @@ export function forecastFireCheck(state: GameState): string {
   const { fuel, needed, ready, logsShort, storm } = stormReadiness(state);
   let hint = '';
   if (!ready && logsShort === 0) {
-    if (storm) hint = ' · add carried wood to the fire';
+    if (livesInHouse(state)) hint = ' · store the wood you carry';
+    else if (storm) hint = ' · add carried wood to the fire';
     else if (state.day === plannedNight(state)) hint = ' · add carried wood at nightfall';
     else hint = ' · keep the logs for nightfall';
   }

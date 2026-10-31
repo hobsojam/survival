@@ -1,6 +1,7 @@
 import { isWinter, nightStart } from './calendar';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { freeSpaces, isInClearing } from './camp';
+import { fuelLeft } from './home';
 import { addFood, availableFood, spendFood, type FoodItem } from './food';
 import { BALANCE, type Friend, type GameState } from './state';
 import { dayHash, foxAt, foxSpookRadius } from './wildlife';
@@ -152,11 +153,12 @@ export function companionNews(before: GameState, after: GameState): string[] {
   return news;
 }
 
-/** Seconds of sleep before a friendly bird wakes the sleeper on a winter night, as the fire falls to 20 s; null if it won't. */
+/** Seconds of sleep before a friendly bird wakes the sleeper on a winter night, as the fire falls to 20 s; null if it won't. In the house, the logs in store keep the fireplace going. */
 export function alarmAfter(state: GameState): number | null {
   const { friend, alarmDay } = state.companion;
-  if (friend !== 'bird' || !isWinter(state.day) || !night(state) || alarmDay === state.day || state.fireFuel <= 0) return null;
-  return Math.max(0, (state.fireFuel - BALANCE.alarmFuel) / BALANCE.coldNightFireBurn);
+  const fuel = fuelLeft(state);
+  if (friend !== 'bird' || !isWinter(state.day) || !night(state) || alarmDay === state.day || fuel <= 0) return null;
+  return Math.max(0, (fuel - BALANCE.alarmFuel) / BALANCE.coldNightFireBurn);
 }
 
 const ITEMS = {

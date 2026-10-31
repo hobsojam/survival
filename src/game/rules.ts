@@ -10,7 +10,7 @@ import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, ma
 import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
 import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
-import { woodStoreCapacity } from './home';
+import { fuelLeft, isAtHome, livesInHouse, tendFireplace, woodStoreCapacity } from './home';
 import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
@@ -95,6 +95,8 @@ export function movementFactor(state: GameState): number {
 /** Why the survivor can't sleep right now, or null if they can. */
 export function sleepBlocker(state: GameState): string | null {
   if (state.timeOfDay < nightStart(state.day)) return 'You can sleep once night falls. Rest (R) for a short break.';
+  // In the house the bed is indoors, so home is the only thing asked for.
+  if (livesInHouse(state)) return isAtHome(state) ? null : 'Go home to sleep.';
   if (!isAtCamp(state)) return 'Move closer to the fire to sleep.';
   if (!state.structures.shelter) return 'Build a shelter to sleep through the night.';
   return null;
@@ -178,17 +180,19 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
   while (remaining > 0.000001) {
     const step = Math.min(remaining, 1, BALANCE.daySeconds - next.timeOfDay);
     const camp = isAtCamp(next);
+    const home = isAtHome(next);
     const coldNight = isFreezingNight(next);
     const drain = (activity === 'awake' ? BALANCE.energyDrainPerSecond : 0) + (next.player.hunger <= 0 ? BALANCE.starvingEnergyDrainPerSecond : 0);
     next.player.hunger = Math.max(0, next.player.hunger - hungerLoss(next, step));
     next.player.energy = Math.max(0, next.player.energy - step * drain);
-    next.player.warmth = Math.max(0, Math.min(100, next.player.warmth + warmthChange(next, step, camp, coldNight)));
+    next.player.warmth = Math.max(0, Math.min(100, next.player.warmth + warmthChange(next, step, camp, home, coldNight)));
     next.fireFuel = Math.max(0, next.fireFuel - step * fireBurn(next, coldNight));
+    tendFireplace(next, step, coldNight);
     next.timeOfDay += step;
     remaining -= step;
     wolfVisit(next);
     startleFox(next);
-    if (next.timeOfDay >= BALANCE.daySeconds - 0.000001) dawn(next, camp);
+    if (next.timeOfDay >= BALANCE.daySeconds - 0.000001) dawn(next, home);
   }
   return next;
 }
@@ -218,12 +222,16 @@ function fireBurn(state: GameState, coldNight: boolean): number {
   return isRaining(state) ? BALANCE.rainFireBurn : 1;
 }
 
-/** How much warmth one step of time adds or takes, read before the step's fire burn. Rain chills like an ordinary night, except in the shelter. */
-function warmthChange(state: GameState, step: number, camp: boolean, coldNight: boolean): number {
-  const sheltered = camp && state.structures.shelter;
+/**
+ * How much warmth one step of time adds or takes, read before the step's fire burn. Rain chills like an ordinary night, except in the shelter.
+ * Home is the shelter or the house with its fire, and the fireplace counts as lit while it has a log in store to draw this step;
+ * a lit campfire still warms whoever stands at it.
+ */
+function warmthChange(state: GameState, step: number, camp: boolean, home: boolean, coldNight: boolean): number {
+  const sheltered = home && (state.structures.shelter || state.structures.house);
   if (state.timeOfDay < nightStart(state.day) && !(isRaining(state) && !sheltered)) return step / 10;
-  const lit = state.fireFuel > 0;
-  if (camp && lit) return step / 2;
+  const lit = (home && fuelLeft(state) > 0) || (camp && state.fireFuel > 0);
+  if (lit) return step / 2;
   let change = -step / 2;
   if (coldNight) {
     change = -step * (sheltered
@@ -240,9 +248,9 @@ function warmthChange(state: GameState, step: number, camp: boolean, coldNight: 
 }
 
 /** Starts the next day in place: regrows nodes and settles the cold night if it just ended. */
-function dawn(next: GameState, camp: boolean): void {
+function dawn(next: GameState, home: boolean): void {
   const stormEnded = next.progress.nextStormDay === next.day;
-  const weathered = stormEnded && camp && next.structures.shelter && next.fireFuel > 0 && next.player.warmth > 20;
+  const weathered = stormEnded && home && (next.structures.shelter || next.structures.house) && fuelLeft(next) > 0 && next.player.warmth > 20;
   next.day += 1;
   next.timeOfDay = 0;
   next.gardenPlots = gardenDawn(next);
@@ -852,7 +860,7 @@ const build: ActionHandler<'build'> = (state, action) => {
 };
 
 const rest: ActionHandler<'rest'> = state => {
-  if (!isAtCamp(state)) return refuse(state, 'Move closer to the fire to rest.');
+  if (!isAtHome(state)) return refuse(state, livesInHouse(state) ? 'Go home to rest.' : 'Move closer to the fire to rest.');
   const rested = advanceTime(state, BALANCE.restSeconds, 'resting');
   const bedGain = BALANCE.bedRestEnergyGain + (state.companion.pillow ? BALANCE.pillowEnergyGain : 0);
   const gain = recovery(state, rested.structures.bed ? bedGain : BALANCE.restEnergyGain) + cakeEnergy(state);
@@ -873,6 +881,15 @@ function sleptEnergy(state: GameState): number {
 
 const ALARM_MESSAGE = 'Your bird woke you. The fire is nearly out.';
 
+/** What the night did to the fire that keeps the survivor warm: in the house, the fireplace, which went out only if it burned and the store ran dry. */
+function fireDiedNote(before: GameState, after: GameState): string {
+  if (livesInHouse(before)) {
+    const burned = before.fireplaceFuel > 0 || after.storedWood < before.storedWood;
+    return burned && after.fireplaceFuel <= 0 && after.storedWood === 0 ? ' The fireplace went out in the night.' : '';
+  }
+  return before.fireFuel > 0 && after.fireFuel <= 0 ? ' The fire burned out in the night.' : '';
+}
+
 const sleep: ActionHandler<'sleep'> = state => {
   const blocked = sleepBlocker(state);
   if (blocked) return refuse(state, blocked);
@@ -885,11 +902,7 @@ const sleep: ActionHandler<'sleep'> = state => {
     return { state: { ...woken, companion: { ...woken.companion, alarmDay: state.day } }, message: ALARM_MESSAGE };
   }
   const slept = advanceTime({ ...state, player: { ...state.player, energy: Math.min(100, sleptEnergy(state) + cakeEnergy(state)) }, cakeBonus: false }, night, 'resting');
-  const fireDied = state.fireFuel > 0 && slept.fireFuel <= 0;
-  return {
-    state: slept,
-    message: fireDied ? 'You sleep until morning. The fire burned out in the night.' : 'You sleep until morning.'
-  };
+  return { state: slept, message: `You sleep until morning.${fireDiedNote(state, slept)}` };
 };
 
 const befriend: ActionHandler<'befriend'> = state => {

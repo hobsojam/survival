@@ -4,7 +4,7 @@ import { foodIconUrl } from '../art/foodIcons';
 import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { workSeconds } from '../game/needs';
-import { woodStoreCapacity } from '../game/home';
+import { livesInHouse, woodStoreCapacity } from '../game/home';
 import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
@@ -276,8 +276,18 @@ export function bagView(state: GameState): BagView {
     fiberShown: state.structures.fibreStack,
     fiberAtCamp: state.structures.fibreStack ? `+${state.storedFiber} at camp` : '',
     fiberStored: `Stored fiber ${state.storedFiber}/${BALANCE.fibreStackCapacity}`,
-    fire: state.fireFuel > 0 ? `Fire burning · ${Math.ceil(state.fireFuel)}s of warmth` : 'The fire is unlit'
+    fire: fireLine(state)
   };
+}
+
+/** The fire that keeps the survivor warm: the campfire's fuel, or once they live in the house, the fireplace and the logs it has to draw on. */
+function fireLine(state: GameState): string {
+  if (!livesInHouse(state)) return state.fireFuel > 0 ? `Fire burning · ${Math.ceil(state.fireFuel)}s of warmth` : 'The fire is unlit';
+  const night = state.timeOfDay >= nightStart(state.day);
+  if (night && state.fireplaceFuel <= 0 && state.storedWood === 0) return 'The fireplace is out. Stock the wood store.';
+  const logs = `${state.storedWood} log${state.storedWood === 1 ? '' : 's'} in store`;
+  if (state.storedWood <= 2) return `Wood is running low · ${logs}`;
+  return `${night ? 'The fireplace is burning' : 'The fireplace is banked'} · ${logs}`;
 }
 
 const LARDER_LABELS: Record<FoodItem, string> = {

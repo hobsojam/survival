@@ -5,6 +5,7 @@ import { rainFade } from '../game/rain';
 import { coldNightApproach } from '../game/coldNight';
 import { palette } from '../art/palette';
 import { darkness } from './ambient';
+import { fireplaceBurning } from '../game/home';
 
 export interface LightingTint { color: number; alpha: number }
 export interface LightRadii { inner: number; middle: number; outer: number }
@@ -78,6 +79,15 @@ export function fireGlow(state: GameState, timeMs: number): LightRadii | null {
   if (state.area !== 'camp') return null;
   return fireRadii(state.fireFuel, state.structures.hearth, timeMs);
 }
+
+/** The house window's small warm glow at night while the fireplace burns, or null when it's out or the survivor is in another area. */
+export function houseGlow(state: GameState): LightRadii | null {
+  if (state.area !== 'camp' || !fireplaceBurning(state)) return null;
+  return { inner: 5, middle: 11, outer: 18 };
+}
+
+/** Where the house's light sits, in world pixels from the house's foot: the window, 6 across and 9 up. */
+export const HOUSE_WINDOW_OFFSET = { x: 6, y: -9 } as const;
 
 /** A white alpha mask for ERASE blending into the lighting RenderTexture. */
 export function lightMaskPixels(radii: LightRadii): { size: number; pixels: Uint8ClampedArray } {

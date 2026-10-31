@@ -9,6 +9,7 @@ import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 import { markedTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
+import { fireplaceBurning } from '../game/home';
 import type { StockLevel } from '../art/phase3Sprites';
 
 export const NIGHT_DEPTH = BALANCE.mapHeight * TILE + 1;
@@ -124,7 +125,7 @@ export function stockFrame(stored: number): StockLevel {
 function builtTexture(state: GameState, id: (typeof CAMP_STRUCTURES)[number][0]): string {
   if (id === 'woodpile') return `woodpile:${stockFrame(state.storedWood)}`;
   if (id === 'fibreStack') return `fibreStack:${stockFrame(state.storedFiber)}`;
-  if (id === 'house') return 'house:dark';
+  if (id === 'house') return fireplaceBurning(state) ? 'house:lit' : 'house:dark';
   return id === 'larder' ? `larder:${stockFrame(storeTotal(state.larder))}` : `${id}:built`;
 }
 
