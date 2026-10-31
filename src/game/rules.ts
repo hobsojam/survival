@@ -465,7 +465,7 @@ const capitalised = (word: string): string => word[0].toUpperCase() + word.slice
 function choppedMessage(toCart: number, toBag: number): string {
   if (toCart === 0) return `Chopped the tree and collected ${countWord(toBag)} wood. A stump remains.`;
   const cart = `${capitalised(countWord(toCart))} wood went into the cart`;
-  return `Chopped the tree. ${toBag > 0 ? `${cart} and ${countWord(toBag)} into your bag` : cart}.`;
+  return `Chopped the tree. ${toBag > 0 ? `${cart} and ${countWord(toBag)} into your bag` : cart}. A stump remains.`;
 }
 
 const chopTree: ActionHandler<'chopTree'> = (state, action) => {
@@ -613,7 +613,9 @@ const unloadCart: ActionHandler<'unloadCart'> = state => {
   const left = state.cartWood - moved;
   return {
     state: { ...state, cartWood: left, storedWood: state.storedWood + moved },
-    message: left > 0 ? `Unloaded ${moved} wood. The wood store is full, so ${left} stays in the cart.` : `Unloaded ${moved} wood onto the ${woodStoreName(state)}.`
+    message: left > 0
+      ? `Unloaded ${countWord(moved)} wood. The wood store is full, so ${countWord(left)} ${left === 1 ? 'stays' : 'stay'} in the cart.`
+      : `Unloaded ${countWord(moved)} wood onto the ${woodStoreName(state)}.`
   };
 };
 

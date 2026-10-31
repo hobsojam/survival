@@ -274,7 +274,7 @@ function validCompanion({ companion, day, structures }: SaveShape): boolean {
   return validBefriendedCompanion(companion, day as number, structures);
 }
 
-/** Checks a version 22 save: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, shelter upgrades, garden plots, vegetable beds, tools, quarry timers, the year journal and companion. */
+/** Checks a version 23 save: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, the workshop and its handcart, shelter upgrades, garden plots, vegetable beds, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
   const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion];

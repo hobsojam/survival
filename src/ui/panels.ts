@@ -349,7 +349,8 @@ export function bagView(state: GameState): BagView {
     storedAtCamp: pile ? `+${state.storedStone} at camp` : '',
     pileStored: `Stored stone ${state.storedStone}/${BALANCE.stonePileCapacity}`,
     woodShown: woodStore,
-    woodAtCamp: woodStore ? `+${logsInStore(state)} at camp` : '',
+    // The handcart's load counts as wood at camp even before there is a woodpile to unload it onto.
+    woodAtCamp: woodStore || state.progress.workshop.handcart ? `+${logsInStore(state)} at camp` : '',
     woodStored: `Stored wood ${state.storedWood}/${woodStoreCapacity(state)}`,
     fiberShown: state.structures.fibreStack,
     fiberAtCamp: state.structures.fibreStack ? `+${state.storedFiber} at camp` : '',

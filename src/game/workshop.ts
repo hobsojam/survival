@@ -47,9 +47,11 @@ export function cartSpace(state: GameState): number {
   return state.progress.workshop.handcart ? BALANCE.handcartCapacity - state.cartWood : 0;
 }
 
-/** A small count spelled out, as the copy writes it: "two", "four". */
+const COUNT_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+
+/** A small count spelled out, as the copy writes it: "two", "four", up to the twelve a cart holds. */
 export function countWord(count: number): string {
-  return ['no', 'one', 'two', 'three', 'four'][count] ?? String(count);
+  return COUNT_WORDS[count] ?? String(count);
 }
 
 /** Wood one felled tree gives: twice as much with the saw. */
