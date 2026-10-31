@@ -9,9 +9,10 @@ import { FOOD_ITEMS, isFresh, storeTotal, type FoodStore } from './food';
 import { FORAGE, isForage } from './forage';
 import { woodStoreCapacity } from './home';
 import { BED_CROPS, MAX_DRY_DAYS } from './beds';
+import { WORKSHOP_UPGRADES, type UpgradeId } from './workshop';
 
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 22;
+const SAVE_VERSION = 23;
 export type SaveResult = { ok: true } | { ok: false; error: string };
 export type LoadResult = { kind: 'empty' } | { kind: 'loaded'; state: GameState } | { kind: 'invalid'; reason: string };
 
@@ -68,6 +69,14 @@ function validProgressDependencies(structures: ObjectValue, progress: ObjectValu
   return progress.hearthUnlocked === true || !needsColdNight;
 }
 
+/** Exactly the three upgrades, each a boolean, and none made before the workshop stands. */
+function validWorkshop(structures: ObjectValue, progress: ObjectValue): boolean {
+  const made = progress.workshop;
+  const ids = Object.keys(WORKSHOP_UPGRADES) as UpgradeId[];
+  if (!object(made) || Object.keys(made).length !== ids.length || !ids.every(id => bool(made[id]))) return false;
+  return structures.workshop === true || !ids.some(id => made[id]);
+}
+
 /** Flags are booleans, and nothing is unlocked without what unlocks it. */
 function validProgress({ structures, progress, area }: SaveShape): boolean {
   const buildingIds = Object.keys(BUILDINGS) as (keyof typeof BUILDINGS)[];
@@ -75,7 +84,7 @@ function validProgress({ structures, progress, area }: SaveShape): boolean {
   if (Object.keys(structures).length !== buildingIds.length || !buildingIds.every(id => bool(structures[id]))) return false;
   if (!validStructureDependencies(structures)) return false;
   const flags = ['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'pickaxeCrafted', 'potCrafted', 'packWoven'] as const;
-  return flags.every(key => bool(progress[key])) && validProgressDependencies(structures, progress, area);
+  return flags.every(key => bool(progress[key])) && validWorkshop(structures, progress) && validProgressDependencies(structures, progress, area);
 }
 
 function validStorm({ progress, day }: SaveShape): boolean {

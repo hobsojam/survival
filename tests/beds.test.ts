@@ -437,19 +437,19 @@ describe('the beds panel', () => {
 });
 
 describe('the beds in the save', () => {
-  const load = (state: unknown, version = 22): string => {
+  const load = (state: unknown, version = 23): string => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;
   };
   const planted = withBeds(camp(true, { day: 6 }), [bed({ grown: 3 }), bed({ grown: 1, dryDays: 3, wateredDay: 6 }), EMPTY]);
 
-  it('accepts version 22 and rejects 21', () => {
+  it('accepts version 23 and rejects 22', () => {
     expect(load(planted)).toBe('loaded');
-    expect(load(planted, 21)).toBe('invalid');
+    expect(load(planted, 22)).toBe('invalid');
     const storage = new MemoryStorage();
     expect(saveGame(storage, planted).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(22);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(23);
   });
 
   it('needs exactly three well-formed beds', () => {

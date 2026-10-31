@@ -2,6 +2,7 @@ import type { JournalEntry } from './journalEntries';
 import type { ClearingState } from './clearing';
 import { emptyFood, type FoodStore } from './foodStore';
 import type { Bed } from './beds';
+import type { UpgradeId } from './workshop';
 export type ResourceKind = 'branch' | 'berry' | 'fiber' | 'stone' | 'hazel' | 'pine' | 'greens' | 'honey';
 
 export const BUILDINGS = {
@@ -24,7 +25,9 @@ export const BUILDINGS = {
   vegetableBeds: { name: 'Vegetable beds', description: 'Three raised beds for potatoes, beans and carrots', symbol: '▦', cost: { wood: 6, fiber: 2 }, prerequisite: null, ground: 'west-near' },
   well: { name: 'Well', description: 'Draw water for the beds and the pot', symbol: '◉', cost: { wood: 2, fiber: 0, stone: 6 }, prerequisite: 'vegetableBeds', ground: 'west-far' },
   /** The survivor moves in the moment it is built, and the shelter becomes a woodshed. */
-  house: { name: 'House', description: 'A home with a fireplace of its own', symbol: '⌂', cost: { wood: 12, fiber: 6, stone: 8 }, prerequisite: 'shelterFinished', alsoRequires: 'bed', ground: 'north-far' }
+  house: { name: 'House', description: 'A home with a fireplace of its own', symbol: '⌂', cost: { wood: 12, fiber: 6, stone: 8 }, prerequisite: 'shelterFinished', alsoRequires: 'bed', ground: 'north-far' },
+  /** Where the saw, the handcart and the bed tools are made, once each. */
+  workshop: { name: 'Workshop', description: 'Make a saw, a handcart and bed tools', symbol: '⚒', cost: { wood: 10, fiber: 4, stone: 6 }, prerequisite: 'toolshed', ground: 'east-far' }
 } as const;
 
 export type StructureId = keyof typeof BUILDINGS;
@@ -117,6 +120,8 @@ export interface GameState {
   structures: Record<StructureId, boolean>;
   progress: { nextStormDay: number | null; hearthUnlocked: boolean; lookoutRepaired: boolean; axeCrafted: boolean;
     quarryFound: boolean; pickaxeCrafted: boolean; potCrafted: boolean; packWoven: boolean;
+    /** The workshop's upgrades, each made once. */
+    workshop: Record<UpgradeId, boolean>;
     discoveries: Record<SiteId, boolean> };
   nodes: ResourceNode[];
   trees: TreeNode[];
@@ -167,6 +172,8 @@ export const BALANCE = {
   houseBuildSeconds: 24,
   chopEnergyCost: 8,
   chopSeconds: 10,
+  /** Wood a felled tree gives once the saw is made, against 2 without it. */
+  sawWood: 4,
   treeRegrowDays: 3,
   /** Trees chopped in spring grow back faster. */
   springTreeRegrowDays: 2,
@@ -317,9 +324,10 @@ export function createGame(): GameState {
     inventory: { wood: 0, fiber: 0, stone: 0, food: emptyFood() },
     fireFuel: 0,
     fireplaceFuel: 0,
-    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false, vegetableBeds: false, well: false, house: false },
+    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
       quarryFound: false, pickaxeCrafted: false, potCrafted: false, packWoven: false,
+      workshop: { saw: false, handcart: false, bedTools: false },
       discoveries: { basket: false, spring: false, cairn: false } },
     nodes,
     trees,

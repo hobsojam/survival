@@ -12,6 +12,7 @@ import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
 import { BED_CROPS, bedsDawn, drawWaterBlocker, emptyBed, harvestBedBlocker, needsWater, sowBedBlocker } from './beds';
 import { fuelLeft, hasWoodStore, isAtHome, livesInHouse, tendFireplace, woodStoreCapacity } from './home';
+import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, countWord, fellingWood, upgradeBlocker, type UpgradeId } from './workshop';
 import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
@@ -27,6 +28,7 @@ export type GameAction =
   | { type: 'sowBed'; index: number }
   | { type: 'harvestBed'; index: number }
   | { type: 'drawWater' }
+  | { type: 'makeUpgrade'; upgrade: UpgradeId }
   | { type: 'eat'; item?: FoodItem }
   | { type: 'storeFood'; item: FoodItem }
   | { type: 'takeFood'; item: FoodItem }
@@ -463,11 +465,12 @@ const chopTree: ActionHandler<'chopTree'> = (state, action) => {
   if (isClearingStump(tree)) return refuse(state, 'This stump stays until the ground is cleared.');
   if (tree.readyDay > state.day) return refuse(state, 'This stump needs more time to regrow.');
   if (isExhausted(state)) return refuse(state, TOO_TIRED_MESSAGE);
-  if (freeSpaces(state) < 2 * spaceFor('wood')) return refuse(state, 'Your bag needs two free spaces for wood.');
+  const wood = fellingWood(state);
+  if (freeSpaces(state) < wood * spaceFor('wood')) return refuse(state, `Your bag needs ${countWord(wood)} free spaces for wood.`);
   const chopped = {
     ...state,
     player: tire(state, BALANCE.chopEnergyCost),
-    inventory: { ...state.inventory, wood: state.inventory.wood + 2 }
+    inventory: { ...state.inventory, wood: state.inventory.wood + wood }
   };
   const marked = tree.id.startsWith('mark-');
   const felledIndex = Number(tree.id.slice(tree.id.lastIndexOf('-') + 1));
@@ -476,7 +479,7 @@ const chopTree: ActionHandler<'chopTree'> = (state, action) => {
     : { ...chopped, trees: state.trees.map(item => item.id === tree.id ? { ...item, readyDay: state.day + treeRegrowDays(state.day) } : item) };
   return {
     state: advanceTime(afterChop, workSeconds(state, BALANCE.chopSeconds), 'working'),
-    message: 'Chopped the tree and collected two wood. A stump remains.'
+    message: `Chopped the tree and collected ${countWord(wood)} wood. A stump remains.`
   };
 };
 
@@ -970,10 +973,20 @@ const craftPillow: ActionHandler<'craftPillow'> = state =>
 const craftCloak: ActionHandler<'craftCloak'> = state =>
   craftKeepsake(state, 'cloak', cloakBlocker(state), 'You made a fur cloak. The nights will bite a little less.');
 
+const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
+  const blocker = upgradeBlocker(state, action.upgrade);
+  if (blocker) return refuse(state, blocker);
+  const workshop = { ...state.progress.workshop, [action.upgrade]: true };
+  return {
+    state: payAndBuild(state, WORKSHOP_UPGRADES[action.upgrade].cost, { progress: { ...state.progress, workshop } }),
+    message: UPGRADE_MESSAGES[action.upgrade]
+  };
+};
+
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
   storeStone, takeStone, storeWood, takeWood, storeFiber, takeFiber, storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, rest, sleep, befriend, craftPillow, craftCloak
+  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak
 };
 
 export function applyAction(state: GameState, action: GameAction): ActionResult {
