@@ -144,7 +144,7 @@ Once the toolshed is built and the east side's far ground is cleared, you can bu
 
 - **Saw** (three wood, three stone): felling a tree gives **four wood** instead of two, including trees marked for clearing. Stumps regrow as before.
 - **Handcart** (eight wood, two fiber, one stone): a two-wheeled cart parks below the workshop and holds twelve wood. Felled wood goes into the cart first ("Chopped the tree. Four wood went into the cart."), then the bag. Wood in the cart counts as stored wood: builds, the campfire and the house fireplace all use it, spending from the bag, then the cart, then the woodpile and woodshed (the fireplace takes from the woodpile and woodshed before the cart). **Unload the cart** moves as much as fits onto the wood store at once, and anything left stays in the cart. The panel reads, say, `Cart 5/12 wood`, and the cart looks empty, part-full or full.
-- **Hoe and watering can** (three wood, one fiber, one stone; needs the vegetable beds): the beds go a day longer without water. Dry soil shows after three dry days, growth stops on the fourth, and a crop withers on the fifth dry dawn.
+- **Hoe and watering can** (three wood, one fiber, one stone; needs the vegetable beds): a dry bed holds on a day longer before it withers. A crop still stops growing on its third dry day, so it still needs water to ripen, but it withers on the fifth dry dawn instead of the fourth.
 
 If the bag (and cart) can't take all of a felled tree's wood, felling is refused and nothing is lost.
 

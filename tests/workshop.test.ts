@@ -410,7 +410,7 @@ describe('the workshop panel', () => {
   it('mentions the watering can in the beds hint once it is made', () => {
     const beds = workshopCamp({ vegetableBeds: true }, {}, ['east-near', 'east-far', 'west-near']);
     expect(bedsPanelView(beds).hint).not.toContain('watering can');
-    expect(bedsPanelView(made(beds, 'bedTools')).hint).toContain(' The watering can keeps them a day longer.');
+    expect(bedsPanelView(made(beds, 'bedTools')).hint).toContain(' The watering can keeps a wilting crop alive a day longer.');
   });
 
   it('points the journal to the workshop once the east far ground is clear', () => {

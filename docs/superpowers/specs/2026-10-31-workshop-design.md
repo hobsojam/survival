@@ -58,7 +58,7 @@ The details are my calls:
 ## The bed tools
 
 - A hoe and a watering can, made as one upgrade. Cost: **3 wood, 1 stone, 1 fiber**. It requires the vegetable beds. *(My call.)*
-- Each threshold in the beds' drying table moves one day later. Dry soil shows from day 3, wilting from day 4 and withering from day 5. A visit every three days is then enough. *(This is the base design's own example.)*
+- A wilting crop survives one more dry day: it withers on day 5 instead of day 4. Dry soil (day 2) and wilting (day 3, when growth stops) are unchanged, so a crop still needs water to ripen. *(Agreed with the user after review. Shifting every threshold a day later would have let a crop ripen with no water at all.)*
 - Rain and drawing water work as now.
 - The beds' panel hint mentions the tools once they're made.
 

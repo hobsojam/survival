@@ -3,7 +3,7 @@ import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { BALANCE, type GameState } from './state';
 
 // The workshop on the east far ground, and the three upgrades made there once each: a saw that doubles the wood from
-// felling, a handcart that catches felled wood, and bed tools that let the vegetable beds go a day longer without water.
+// felling, a handcart that catches felled wood, and bed tools that keep a dry vegetable bed alive a day longer.
 
 export type UpgradeId = 'saw' | 'handcart' | 'bedTools';
 
@@ -18,7 +18,7 @@ export const WORKSHOP_UPGRADES: Record<UpgradeId, { name: string; cost: Cost }> 
 export const UPGRADE_MESSAGES: Record<UpgradeId, string> = {
   saw: 'You made a saw. A felled tree gives twice the wood now.',
   handcart: 'You built a handcart. Felled wood goes into the cart now.',
-  bedTools: 'You made a hoe and a watering can. The beds hold their water a day longer now.'
+  bedTools: 'You made a hoe and a watering can. A dry bed holds on a day longer before it withers.'
 };
 
 /** "3 wood and 3 stone", or "8 wood, 2 fiber, and 1 stone": the cost's parts, leaving out any it doesn't need. */

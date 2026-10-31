@@ -80,7 +80,7 @@ export function bedsPanelView(state: GameState): { shown: boolean; hint: string;
     return { label, action: 'harvestBed' as const, verb: 'Harvest', disabled: Boolean(blocker), title: blocker ?? `Harvest ${BALANCE.cropYield} vegetables.` };
   });
   const watering = wateringHint(state);
-  const tools = state.progress.workshop.bedTools ? ' The watering can keeps them a day longer.' : '';
+  const tools = state.progress.workshop.bedTools ? ' The watering can keeps a wilting crop alive a day longer.' : '';
   const hint = `Each bed keeps its own seed, so sowing costs nothing. ${watering}. Left dry for a few days, a crop wilts and then withers.${tools} A ripe crop waits safely until you harvest it.`;
   const blocker = drawWaterBlocker(state);
   return { shown: state.structures.vegetableBeds, hint, beds, water: { shown: state.structures.well, disabled: Boolean(blocker), hint: blocker ?? '' } };
@@ -98,7 +98,7 @@ export interface ActionPanelView { title: string; copy: string; cost: string; di
 const UPGRADE_COPY: Record<UpgradeId, { title: string; copy: string; made: string }> = {
   saw: { title: 'Saw', copy: 'Felling a tree gives four wood instead of two.', made: 'Felling a tree gives four wood.' },
   handcart: { title: 'Handcart', copy: 'Felled wood goes into a cart by the workshop, and counts as stored wood.', made: 'Felled wood goes into the cart. Unload it onto the wood store to make room.' },
-  bedTools: { title: 'Hoe and watering can', copy: 'The beds go a day longer without water.', made: 'The beds go a day longer without water.' }
+  bedTools: { title: 'Hoe and watering can', copy: 'A dry bed holds on a day longer before it withers.', made: 'A dry bed holds on a day longer before it withers.' }
 };
 
 /** "3 wood · 3 stone": an upgrade's cost, leaving out what it doesn't need. */

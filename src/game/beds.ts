@@ -26,10 +26,10 @@ export type BedSoil = 'fresh' | 'dry' | 'wilted' | 'frost';
 
 /**
  * How many dry days in a row a bed takes to show dry soil, to stop growing, and to wither. The workshop's hoe and
- * watering can move each of them a day later.
+ * watering can keep a stalled crop alive one day longer; it still stops growing on its third dry day, so it still needs water.
  */
 export function dryLimitsFor(bedTools: boolean): { dry: number; stall: number; wither: number } {
-  return bedTools ? { dry: 3, stall: 4, wither: 5 } : { dry: 2, stall: 3, wither: 4 };
+  return { dry: 2, stall: 3, wither: bedTools ? 5 : 4 };
 }
 
 export const dryLimits = (state: Pick<GameState, 'progress'>) => dryLimitsFor(state.progress.workshop.bedTools);

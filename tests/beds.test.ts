@@ -507,39 +507,38 @@ describe('the bed tools', () => {
     };
   };
 
-  it('moves every drying threshold a day later', () => {
+  it('give a stalled crop one more day before it withers, and nothing else', () => {
     expect(dryLimits(camp())).toEqual({ dry: 2, stall: 3, wither: 4 });
-    expect(dryLimits(tooled([]))).toEqual({ dry: 3, stall: 4, wither: 5 });
+    expect(dryLimits(tooled([]))).toEqual({ dry: 2, stall: 3, wither: 5 });
     const soil = (dryDays: number) => bedSoil(tooled([]), bed({ dryDays }));
-    expect([0, 1, 2, 3, 4].map(soil)).toEqual(['fresh', 'fresh', 'fresh', 'dry', 'wilted']);
+    expect([0, 1, 2, 3, 4].map(soil)).toEqual(['fresh', 'fresh', 'dry', 'wilted', 'wilted']);
   });
 
   it('are made at the workshop once the beds are built', () => {
     const state = tooled([EMPTY, EMPTY, EMPTY]);
     const unmade = { ...state, progress: { ...state.progress, workshop: { ...state.progress.workshop, bedTools: false } }, inventory: { ...state.inventory, wood: 3, fiber: 1, stone: 1 } };
     const result = applyAction(unmade, { type: 'makeUpgrade', upgrade: 'bedTools' });
-    expect(result.message).toBe('You made a hoe and a watering can. The beds hold their water a day longer now.');
+    expect(result.message).toBe('You made a hoe and a watering can. A dry bed holds on a day longer before it withers.');
     expect(result.state.progress.workshop.bedTools).toBe(true);
   });
 
-  it('keeps a growing bed through its third dry day, stalls it on the fourth, and withers it on the fifth', () => {
-    let state = tooled([EMPTY, EMPTY, bed({ grown: 1, dryDays: 2 })], { day: 2 });
-    state = nextDawn(state);
-    expect(state.beds[2]).toEqual(bed({ grown: 2, dryDays: 3 }));
-    expect(bedSoil(state, state.beds[2])).toBe('dry');
-    const stalled = withBeds(state, [EMPTY, EMPTY, bed({ grown: 1, dryDays: 3 })]);
-    const fourth = nextDawn(stalled);
-    expect(fourth.beds[2]).toEqual(bed({ grown: 1, dryDays: 4 }));
-    expect(bedSoil(fourth, fourth.beds[2])).toBe('wilted');
-    expect(nextDawn(fourth).beds[2]).toEqual(EMPTY);
+  it('still needs water to ripen: a bed sown and left dry stalls on its third dry day', () => {
+    let state = tooled([EMPTY, EMPTY, bed()], { day: 2 });
+    const seen: [number, number][] = [];
+    for (let dawn = 0; dawn < 4; dawn++) {
+      state = nextDawn(state);
+      seen.push([state.beds[2].grown, state.beds[2].dryDays]);
+    }
+    expect(seen).toEqual([[1, 1], [2, 2], [2, 3], [2, 4]]);
+    expect(bedSoil(state, state.beds[2])).toBe('wilted');
+    expect(nextDawn(state).beds[2]).toEqual(EMPTY);
   });
 
-  it('saves a wilting bed that the tools were made for', () => {
-    const wilting = withBeds(camp(true, { day: 3 }), [EMPTY, EMPTY, bed({ grown: 1, dryDays: 3 })]);
-    const state = tooled(wilting.beds, { day: 3 });
-    expect(bedSoil(state, state.beds[2])).toBe('dry');
+  it('save a wilting bed the tools were made for from withering at its next dry dawn', () => {
+    const state = tooled([EMPTY, EMPTY, bed({ grown: 1, dryDays: 3 })], { day: 3 });
     const next = nextDawn(state);
     expect(next.beds[2]).toEqual(bed({ grown: 1, dryDays: 4 }));
+    expect(bedSoil(next, next.beds[2])).toBe('wilted');
   });
 
   it('lets a save hold four dry days with the tools, and not five', () => {
