@@ -42,6 +42,11 @@ export function upgradeBlocker(state: GameState, id: UpgradeId): string | null {
   return null;
 }
 
+/** Room left in the handcart, or none before it is made. */
+export function cartSpace(state: GameState): number {
+  return state.progress.workshop.handcart ? BALANCE.handcartCapacity - state.cartWood : 0;
+}
+
 /** A small count spelled out, as the copy writes it: "two", "four". */
 export function countWord(count: number): string {
   return ['no', 'one', 'two', 'three', 'four'][count] ?? String(count);

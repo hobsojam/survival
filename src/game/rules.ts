@@ -12,7 +12,8 @@ import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
 import { BED_CROPS, bedsDawn, drawWaterBlocker, emptyBed, harvestBedBlocker, needsWater, sowBedBlocker } from './beds';
 import { fuelLeft, hasWoodStore, isAtHome, livesInHouse, tendFireplace, woodStoreCapacity } from './home';
-import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, countWord, fellingWood, upgradeBlocker, type UpgradeId } from './workshop';
+import { logsInStore } from './wood';
+import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, cartSpace, countWord, fellingWood, upgradeBlocker, type UpgradeId } from './workshop';
 import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
 
 export type GameAction =
@@ -33,7 +34,7 @@ export type GameAction =
   | { type: 'storeFood'; item: FoodItem }
   | { type: 'takeFood'; item: FoodItem }
   | { type: 'cook'; dish?: DishId }
-  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'storeWood' | 'takeWood' | 'storeFiber' | 'takeFiber' | 'befriend' | 'craftPillow' | 'craftCloak' }
+  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'storeWood' | 'takeWood' | 'unloadCart' | 'storeFiber' | 'takeFiber' | 'befriend' | 'craftPillow' | 'craftCloak' }
   | { type: 'pickUpStone'; pileId: string };
 
 /** Awake time tires the survivor; work already costs energy, and resting doesn't. */
@@ -458,6 +459,15 @@ export function treeRegrowDays(day: number): number {
   return isSpring(day) ? BALANCE.springTreeRegrowDays : BALANCE.treeRegrowDays;
 }
 
+const capitalised = (word: string): string => word[0].toUpperCase() + word.slice(1);
+
+/** What a felling says: where its wood went, the cart and then the bag. */
+function choppedMessage(toCart: number, toBag: number): string {
+  if (toCart === 0) return `Chopped the tree and collected ${countWord(toBag)} wood. A stump remains.`;
+  const cart = `${capitalised(countWord(toCart))} wood went into the cart`;
+  return `Chopped the tree. ${toBag > 0 ? `${cart} and ${countWord(toBag)} into your bag` : cart}.`;
+}
+
 const chopTree: ActionHandler<'chopTree'> = (state, action) => {
   if (!state.progress.axeCrafted) return refuse(state, 'Craft a stone axe before chopping trees.');
   const tree = choppableTrees(state).find(item => item.id === action.treeId);
@@ -466,11 +476,17 @@ const chopTree: ActionHandler<'chopTree'> = (state, action) => {
   if (tree.readyDay > state.day) return refuse(state, 'This stump needs more time to regrow.');
   if (isExhausted(state)) return refuse(state, TOO_TIRED_MESSAGE);
   const wood = fellingWood(state);
-  if (freeSpaces(state) < wood * spaceFor('wood')) return refuse(state, `Your bag needs ${countWord(wood)} free spaces for wood.`);
+  // Felled wood fills the handcart first, and the bag takes the rest.
+  const toCart = Math.min(wood, cartSpace(state));
+  const toBag = wood - toCart;
+  if (freeSpaces(state) + cartSpace(state) < wood * spaceFor('wood')) {
+    return refuse(state, `Your ${state.progress.workshop.handcart ? 'bag and cart need' : 'bag needs'} ${countWord(wood)} free spaces for wood.`);
+  }
   const chopped = {
     ...state,
     player: tire(state, BALANCE.chopEnergyCost),
-    inventory: { ...state.inventory, wood: state.inventory.wood + wood }
+    inventory: { ...state.inventory, wood: state.inventory.wood + toBag },
+    cartWood: state.cartWood + toCart
   };
   const marked = tree.id.startsWith('mark-');
   const felledIndex = Number(tree.id.slice(tree.id.lastIndexOf('-') + 1));
@@ -479,7 +495,7 @@ const chopTree: ActionHandler<'chopTree'> = (state, action) => {
     : { ...chopped, trees: state.trees.map(item => item.id === tree.id ? { ...item, readyDay: state.day + treeRegrowDays(state.day) } : item) };
   return {
     state: advanceTime(afterChop, workSeconds(state, BALANCE.chopSeconds), 'working'),
-    message: `Chopped the tree and collected ${countWord(wood)} wood. A stump remains.`
+    message: choppedMessage(toCart, toBag)
   };
 };
 
@@ -577,6 +593,21 @@ const storeWood: ActionHandler<'storeWood'> = state => {
   if (state.inventory.wood < 1) return refuse(state, 'You have no wood to store.');
   if (state.storedWood >= woodStoreCapacity(state)) return refuse(state, 'The wood store is full.');
   return { state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood - 1 }, storedWood: state.storedWood + 1 }, message: `Stacked a log on the ${woodStoreName(state)}.` };
+};
+
+const unloadCart: ActionHandler<'unloadCart'> = state => {
+  if (!state.progress.workshop.handcart) return refuse(state, 'Make a handcart first.');
+  if (!isInClearing(state)) return refuse(state, 'Return to camp to unload the cart.');
+  if (state.cartWood < 1) return refuse(state, 'The cart is empty.');
+  if (!hasWoodStore(state)) return refuse(state, 'Build a woodpile to unload the cart into.');
+  const room = woodStoreCapacity(state) - state.storedWood;
+  if (room < 1) return refuse(state, 'The wood store is full.');
+  const moved = Math.min(room, state.cartWood);
+  const left = state.cartWood - moved;
+  return {
+    state: { ...state, cartWood: left, storedWood: state.storedWood + moved },
+    message: left > 0 ? `Unloaded ${moved} wood. The wood store is full, so ${left} stays in the cart.` : `Unloaded ${moved} wood onto the ${woodStoreName(state)}.`
+  };
 };
 
 const takeWood: ActionHandler<'takeWood'> = state => {
@@ -932,8 +963,8 @@ const alarmMessage = (state: GameState): string => `Your bird woke you. The ${li
 /** What the night did to the fire that keeps the survivor warm: in the house, the fireplace, which went out only if it burned and the store ran dry. */
 function fireDiedNote(before: GameState, after: GameState): string {
   if (livesInHouse(before)) {
-    const burned = before.fireplaceFuel > 0 || after.storedWood < before.storedWood;
-    return burned && after.fireplaceFuel <= 0 && after.storedWood === 0 ? ' The fireplace went out in the night.' : '';
+    const burned = before.fireplaceFuel > 0 || logsInStore(after) < logsInStore(before);
+    return burned && after.fireplaceFuel <= 0 && logsInStore(after) === 0 ? ' The fireplace went out in the night.' : '';
   }
   return before.fireFuel > 0 && after.fireFuel <= 0 ? ' The fire burned out in the night.' : '';
 }
@@ -985,7 +1016,7 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
 
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
-  storeStone, takeStone, storeWood, takeWood, storeFiber, takeFiber, storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
+  storeStone, takeStone, storeWood, takeWood, unloadCart, storeFiber, takeFiber, storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
   cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak
 };
 

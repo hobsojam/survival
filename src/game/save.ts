@@ -99,9 +99,11 @@ function validDiscoveries({ progress }: SaveShape): boolean {
 
 const readyBy = (value: unknown, latest: number): boolean => whole(value) && value >= 1 && value <= latest;
 
-/** The wood store holds no more than the woodpile and the woodshed between them, and nothing until one is built. */
+/** The wood store holds no more than the woodpile and the woodshed between them, and nothing until one is built; the cart holds its load only once made. */
 function validWoodStore(value: SaveShape): boolean {
-  return count(value.storedWood) && value.storedWood <= woodStoreCapacity(value as unknown as GameState);
+  const handcart = object(value.progress.workshop) && value.progress.workshop.handcart === true;
+  return count(value.storedWood) && value.storedWood <= woodStoreCapacity(value as unknown as GameState)
+    && count(value.cartWood) && value.cartWood <= BALANCE.handcartCapacity && (handcart || value.cartWood === 0);
 }
 
 /** The fireplace's fuel is never negative, and there is none until the house stands. */

@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { BALANCE, BUILDINGS, createGame, type GameState } from '../src/game/state';
 import { CLEARING_STEPS, placeBranches } from '../src/game/clearing';
 import { TOO_TIRED_MESSAGE } from '../src/game/needs';
-import { applyAction, buildStatus, groundBlocker } from '../src/game/rules';
-import { WORKSHOP_UPGRADES, fellingWood, upgradeBlocker, type UpgradeId } from '../src/game/workshop';
+import { advanceTime, applyAction, buildStatus, groundBlocker } from '../src/game/rules';
+import { nightStart } from '../src/game/calendar';
+import { HOUSE_SPOT, fuelLeft } from '../src/game/home';
+import { availableWood, logsInStore, spendWood } from '../src/game/wood';
+import { SLEEP_REPLAY_MS, replayFrame } from '../src/scene/sleepReplay';
+import { WORKSHOP_UPGRADES, cartSpace, fellingWood, upgradeBlocker, type UpgradeId } from '../src/game/workshop';
 import { loadGame, saveGame, SAVE_KEY } from '../src/game/save';
 
 const { campX, campY } = BALANCE;
@@ -171,5 +175,143 @@ describe('saving the workshop', () => {
     expect(tampered(data => { delete (data.state ?? data).progress.workshop.handcart; })).toBe('invalid');
     expect(tampered(data => { (data.state ?? data).progress.workshop.saw = 'yes'; })).toBe('invalid');
     expect(tampered(data => { data.version = 22; })).toBe('invalid');
+  });
+});
+
+describe('the handcart', () => {
+  const carted = (changes: Partial<GameState> = {}, structures: Structures = { woodpile: true }) =>
+    made(workshopCamp(structures, changes), 'handcart');
+
+  it('holds twelve wood, and starts empty', () => {
+    expect(BALANCE.handcartCapacity).toBe(12);
+    expect(createGame().cartWood).toBe(0);
+    expect(cartSpace(workshopCamp())).toBe(0);
+    expect(cartSpace(carted({ cartWood: 5 }))).toBe(7);
+  });
+
+  it('is built at the workshop', () => {
+    const state = withBag(workshopCamp(), { wood: 8, fiber: 2, stone: 1 });
+    const result = applyAction(state, { type: 'makeUpgrade', upgrade: 'handcart' });
+    expect(result.message).toBe('You built a handcart. Felled wood goes into the cart now.');
+    expect(result.state.progress.workshop.handcart).toBe(true);
+  });
+
+  it('catches all of a felled tree\'s wood while it has room', () => {
+    const { state, treeId } = byTree(carted());
+    const two = applyAction(state, { type: 'chopTree', treeId });
+    expect(two.message).toBe('Chopped the tree. Two wood went into the cart.');
+    expect(two.state).toMatchObject({ cartWood: 2, inventory: { wood: 0 } });
+    const sawn = byTree(made(carted(), 'saw'));
+    const four = applyAction(sawn.state, { type: 'chopTree', treeId: sawn.treeId });
+    expect(four.message).toBe('Chopped the tree. Four wood went into the cart.');
+    expect(four.state).toMatchObject({ cartWood: 4, inventory: { wood: 0 } });
+  });
+
+  it('fills the cart first, then the bag', () => {
+    const { state, treeId } = byTree(made(carted({ cartWood: 11 }), 'saw'));
+    const result = applyAction(state, { type: 'chopTree', treeId });
+    expect(result.message).toBe('Chopped the tree. One wood went into the cart and three into your bag.');
+    expect(result.state).toMatchObject({ cartWood: 12, inventory: { wood: 3 } });
+  });
+
+  it('goes to the bag as before once the cart is full', () => {
+    const { state, treeId } = byTree(carted({ cartWood: 12 }));
+    const result = applyAction(state, { type: 'chopTree', treeId });
+    expect(result.message).toBe('Chopped the tree and collected two wood. A stump remains.');
+    expect(result.state).toMatchObject({ cartWood: 12, inventory: { wood: 2 } });
+  });
+
+  it('refuses when the bag and cart together lack room, changing nothing', () => {
+    const { state, treeId } = byTree(withBag(made(carted({ cartWood: 12 }), 'saw'), { wood: BALANCE.baseCapacity - 3 }));
+    const result = applyAction(state, { type: 'chopTree', treeId });
+    expect(result.state).toBe(state);
+    expect(result.message).toBe('Your bag and cart need four free spaces for wood.');
+  });
+
+  it('counts as stored wood, spent after the bag and before the woodpile', () => {
+    const state = withBag(carted({ cartWood: 2, storedWood: 4 }), { wood: 2 });
+    expect(availableWood(state)).toBe(8);
+    expect(logsInStore(state)).toBe(6);
+    expect(spendWood(state, 5)).toMatchObject({ inventory: { wood: 0 }, cartWood: 0, storedWood: 3 });
+  });
+
+  it('says why it can\'t be unloaded, in order', () => {
+    const unload = (state: GameState) => applyAction(state, { type: 'unloadCart' }).message;
+    const away = { player: { ...createGame().player, x: 1, y: 1 } };
+    expect(unload(workshopCamp({ woodpile: true }, away))).toBe('Make a handcart first.');
+    expect(unload(carted({ ...away, cartWood: 3 }))).toBe('Return to camp to unload the cart.');
+    expect(unload(carted())).toBe('The cart is empty.');
+    expect(unload(carted({ cartWood: 3 }, {}))).toBe('Build a woodpile to unload the cart into.');
+    expect(unload(carted({ cartWood: 3, storedWood: BALANCE.woodpileCapacity }))).toBe('The wood store is full.');
+  });
+
+  it('unloads everything that fits onto the woodpile, at once', () => {
+    const state = carted({ cartWood: 5 });
+    const result = applyAction(state, { type: 'unloadCart' });
+    expect(result.message).toBe('Unloaded 5 wood onto the woodpile.');
+    expect(result.state).toMatchObject({ cartWood: 0, storedWood: 5, timeOfDay: state.timeOfDay });
+  });
+
+  it('leaves what doesn\'t fit in the cart', () => {
+    const result = applyAction(carted({ cartWood: 5, storedWood: BALANCE.woodpileCapacity - 2 }), { type: 'unloadCart' });
+    expect(result.message).toBe('Unloaded 2 wood. The wood store is full, so 3 stays in the cart.');
+    expect(result.state).toMatchObject({ cartWood: 3, storedWood: BALANCE.woodpileCapacity });
+  });
+});
+
+describe('the fireplace and the cart', () => {
+  const FINISHED: Structures = { shelterThatched: true, shelterStonework: true, shelterPorch: true, shelterFinished: true, hearth: true, bed: true, house: true };
+  const home = (changes: Partial<GameState>): GameState => {
+    const state = made(workshopCamp(FINISHED, changes, ['north-near', 'north-far', 'east-near', 'east-far']), 'handcart');
+    return { ...state, player: { ...state.player, x: HOUSE_SPOT.x, y: HOUSE_SPOT.y } };
+  };
+
+  it('draws from the cart once the store is empty', () => {
+    const state = home({ storedWood: 0, cartWood: 3, fireplaceFuel: 0, timeOfDay: nightStart(6) });
+    expect(fuelLeft(state)).toBe(3 * BALANCE.fireplaceSecondsPerWood);
+    const later = advanceTime(state, 1, 'resting');
+    expect(later.cartWood).toBe(2);
+    expect(later.fireplaceFuel).toBeGreaterThan(0);
+  });
+
+  it('draws from the store before the cart', () => {
+    const later = advanceTime(home({ storedWood: 1, cartWood: 3, fireplaceFuel: 0, timeOfDay: nightStart(6) }), 1, 'resting');
+    expect(later).toMatchObject({ storedWood: 0, cartWood: 3 });
+  });
+
+  it('doesn\'t say the fireplace went out while the cart still has wood', () => {
+    const result = applyAction(home({ storedWood: 0, cartWood: 12, fireplaceFuel: 0, timeOfDay: nightStart(6) }), { type: 'sleep' });
+    expect(result.message).not.toContain('The fireplace went out in the night.');
+    expect(result.state.cartWood).toBeLessThan(12);
+    expect(result.state.cartWood).toBeGreaterThan(0);
+  });
+
+  it('shows the store emptied before the cart while a cold night plays out', () => {
+    const before = home({ storedWood: 1, cartWood: 2, fireplaceFuel: 0, timeOfDay: nightStart(6) });
+    const after = { ...before, storedWood: 0, cartWood: 2, day: 7, timeOfDay: 0 };
+    expect(replayFrame(before, after, 1)).toMatchObject({ storedWood: 0, cartWood: 2 });
+    // With the store already empty, the night's log comes out of the cart.
+    const fromCart = { ...before, storedWood: 0 };
+    expect(replayFrame(fromCart, { ...after, cartWood: 1 }, SLEEP_REPLAY_MS)).toMatchObject({ storedWood: 0, cartWood: 1 });
+  });
+});
+
+describe('saving the cart', () => {
+  const load = (state: GameState, edit: (saved: Record<string, any>) => void = () => {}): string => {
+    const storage = new MemoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 23, state }));
+    const data = JSON.parse(storage.getItem(SAVE_KEY) ?? '{}');
+    edit(data.state);
+    storage.setItem(SAVE_KEY, JSON.stringify(data));
+    return loadGame(storage).kind;
+  };
+  const carted = made(workshopCamp({ woodpile: true }, { cartWood: 12 }), 'handcart');
+
+  it('holds up to twelve, and none without the handcart', () => {
+    expect(load(carted)).toBe('loaded');
+    expect(load(carted, saved => { saved.cartWood = 13; })).toBe('invalid');
+    expect(load(carted, saved => { saved.cartWood = -1; })).toBe('invalid');
+    expect(load(carted, saved => { saved.progress.workshop.handcart = false; saved.cartWood = 1; })).toBe('invalid');
+    expect(load(carted, saved => { delete saved.cartWood; })).toBe('invalid');
   });
 });

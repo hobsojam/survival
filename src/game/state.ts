@@ -133,6 +133,8 @@ export interface GameState {
   storedStone: number;
   /** Wood split and stacked on the woodpile, outside the bag: it counts for building and the fire, from anywhere. */
   storedWood: number;
+  /** Felled wood waiting in the handcart: it counts as stored wood, for building and the fires, from anywhere. */
+  cartWood: number;
   /** Fiber kept dry in the fibre stack, outside the bag: it counts for building, crafting and kindling, from anywhere. */
   storedFiber: number;
   /** Food kept in the larder, outside the bag: reachable only in the clearing, and it keeps fresh food longer. */
@@ -250,6 +252,8 @@ export const BALANCE = {
   /** How near the house counts as home. */
   homeRadius: 2.5,
   fibreStackCapacity: 12,
+  /** Felled wood the handcart holds, parked by the workshop. */
+  handcartCapacity: 12,
   hearthFireSecondsPerWood: 150,
   coldNightStartDay: 3,
   coldNightRetryDays: 3,
@@ -335,7 +339,7 @@ export function createGame(): GameState {
     gardenPlots: Array.from({ length: 3 }, () => ({ plantedYear: null, harvestedYear: null, harvestReady: false })),
     beds: Array.from({ length: 3 }, () => ({ sown: false, grown: 0, dryDays: 0, wateredDay: null })),
     storedStone: 0,
-    storedWood: 0,
+    storedWood: 0, cartWood: 0,
     storedFiber: 0,
     larder: emptyFood(),
     quarryReadyDay: 1,

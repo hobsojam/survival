@@ -2,6 +2,7 @@ import { isColdNight, type GameAction } from '../game/rules';
 import { dawnEffect } from '../game/coldNight';
 import { BALANCE, type GameState } from '../game/state';
 import { livesInHouse } from '../game/home';
+import { logsInStore } from '../game/wood';
 
 // Sleeping through the cold night plays the storm out in a few quick seconds rather than in a blink.
 // The rules have already worked out the morning; this only shows the night on its way there.
@@ -29,17 +30,19 @@ export function replayFrame(before: GameState, after: GameState, elapsedMs: numb
   };
 }
 
-/** The fireplace partway through the night: burning at the storm rate, drawing a log from the store each time it runs out, as many as the night took. */
-function fireplaceFrame(before: GameState, after: GameState, passed: number): Pick<GameState, 'fireplaceFuel' | 'storedWood'> {
-  if (!livesInHouse(before)) return { fireplaceFuel: before.fireplaceFuel, storedWood: before.storedWood };
-  const logs = before.storedWood - after.storedWood;
+/** The fireplace partway through the night: burning at the storm rate, drawing a log each time it runs out, as many as the night took,
+ * from the store first and then the handcart. */
+function fireplaceFrame(before: GameState, after: GameState, passed: number): Pick<GameState, 'fireplaceFuel' | 'storedWood' | 'cartWood'> {
+  if (!livesInHouse(before)) return { fireplaceFuel: before.fireplaceFuel, storedWood: before.storedWood, cartWood: before.cartWood };
+  const logs = logsInStore(before) - logsInStore(after);
   let fuel = before.fireplaceFuel - passed * BALANCE.coldNightFireBurn;
   let drawn = 0;
   while (fuel <= 0 && drawn < logs) {
     fuel += BALANCE.fireplaceSecondsPerWood;
     drawn += 1;
   }
-  return { fireplaceFuel: Math.max(0, fuel), storedWood: before.storedWood - drawn };
+  const fromStore = Math.min(drawn, before.storedWood);
+  return { fireplaceFuel: Math.max(0, fuel), storedWood: before.storedWood - fromStore, cartWood: before.cartWood - (drawn - fromStore) };
 }
 
 /** One sleep through the cold night: each step shows the night as it stands, until the morning takes over. */
