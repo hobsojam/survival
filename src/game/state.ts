@@ -19,7 +19,8 @@ export const BUILDINGS = {
   windbreak: { name: 'Windbreak', description: 'Stay warmer when the fire fades', symbol: '▥', cost: { wood: 5, fiber: 0 }, prerequisite: null },
   /** Stands on cleared ground: the step named by `ground` must be cleared first. */
   larder: { name: 'Larder', description: 'Keep up to 10 food raised off the ground', symbol: '▥', cost: { wood: 5, fiber: 2, stone: 2 }, prerequisite: null, ground: 'north-near' },
-  woodpile: { name: 'Woodpile', description: 'Keep up to 12 wood split and dry', symbol: '▤', cost: { wood: 3, fiber: 1 }, prerequisite: null, ground: 'east-near' }
+  woodpile: { name: 'Woodpile', description: 'Keep up to 12 wood split and dry', symbol: '▤', cost: { wood: 3, fiber: 1 }, prerequisite: null, ground: 'east-near' },
+  fibreStack: { name: 'Fibre stack', description: 'Keep up to 12 fiber dry under thatch', symbol: '≋', cost: { wood: 2, fiber: 3 }, prerequisite: null, ground: 'east-near' }
 } as const;
 
 export type StructureId = keyof typeof BUILDINGS;
@@ -116,6 +117,8 @@ export interface GameState {
   storedStone: number;
   /** Wood split and stacked on the woodpile, outside the bag: it counts for building and the fire, from anywhere. */
   storedWood: number;
+  /** Fiber kept dry in the fibre stack, outside the bag: it counts for building, crafting and kindling, from anywhere. */
+  storedFiber: number;
   /** Food kept in the larder, outside the bag: reachable only in the clearing, and it keeps fresh food longer. */
   larder: FoodStore;
   /** First day the quarry face can be dug again. */
@@ -215,6 +218,7 @@ export const BALANCE = {
   stonePileCapacity: 12,
   larderCapacity: 10,
   woodpileCapacity: 12,
+  fibreStackCapacity: 12,
   hearthFireSecondsPerWood: 150,
   coldNightStartDay: 3,
   coldNightRetryDays: 3,
@@ -285,7 +289,7 @@ export function createGame(): GameState {
     player: { x: BALANCE.campX + 1, y: BALANCE.campY + 1, energy: 100, hunger: 100, warmth: 100 },
     inventory: { wood: 0, fiber: 0, stone: 0, food: emptyFood() },
     fireFuel: 0,
-    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, crate: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false },
+    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, crate: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
       quarryFound: false, pickaxeCrafted: false, potCrafted: false,
       discoveries: { basket: false, spring: false, cairn: false } },
@@ -295,6 +299,7 @@ export function createGame(): GameState {
     gardenPlots: Array.from({ length: 3 }, () => ({ plantedYear: null, harvestedYear: null, harvestReady: false })),
     storedStone: 0,
     storedWood: 0,
+    storedFiber: 0,
     larder: emptyFood(),
     quarryReadyDay: 1,
     rubbleReadyDay: 1,

@@ -9,7 +9,7 @@ import { FOOD_ITEMS, isFresh, storeTotal, type FoodStore } from './food';
 import { FORAGE, isForage } from './forage';
 
 export const SAVE_KEY = 'hearthwild.save';
-const SAVE_VERSION = 19;
+const SAVE_VERSION = 20;
 export type SaveResult = { ok: true } | { ok: false; error: string };
 export type LoadResult = { kind: 'empty' } | { kind: 'loaded'; state: GameState } | { kind: 'invalid'; reason: string };
 
@@ -89,6 +89,10 @@ const readyBy = (value: unknown, latest: number): boolean => whole(value) && val
 
 function validWoodpile({ structures, storedWood }: SaveShape): boolean {
   return count(storedWood) && storedWood <= BALANCE.woodpileCapacity && (structures.woodpile === true || storedWood === 0);
+}
+
+function validFibreStack({ structures, storedFiber }: SaveShape): boolean {
+  return count(storedFiber) && storedFiber <= BALANCE.fibreStackCapacity && (structures.fibreStack === true || storedFiber === 0);
 }
 
 function validStone({ structures, storedStone, quarryReadyDay, rubbleReadyDay, day }: SaveShape): boolean {
@@ -233,10 +237,10 @@ function validCompanion({ companion, day, structures }: SaveShape): boolean {
   return validBefriendedCompanion(companion, day as number, structures);
 }
 
-/** Checks a version 19 save: the clearing and the larder, shelter upgrades, garden plots, tools, quarry timers, the year journal and companion. */
+/** Checks a version 20 save: the clearing, the larder, the woodpile and the fibre stack, shelter upgrades, garden plots, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodpile, validGarden, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion];
+  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodpile, validFibreStack, validGarden, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

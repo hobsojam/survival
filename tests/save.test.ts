@@ -22,7 +22,7 @@ describe('local save', () => {
     const state = createGame();
     const old = [[22, 15], [18, 16], [21, 18], [16, 14], [24, 13], [13, 7]];
     const saved = { ...state, nodes: state.nodes.map((node, index) => index < old.length ? { ...node, x: old[index][0], y: old[index][1], amount: 0 } : node) };
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 19, state: saved }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 20, state: saved }));
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind !== 'loaded') return;
@@ -66,6 +66,14 @@ describe('local save', () => {
     expect(loadGame(storage).kind).toBe('invalid');
   });
 
+  it('rejects a version 19 save, from before the fibre stack', () => {
+    const storage = new MemoryStorage();
+    const { storedFiber: _stored, ...older } = createGame();
+    const { fibreStack: _stack, ...structures } = older.structures;
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 19, state: { ...older, structures } }));
+    expect(loadGame(storage).kind).toBe('invalid');
+  });
+
   it('round-trips progression across a page reload', () => {
     const storage = new MemoryStorage();
     const state = createGame();
@@ -86,7 +94,7 @@ describe('local save', () => {
     state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
     state.nodes.find(node => node.kind === 'fiber')!.readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(19);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(20);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);
@@ -396,7 +404,7 @@ describe('garden plots in saves', () => {
 });
 
 describe('the year journal in the save', () => {
-  const store = (state: ReturnType<typeof createGame>, version = 19) => {
+  const store = (state: ReturnType<typeof createGame>, version = 20) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;
@@ -440,7 +448,7 @@ describe('the year journal in the save', () => {
 });
 
 describe('the companion in the save', () => {
-  const store = (state: unknown, version = 19) => {
+  const store = (state: unknown, version = 20) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;
@@ -487,7 +495,7 @@ describe('the companion in the save', () => {
 describe('the spoiled-food note in the save', () => {
   const accepts = (lastSpoiled: unknown) => {
     const storage = new MemoryStorage();
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 19, state: { ...createGame(), day: 6, lastSpoiled, progress: { ...createGame().progress, nextStormDay: null, hearthUnlocked: true } } }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 20, state: { ...createGame(), day: 6, lastSpoiled, progress: { ...createGame().progress, nextStormDay: null, hearthUnlocked: true } } }));
     return loadGame(storage).kind === 'loaded';
   };
 
@@ -504,7 +512,7 @@ describe('the spoiled-food note in the save', () => {
 });
 
 describe('the clearing in the save', () => {
-  const accepts = (state: unknown, version = 19) => {
+  const accepts = (state: unknown, version = 20) => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind === 'loaded';
@@ -560,7 +568,7 @@ describe('forage regrowth in the save', () => {
     const node = state.nodes.find(item => item.id === id)!;
     node.amount = 0;
     node.readyDay = readyDay;
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 19, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 20, state }));
     return loadGame(storage).kind;
   };
 
@@ -595,7 +603,7 @@ describe('the cooking pot in the save', () => {
     const storage = new MemoryStorage();
     const state = createGame();
     change(state);
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 19, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 20, state }));
     return loadGame(storage).kind === 'loaded';
   };
 
@@ -622,7 +630,7 @@ describe('the larder in the save', () => {
     state.nodes = state.nodes.map((node, i) => ({ ...node, x: placed[i].x, y: placed[i].y }));
     state.clearing = { cleared: ['north-near'], marked: null, felled: [] };
     change(state);
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: 19, state }));
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 20, state }));
     return loadGame(storage).kind === 'loaded';
   };
 
@@ -639,6 +647,21 @@ describe('the larder in the save', () => {
     expect(east(state => { state.storedWood = 1; })).toBe(false);
     expect(east(state => { delete (state as any).storedWood; })).toBe(false);
     expect(accepts(state => { state.structures.woodpile = true; })).toBe(false);
+  });
+
+  it('keeps the fibre stack to its ground, its capacity and a built stack', () => {
+    const east = (change: (state: GameState) => void) => accepts(state => {
+      const placed = placeBranches(createGame().nodes, ['east-near']);
+      state.nodes = state.nodes.map((node, i) => ({ ...node, x: placed[i].x, y: placed[i].y }));
+      state.clearing = { cleared: ['east-near'], marked: null, felled: [] };
+      change(state);
+    });
+    expect(east(state => { state.structures.fibreStack = true; state.storedFiber = 12; })).toBe(true);
+    expect(east(state => { state.structures.fibreStack = true; state.storedFiber = 13; })).toBe(false);
+    expect(east(state => { state.structures.fibreStack = true; state.storedFiber = 0.5; })).toBe(false);
+    expect(east(state => { state.storedFiber = 1; })).toBe(false);
+    expect(east(state => { delete (state as any).storedFiber; })).toBe(false);
+    expect(accepts(state => { state.structures.fibreStack = true; })).toBe(false);
   });
 
   it('round-trips a stocked larder', () => {

@@ -3,7 +3,7 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type SiteId, typ
 import { GameScene } from '../scene/GameScene';
 import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
-import { availableWood, cookBlocker, isAtCamp, isInClearing, sleepBlocker, stargazeBlocker } from '../game/rules';
+import { availableFiber, availableWood, cookBlocker, isAtCamp, isInClearing, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { nextStep, type Side } from '../game/clearing';
 import { offerBlocker } from '../game/companion';
 import { defaultDish, type DishId } from '../game/cooking';
@@ -25,9 +25,10 @@ const SUPPLY_COUNTS: Record<string, (inventory: GameState['inventory']) => numbe
   fiber: inventory => inventory.fiber,
   stone: inventory => inventory.stone
 };
-/** Burn reaches the woodpile at camp; everything else follows the bag. */
+/** Burn reaches the woodpile and the fibre stack at camp; everything else follows the bag. */
+const AT_CAMP_COUNTS: Record<string, (state: GameState) => number> = { wood: availableWood, fiber: availableFiber };
 const supplyCount = (state: GameState, supply: string): number =>
-  supply === 'wood' && isAtCamp(state) ? availableWood(state) : SUPPLY_COUNTS[supply]?.(state.inventory) ?? 0;
+  (isAtCamp(state) ? AT_CAMP_COUNTS[supply]?.(state) : undefined) ?? SUPPLY_COUNTS[supply]?.(state.inventory) ?? 0;
 
 export class App {
   private state: GameState;
@@ -65,6 +66,7 @@ export class App {
       let extraControls = '';
       if (id === 'stonePile') extraControls = `<div id="stone-pile-controls" class="stone-pile-controls" hidden><span id="stone-pile-stored">Stored stone 0/${BALANCE.stonePileCapacity}</span><button type="button" data-action="storeStone">Store 1</button><button type="button" data-action="takeStone">Take 1</button></div>`;
       if (id === 'woodpile') extraControls = `<div id="wood-pile-controls" class="stone-pile-controls" hidden><span id="wood-pile-stored">Stored wood 0/${BALANCE.woodpileCapacity}</span><button type="button" data-action="storeWood">Store 1</button><button type="button" data-action="takeWood">Take 1</button></div>`;
+      if (id === 'fibreStack') extraControls = `<div id="fibre-stack-controls" class="stone-pile-controls" hidden><span id="fibre-stack-stored">Stored fiber 0/${BALANCE.fibreStackCapacity}</span><button type="button" data-action="storeFiber">Store 1</button><button type="button" data-action="takeFiber">Take 1</button></div>`;
       if (id === 'larder') extraControls = larderMarkup();
       return groupHeading + `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>` + extraControls;
     }).join('');
@@ -108,7 +110,7 @@ export class App {
               <section class="panel bag-panel" data-tab="bag"><p class="eyebrow">IN YOUR BAG</p><div class="supplies">
                 <div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small><small id="wood-stored" class="supply-note"></small><button type="button" class="supply-action" data-action="stokeFire" data-supply="wood" aria-label="Burn one wood">Burn</button></div>
                 <div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small><small id="berry-line" class="supply-note"></small><button type="button" class="supply-action" data-action="eat" data-item="berry" data-supply="food" aria-label="Eat one berry">Eat</button></div>
-                <div><span class="supply-icon fiber">≋</span><strong id="fiber-count">0</strong><small>Fiber</small><button type="button" class="supply-action" data-action="burnFiber" data-supply="fiber" aria-label="Burn one fiber">Burn</button></div>
+                <div><span class="supply-icon fiber">≋</span><strong id="fiber-count">0</strong><small>Fiber</small><small id="fiber-stored" class="supply-note"></small><button type="button" class="supply-action" data-action="burnFiber" data-supply="fiber" aria-label="Burn one fiber">Burn</button></div>
                 <div><span class="supply-icon stone">◆</span><strong id="stone-count">0</strong><small>Stone</small><small id="stone-stored" class="supply-note"></small><button type="button" class="supply-action" data-action="dropStone" data-supply="stone" aria-label="Drop one stone">Drop</button></div>
                 <div><span class="supply-icon ration">◇</span><strong id="ration-count">0</strong><small>Rations</small><button type="button" class="supply-action" data-action="eatTrailFood" data-supply="trailFood" aria-label="Eat one trail ration">Eat</button></div>
                 <div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small>Carried</small></div>${bagFoodMarkup()}
@@ -129,7 +131,7 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'storeWood' | 'takeWood' | 'storeFood' | 'takeFood';
+        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'storeWood' | 'takeWood' | 'storeFiber' | 'takeFiber' | 'storeFood' | 'takeFood';
         const item = button.dataset.item as FoodItem | undefined;
         const dish = button.dataset.dish as DishId | undefined;
         if (type === 'storeFood' || type === 'takeFood') {
@@ -392,6 +394,10 @@ export class App {
     const woodControls = this.root.querySelector<HTMLElement>('#wood-pile-controls');
     if (woodControls) woodControls.hidden = !bag.woodShown;
     this.setText('wood-pile-stored', bag.woodStored);
+    this.setText('fiber-stored', bag.fiberAtCamp);
+    const fiberControls = this.root.querySelector<HTMLElement>('#fibre-stack-controls');
+    if (fiberControls) fiberControls.hidden = !bag.fiberShown;
+    this.setText('fibre-stack-stored', bag.fiberStored);
     this.renderLarder();
     this.setText('fire-status', bag.fire);
     const keepsakes = keepsakeView(this.state);
