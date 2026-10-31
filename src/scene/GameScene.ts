@@ -144,7 +144,7 @@ export class GameScene extends Phaser.Scene {
   private syncPlayerSprite(moving: boolean): void {
     const { warmth, energy, hunger } = this.state.player;
     const visual = selectSurvivorVisual({ facing: this.facing, moving, warmth, energy, hunger,
-      nowMs: this.time.now, action: this.visualAction });
+      nowMs: this.time.now, action: this.visualAction, packed: this.state.progress.packWoven });
     if (this.playerSprite.texture.key !== visual.texture) this.playerSprite.setTexture(visual.texture);
     this.playerSprite.setPosition(Math.round(worldX(this.state.player.x)), Math.round(worldY(this.state.player.y)));
     this.playerSprite.setDepth(playerVisualDepth(this.state));

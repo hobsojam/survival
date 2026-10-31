@@ -53,6 +53,47 @@ function paint(g: Grid, pose: Pose, stride = 0, arm = 0, lean = 0): void {
   }
 }
 
+/** Where the pack sits: seen from behind it covers the back; from the front or side it shows behind the shoulders. */
+type PackView = 'front' | 'back' | 'side';
+const PACK_VIEW: Record<Pose, PackView> = { down: 'front', up: 'back', side: 'side' };
+
+/** Woven straw on a wooden frame. Behind the survivor it only fills pixels the body leaves clear. */
+function wearPack(g: Grid, view: PackView, lean = 0, dx = 0, bare: [number, number][] = []): void {
+  const weave = (x: number, y: number, behind: boolean): void => {
+    if (behind && g[y]?.[x] !== '.') return;
+    dot(g, x, y, (x + y) % 2 === 0 ? 'p' : 'o');
+  };
+  const rim = (x: number, y: number, behind: boolean): void => {
+    if (bare.some(([bx, by]) => bx === x && by === y)) return;
+    if (!behind || g[y]?.[x] === '.') dot(g, x, y, 'q');
+  };
+  const pack = (x0: number, y0: number, width: number, height: number, behind: boolean): void => {
+    for (let y = y0; y < y0 + height; y++) for (let x = x0; x < x0 + width; x++) {
+      if (y === y0) dot(g, x, y, behind && g[y]?.[x] !== '.' ? g[y][x] : 'r');
+      else if (x === x0 || x === x0 + width - 1 || y === y0 + height - 1) rim(x, y, behind);
+      else weave(x, y, behind);
+    }
+  };
+  if (view === 'back') {
+    pack(5 + dx, 11 + lean, 7, 8, false);
+    box(g, 6 + dx, 14 + lean, 5, 1, 'q');
+  } else if (view === 'front') {
+    pack(2 + dx, 8 + lean, 13, 6, true);
+    for (const x of [5, 11]) box(g, x + dx, 13 + lean, 1, 2, 'r');
+  } else {
+    pack(0 + dx, 10 + lean, 5, 9, true);
+  }
+}
+
+/** Frames that stand slumped one pixel low, by name; the pack is worn the same distance low. */
+const STANDING_LEAN: Record<string, number> = {};
+
+/** A standing frame; its lean is recorded under its name so the pack follows it. */
+function stand(name: string, pose: Pose, stride = 0, arm = 0, lean = 0, detail?: (g: Grid) => void): string[] {
+  if (lean) STANDING_LEAN[name] = lean;
+  return frame(pose, stride, arm, lean, detail);
+}
+
 function frame(pose: Pose, stride = 0, arm = 0, lean = 0, detail?: (g: Grid) => void): string[] {
   const g = blank();
   paint(g, pose, stride, arm, lean);
@@ -91,8 +132,8 @@ function seated(kind: 'rest' | 'cook' | 'stargaze', phase: number): string[] {
 }
 
 /** Slumped one pixel lower with closed, drooping eyes; the second frame yawns. */
-function tired(yawn: boolean): string[] {
-  return frame('down', 0, 0, 1, g => {
+function tired(name: string, yawn: boolean): string[] {
+  return stand(name, 'down', 0, 0, 1, g => {
     box(g, 6, 8, 2, 1, 'a'); box(g, 10, 8, 2, 1, 'a');
     box(g, 7, 8, 1, 1, 'd'); box(g, 10, 8, 1, 1, 'd');
     if (yawn) box(g, 8, 9, 2, 2, 'a');
@@ -121,23 +162,53 @@ function reaching(): string[] {
 }
 
 const frames: Record<string, string[]> = {
-  idleDown0: frame('down'), idleDown1: frame('down', 0, 0, 1),
-  walkDown0: frame('down', -1, 1), walkDown1: frame('down', 0, 0, 1),
+  idleDown0: frame('down'), idleDown1: stand('idleDown1', 'down', 0, 0, 1),
+  walkDown0: frame('down', -1, 1), walkDown1: stand('walkDown1', 'down', 0, 0, 1),
   walkDown2: frame('down', 1, -1), walkDown3: frame('down', 0, 1),
-  walkUp0: frame('up', -1, 1), walkUp1: frame('up', 0, 0, 1),
+  walkUp0: frame('up', -1, 1), walkUp1: stand('walkUp1', 'up', 0, 0, 1),
   walkUp2: frame('up', 1, -1), walkUp3: frame('up', 0, 1),
-  walkSide0: frame('side', -1, 1), walkSide1: frame('side', 0, 0, 1),
+  walkSide0: frame('side', -1, 1), walkSide1: stand('walkSide1', 'side', 0, 0, 1),
   walkSide2: frame('side', 1, -1), walkSide3: frame('side', 0, 1),
-  gather0: frame('side', 0, 2, 1),
+  gather0: stand('gather0', 'side', 0, 2, 1),
   gather1: reaching(),
   rest0: seated('rest', 0), rest1: seated('rest', 1),
   cook0: seated('cook', 0), cook1: seated('cook', 1),
   stargaze0: seated('stargaze', 0), stargaze1: seated('stargaze', 1),
-  shiver0: frame('down', -1, 0, 1, g => { dot(g, 2, 8, 't'); }),
-  shiver1: frame('down', 1, 0, 1, g => { dot(g, 14, 8, 't'); }),
-  tired0: tired(false), tired1: tired(true),
+  shiver0: stand('shiver0', 'down', -1, 0, 1, g => { dot(g, 2, 8, 't'); }),
+  shiver1: stand('shiver1', 'down', 1, 0, 1, g => { dot(g, 14, 8, 't'); }),
+  tired0: tired('tired0', false), tired1: tired('tired1', true),
   hungry0: hungry(0), hungry1: hungry(1)
 };
+
+/** How each frame wears the pack: its view, how far it is slumped or seated, and its sideways sway. */
+const PACK_FIT: Record<string, [PackView, number, number]> = {
+  gather1: ['side', 0, 0],
+  rest0: ['front', 1, 0], rest1: ['front', 1, 1],
+  cook0: ['side', 0, 0], cook1: ['side', 0, 1],
+  stargaze0: ['side', 0, 0], stargaze1: ['side', 0, 1]
+};
+
+function packFit(name: string): [PackView, number, number] {
+  const fit = PACK_FIT[name];
+  if (fit) return fit;
+  return [PACK_VIEW[standingPose(name)], STANDING_LEAN[name] ?? 0, 0];
+}
+
+/** Which way a standing frame faces, read from its name. */
+function standingPose(name: string): Pose {
+  if (name.startsWith('walkUp')) return 'up';
+  if (name.startsWith('walkSide') || name.startsWith('gather')) return 'side';
+  return 'down';
+}
+
+// Every frame has a twin with the woven pack on, named `${name}Pack`; the scene picks it once the pack is woven.
+for (const [name, rows] of Object.entries(frames)) {
+  const g = rows.map(row => row.split(''));
+  const [view, lean, dx] = packFit(name);
+  // The hungry frames bring the right arm across, leaving nothing behind it for the front pack's rim to hang on.
+  wearPack(g, view, lean, dx, name.startsWith('hungry') ? [[13, 13], [14, 13]] : []);
+  frames[`${name}Pack`] = g.map(row => row.join(''));
+}
 
 const animations: NonNullable<SpriteDef['animations']> = {};
 for (const [name, count] of Object.entries({ idleDown: 2, walkDown: 4, walkUp: 4, walkSide: 4, gather: 2, rest: 2, cook: 2, stargaze: 2, shiver: 2, tired: 2, hungry: 2 })) {

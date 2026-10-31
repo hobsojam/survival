@@ -10,7 +10,7 @@ describe('build buttons', () => {
     const state = createGame();
     state.inventory = { wood: 9, fiber: 0, stone: 3, food: emptyFood() };
     expect(buildStatus(state, 'hearth')).toBe('locked');
-    state.progress = { nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false, axeCrafted: false, quarryFound: false, pickaxeCrafted: false, potCrafted: false,
+    state.progress = { nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false, axeCrafted: false, quarryFound: false, pickaxeCrafted: false, potCrafted: false, packWoven: false,
       discoveries: { basket: false, spring: false, cairn: false } };
     expect(buildStatus(state, 'hearth')).toBe('ready');
   });
@@ -27,11 +27,11 @@ describe('build buttons', () => {
   it('is only ready at camp with the materials in hand', () => {
     const state = createGame();
     state.inventory.wood = 3;
-    expect(buildStatus(state, 'crate')).toBe('unavailable');
+    expect(buildStatus(state, 'dryingRack')).toBe('unavailable');
     state.inventory.wood = 4;
-    expect(buildStatus(state, 'crate')).toBe('ready');
+    expect(buildStatus(state, 'dryingRack')).toBe('ready');
     state.player.x = BALANCE.campX + BALANCE.campRadius + 1;
-    expect(buildStatus(state, 'crate')).toBe('unavailable');
+    expect(buildStatus(state, 'dryingRack')).toBe('unavailable');
   });
 });
 

@@ -5,7 +5,7 @@ import { potBlocker } from '../src/game/cooking';
 import { stormReadiness } from '../src/game/forecast';
 import { FULL_BAG_MESSAGE, applyAction, availableWood, buildStatus, groundBlocker, lookoutRepairBlocker, spendWood } from '../src/game/rules';
 import { bagView, buildButtonView } from '../src/ui/panels';
-import { CAMP_STRUCTURES, woodpileFrame } from '../src/scene/visuals';
+import { CAMP_STRUCTURES, stockFrame } from '../src/scene/visuals';
 import { PATH_DESTINATIONS, segmentDistance } from './placement';
 
 const { campX, campY } = BALANCE;
@@ -82,7 +82,7 @@ describe('where the woodpile stands', () => {
   });
 
   it('shows how much it holds', () => {
-    expect([0, 1, 6, 7, 12].map(woodpileFrame)).toEqual(['empty', 'some', 'some', 'full', 'full']);
+    expect([0, 1, 6, 7, 12].map(stockFrame)).toEqual(['empty', 'some', 'some', 'full', 'full']);
   });
 });
 
