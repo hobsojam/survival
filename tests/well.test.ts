@@ -265,7 +265,7 @@ describe('vegetable stew', () => {
 
 describe('the well in the save', () => {
   const load = (state: GameState): string => {
-    const data = new Map<string, string>([[SAVE_KEY, JSON.stringify({ version: 22, state })]]);
+    const data = new Map<string, string>([[SAVE_KEY, JSON.stringify({ version: 23, state })]]);
     const storage = { getItem: (key: string) => data.get(key) ?? null, setItem: () => undefined, removeItem: () => undefined } as unknown as Storage;
     return loadGame(storage).kind;
   };

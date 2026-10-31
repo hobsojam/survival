@@ -1,6 +1,7 @@
 import { nightStart } from './calendar';
 import { isAtCamp } from './camp';
 import { BALANCE, type GameState } from './state';
+import { logsInStore } from './wood';
 
 // Living in the house: where it stands, whether the survivor has moved in, the wood store it adds,
 // and the fireplace that feeds itself from that store at night and takes over the campfire's work.
@@ -34,17 +35,19 @@ export function warmFuel(state: GameState): number {
   return livesInHouse(state) ? state.fireplaceFuel : state.fireFuel;
 }
 
-/** Seconds of fire still to come: for the house, the fireplace and every log it will draw from the store; otherwise the campfire's fuel. */
+/** Seconds of fire still to come: for the house, the fireplace and every log it will draw from the store and the cart; otherwise the campfire's fuel. */
 export function fuelLeft(state: GameState): number {
-  return livesInHouse(state) ? state.fireplaceFuel + state.storedWood * BALANCE.fireplaceSecondsPerWood : state.fireFuel;
+  return livesInHouse(state) ? state.fireplaceFuel + logsInStore(state) * BALANCE.fireplaceSecondsPerWood : state.fireFuel;
 }
 
 /** One step of the fireplace inside advanceTime's loop: draw a log at night when empty, then burn. Mutates the working copy. */
 export function tendFireplace(next: GameState, step: number, coldNight: boolean): void {
   // By day the fireplace is banked: whatever is left waits for nightfall.
   if (!livesInHouse(next) || next.timeOfDay < nightStart(next.day)) return;
-  if (next.fireplaceFuel <= 0 && next.storedWood > 0) {
-    next.storedWood -= 1;
+  // It takes from the woodpile and woodshed first, and from the handcart once they are empty.
+  if (next.fireplaceFuel <= 0 && logsInStore(next) > 0) {
+    if (next.storedWood > 0) next.storedWood -= 1;
+    else next.cartWood -= 1;
     next.fireplaceFuel += BALANCE.fireplaceSecondsPerWood;
   }
   next.fireplaceFuel = Math.max(0, next.fireplaceFuel - step * (coldNight ? BALANCE.coldNightFireBurn : 1));

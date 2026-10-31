@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, BUILDINGS, createGame, type GameState } from '../src/game/state';
 import { CLEARING_STEPS, STEP_IDS, clearingReach, inClearing, placeBranches } from '../src/game/clearing';
-import { BED_CROPS, bedSoil, bedStage, bedsDawn, harvestBedBlocker, sowBedBlocker, wateredOn, witheredMessage, type Bed } from '../src/game/beds';
+import { BED_CROPS, bedSoil, bedStage, bedsDawn, dryLimits, harvestBedBlocker, sowBedBlocker, wateredOn, witheredMessage, type Bed } from '../src/game/beds';
 import { FOOD_ITEMS, addFood, emptyFood, type FoodStore } from '../src/game/food';
 import { TOO_TIRED_MESSAGE, workSeconds } from '../src/game/needs';
 import { rainWindow } from '../src/game/rain';
@@ -437,19 +437,19 @@ describe('the beds panel', () => {
 });
 
 describe('the beds in the save', () => {
-  const load = (state: unknown, version = 22): string => {
+  const load = (state: unknown, version = 23): string => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;
   };
   const planted = withBeds(camp(true, { day: 6 }), [bed({ grown: 3 }), bed({ grown: 1, dryDays: 3, wateredDay: 6 }), EMPTY]);
 
-  it('accepts version 22 and rejects 21', () => {
+  it('accepts version 23 and rejects 22', () => {
     expect(load(planted)).toBe('loaded');
-    expect(load(planted, 21)).toBe('invalid');
+    expect(load(planted, 22)).toBe('invalid');
     const storage = new MemoryStorage();
     expect(saveGame(storage, planted).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(22);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(23);
   });
 
   it('needs exactly three well-formed beds', () => {
@@ -492,5 +492,65 @@ describe('the beds in the save', () => {
     expect(load(withFood(planted, { ...emptyFood(), vegetables: -1 }))).toBe('invalid');
     const { vegetables: _, ...noVegetables } = emptyFood();
     expect(load(withFood(planted, noVegetables as FoodStore))).toBe('invalid');
+  });
+});
+
+describe('the bed tools', () => {
+  /** The beds built, with the workshop up and its hoe and watering can made. */
+  const tooled = (beds: Bed[], changes: Partial<GameState> = {}): GameState => {
+    const state = withBeds(camp(true, changes), beds);
+    return {
+      ...state,
+      clearing: { ...state.clearing, cleared: ['west-near', 'east-near', 'east-far'] },
+      structures: { ...state.structures, shelter: true, toolshed: true, workshop: true },
+      progress: { ...state.progress, workshop: { ...state.progress.workshop, bedTools: true } }
+    };
+  };
+
+  it('give a stalled crop one more day before it withers, and nothing else', () => {
+    expect(dryLimits(camp())).toEqual({ dry: 2, stall: 3, wither: 4 });
+    expect(dryLimits(tooled([]))).toEqual({ dry: 2, stall: 3, wither: 5 });
+    const soil = (dryDays: number) => bedSoil(tooled([]), bed({ dryDays }));
+    expect([0, 1, 2, 3, 4].map(soil)).toEqual(['fresh', 'fresh', 'dry', 'wilted', 'wilted']);
+  });
+
+  it('are made at the workshop once the beds are built', () => {
+    const state = tooled([EMPTY, EMPTY, EMPTY]);
+    const unmade = { ...state, progress: { ...state.progress, workshop: { ...state.progress.workshop, bedTools: false } }, inventory: { ...state.inventory, wood: 3, fiber: 1, stone: 1 } };
+    const result = applyAction(unmade, { type: 'makeUpgrade', upgrade: 'bedTools' });
+    expect(result.message).toBe('You made a hoe and a watering can. A dry bed holds on a day longer before it withers.');
+    expect(result.state.progress.workshop.bedTools).toBe(true);
+  });
+
+  it('still needs water to ripen: a bed sown and left dry stalls on its third dry day', () => {
+    let state = tooled([EMPTY, EMPTY, bed()], { day: 2 });
+    const seen: [number, number][] = [];
+    for (let dawn = 0; dawn < 4; dawn++) {
+      state = nextDawn(state);
+      seen.push([state.beds[2].grown, state.beds[2].dryDays]);
+    }
+    expect(seen).toEqual([[1, 1], [2, 2], [2, 3], [2, 4]]);
+    expect(bedSoil(state, state.beds[2])).toBe('wilted');
+    expect(nextDawn(state).beds[2]).toEqual(EMPTY);
+  });
+
+  it('save a wilting bed the tools were made for from withering at its next dry dawn', () => {
+    const state = tooled([EMPTY, EMPTY, bed({ grown: 1, dryDays: 3 })], { day: 3 });
+    const next = nextDawn(state);
+    expect(next.beds[2]).toEqual(bed({ grown: 1, dryDays: 4 }));
+    expect(bedSoil(next, next.beds[2])).toBe('wilted');
+  });
+
+  it('lets a save hold four dry days with the tools, and not five', () => {
+    const load = (state: unknown): string => {
+      const storage = new MemoryStorage();
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: 23, state }));
+      return loadGame(storage).kind;
+    };
+    expect(load(tooled([EMPTY, EMPTY, bed({ grown: 1, dryDays: 4 })]))).toBe('loaded');
+    expect(load(tooled([EMPTY, EMPTY, bed({ grown: 1, dryDays: 5 })]))).toBe('invalid');
+    expect(load(withBeds(camp(), [EMPTY, EMPTY, bed({ grown: 1, dryDays: 4 })]))).toBe('invalid');
+    const noBeds = tooled([EMPTY, EMPTY, EMPTY]);
+    expect(load({ ...noBeds, structures: { ...noBeds.structures, vegetableBeds: false } })).toBe('invalid');
   });
 });

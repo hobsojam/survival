@@ -83,5 +83,9 @@ export function journalView(state: GameState): {
     else if (sitesFound) nextHint = 'Follow the west path out of camp to see what lies beyond.';
     else nextHint = 'Follow an unexplored path to find another quiet place.';
   }
+  // Once the east far ground is clear, the workshop is the next thing to build there.
+  if (state.structures.toolshed && !state.structures.workshop && state.clearing.cleared.includes('east-far')) {
+    nextHint = 'Build a workshop on the cleared east ground to make a saw and a handcart.';
+  }
   return { locations, milestones, nextHint, regions: regionSummaries(state) };
 }

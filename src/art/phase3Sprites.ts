@@ -557,6 +557,54 @@ function gardenPlant(g: Grid, stage: string): void {
 }
 
 /** Where the three vegetable beds will go: a staked, strung plot with three patches of turned earth, one under each bed. */
+function workshopSite(g: Grid): void {
+  for (const [x, y] of [[2, 4], [32, 4], [2, 10], [32, 10]]) stake(g, x, y);
+  line(g, 4, 5, 32, 5, 'h'); line(g, 4, 11, 32, 11, 'h');
+  box(g, 10, 7, 16, 3, 'A'); line(g, 11, 7, 24, 7, 'z');
+  for (const x of [12, 17, 22]) line(g, x, 8, x + 3, 8, 'c');
+}
+/**
+ * An open-fronted timber workshop: a plank back wall with a saw and tools hung on it, a sturdy workbench across the
+ * front, and a lean roof on four posts. Every post, the bench and the roof are edged in dark wood so it reads on bare earth.
+ */
+function workshop(g: Grid): void {
+  oval(g, 18, 26, 17, 2, 's');
+  // The back wall, in vertical planks, shaded inside the open front.
+  box(g, 3, 7, 30, 18, 'a'); box(g, 4, 8, 28, 16, 'b');
+  for (const x of [8, 13, 18, 23, 28]) line(g, x, 8, x, 23, 'a');
+  // A bow saw and a mallet hang on the wall.
+  line(g, 6, 11, 12, 11, 'q'); line(g, 6, 11, 6, 13, 'c'); line(g, 12, 11, 12, 13, 'c'); line(g, 6, 13, 12, 13, 'd');
+  box(g, 22, 10, 4, 2, 'd'); line(g, 24, 12, 24, 16, 'c');
+  dot(g, 16, 11, 'p'); line(g, 16, 12, 16, 15, 'e');
+  // The workbench: a thick top with a log on it, on two stout legs.
+  box(g, 5, 17, 26, 3, 'a'); box(g, 6, 17, 24, 1, 'e'); line(g, 6, 18, 29, 18, 'd');
+  box(g, 14, 15, 7, 2, 'c'); line(g, 14, 15, 20, 15, 'e'); dot(g, 20, 16, 'd');
+  for (const x of [7, 27]) { box(g, x, 20, 2, 5, 'a'); line(g, x + 1, 20, x + 1, 24, 'c'); }
+  // Shavings on the floor, and the four posts at the corners.
+  for (const [x, y] of [[11, 24], [13, 23], [21, 24], [24, 23]]) dot(g, x, y, 'e');
+  for (const x of [1, 33]) { box(g, x, 6, 2, 19, 'a'); line(g, x + 1, 6, x + 1, 24, 'd'); }
+  box(g, 1, 25, 34, 1, 'a');
+  // The lean roof is drawn last so it overhangs the posts.
+  box(g, 0, 1, 36, 5, 'd'); box(g, 1, 1, 17, 1, 'e');
+  for (const x of [6, 12, 18, 24, 30]) line(g, x, 2, x, 5, 'c');
+  line(g, 0, 0, 35, 0, 'a'); line(g, 0, 5, 35, 5, 'b'); box(g, 0, 6, 36, 1, 'a');
+  dot(g, 0, 1, 'a'); dot(g, 35, 1, 'a');
+}
+/** A two-wheeled handcart with long handles, parked by the workshop, its bed piled with logs as it fills. */
+function handcart(g: Grid, stock: StockLevel): void {
+  oval(g, 10, 12, 9, 1.5, 's');
+  // The handles reach out to the right, resting on a little prop.
+  line(g, 13, 8, 19, 10, 'a'); line(g, 13, 7, 19, 9, 'c'); line(g, 18, 10, 18, 12, 'a');
+  const log = (x: number, y: number): void => { box(g, x, y, 4, 2, 'c'); line(g, x, y, x + 3, y, 'e'); dot(g, x + 3, y + 1, 'd'); };
+  if (stock !== 'empty') { log(2, 4); log(7, 4); }
+  if (stock === 'full') { log(4, 2); log(9, 2); log(6, 0); }
+  // The cart bed: plank sides edged in dark wood.
+  box(g, 1, 6, 13, 4, 'a'); box(g, 2, 6, 11, 3, 'd'); line(g, 2, 7, 12, 7, 'c'); line(g, 7, 6, 7, 8, 'b');
+  // The wheel, with its rim, hub and spokes.
+  oval(g, 7, 10.5, 3, 2.5, 'a'); oval(g, 7, 10.5, 2, 1.5, 'b');
+  line(g, 5, 10, 9, 11, 'c'); line(g, 7, 9, 7, 12, 'c'); dot(g, 7, 10, 'e');
+}
+
 function vegetableBedsSite(g: Grid): void {
   for (const [x, y] of [[1, 4], [45, 4], [1, 11], [45, 11]]) stake(g, x, y);
   line(g, 3, 5, 45, 5, 'h'); line(g, 3, 12, 45, 12, 'h');
@@ -742,6 +790,9 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   vegetableBedsSite: define(48, 16, campLegend, { still: vegetableBedsSite }),
   vegBed: define(14, 12, bedLegend, BED_FRAMES),
   wellSite: define(20, 12, campLegend, { still: wellSite }),
+  workshopSite: define(36, 16, campLegend, { still: workshopSite }),
+  workshop: define(36, 28, campLegend, { built: workshop }),
+  handcart: define(20, 14, campLegend, { empty: g => handcart(g, 'empty'), some: g => handcart(g, 'some'), full: g => handcart(g, 'full') }),
   well: define(20, 24, wellLegend, { built: well }),
   pileCount: define(13, 7, countLegend, {
     ...Object.fromEntries([2, 3, 4, 5, 6, 7, 8, 9].map(n => [`n${n}`, (g: Grid) => pileCount(g, [String(n)])])),

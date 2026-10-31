@@ -213,18 +213,18 @@ describe('the woodshed', () => {
 });
 
 describe('the house in the save', () => {
-  const save = (state: GameState, version = 22): string => {
+  const save = (state: GameState, version = 23): string => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version, state }));
     return loadGame(storage).kind;
   };
 
-  it('accepts version 22 and rejects 21', () => {
+  it('accepts version 23 and rejects 22', () => {
     expect(save(housed())).toBe('loaded');
-    expect(save(housed(), 21)).toBe('invalid');
+    expect(save(housed(), 22)).toBe('invalid');
     const storage = new MemoryStorage();
     expect(saveGame(storage, housed({ woodpile: true }, { storedWood: 30, fireplaceFuel: 120 })).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(22);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(23);
   });
 
   it('holds up to the whole wood store', () => {

@@ -6,7 +6,9 @@ import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { BED_CROPS, bedSoil, bedStage, drawWaterBlocker, harvestBedBlocker, sowBedBlocker, type BedSoil, type BedStage } from '../game/beds';
 import { workSeconds } from '../game/needs';
 import { hasWoodStore, livesInHouse, woodStoreCapacity } from '../game/home';
-import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
+import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker, unloadCartBlocker } from '../game/rules';
+import { WORKSHOP_UPGRADES, upgradeBlocker, type UpgradeId } from '../game/workshop';
+import { logsInStore } from '../game/wood';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
 import { CLEARING_STEPS, clearGroundBlocker, markBlocker, nextStep, roomLine, type Side } from '../game/clearing';
@@ -78,7 +80,8 @@ export function bedsPanelView(state: GameState): { shown: boolean; hint: string;
     return { label, action: 'harvestBed' as const, verb: 'Harvest', disabled: Boolean(blocker), title: blocker ?? `Harvest ${BALANCE.cropYield} vegetables.` };
   });
   const watering = wateringHint(state);
-  const hint = `Each bed keeps its own seed, so sowing costs nothing. ${watering}. Left dry for a few days, a crop wilts and then withers. A ripe crop waits safely until you harvest it.`;
+  const tools = state.progress.workshop.bedTools ? ' The watering can keeps a wilting crop alive a day longer.' : '';
+  const hint = `Each bed keeps its own seed, so sowing costs nothing. ${watering}. Left dry for a few days, a crop wilts and then withers.${tools} A ripe crop waits safely until you harvest it.`;
   const blocker = drawWaterBlocker(state);
   return { shown: state.structures.vegetableBeds, hint, beds, water: { shown: state.structures.well, disabled: Boolean(blocker), hint: blocker ?? '' } };
 }
@@ -90,6 +93,39 @@ export function bedMarkup(bed: BedPanelView, index: number): string {
 
 /** What a panel with one action button shows: its heading, its copy, its price line and its button state. */
 export interface ActionPanelView { title: string; copy: string; cost: string; disabled: boolean; ready: boolean }
+
+/** What each workshop upgrade does, shown while it can be made. */
+const UPGRADE_COPY: Record<UpgradeId, { title: string; copy: string; made: string }> = {
+  saw: { title: 'Saw', copy: 'Felling a tree gives four wood instead of two.', made: 'Felling a tree gives four wood.' },
+  handcart: { title: 'Handcart', copy: 'Felled wood goes into a cart by the workshop, and counts as stored wood.', made: 'Felled wood goes into the cart. Unload it onto the wood store to make room.' },
+  bedTools: { title: 'Hoe and watering can', copy: 'A dry bed holds on a day longer before it withers.', made: 'A dry bed holds on a day longer before it withers.' }
+};
+
+/** "3 wood · 3 stone": an upgrade's cost, leaving out what it doesn't need. */
+const costLabel = (cost: Record<'wood' | 'fiber' | 'stone', number>): string =>
+  (['wood', 'fiber', 'stone'] as const).filter(key => cost[key] > 0).map(key => `${cost[key]} ${key}`).join(' · ');
+
+export interface WorkshopView {
+  shown: boolean;
+  rows: Record<UpgradeId, ActionPanelView & { shown: boolean }>;
+  cart: { shown: boolean; line: string; ready: boolean };
+}
+
+/** The workshop panel, once it stands: each upgrade with its cost or why it can't be made, and the handcart's load. */
+export function workshopView(state: GameState): WorkshopView {
+  const row = (id: UpgradeId): ActionPanelView & { shown: boolean } => {
+    const { title, copy, made } = UPGRADE_COPY[id];
+    const shown = id !== 'bedTools' || state.structures.vegetableBeds;
+    if (state.progress.workshop[id]) return { shown, title, copy: made, cost: 'Made', disabled: true, ready: false };
+    const blocker = upgradeBlocker(state, id);
+    return { shown, title, copy: blocker ?? copy, cost: costLabel(WORKSHOP_UPGRADES[id].cost), disabled: false, ready: !blocker };
+  };
+  return {
+    shown: state.structures.workshop,
+    rows: { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools') },
+    cart: { shown: state.progress.workshop.handcart, line: `Cart ${state.cartWood}/${BALANCE.handcartCapacity} wood`, ready: !unloadCartBlocker(state) }
+  };
+}
 
 export function lookoutView(state: GameState): ActionPanelView {
   const { hearthUnlocked, lookoutRepaired } = state.progress;
@@ -313,7 +349,8 @@ export function bagView(state: GameState): BagView {
     storedAtCamp: pile ? `+${state.storedStone} at camp` : '',
     pileStored: `Stored stone ${state.storedStone}/${BALANCE.stonePileCapacity}`,
     woodShown: woodStore,
-    woodAtCamp: woodStore ? `+${state.storedWood} at camp` : '',
+    // The handcart's load counts as wood at camp even before there is a woodpile to unload it onto.
+    woodAtCamp: woodStore || state.progress.workshop.handcart ? `+${logsInStore(state)} at camp` : '',
     woodStored: `Stored wood ${state.storedWood}/${woodStoreCapacity(state)}`,
     fiberShown: state.structures.fibreStack,
     fiberAtCamp: state.structures.fibreStack ? `+${state.storedFiber} at camp` : '',
@@ -326,9 +363,10 @@ export function bagView(state: GameState): BagView {
 function fireLine(state: GameState): string {
   if (!livesInHouse(state)) return state.fireFuel > 0 ? `Fire burning · ${Math.ceil(state.fireFuel)}s of warmth` : 'The fire is unlit';
   const night = state.timeOfDay >= nightStart(state.day);
-  if (night && state.fireplaceFuel <= 0 && state.storedWood === 0) return 'The fireplace is out. Stock the wood store.';
-  const logs = `${state.storedWood} log${state.storedWood === 1 ? '' : 's'} in store`;
-  if (state.storedWood <= 2) return `Wood is running low · ${logs}`;
+  const stored = logsInStore(state);
+  if (night && state.fireplaceFuel <= 0 && stored === 0) return 'The fireplace is out. Stock the wood store.';
+  const logs = `${stored} log${stored === 1 ? '' : 's'} in store`;
+  if (stored <= 2) return `Wood is running low · ${logs}`;
   return `${night ? 'The fireplace is burning' : 'The fireplace is banked'} · ${logs}`;
 }
 

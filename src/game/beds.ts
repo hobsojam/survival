@@ -6,7 +6,7 @@ import { BALANCE, type GameState } from './state';
 
 // Three raised beds on the west ground, each with its own crop. A bed keeps its seed through every harvest and every withering,
 // so an empty bed can always be sown again for nothing. It grows a day at each dawn after a watered day, dries on a dry one,
-// and withers after four dry days; a ripe crop waits safely, and winter pauses everything.
+// and withers after four dry days (five with the workshop's bed tools); a ripe crop waits safely, and winter pauses everything.
 
 export const BED_CROPS = ['potatoes', 'beans', 'carrots'] as const;
 export type Crop = (typeof BED_CROPS)[number];
@@ -24,11 +24,15 @@ export interface Bed {
 export type BedStage = 'empty' | 'sprout' | 'growing' | 'ripe';
 export type BedSoil = 'fresh' | 'dry' | 'wilted' | 'frost';
 
-/** A bed's fourth dry day in a row withers it; on its third it stops growing. */
-const WITHER_DAYS = 4;
-const STALL_DAYS = 3;
-/** The most dry days in a row a bed can show without having withered. */
-export const MAX_DRY_DAYS = WITHER_DAYS - 1;
+/**
+ * How many dry days in a row a bed takes to show dry soil, to stop growing, and to wither. The workshop's hoe and
+ * watering can keep a stalled crop alive one day longer; it still stops growing on its third dry day, so it still needs water.
+ */
+export function dryLimitsFor(bedTools: boolean): { dry: number; stall: number; wither: number } {
+  return { dry: 2, stall: 3, wither: bedTools ? 5 : 4 };
+}
+
+export const dryLimits = (state: Pick<GameState, 'progress'>) => dryLimitsFor(state.progress.workshop.bedTools);
 
 export const emptyBed = (): Bed => ({ sown: false, grown: 0, dryDays: 0, wateredDay: null });
 
@@ -40,8 +44,9 @@ export function bedStage(bed: Bed): BedStage {
 
 export function bedSoil(state: GameState, bed: Bed): BedSoil {
   if (isWinter(state.day)) return 'frost';
-  if (bed.dryDays >= STALL_DAYS) return 'wilted';
-  return bed.dryDays === 2 ? 'dry' : 'fresh';
+  const { dry, stall } = dryLimits(state);
+  if (bed.dryDays >= stall) return 'wilted';
+  return bed.dryDays >= dry ? 'dry' : 'fresh';
 }
 
 /** Whether a bed had water on a day: drawn for it from the well, or a spring shower. */
@@ -53,8 +58,9 @@ export function wateredOn(_state: GameState, bed: Bed, day: number): boolean {
 function grownBed(state: GameState, bed: Bed, day: number): Bed {
   if (!bed.sown || bed.grown >= BALANCE.cropGrowDays) return bed;
   const dryDays = wateredOn(state, bed, day) ? 0 : bed.dryDays + 1;
-  if (dryDays >= WITHER_DAYS) return emptyBed();
-  const grown = dryDays < STALL_DAYS ? bed.grown + 1 : bed.grown;
+  const { stall, wither } = dryLimits(state);
+  if (dryDays >= wither) return emptyBed();
+  const grown = dryDays < stall ? bed.grown + 1 : bed.grown;
   // A ripe crop never dries out while it waits to be picked.
   return { ...bed, grown, dryDays: grown >= BALANCE.cropGrowDays ? 0 : dryDays };
 }
