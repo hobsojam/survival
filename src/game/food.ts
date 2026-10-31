@@ -67,7 +67,7 @@ function bagShare(bag: FoodStore, larder: FoodStore, item: FoodItem, n: number):
   if (!isFresh(item)) return Math.min(n, bag[item]);
   const fromBag = [...bag[item]].sort((a, b) => a - b), fromLarder = [...larder[item]].sort((a, b) => a - b);
   let b = 0, l = 0;
-  while (b + l < n) {
+  for (let taken = 0; taken < n; taken++) {
     if (l >= fromLarder.length || (b < fromBag.length && fromBag[b] <= fromLarder[l])) b++;
     else l++;
   }
