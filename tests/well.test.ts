@@ -184,7 +184,7 @@ describe('drawing water', () => {
     expect(bedsPanelView(withBeds(camp(), [bed(), EMPTY, EMPTY])).water).toEqual({ shown: true, disabled: false, hint: '' });
     expect(bedsPanelView(withBeds(camp(), [EMPTY, EMPTY, EMPTY])).water).toEqual({ shown: true, disabled: true, hint: 'Nothing in the beds needs water.' });
     expect(bedsPanelView(camp()).hint).toContain('well');
-    expect(bedsPanelView(camp(false)).hint).not.toContain('well');
+    expect(bedsPanelView(camp(false)).hint).not.toContain('a bucket from the well');
   });
 });
 

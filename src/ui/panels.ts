@@ -1,4 +1,4 @@
-import { daysLeftInSeason, isWinter, nightStart, season } from '../game/calendar';
+import { daysLeftInSeason, isSpring, isWinter, nightStart, season } from '../game/calendar';
 import { FOOD_ITEMS, availableFood, foodCount, goingSoft, isFresh, keptFoodTotal, storeTotal, type FoodItem } from '../game/food';
 import { foodIconUrl } from '../art/foodIcons';
 import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
@@ -60,7 +60,9 @@ export interface DrawWaterView { shown: boolean; disabled: boolean; hint: string
 export function bedsPanelView(state: GameState): { shown: boolean; hint: string; beds: BedPanelView[]; water: DrawWaterView } {
   const beds = state.beds.map((bed, index) => {
     const crop = BED_CROPS[index];
-    const label = [capitalised(crop), BED_STAGE_WORDS[bedStage(bed)], BED_SOIL_WORDS[bedSoil(state, bed)]].filter(Boolean).join(' · ');
+    const resting = !bed.sown && isWinter(state.day);
+    const words = resting ? ['Empty, resting for winter'] : [BED_STAGE_WORDS[bedStage(bed)], BED_SOIL_WORDS[bedSoil(state, bed)]];
+    const label = [capitalised(crop), ...words].filter(Boolean).join(' · ');
     if (!bed.sown) {
       const blocker = sowBedBlocker(state, index);
       return { label, action: 'sowBed' as const, verb: 'Sow', disabled: Boolean(blocker), title: blocker ?? `Sow the ${crop}.` };
@@ -68,8 +70,10 @@ export function bedsPanelView(state: GameState): { shown: boolean; hint: string;
     const blocker = harvestBedBlocker(state, index);
     return { label, action: 'harvestBed' as const, verb: 'Harvest', disabled: Boolean(blocker), title: blocker ?? `Harvest ${BALANCE.cropYield} vegetables.` };
   });
-  const watering = state.structures.well ? 'Rain waters the beds, or draw a bucket from the well once a day' : 'Rain waters the beds';
-  const hint = `Each bed keeps its own seed, so sowing costs nothing. ${watering}; left dry for a few days, a crop wilts and then withers. A ripe crop waits safely until you harvest it.`;
+  const watering = state.structures.well ? 'Rain waters the beds, and a bucket from the well waters them all for the day'
+    : isSpring(state.day) ? 'Rain waters the beds'
+    : 'No rain falls until spring; a well on the west ground would water them';
+  const hint = `Each bed keeps its own seed, so sowing costs nothing. ${watering}. Left dry for a few days, a crop wilts and then withers. A ripe crop waits safely until you harvest it.`;
   const blocker = drawWaterBlocker(state);
   return { shown: state.structures.vegetableBeds, hint, beds, water: { shown: state.structures.well, disabled: Boolean(blocker), hint: blocker ?? '' } };
 }

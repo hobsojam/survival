@@ -27,6 +27,8 @@ export type BedSoil = 'fresh' | 'dry' | 'wilted' | 'frost';
 /** A bed's fourth dry day in a row withers it; on its third it stops growing. */
 const WITHER_DAYS = 4;
 const STALL_DAYS = 3;
+/** The most dry days in a row a bed can show without having withered. */
+export const MAX_DRY_DAYS = WITHER_DAYS - 1;
 
 export const emptyBed = (): Bed => ({ sown: false, grown: 0, dryDays: 0, wateredDay: null });
 
@@ -37,7 +39,7 @@ export function bedStage(bed: Bed): BedStage {
 }
 
 export function bedSoil(state: GameState, bed: Bed): BedSoil {
-  if (bed.sown && isWinter(state.day)) return 'frost';
+  if (isWinter(state.day)) return 'frost';
   if (bed.dryDays >= STALL_DAYS) return 'wilted';
   return bed.dryDays === 2 ? 'dry' : 'fresh';
 }

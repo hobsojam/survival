@@ -8,7 +8,7 @@ import { KEEPSAKES_NEEDED, TRUST_TARGET } from './companion';
 import { FOOD_ITEMS, isFresh, storeTotal, type FoodStore } from './food';
 import { FORAGE, isForage } from './forage';
 import { woodStoreCapacity } from './home';
-import { BED_CROPS } from './beds';
+import { BED_CROPS, MAX_DRY_DAYS } from './beds';
 
 export const SAVE_KEY = 'hearthwild.save';
 const SAVE_VERSION = 22;
@@ -129,9 +129,11 @@ function validBeds({ beds, structures, day }: SaveShape): boolean {
   if (!Array.isArray(beds) || beds.length !== BED_CROPS.length) return false;
   return beds.every(bed => {
     if (!object(bed) || !bool(bed.sown) || !count(bed.grown) || !count(bed.dryDays)) return false;
-    if (bed.grown > BALANCE.cropGrowDays || bed.dryDays > 3) return false;
+    if (bed.grown > BALANCE.cropGrowDays || bed.dryDays > MAX_DRY_DAYS) return false;
     if (bed.wateredDay !== null && !readyBy(bed.wateredDay, day as number)) return false;
     if (!bed.sown) return bed.grown === 0 && bed.dryDays === 0;
+    // A ripe crop never dries out: ripening resets its dryness.
+    if (bed.grown >= BALANCE.cropGrowDays && bed.dryDays > 0) return false;
     return structures.vegetableBeds === true;
   });
 }

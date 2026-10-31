@@ -277,6 +277,7 @@ describe('sleeping through several days at once (Review Focus 4)', () => {
     const four = advanceTime(sowAt(day), 4 * daySeconds, 'resting');
     expect(four.beds[2].sown).toBe(true);
     expect(four.beds[2].dryDays).toBeLessThanOrEqual(2);
+    expect(advanceTime(sowAt(day), 2 * daySeconds, 'resting').beds[2].dryDays).toBe(0);
   });
 });
 
@@ -365,7 +366,7 @@ describe('how the beds look', () => {
     expect(bedSoil(autumn, bed({ dryDays: 3 }))).toBe('wilted');
     expect(bedSoil(winter, bed({ dryDays: 3 }))).toBe('frost');
     expect(bedSoil(winter, bed({ grown: 3 }))).toBe('frost');
-    expect(bedSoil(winter, EMPTY)).toBe('fresh');
+    expect(bedSoil(winter, EMPTY)).toBe('frost');
   });
 
   it('shows a staked site once the ground is clear, and three beds once built', () => {
@@ -378,7 +379,7 @@ describe('how the beds look', () => {
     expect(beds.map(visual => visual.x)).toEqual([-0.9, 0, 0.9].map(dx => Math.round(worldX(SPOT.x + dx))));
     expect(beds.every(visual => visual.y === Math.round(worldY(SPOT.y)))).toBe(true);
     const winter = withBeds(camp(true, { day: 15 }), [bed({ grown: 3 }), bed({ grown: 1, dryDays: 3 }), EMPTY]);
-    expect(textures(winter).map(visual => visual.texture)).toEqual(['vegBed:potatoes-ripe-frost', 'vegBed:beans-growing-frost', 'vegBed:carrots-empty-fresh']);
+    expect(textures(winter).map(visual => visual.texture)).toEqual(['vegBed:potatoes-ripe-frost', 'vegBed:beans-growing-frost', 'vegBed:carrots-empty-frost']);
   });
 
   it('has a drawn frame for every crop, stage and soil', () => {
@@ -418,6 +419,21 @@ describe('the beds panel', () => {
     const winter = withBeds(camp(true, { day: 15 }), [bed(), EMPTY, EMPTY]);
     expect(bedsPanelView(winter).beds[0].label).toBe('Potatoes · Sprouting · Resting under the frost');
   });
+
+  it('calls an empty winter bed resting, never both empty and under the frost', () => {
+    const winter = withBeds(camp(true, { day: 15 }), [bed({ grown: 1 }), EMPTY, EMPTY]);
+    expect(bedsPanelView(winter).beds.map(item => item.label)).toEqual(['Potatoes · Growing · Resting under the frost', 'Beans · Empty, resting for winter', 'Carrots · Empty, resting for winter']);
+  });
+
+  it('says what waters the beds, by season and well', () => {
+    const hint = (built: boolean, day: number) => bedsPanelView(camp(true, { day, structures: { ...camp(true).structures, well: built } })).hint;
+    expect(hint(true, 25)).toContain('a bucket from the well waters them all for the day');
+    expect(hint(true, 35)).toContain('a bucket from the well waters them all for the day');
+    expect(hint(false, 25)).toContain('Rain waters the beds.');
+    expect(hint(false, 25)).not.toContain('well');
+    expect(hint(false, 35)).toContain('No rain falls until spring; a well on the west ground would water them.');
+    expect(hint(false, 35)).not.toContain('!');
+  });
 });
 
 describe('the beds in the save', () => {
@@ -453,6 +469,7 @@ describe('the beds in the save', () => {
     expect(load(one({ grown: 1.5 }))).toBe('invalid');
     expect(load(one({ dryDays: 3 }))).toBe('loaded');
     expect(load(one({ dryDays: 4 }))).toBe('invalid');
+    expect(load(one({ grown: BALANCE.cropGrowDays, dryDays: 1 }))).toBe('invalid');
     expect(load(one({ dryDays: -1 }))).toBe('invalid');
     expect(load(one({ wateredDay: 6 }))).toBe('loaded');
     expect(load(one({ wateredDay: 7 }))).toBe('invalid');
