@@ -8,7 +8,7 @@ import { KEEPSAKES_NEEDED, TRUST_TARGET } from './companion';
 import { FOOD_ITEMS, isFresh, storeTotal, type FoodStore } from './food';
 import { FORAGE, isForage } from './forage';
 import { woodStoreCapacity } from './home';
-import { BED_CROPS, MAX_DRY_DAYS } from './beds';
+import { BED_CROPS, dryLimitsFor } from './beds';
 import { WORKSHOP_UPGRADES, type UpgradeId } from './workshop';
 
 export const SAVE_KEY = 'hearthwild.save';
@@ -69,11 +69,12 @@ function validProgressDependencies(structures: ObjectValue, progress: ObjectValu
   return progress.hearthUnlocked === true || !needsColdNight;
 }
 
-/** Exactly the three upgrades, each a boolean, and none made before the workshop stands. */
+/** Exactly the three upgrades, each a boolean, none made before the workshop stands, and the bed tools only for built beds. */
 function validWorkshop(structures: ObjectValue, progress: ObjectValue): boolean {
   const made = progress.workshop;
   const ids = Object.keys(WORKSHOP_UPGRADES) as UpgradeId[];
   if (!object(made) || Object.keys(made).length !== ids.length || !ids.every(id => bool(made[id]))) return false;
+  if (made.bedTools && !structures.vegetableBeds) return false;
   return structures.workshop === true || !ids.some(id => made[id]);
 }
 
@@ -136,11 +137,13 @@ function validGarden({ gardenPlots, structures, day }: SaveShape): boolean {
 }
 
 /** Three beds, each empty and bare or sown with its growth and dryness in range, watered no later than today, and sown only once the beds are built. */
-function validBeds({ beds, structures, day }: SaveShape): boolean {
-  if (!Array.isArray(beds) || beds.length !== BED_CROPS.length) return false;
+function validBeds({ beds, structures, progress, day }: SaveShape): boolean {
+  if (!Array.isArray(beds) || beds.length !== BED_CROPS.length || !object(progress.workshop)) return false;
+  // The most dry days in a row a bed can show without having withered.
+  const maxDryDays = dryLimitsFor(progress.workshop.bedTools === true).wither - 1;
   return beds.every(bed => {
     if (!object(bed) || !bool(bed.sown) || !count(bed.grown) || !count(bed.dryDays)) return false;
-    if (bed.grown > BALANCE.cropGrowDays || bed.dryDays > MAX_DRY_DAYS) return false;
+    if (bed.grown > BALANCE.cropGrowDays || bed.dryDays > maxDryDays) return false;
     if (bed.wateredDay !== null && !readyBy(bed.wateredDay, day as number)) return false;
     if (!bed.sown) return bed.grown === 0 && bed.dryDays === 0;
     // A ripe crop never dries out: ripening resets its dryness.
