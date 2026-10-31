@@ -393,6 +393,10 @@ export function clearingView(state: GameState): { shown: boolean; sides: Clearin
   if (!marked) return { shown, sides, clear: { ...clear, copy: 'Choose a side to mark its trees for felling.', cost: 'Choose a side first' } };
   const { side, trees, cost } = CLEARING_STEPS[marked];
   const left = trees.length - felled.length;
-  const copy = left > 0 ? `Fell the ${left} marked ${left === 1 ? 'tree' : 'trees'} left on the ${side} side.` : `Ready to clear the ${side} side.`;
+  let copy = `Ready to clear the ${side} side.`;
+  if (left > 0) {
+    const treeWord = left === 1 ? 'tree' : 'trees';
+    copy = `Fell the ${left} marked ${treeWord} left on the ${side} side.`;
+  }
   return { shown, sides, clear: { ...clear, copy, cost: `${cost.wood} wood · ${cost.fiber} fiber` } };
 }

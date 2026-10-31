@@ -135,31 +135,41 @@ function builtTexture(state: GameState, id: (typeof CAMP_STRUCTURES)[number][0])
   return id === 'larder' ? `larder:${stockFrame(storeTotal(state.larder))}` : `${id}:built`;
 }
 
-function addCamp(state: GameState, add: AddVisual): void {
-  const { campX: x, campY: y } = BALANCE;
-  const { structures, progress } = state;
-  let shelterTexture = 'shelterSite:still';
-  if (structures.shelter) {
-    let stage = 'built';
-    if (structures.shelterThatched) stage = 'thatched';
-    if (structures.shelterStonework) stage = 'stonework';
-    if (structures.shelterPorch) stage = 'porch';
-    if (structures.shelterFinished) stage = 'finished';
-    shelterTexture = structures.bed ? `shelter:${stage}Bed` : `shelter:${stage}`;
-  }
+function shelterTexture(state: GameState): string {
+  const { structures } = state;
   // Once the house stands, the bed has gone indoors and the shelter keeps the wood store as a woodshed.
-  if (structures.house) shelterTexture = `woodshed:${woodshedFrame(state)}`;
-  add('shelter', shelterTexture, x - 3, y - 2, structures.shelter ? undefined : GROUND_DECAL_DEPTH);
+  if (structures.house) return `woodshed:${woodshedFrame(state)}`;
+  if (!structures.shelter) return 'shelterSite:still';
+  let stage = 'built';
+  if (structures.shelterThatched) stage = 'thatched';
+  if (structures.shelterStonework) stage = 'stonework';
+  if (structures.shelterPorch) stage = 'porch';
+  if (structures.shelterFinished) stage = 'finished';
+  return structures.bed ? `shelter:${stage}Bed` : `shelter:${stage}`;
+}
+
+function addBuildableStructures(state: GameState, add: AddVisual, x: number, y: number): void {
+  const { structures } = state;
   for (const [id, dx, dy] of CAMP_STRUCTURES) {
     if (groundBlocker(state, id)) continue;
     add(id, structures[id] ? builtTexture(state, id) : `${id}Site:still`, x + dx, y + dy, structures[id] ? undefined : GROUND_DECAL_DEPTH);
   }
-  if (structures.garden) {
-    state.gardenPlots.forEach((plot, index) => {
-      const stage = gardenPlotStage(state, plot);
-      if (stage !== 'empty') add(`garden-plant-${index}`, `gardenPlant:${stage}`, x - 7 + index, y + 3);
-    });
-  }
+}
+
+function addGardenPlants(state: GameState, add: AddVisual, x: number, y: number): void {
+  if (!state.structures.garden) return;
+  state.gardenPlots.forEach((plot, index) => {
+    const stage = gardenPlotStage(state, plot);
+    if (stage !== 'empty') add(`garden-plant-${index}`, `gardenPlant:${stage}`, x - 7 + index, y + 3);
+  });
+}
+
+function addCamp(state: GameState, add: AddVisual): void {
+  const { campX: x, campY: y } = BALANCE;
+  const { structures, progress } = state;
+  add('shelter', shelterTexture(state), x - 3, y - 2, structures.shelter ? undefined : GROUND_DECAL_DEPTH);
+  addBuildableStructures(state, add, x, y);
+  addGardenPlants(state, add, x, y);
   add('logSeat', 'logSeat:still', x - 1, y + 1);
   add('lookout', progress.lookoutRepaired ? 'lookout:restored' : 'lookout:damaged', LOOKOUT.x, LOOKOUT.y);
   add('site-basket', progress.discoveries.basket ? 'oldBasket:empty' : 'oldBasket:full', SITES.basket.x, SITES.basket.y);

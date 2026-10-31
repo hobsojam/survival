@@ -110,6 +110,16 @@ describe('the soundscape', () => {
     expect([birds(), crickets(), quarry()]).toEqual([0, 0.22, 0.72]);
   });
 
+  it('keeps quarry birds quiet despite a friendly bird at spring dawn', () => {
+    const { sound, birds } = setup();
+    const bird = { ...createGame().companion, friend: 'bird' as const, since: 1 };
+    sound.start();
+    sound.update(world({ day: 22, timeOfDay: 10, area: 'quarry', companion: bird }));
+    expect(birds()).toBe(0.16);
+    sound.update(world({ day: 12, timeOfDay: 10, area: 'quarry', companion: bird }));
+    expect(birds()).toBe(0);
+  });
+
   it('lets the wolves howl near a dying fire on winter nights, and silences winter birds', () => {
     const { sound, birds, crickets, wolves } = setup();
     sound.start();

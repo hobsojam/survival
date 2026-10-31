@@ -311,32 +311,12 @@ export class AmbientLife {
   private updateRabbit(rabbit: Rabbit, state: GameState, out: boolean, seconds: number, timeMs: number): void {
     const { image } = rabbit;
     const player = state.player;
-    if (!out && !rabbit.run) {
-      // At dusk a rabbit still in sight hops off home, fading as it goes.
-      if (image.visible && !rabbit.away) {
-        const pose = rabbitAt(rabbit.index, timeMs);
-        const dx = pose.x >= BALANCE.campX ? 1 : -1;
-        rabbit.run = { from: pose, to: { x: pose.x + dx * 4, y: pose.y + 1 }, elapsed: 0, duration: RABBIT_RUN_SECONDS };
-      } else {
-        image.setVisible(false);
-        return;
-      }
-    }
+    if (!out && !rabbit.run && !this.startRabbitDuskRun(rabbit, timeMs)) return;
     if (rabbit.run) {
-      const run = rabbit.run;
-      run.elapsed += seconds;
-      const progress = Math.min(1, run.elapsed / run.duration);
-      this.show(image, lerp(run.from.x, run.to.x, progress), lerp(run.from.y, run.to.y, progress),
-        `rabbit:hop${Math.floor(run.elapsed / 0.1) % 2}`, Math.sign(run.to.x - run.from.x) || 1, Math.min(1, (1 - progress) / 0.3));
-      if (progress >= 1) { rabbit.run = null; rabbit.away = true; rabbit.hiddenSeconds = RABBIT_HIDE_SECONDS; image.setVisible(false); }
+      this.advanceRabbitRun(rabbit, rabbit.run, seconds);
       return;
     }
-    if (rabbit.away) {
-      rabbit.hiddenSeconds = Math.max(0, rabbit.hiddenSeconds - seconds);
-      const home = RABBIT_HOMES[rabbit.index];
-      if (rabbit.hiddenSeconds > 0 || Math.hypot(home.x - player.x, home.y - player.y) <= RABBIT_RETURN_DISTANCE) { image.setVisible(false); return; }
-      rabbit.away = false;
-    }
+    if (rabbit.away && !this.returnRabbit(rabbit, player, seconds)) return;
     const pose = rabbitAt(rabbit.index, timeMs);
     const away = Math.hypot(pose.x - player.x, pose.y - player.y);
     if (away < RABBIT_FLEE_RADIUS) {
@@ -346,6 +326,36 @@ export class AmbientLife {
       return;
     }
     this.show(image, pose.x, pose.y, pose.frame, pose.facing);
+  }
+
+  /** At dusk a visible rabbit hops away from home; one already hidden stays hidden. */
+  private startRabbitDuskRun(rabbit: Rabbit, timeMs: number): boolean {
+    if (!rabbit.image.visible || rabbit.away) { rabbit.image.setVisible(false); return false; }
+    const pose = rabbitAt(rabbit.index, timeMs);
+    const dx = pose.x >= BALANCE.campX ? 1 : -1;
+    rabbit.run = { from: pose, to: { x: pose.x + dx * 4, y: pose.y + 1 }, elapsed: 0, duration: RABBIT_RUN_SECONDS };
+    return true;
+  }
+
+  /** Complete a hop before making the rabbit hide. */
+  private advanceRabbitRun(rabbit: Rabbit, run: Motion, seconds: number): void {
+    run.elapsed += seconds;
+    const progress = Math.min(1, run.elapsed / run.duration);
+    this.show(rabbit.image, lerp(run.from.x, run.to.x, progress), lerp(run.from.y, run.to.y, progress),
+      `rabbit:hop${Math.floor(run.elapsed / 0.1) % 2}`, Math.sign(run.to.x - run.from.x) || 1, Math.min(1, (1 - progress) / 0.3));
+    if (progress >= 1) { rabbit.run = null; rabbit.away = true; rabbit.hiddenSeconds = RABBIT_HIDE_SECONDS; rabbit.image.setVisible(false); }
+  }
+
+  /** Let a hidden rabbit reappear only after its rest and after the survivor moves away. */
+  private returnRabbit(rabbit: Rabbit, player: Point, seconds: number): boolean {
+    rabbit.hiddenSeconds = Math.max(0, rabbit.hiddenSeconds - seconds);
+    const home = RABBIT_HOMES[rabbit.index];
+    if (rabbit.hiddenSeconds > 0 || Math.hypot(home.x - player.x, home.y - player.y) <= RABBIT_RETURN_DISTANCE) {
+      rabbit.image.setVisible(false);
+      return false;
+    }
+    rabbit.away = false;
+    return true;
   }
 
   /** Wolf eyes at the camp edge on winter nights while the fire burns low, fading as it is fed. */
