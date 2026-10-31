@@ -5,7 +5,7 @@ import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/st
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { BED_CROPS, bedSoil, bedStage, drawWaterBlocker, harvestBedBlocker, sowBedBlocker, type BedSoil, type BedStage } from '../game/beds';
 import { workSeconds } from '../game/needs';
-import { hasWoodStore, livesInHouse } from '../game/home';
+import { hasWoodStore, livesInHouse, woodStoreCapacity } from '../game/home';
 import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
 import { WORKSHOP_UPGRADES, upgradeBlocker, type UpgradeId } from '../game/workshop';
 import { logsInStore } from '../game/wood';
@@ -385,6 +385,21 @@ export function larderView(state: GameState): { shown: boolean; stored: string; 
 export function larderMarkup(): string {
   const rows = FOOD_ITEMS.map(item => `<div class="larder-row" data-larder-item="${item}" hidden><span>${LARDER_LABELS[item]} <b id="larder-${item}-count">0</b></span><button type="button" data-action="storeFood" data-item="${item}">Store 1</button><button type="button" data-action="takeFood" data-item="${item}">Take 1</button></div>`).join('');
   return `<div id="larder-controls" class="stone-pile-controls larder-controls" hidden><span id="larder-stored">Stored food 0/${BALANCE.larderCapacity}</span>${rows}</div>`;
+}
+
+export type CampStoreId = 'wood' | 'fiber' | 'stone' | 'cart';
+export interface CampStoresView { shown: boolean; lines: { id: CampStoreId; text: string; shown: boolean }[] }
+
+export function campStoresView(state: GameState): CampStoresView {
+  const { structures } = state;
+  const handcart = state.progress.workshop.handcart;
+  const lines: CampStoresView['lines'] = [
+    { id: 'wood', text: `Wood ${state.storedWood}/${woodStoreCapacity(state)}`, shown: hasWoodStore(state) },
+    { id: 'fiber', text: `Fiber ${state.storedFiber}/${BALANCE.fibreStackCapacity}`, shown: structures.fibreStack },
+    { id: 'stone', text: `Stone ${state.storedStone}/${BALANCE.stonePileCapacity}`, shown: structures.stonePile },
+    { id: 'cart', text: `Cart ${state.cartWood}/${BALANCE.handcartCapacity}`, shown: handcart }
+  ];
+  return { shown: structures.larder || lines.some(line => line.shown), lines };
 }
 
 export interface BuildButtonView { shown: boolean; disabled: boolean; built: boolean; locked: boolean; ready: boolean; description: string; verb: string; price: string }

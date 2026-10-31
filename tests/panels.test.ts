@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from '../src/game/state';
 import { CLEARING_STEPS } from '../src/game/clearing';
-import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishesView, nightHint, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
+import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, campStoresView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishesView, nightHint, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
 import { dishBlocker } from '../src/game/cooking';
 import { addFood, emptyFood } from '../src/game/food';
 import { stock } from './stock';
@@ -318,6 +318,33 @@ describe('the build list shows only what can be built', () => {
       hint: 'Nothing new to build for now. Clear more land or explore to find what comes next.' });
     expect(buildListView(game())).toMatchObject({ empty: false, hint: 'In the clearing — click an upgrade to build.' });
     expect(buildListView(game({}, { area: 'quarry' }))).toMatchObject({ empty: false, hint: 'Stand anywhere in the clearing to build.' });
+  });
+});
+
+describe('the camp stores panel', () => {
+  const shownLines = (state: GameState) => campStoresView(state).lines.filter(line => line.shown).map(({ id, text }) => ({ id, text }));
+  const FINISHED_SHELTER = { shelter: true, shelterThatched: true, shelterStonework: true, shelterPorch: true, shelterFinished: true };
+
+  it('stays hidden on a new game', () => {
+    expect(campStoresView(game()).shown).toBe(false);
+  });
+
+  it('shows only the stores that exist', () => {
+    const state = game({ structures: { stonePile: true } }, { storedStone: 6 });
+    expect(campStoresView(state).shown).toBe(true);
+    expect(shownLines(state)).toEqual([{ id: 'stone', text: 'Stone 6/12' }]);
+  });
+
+  it('counts the whole wood store, the fibre stack and the cart', () => {
+    const base = game({ structures: { ...FINISHED_SHELTER, woodpile: true, house: true, fibreStack: true }, progress: { workshop: { saw: false, handcart: true, bedTools: false } } },
+      { storedWood: 20, storedFiber: 5, cartWood: 3 });
+    expect(shownLines(base)).toEqual([{ id: 'wood', text: 'Wood 20/36' }, { id: 'fiber', text: 'Fiber 5/12' }, { id: 'cart', text: 'Cart 3/12' }]);
+  });
+
+  it('shows for the larder alone, with no store lines', () => {
+    const state = game({ structures: { larder: true } });
+    expect(campStoresView(state).shown).toBe(true);
+    expect(shownLines(state)).toEqual([]);
   });
 });
 

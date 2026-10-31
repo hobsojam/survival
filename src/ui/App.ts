@@ -15,11 +15,12 @@ import { createPause, wirePause, type PauseControl } from './pause';
 import { journalView } from './journal';
 import { renderRegionOverview } from './regionOverview';
 import { currentPage, journalPageView, renderJournalPage, turnPage } from './yearJournal';
-import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListView, type EatableFood, larderMarkup, larderView, clearingView, cloakView, forecastView, bedMarkup, bedsPanelView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
+import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListView, campStoresView, type CampStoreId, type EatableFood, larderMarkup, larderView, clearingView, cloakView, forecastView, bedMarkup, bedsPanelView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
 import type { UpgradeId } from '../game/workshop';
 import { Soundscape } from '../game/soundscape';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
+const STORE_LINES: readonly CampStoreId[] = ['wood', 'fiber', 'stone', 'cart'];
 /** What each Burn or Drop button spends, as a count in the bag; Eat buttons follow the bag view instead. */
 const SUPPLY_COUNTS: Record<string, (inventory: GameState['inventory']) => number> = {
   wood: inventory => inventory.wood,
@@ -64,9 +65,7 @@ export class App {
     const buildMarkup = buildOptions.map(id => {
       const { name, description, symbol } = BUILDINGS[id];
       const groupHeading = id === 'shelterThatched' ? '<h3 id="shelter-upgrades-heading" class="build-group-heading">Shelter upgrades</h3>' : '';
-      let extraControls = '';
-      if (id === 'larder') extraControls = larderMarkup();
-      return groupHeading + `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>` + extraControls;
+      return groupHeading + `<button type="button" class="build-item" data-build="${id}"><span class="build-symbol">${symbol}</span><span class="build-copy"><strong>${name}</strong><small>${description}</small></span><span class="build-cost"><b class="build-verb">Build</b><small class="build-price"></small></span></button>`;
     }).join('');
     const clearingMarkup = (['north', 'east', 'south', 'west'] as const).map(side => `<button type="button" class="build-item" data-clear-side="${side}"><span class="build-copy"><strong></strong><small></small></span></button>`).join('');
     this.root.innerHTML = `
@@ -114,6 +113,7 @@ export class App {
                 <div><span class="supply-icon ration">◇</span><strong id="ration-count">0</strong><small>Rations</small><button type="button" class="supply-action" data-action="eatTrailFood" data-supply="trailFood" aria-label="Eat one trail ration">Eat</button></div>
                 <div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small id="space-label">Carried</small></div>${bagFoodMarkup()}
               </div><p class="keepsake-line" id="pack-hint" hidden></p><p class="keepsake-line" id="keepsake-line" hidden></p><div class="fire-status" id="fire-status">The fire is unlit</div></section>
+              <section class="panel stores-panel" id="stores-panel" data-tab="bag" hidden><p class="eyebrow">CAMP STORES</p><div class="store-lines">${STORE_LINES.map(id => `<p id="store-line-${id}" class="store-line" hidden></p>`).join('')}</div>${larderMarkup()}</section>
               <section class="panel garden-panel" data-tab="camp"><p class="eyebrow">GROW WITH THE SEASONS</p><h2>Berry garden</h2><p class="garden-hint" id="garden-hint"></p><div id="garden-plots"></div></section>
               <section class="panel beds-panel" data-tab="camp" hidden><p class="eyebrow">THE WEST GROUND</p><h2>Vegetable beds</h2><p class="garden-hint" id="beds-hint"></p><div id="bed-list"></div><div class="tool-row" id="draw-water-row" hidden><button type="button" id="draw-water-button" data-action="drawWater">Draw water</button><small id="draw-water-hint"></small></div></section>
               <section class="panel night-panel" data-tab="camp"><p class="eyebrow">AFTER DARK</p><h2>A little time for yourself</h2><p class="night-hint" id="night-hint">These small moments are waiting for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" data-dish="berries" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button>${nightDishMarkup()}</div></section>
@@ -403,12 +403,25 @@ export class App {
     this.setText('stone-stored', bag.storedAtCamp);
     this.setText('wood-stored', bag.woodAtCamp);
     this.setText('fiber-stored', bag.fiberAtCamp);
-    this.renderLarder();
+    this.renderStores();
     this.setText('fire-status', bag.fire);
     const keepsakes = keepsakeView(this.state);
     const keepsakeLine = this.root.querySelector<HTMLElement>('#keepsake-line');
     if (keepsakeLine) keepsakeLine.hidden = !keepsakes.shown;
     this.setText('keepsake-line', `Keepsakes · ${keepsakes.text}`);
+  }
+
+  private renderStores(): void {
+    const view = campStoresView(this.state);
+    const panel = this.root.querySelector<HTMLElement>('#stores-panel');
+    if (panel) panel.hidden = !view.shown;
+    for (const line of view.lines) {
+      const element = this.root.querySelector<HTMLElement>(`#store-line-${line.id}`);
+      if (!element) continue;
+      element.hidden = !line.shown;
+      element.textContent = line.text;
+    }
+    this.renderLarder();
   }
 
   private renderLarder(): void {
