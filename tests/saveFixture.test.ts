@@ -17,6 +17,14 @@ class MemoryStorage implements Storage {
   removeItem(key: string): void { this.data.delete(key); }
 }
 
+/** The fixture's SHA-256, taken when it was frozen. If this test fails, put the file back: never change this hash to match an edit. */
+const FROZEN_SHA256 = '94b8a5643b5716c93277a518dd880b0a2887e90e569889445e6f1f312f5857cb';
+
+async function sha256(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
 const frozen = JSON.parse(FIXTURE) as { version: number; state: GameState };
 
 function load(raw: string = FIXTURE) {
@@ -39,6 +47,10 @@ describe('the frozen version 23 save', () => {
     expect(frozen.state.companion.friend).toBe('fox');
   });
 
+  it('is byte for byte the file that was frozen', async () => {
+    expect(await sha256(FIXTURE), 'save-v23.json was edited. Restore it, and add an upgrade step instead.').toBe(FROZEN_SHA256);
+  });
+
   it('loads', () => {
     expect(load().kind).toBe('loaded');
   });
@@ -58,6 +70,10 @@ describe('the frozen version 23 save', () => {
     expect(state.beds).toEqual(was.beds);
     expect({ friend: state.companion.friend, cloak: state.companion.cloak }).toEqual({ friend: was.companion.friend, cloak: was.companion.cloak });
     expect(state.journal.map(entry => `${entry.year}:${entry.id}`)).toEqual(was.journal.map(entry => `${entry.year}:${entry.id}`));
+  });
+
+  it('keeps everything the camp had: upgrades may only add', () => {
+    expect(loaded()).toMatchObject(frozen.state);
   });
 
   it('saves again in the current format', () => {
