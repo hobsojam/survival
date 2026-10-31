@@ -239,7 +239,7 @@ export function bagFoodMarkup(): string {
 export const EATABLE_FOODS = ['berry', 'trailFood', ...BAG_FOODS.filter(cell => cell.eat).map(cell => cell.item)] as const satisfies readonly FoodItem[];
 export type EatableFood = (typeof EATABLE_FOODS)[number];
 
-export interface BagView { foods: Record<BagFood, { count: number; shown: boolean; note: string }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; packHint: string; prepareReady: boolean; prepareHint: string; pileShown: boolean; storedAtCamp: string; pileStored: string; woodShown: boolean; woodAtCamp: string; woodStored: string; fiberShown: boolean; fiberAtCamp: string; fiberStored: string; fire: string }
+export interface BagView { foods: Record<BagFood, { count: number; shown: boolean; note: string }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; spacesLabel: string; packHint: string; prepareReady: boolean; prepareHint: string; pileShown: boolean; storedAtCamp: string; pileStored: string; woodShown: boolean; woodAtCamp: string; woodStored: string; fiberShown: boolean; fiberAtCamp: string; fiberStored: string; fire: string }
 
 export function bagView(state: GameState): BagView {
   const prepareBlocker = trailFoodBlocker(state);
@@ -259,7 +259,8 @@ export function bagView(state: GameState): BagView {
     foods,
     eatable,
     berries: `Berries ${foodCount(state.inventory.food, 'berry')}${softNote('berry')}`,
-    spaces: `${carriedCount(state)}/${bagCapacity(state)}${state.progress.packWoven ? ' · woven pack' : ''}`,
+    spaces: `${carriedCount(state)}/${bagCapacity(state)}`,
+    spacesLabel: state.progress.packWoven ? 'Carried · woven pack' : 'Carried',
     packHint: state.progress.packWoven ? '' : `Weave a pack at the toolshed to carry ${BALANCE.packCapacity}.`,
     prepareReady: !prepareBlocker,
     prepareHint: prepareBlocker ?? `1 berry · ${workSeconds(state, BALANCE.trailFoodSeconds)} seconds · 1 ration`,

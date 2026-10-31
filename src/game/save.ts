@@ -69,7 +69,7 @@ function validProgressDependencies(structures: ObjectValue, progress: ObjectValu
 /** Flags are booleans, and nothing is unlocked without what unlocks it. */
 function validProgress({ structures, progress, area }: SaveShape): boolean {
   const buildingIds = Object.keys(BUILDINGS) as (keyof typeof BUILDINGS)[];
-  // Exactly the buildings there are: an old save's storage crate is refused.
+  // Exactly the buildings there are, and no others.
   if (Object.keys(structures).length !== buildingIds.length || !buildingIds.every(id => bool(structures[id]))) return false;
   if (!validStructureDependencies(structures)) return false;
   const flags = ['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'pickaxeCrafted', 'potCrafted', 'packWoven'] as const;

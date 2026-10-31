@@ -57,7 +57,7 @@ describe('the woven pack', () => {
     expect(made.state.progress.packWoven).toBe(true);
     expect(made.state.inventory).toMatchObject({ wood: 0, fiber: 0 });
     expect(made.state.timeOfDay).toBe(BALANCE.buildSeconds);
-    expect(made.state.player.energy).toBeLessThanOrEqual(100 - BALANCE.buildEnergyCost);
+    expect(made.state.player.energy).toBe(state.player.energy - BALANCE.buildEnergyCost);
     expect(packBlocker(made.state)).toBe('You already have a woven pack.');
     expect(applyAction(made.state, { type: 'craftPack' }).state).toBe(made.state);
   });
@@ -79,9 +79,11 @@ describe('no storage crate', () => {
 
 describe('the bag line', () => {
   it('names the pack once woven, and hints at it before', () => {
-    expect(bagView(packed(shed(2, 4))).spaces).toBe('6/16 · woven pack');
+    expect(bagView(packed(shed(2, 4))).spaces).toBe('6/16');
+    expect(bagView(packed(shed(2, 4))).spacesLabel).toBe('Carried · woven pack');
     expect(bagView(packed(shed(2, 4))).packHint).toBe('');
     expect(bagView(shed(2, 4)).spaces).toBe('6/8');
+    expect(bagView(shed(2, 4)).spacesLabel).toBe('Carried');
     expect(bagView(shed(2, 4)).packHint).toBe('Weave a pack at the toolshed to carry 16.');
   });
 });
@@ -89,6 +91,14 @@ describe('the bag line', () => {
 describe('the survivor wearing the pack', () => {
   const survivor = sprites.survivor;
   const names = Object.keys(survivor.frames).filter(name => !name.endsWith('Pack'));
+
+  it('leaves no floating pack rim beside the hungry arm', () => {
+    for (const name of ['hungry0Pack', 'hungry1Pack']) {
+      const rows = survivor.frames[name];
+      expect(rows[13][13], name).not.toBe('q');
+      expect(rows[13][14], name).not.toBe('q');
+    }
+  });
 
   it('has a same-sized Pack twin for every frame', () => {
     expect(names.length).toBeGreaterThan(0);

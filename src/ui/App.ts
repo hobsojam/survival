@@ -113,7 +113,7 @@ export class App {
                 <div><span class="supply-icon fiber">≋</span><strong id="fiber-count">0</strong><small>Fiber</small><small id="fiber-stored" class="supply-note"></small><button type="button" class="supply-action" data-action="burnFiber" data-supply="fiber" aria-label="Burn one fiber">Burn</button></div>
                 <div><span class="supply-icon stone">◆</span><strong id="stone-count">0</strong><small>Stone</small><small id="stone-stored" class="supply-note"></small><button type="button" class="supply-action" data-action="dropStone" data-supply="stone" aria-label="Drop one stone">Drop</button></div>
                 <div><span class="supply-icon ration">◇</span><strong id="ration-count">0</strong><small>Rations</small><button type="button" class="supply-action" data-action="eatTrailFood" data-supply="trailFood" aria-label="Eat one trail ration">Eat</button></div>
-                <div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small>Carried</small></div>${bagFoodMarkup()}
+                <div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small id="space-label">Carried</small></div>${bagFoodMarkup()}
               </div><p class="keepsake-line" id="pack-hint" hidden></p><p class="keepsake-line" id="keepsake-line" hidden></p><div class="fire-status" id="fire-status">The fire is unlit</div></section>
               <section class="panel garden-panel" data-tab="camp"><p class="eyebrow">GROW WITH THE SEASONS</p><h2>Berry garden</h2><p class="garden-hint" id="garden-hint"></p><div id="garden-plots"></div></section>
               <section class="panel night-panel" data-tab="camp"><p class="eyebrow">AFTER DARK</p><h2>A little time for yourself</h2><p class="night-hint" id="night-hint">These small moments are waiting for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" data-dish="berries" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button>${nightDishMarkup()}</div></section>
@@ -377,6 +377,7 @@ export class App {
       this.setText(`${item}-note`, bag.foods[item].note);
     }
     this.setText('space-count', bag.spaces);
+    this.setText('space-label', bag.spacesLabel);
     const packHint = this.root.querySelector<HTMLElement>('#pack-hint');
     if (packHint) packHint.hidden = !bag.packHint;
     this.setText('pack-hint', bag.packHint);
