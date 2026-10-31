@@ -1,4 +1,5 @@
 import { settleStores } from '../src/game/stores';
+import { forecastFireCheck } from '../src/game/forecast';
 import { describe, expect, it } from 'vitest';
 import { BALANCE, BUILDINGS, createGame, type GameState } from '../src/game/state';
 import { CLEARING_STEPS, STEP_IDS, clearingReach, inClearing, placeBranches } from '../src/game/clearing';
@@ -165,6 +166,11 @@ describe('the wood store', () => {
     expect(settleStores(away)).toBe(away);
     const bare = withBag(camp(), { wood: 2 });
     expect(settleStores(bare)).toBe(bare);
+  });
+
+  it('asks for carried wood to be brought home for a cold night, now that it stores itself', () => {
+    const away = withBag(housed({}, { area: 'quarry', storedWood: 0, fireplaceFuel: 0 }), { wood: 20 });
+    expect(forecastFireCheck(away)).toMatch(/ · bring the wood you carry home$/);
   });
 
   it('counts the wood store in the bag', () => {
