@@ -56,6 +56,13 @@ export interface BedPanelView { label: string; action: 'sowBed' | 'harvestBed'; 
 /** The Draw water button under the beds: shown once the well stands, with why it is refused as its hint. */
 export interface DrawWaterView { shown: boolean; disabled: boolean; hint: string }
 
+/** How the beds get their water: the well once it stands, otherwise spring rain, or a nudge toward the well. */
+function wateringHint(state: GameState): string {
+  if (state.structures.well) return 'Rain waters the beds, and a bucket from the well waters them all for the day';
+  if (isSpring(state.day)) return 'Rain waters the beds';
+  return 'No rain falls until spring; a well on the west ground would water them';
+}
+
 /** The Vegetable beds panel, once built: a line per bed naming its crop, how far it has grown and how its soil is, with Sow or Harvest, and Draw water once the well stands. */
 export function bedsPanelView(state: GameState): { shown: boolean; hint: string; beds: BedPanelView[]; water: DrawWaterView } {
   const beds = state.beds.map((bed, index) => {
@@ -70,9 +77,7 @@ export function bedsPanelView(state: GameState): { shown: boolean; hint: string;
     const blocker = harvestBedBlocker(state, index);
     return { label, action: 'harvestBed' as const, verb: 'Harvest', disabled: Boolean(blocker), title: blocker ?? `Harvest ${BALANCE.cropYield} vegetables.` };
   });
-  const watering = state.structures.well ? 'Rain waters the beds, and a bucket from the well waters them all for the day'
-    : isSpring(state.day) ? 'Rain waters the beds'
-    : 'No rain falls until spring; a well on the west ground would water them';
+  const watering = wateringHint(state);
   const hint = `Each bed keeps its own seed, so sowing costs nothing. ${watering}. Left dry for a few days, a crop wilts and then withers. A ripe crop waits safely until you harvest it.`;
   const blocker = drawWaterBlocker(state);
   return { shown: state.structures.vegetableBeds, hint, beds, water: { shown: state.structures.well, disabled: Boolean(blocker), hint: blocker ?? '' } };
