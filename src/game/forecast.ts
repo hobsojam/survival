@@ -69,7 +69,7 @@ export function forecastFireCheck(state: GameState): string {
   const { fuel, needed, ready, logsShort, storm } = stormReadiness(state);
   let hint = '';
   if (!ready && logsShort === 0) {
-    if (livesInHouse(state)) hint = ' · store the wood you carry';
+    if (livesInHouse(state)) hint = ' · bring the wood you carry home';
     else if (storm) hint = ' · add carried wood to the fire';
     else if (state.day === plannedNight(state)) hint = ' · add carried wood at nightfall';
     else hint = ' · keep the logs for nightfall';

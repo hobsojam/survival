@@ -80,8 +80,7 @@ describe('the bag across a dawn with the fox\'s gift due', () => {
     expectWithinBag(lateNight({}, {}, 2), { type: 'harvestGarden', plotIndex: 0 });
   });
 
-  it('takes food and wood from their stores without overfilling the bag', () => {
+  it('takes food from the larder without overfilling the bag', () => {
     expectWithinBag(lateNight({ hazelnut: 1 }), { type: 'takeFood', item: 'hazelnut' }, false);
-    expectWithinBag(lateNight({}), { type: 'takeWood' }, false);
   });
 });

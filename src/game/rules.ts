@@ -11,8 +11,9 @@ import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, sp
 import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
 import { BED_CROPS, bedsDawn, drawWaterBlocker, emptyBed, harvestBedBlocker, needsWater, sowBedBlocker } from './beds';
-import { fuelLeft, hasWoodStore, isAtHome, livesInHouse, tendFireplace, woodStoreCapacity } from './home';
+import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
 import { logsInStore } from './wood';
+import { settleStores } from './stores';
 import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, cartSpace, countWord, fellingWood, upgradeBlocker, type UpgradeId } from './workshop';
 import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
 
@@ -34,7 +35,7 @@ export type GameAction =
   | { type: 'storeFood'; item: FoodItem }
   | { type: 'takeFood'; item: FoodItem }
   | { type: 'cook'; dish?: DishId }
-  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'storeStone' | 'takeStone' | 'storeWood' | 'takeWood' | 'unloadCart' | 'storeFiber' | 'takeFiber' | 'befriend' | 'craftPillow' | 'craftCloak' }
+  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' }
   | { type: 'pickUpStone'; pileId: string };
 
 /** Awake time tires the survivor; work already costs energy, and resting doesn't. */
@@ -554,101 +555,6 @@ const visitSite: ActionHandler<'visitSite'> = (state, action) => {
   return { state: found, message: action.siteId === 'basket' ? 'An old basket holds two berries.' : 'You find two useful stones tucked in the cairn.' };
 };
 
-function stonePileBlocker(state: GameState): string | null {
-  if (!state.structures.stonePile) return 'Build a stone pile first.';
-  if (!isInClearing(state)) return 'Return to camp to use the stone pile.';
-  return null;
-}
-
-const storeStone: ActionHandler<'storeStone'> = state => {
-  const blocker = stonePileBlocker(state);
-  if (blocker) return refuse(state, blocker);
-  if (state.inventory.stone < 1) return refuse(state, 'You have no stone to store.');
-  if (state.storedStone >= BALANCE.stonePileCapacity) return refuse(state, 'The stone pile is full.');
-  return { state: { ...state, inventory: { ...state.inventory, stone: state.inventory.stone - 1 }, storedStone: state.storedStone + 1 }, message: 'Stored a stone.' };
-};
-
-const takeStone: ActionHandler<'takeStone'> = state => {
-  const blocker = stonePileBlocker(state);
-  if (blocker) return refuse(state, blocker);
-  if (state.storedStone < 1) return refuse(state, 'The stone pile is empty.');
-  if (freeSpaces(state) < spaceFor('stone')) return refuse(state, FULL_BAG_MESSAGE);
-  return { state: { ...state, inventory: { ...state.inventory, stone: state.inventory.stone + 1 }, storedStone: state.storedStone - 1 }, message: 'Took a stone from the pile.' };
-};
-
-/** The woodpile names the wood store while it stands; with only the house, the woodshed does. */
-function woodStoreName(state: GameState): string {
-  return state.structures.woodpile ? 'woodpile' : 'woodshed';
-}
-
-function woodStoreBlocker(state: GameState): string | null {
-  if (!hasWoodStore(state)) return 'Build a woodpile first.';
-  if (!isInClearing(state)) return `Return to camp to use the ${woodStoreName(state)}.`;
-  return null;
-}
-
-const storeWood: ActionHandler<'storeWood'> = state => {
-  const blocker = woodStoreBlocker(state);
-  if (blocker) return refuse(state, blocker);
-  if (state.inventory.wood < 1) return refuse(state, 'You have no wood to store.');
-  if (state.storedWood >= woodStoreCapacity(state)) return refuse(state, 'The wood store is full.');
-  return { state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood - 1 }, storedWood: state.storedWood + 1 }, message: `Stacked a log on the ${woodStoreName(state)}.` };
-};
-
-/** Why the handcart can't be unloaded into the wood store right now, or null if it can. */
-export function unloadCartBlocker(state: GameState): string | null {
-  if (!state.progress.workshop.handcart) return 'Make a handcart first.';
-  if (!isInClearing(state)) return 'Return to camp to unload the cart.';
-  if (state.cartWood < 1) return 'The cart is empty.';
-  if (!hasWoodStore(state)) return 'Build a woodpile to unload the cart into.';
-  if (state.storedWood >= woodStoreCapacity(state)) return 'The wood store is full.';
-  return null;
-}
-
-const unloadCart: ActionHandler<'unloadCart'> = state => {
-  const blocker = unloadCartBlocker(state);
-  if (blocker) return refuse(state, blocker);
-  const room = woodStoreCapacity(state) - state.storedWood;
-  const moved = Math.min(room, state.cartWood);
-  const left = state.cartWood - moved;
-  return {
-    state: { ...state, cartWood: left, storedWood: state.storedWood + moved },
-    message: left > 0
-      ? `Unloaded ${countWord(moved)} wood. The wood store is full, so ${countWord(left)} ${left === 1 ? 'stays' : 'stay'} in the cart.`
-      : `Unloaded ${countWord(moved)} wood onto the ${woodStoreName(state)}.`
-  };
-};
-
-const takeWood: ActionHandler<'takeWood'> = state => {
-  const blocker = woodStoreBlocker(state);
-  if (blocker) return refuse(state, blocker);
-  if (state.storedWood < 1) return refuse(state, `The ${woodStoreName(state)} is empty.`);
-  if (freeSpaces(state) < spaceFor('wood')) return refuse(state, FULL_BAG_MESSAGE);
-  return { state: { ...state, inventory: { ...state.inventory, wood: state.inventory.wood + 1 }, storedWood: state.storedWood - 1 }, message: `Took a log from the ${woodStoreName(state)}.` };
-};
-
-function fibreStackBlocker(state: GameState): string | null {
-  if (!state.structures.fibreStack) return 'Build a fibre stack first.';
-  if (!isInClearing(state)) return 'Return to camp to use the fibre stack.';
-  return null;
-}
-
-const storeFiber: ActionHandler<'storeFiber'> = state => {
-  const blocker = fibreStackBlocker(state);
-  if (blocker) return refuse(state, blocker);
-  if (state.inventory.fiber < 1) return refuse(state, 'You have no fiber to store.');
-  if (state.storedFiber >= BALANCE.fibreStackCapacity) return refuse(state, 'The fibre stack is full.');
-  return { state: { ...state, inventory: { ...state.inventory, fiber: state.inventory.fiber - 1 }, storedFiber: state.storedFiber + 1 }, message: 'Tucked a bundle of fiber under the thatch.' };
-};
-
-const takeFiber: ActionHandler<'takeFiber'> = state => {
-  const blocker = fibreStackBlocker(state);
-  if (blocker) return refuse(state, blocker);
-  if (state.storedFiber < 1) return refuse(state, 'The fibre stack is empty.');
-  if (freeSpaces(state) < spaceFor('fiber')) return refuse(state, FULL_BAG_MESSAGE);
-  return { state: { ...state, inventory: { ...state.inventory, fiber: state.inventory.fiber + 1 }, storedFiber: state.storedFiber - 1 }, message: 'Took a bundle of fiber from the stack.' };
-};
-
 function larderBlocker(state: GameState): string | null {
   if (!state.structures.larder) return 'Build a larder first.';
   if (!isInClearing(state)) return 'Return to camp to use the larder.';
@@ -1025,12 +931,14 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
 
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
-  storeStone, takeStone, storeWood, takeWood, unloadCart, storeFiber, takeFiber, storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
+  storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
   cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak
 };
 
 export function applyAction(state: GameState, action: GameAction): ActionResult {
   const handler = HANDLERS[action.type] as ActionHandler<GameAction['type']> | undefined;
   if (!handler) return refuse(state, 'That action is not available yet.');
-  return handler(state, action as never);
+  const result = handler(state, action as never);
+  // Anything that moved the survivor or the bag gives the camp stores a chance to take in their materials.
+  return result.state === state ? result : { ...result, state: settleStores(result.state) };
 }

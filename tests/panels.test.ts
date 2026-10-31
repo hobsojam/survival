@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
-import { BALANCE, createGame, type GameState } from '../src/game/state';
+import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from '../src/game/state';
 import { CLEARING_STEPS } from '../src/game/clearing';
-import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishesView, nightHint, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
+import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, campStoresView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishesView, nightHint, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
 import { dishBlocker } from '../src/game/cooking';
 import { addFood, emptyFood } from '../src/game/food';
 import { stock } from './stock';
@@ -251,14 +251,14 @@ describe('bag panel', () => {
 
   it('counts spaces and describes the fire and trail rations', () => {
     const view = bagView(game({ inventory: { wood: 2, stone: 1 } }, { fireFuel: 12.2 }));
-    expect(view).toMatchObject({ spaces: '4/8', fire: 'Fire burning · 13s of warmth', pileShown: false, storedAtCamp: '' });
+    expect(view).toMatchObject({ spaces: '4/8', fire: 'Fire burning · 13s of warmth', storedAtCamp: '' });
     expect(view.prepareReady).toBe(false);
     expect(bagView(game()).fire).toBe('The fire is unlit');
   });
 
   it('shows the stone pile once it is built', () => {
     expect(bagView(game({ structures: { stonePile: true } }, { storedStone: 3 })))
-      .toMatchObject({ pileShown: true, storedAtCamp: '+3 at camp', pileStored: 'Stored stone 3/12' });
+      .toMatchObject({ storedAtCamp: '+3 at camp' });
   });
 
   it('offers trail rations with a drying rack and a berry at camp', () => {
@@ -269,7 +269,7 @@ describe('bag panel', () => {
 
 describe('build buttons', () => {
   it('prices a building and marks it ready when affordable at camp', () => {
-    expect(buildButtonView(game({ inventory: supplies }), 'shelter')).toEqual({ disabled: false, built: false, locked: false, ready: true,
+    expect(buildButtonView(game({ inventory: supplies }), 'shelter')).toEqual({ shown: true, disabled: false, built: false, locked: false, ready: true,
       description: 'A roof against the night cold', verb: 'Build', price: '6 wood · 2 fiber' });
     expect(buildButtonView(game({ inventory: supplies }), 'dryingRack')).toMatchObject({ price: '4 wood', ready: true });
   });
@@ -285,6 +285,66 @@ describe('build buttons', () => {
 
   it('shows built structures as complete', () => {
     expect(buildButtonView(game({ structures: { dryingRack: true } }), 'dryingRack')).toMatchObject({ disabled: true, built: true, locked: false, verb: 'Built', price: 'Complete' });
+  });
+});
+
+describe('the build list shows only what can be built', () => {
+  const ALL = Object.keys(BUILDINGS) as StructureId[];
+  const shownIn = (state: GameState) => ALL.filter(id => buildButtonView(state, id).shown);
+  const SHELTER_UPGRADES = ['shelterThatched', 'shelterStonework', 'shelterPorch', 'shelterFinished'] as const;
+  const everything = Object.fromEntries(ALL.map(id => [id, true])) as Partial<GameState['structures']>;
+
+  it('on a new game, offers the shelter and the buildings that need nothing first', () => {
+    expect(shownIn(game()).sort()).toEqual(['dryingRack', 'garden', 'shelter', 'stonePile', 'windbreak'].sort());
+    for (const id of ['bed', 'toolshed', 'hearth', 'larder', 'house', ...SHELTER_UPGRADES] as const) expect(buildButtonView(game(), id).shown, id).toBe(false);
+  });
+
+  it('hides what is built or waits on cleared ground, and keeps what is only short of materials', () => {
+    expect(buildButtonView(game({ structures: { dryingRack: true } }), 'dryingRack').shown).toBe(false);
+    expect(buildButtonView(game({ inventory: supplies }), 'larder').shown).toBe(false);
+    const short = buildButtonView(game(), 'dryingRack');
+    expect(short).toMatchObject({ shown: true, ready: false });
+  });
+
+  it('shows the shelter upgrades heading only while an upgrade is offered', () => {
+    expect(buildListView(game()).shelterHeading).toBe(false);
+    expect(buildListView(game({ structures: { shelter: true } })).shelterHeading).toBe(true);
+    const finished = Object.fromEntries(['shelter', ...SHELTER_UPGRADES].map(id => [id, true]));
+    expect(buildListView(game({ structures: finished })).shelterHeading).toBe(false);
+  });
+
+  it('says so when there is nothing new to build, and otherwise keeps its usual hint', () => {
+    expect(buildListView(game({ structures: everything }))).toEqual({ shelterHeading: false, empty: true,
+      hint: 'Nothing new to build for now. Clear more land or explore to find what comes next.' });
+    expect(buildListView(game())).toMatchObject({ empty: false, hint: 'In the clearing — click an upgrade to build.' });
+    expect(buildListView(game({}, { area: 'quarry' }))).toMatchObject({ empty: false, hint: 'Stand anywhere in the clearing to build.' });
+  });
+});
+
+describe('the camp stores panel', () => {
+  const shownLines = (state: GameState) => campStoresView(state).lines.filter(line => line.shown).map(({ id, text }) => ({ id, text }));
+  const FINISHED_SHELTER = { shelter: true, shelterThatched: true, shelterStonework: true, shelterPorch: true, shelterFinished: true };
+
+  it('stays hidden on a new game', () => {
+    expect(campStoresView(game()).shown).toBe(false);
+  });
+
+  it('shows only the stores that exist', () => {
+    const state = game({ structures: { stonePile: true } }, { storedStone: 6 });
+    expect(campStoresView(state).shown).toBe(true);
+    expect(shownLines(state)).toEqual([{ id: 'stone', text: 'Stone 6/12' }]);
+  });
+
+  it('counts the whole wood store, the fibre stack and the cart', () => {
+    const base = game({ structures: { ...FINISHED_SHELTER, woodpile: true, house: true, fibreStack: true }, progress: { workshop: { saw: false, handcart: true, bedTools: false } } },
+      { storedWood: 20, storedFiber: 5, cartWood: 3 });
+    expect(shownLines(base)).toEqual([{ id: 'wood', text: 'Wood 20/36' }, { id: 'fiber', text: 'Fiber 5/12' }, { id: 'cart', text: 'Cart 3/12' }]);
+  });
+
+  it('shows for the larder alone, with no store lines', () => {
+    const state = game({ structures: { larder: true } });
+    expect(campStoresView(state).shown).toBe(true);
+    expect(shownLines(state)).toEqual([]);
   });
 });
 
