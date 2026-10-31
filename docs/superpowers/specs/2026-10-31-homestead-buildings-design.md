@@ -71,7 +71,7 @@ Each building uses the existing `ground: StepId` mechanism: it can't be built un
 ### Moving in
 
 - Moving in happens at the first nightfall after the house is built, or when the player first sleeps there. *(Which one is the builder's call. Pick whichever reads as a clear single moment.)*
-- That moment brings a message and a **journal entry**. The wording is the builder's, but the meaning is: *the fireplace inside will keep you warm now, and the campfire is yours to light whenever you like.*
+- That moment brings a message. *(Agreed with the user while planning: the year journal is organised by season, so instead of a one-off moving-in entry, the house adds an autumn entry for a night by the fireplace.)* The original idea was a message and a **journal entry**. The wording is the builder's, but the meaning is: *the fireplace inside will keep you warm now, and the campfire is yours to light whenever you like.*
 - **The shelter becomes the woodshed** at that moment. The shelter sprite is replaced by a woodshed sprite in the same spot, keeping the shelter's footprint. It may keep a hint of what it was.
 - **The bed moves into the house.** It isn't rebuilt, and sleeping and resting happen at the house.
 
