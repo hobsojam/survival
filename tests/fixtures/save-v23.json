@@ -1,0 +1,625 @@
+{
+  "version": 23,
+  "state": {
+    "area": "camp",
+    "day": 47,
+    "timeOfDay": 120,
+    "player": {
+      "x": 21,
+      "y": 14,
+      "energy": 72,
+      "hunger": 64,
+      "warmth": 88
+    },
+    "inventory": {
+      "wood": 3,
+      "fiber": 2,
+      "stone": 1,
+      "food": {
+        "berry": [
+          46,
+          46
+        ],
+        "greens": [],
+        "hazelnut": 0,
+        "honey": 0,
+        "pineNeedles": 0,
+        "roastedHazelnuts": 0,
+        "trailFood": 1,
+        "vegetables": 2
+      }
+    },
+    "fireFuel": 40,
+    "fireplaceFuel": 150,
+    "structures": {
+      "shelter": true,
+      "shelterThatched": true,
+      "shelterStonework": true,
+      "shelterPorch": true,
+      "shelterFinished": true,
+      "bed": true,
+      "hearth": true,
+      "dryingRack": true,
+      "garden": true,
+      "windbreak": true,
+      "stonePile": true,
+      "toolshed": true,
+      "larder": true,
+      "woodpile": true,
+      "fibreStack": true,
+      "vegetableBeds": true,
+      "well": true,
+      "house": true,
+      "workshop": true
+    },
+    "progress": {
+      "nextStormDay": null,
+      "hearthUnlocked": true,
+      "lookoutRepaired": true,
+      "axeCrafted": true,
+      "quarryFound": true,
+      "pickaxeCrafted": true,
+      "potCrafted": true,
+      "packWoven": true,
+      "workshop": {
+        "saw": true,
+        "handcart": true,
+        "bedTools": true
+      },
+      "discoveries": {
+        "basket": true,
+        "spring": true,
+        "cairn": true
+      }
+    },
+    "nodes": [
+      {
+        "id": "branch-0",
+        "kind": "branch",
+        "x": 15,
+        "y": 6,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "branch-1",
+        "kind": "branch",
+        "x": 22,
+        "y": 5,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "branch-2",
+        "kind": "branch",
+        "x": 18,
+        "y": 21,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "branch-3",
+        "kind": "branch",
+        "x": 22,
+        "y": 21,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "branch-4",
+        "kind": "branch",
+        "x": 13,
+        "y": 8,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "branch-5",
+        "kind": "branch",
+        "x": 14,
+        "y": 7,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "branch-6",
+        "kind": "branch",
+        "x": 29,
+        "y": 5,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "branch-7",
+        "kind": "branch",
+        "x": 35,
+        "y": 13,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "branch-8",
+        "kind": "branch",
+        "x": 34,
+        "y": 25,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "branch-9",
+        "kind": "branch",
+        "x": 24,
+        "y": 25,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "branch-10",
+        "kind": "branch",
+        "x": 12,
+        "y": 25,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "branch-11",
+        "kind": "branch",
+        "x": 5,
+        "y": 15,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "berry-0",
+        "kind": "berry",
+        "x": 19,
+        "y": 13,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "berry-1",
+        "kind": "berry",
+        "x": 23,
+        "y": 17,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "berry-2",
+        "kind": "berry",
+        "x": 16,
+        "y": 18,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "berry-3",
+        "kind": "berry",
+        "x": 25,
+        "y": 11,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "berry-4",
+        "kind": "berry",
+        "x": 12,
+        "y": 15,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "berry-5",
+        "kind": "berry",
+        "x": 28,
+        "y": 20,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "berry-6",
+        "kind": "berry",
+        "x": 9,
+        "y": 10,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "berry-7",
+        "kind": "berry",
+        "x": 33,
+        "y": 8,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "fiber-0",
+        "kind": "fiber",
+        "x": 21,
+        "y": 14,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "fiber-1",
+        "kind": "fiber",
+        "x": 17,
+        "y": 19,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "fiber-2",
+        "kind": "fiber",
+        "x": 24,
+        "y": 18,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "fiber-3",
+        "kind": "fiber",
+        "x": 14,
+        "y": 16,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "fiber-4",
+        "kind": "fiber",
+        "x": 27,
+        "y": 12,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "fiber-5",
+        "kind": "fiber",
+        "x": 10,
+        "y": 14,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "fiber-6",
+        "kind": "fiber",
+        "x": 30,
+        "y": 18,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "fiber-7",
+        "kind": "fiber",
+        "x": 8,
+        "y": 21,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "stone-0",
+        "kind": "stone",
+        "x": 31,
+        "y": 10,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "stone-1",
+        "kind": "stone",
+        "x": 11,
+        "y": 22,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "stone-2",
+        "kind": "stone",
+        "x": 29,
+        "y": 21,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "hazel-0",
+        "kind": "hazel",
+        "x": 15,
+        "y": 5,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "hazel-1",
+        "kind": "hazel",
+        "x": 25.5,
+        "y": 5.5,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "hazel-2",
+        "kind": "hazel",
+        "x": 26.75,
+        "y": 6.5,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "pine-0",
+        "kind": "pine",
+        "x": 9.5,
+        "y": 12.5,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "pine-1",
+        "kind": "pine",
+        "x": 23,
+        "y": 5.5,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "pine-2",
+        "kind": "pine",
+        "x": 19.5,
+        "y": 25,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "greens-0",
+        "kind": "greens",
+        "x": 9.5,
+        "y": 17.5,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "greens-1",
+        "kind": "greens",
+        "x": 12.5,
+        "y": 21.5,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "greens-2",
+        "kind": "greens",
+        "x": 27,
+        "y": 22.5,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "greens-3",
+        "kind": "greens",
+        "x": 30.5,
+        "y": 16.5,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "greens-4",
+        "kind": "greens",
+        "x": 12.5,
+        "y": 8,
+        "amount": 1,
+        "readyDay": 1
+      },
+      {
+        "id": "honey-0",
+        "kind": "honey",
+        "x": 16,
+        "y": 6.5,
+        "amount": 1,
+        "readyDay": 1
+      }
+    ],
+    "trees": [
+      {
+        "id": "tree-0",
+        "x": 20,
+        "y": 5,
+        "sprite": "treeBroadleaf",
+        "readyDay": 1
+      },
+      {
+        "id": "tree-1",
+        "x": 17,
+        "y": 9,
+        "sprite": "treeBroadleaf",
+        "readyDay": 1
+      },
+      {
+        "id": "tree-2",
+        "x": 27,
+        "y": 5,
+        "sprite": "treeBroadleaf",
+        "readyDay": 1
+      },
+      {
+        "id": "tree-3",
+        "x": 22,
+        "y": 23,
+        "sprite": "treePine",
+        "readyDay": 1
+      },
+      {
+        "id": "tree-4",
+        "x": 32,
+        "y": 14,
+        "sprite": "treePine",
+        "readyDay": 1
+      },
+      {
+        "id": "tree-5",
+        "x": 15,
+        "y": 24,
+        "sprite": "treePine",
+        "readyDay": 1
+      }
+    ],
+    "stonePiles": [],
+    "gardenPlots": [
+      {
+        "plantedYear": null,
+        "harvestedYear": null,
+        "harvestReady": false
+      },
+      {
+        "plantedYear": null,
+        "harvestedYear": null,
+        "harvestReady": false
+      },
+      {
+        "plantedYear": null,
+        "harvestedYear": null,
+        "harvestReady": false
+      }
+    ],
+    "beds": [
+      {
+        "sown": true,
+        "grown": 3,
+        "dryDays": 0,
+        "wateredDay": null
+      },
+      {
+        "sown": true,
+        "grown": 1,
+        "dryDays": 2,
+        "wateredDay": 44
+      },
+      {
+        "sown": false,
+        "grown": 0,
+        "dryDays": 0,
+        "wateredDay": null
+      }
+    ],
+    "storedStone": 6,
+    "storedWood": 20,
+    "cartWood": 7,
+    "storedFiber": 5,
+    "larder": {
+      "berry": [],
+      "greens": [],
+      "hazelnut": 2,
+      "honey": 0,
+      "pineNeedles": 0,
+      "roastedHazelnuts": 0,
+      "trailFood": 0,
+      "vegetables": 3
+    },
+    "quarryReadyDay": 1,
+    "rubbleReadyDay": 1,
+    "lastWolf": null,
+    "lastSpoiled": null,
+    "cakeBonus": false,
+    "journal": [
+      {
+        "year": 1,
+        "id": "leaves",
+        "day": 2,
+        "variant": 0
+      },
+      {
+        "year": 1,
+        "id": "fox",
+        "day": 5,
+        "variant": 0
+      },
+      {
+        "year": 1,
+        "id": "coldFront",
+        "day": 6,
+        "variant": 0
+      },
+      {
+        "year": 1,
+        "id": "firstSnow",
+        "day": 12,
+        "variant": 0
+      },
+      {
+        "year": 1,
+        "id": "winterFire",
+        "day": 15,
+        "variant": 0
+      },
+      {
+        "year": 1,
+        "id": "rabbits",
+        "day": 23,
+        "variant": 0
+      },
+      {
+        "year": 1,
+        "id": "salad",
+        "day": 27,
+        "variant": 0
+      },
+      {
+        "year": 1,
+        "id": "fireflies",
+        "day": 33,
+        "variant": 0
+      },
+      {
+        "year": 1,
+        "id": "goldEvening",
+        "day": 36,
+        "variant": 0
+      },
+      {
+        "year": 2,
+        "id": "leaves",
+        "day": 41,
+        "variant": 0
+      },
+      {
+        "year": 2,
+        "id": "fireside",
+        "day": 44,
+        "variant": 0
+      }
+    ],
+    "clearing": {
+      "cleared": [
+        "north-near",
+        "north-far",
+        "east-near",
+        "east-far",
+        "west-near",
+        "west-far"
+      ],
+      "marked": null,
+      "felled": []
+    },
+    "companion": {
+      "friend": "fox",
+      "since": 20,
+      "trust": {
+        "bird": 2,
+        "fox": 4,
+        "wolf": 1
+      },
+      "lastOffer": {
+        "bird": 3,
+        "fox": 20,
+        "wolf": 12
+      },
+      "keepsakes": 0,
+      "keepsakeLying": false,
+      "lastFind": 40,
+      "lastGift": 45,
+      "pillow": false,
+      "cloak": true,
+      "alarmDay": 0,
+      "foxFled": 0
+    }
+  }
+}
