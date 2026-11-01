@@ -205,6 +205,7 @@ describe('action feedback', () => {
   it('poses the survivor for gathering, resting, cooking and stargazing', () => {
     expect(actionPose('gather')).toBe('gather');
     expect(actionPose('chopTree')).toBe('gather');
+    expect(actionPose('fish')).toBe('gather');
     expect(actionPose('digQuarry')).toBe('gather');
     expect(actionPose('rest')).toBe('rest');
     expect(actionPose('cook')).toBe('cook');

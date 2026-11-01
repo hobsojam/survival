@@ -135,6 +135,13 @@ describe('each moment of the year', () => {
     expect(written(act({ ...cooking, day: 5, timeOfDay: nightStart(5) + 5 }, { type: 'cook' }), 'winterCooking')).toBe(false);
   });
 
+  it('writes the winter cooking line about the fish when a fish was cooked', () => {
+    const fishing = at(12, nightStart(12) + 5, { fireFuel: 100, inventory: { ...base.inventory, food: { ...emptyFood(), fish: 1 } } });
+    const result = act(fishing, { type: 'cook', dish: 'fish' });
+    expect(result.state.journal).toContainEqual({ year: 1, id: 'winterCooking', day: 12, variant: 1 });
+    expect(result.messages).toContain('Written in your journal: Cooked a fish by the fire, with the snow coming down.');
+  });
+
   it('notes paw prints quietly when a wolf comes to the dark camp', () => {
     const dark = tick(at(12, nightStart(12) + 5, { fireFuel: 0 }));
     expect(written(dark, 'wolfTracks')).toBe(true);
@@ -147,6 +154,11 @@ describe('each moment of the year', () => {
     expect(written(act(spring(12), visit), 'frozenSpring')).toBe(true);
     expect(written(act(spring(22), visit), 'springRest')).toBe(true);
     expect(written(act(spring(22), visit), 'frozenSpring')).toBe(false);
+  });
+
+  it('notes the frozen spring for a survivor who comes to fish it', () => {
+    const fishing = withPlayer(at(12, 60, { progress: { ...base.progress, nextStormDay: null, hearthUnlocked: true, fishingLine: true } }), SITES.spring.x, SITES.spring.y);
+    expect(written(act(fishing, { type: 'fish', roll: 0.9 }), 'frozenSpring')).toBe(true);
   });
 
   it('notes full bushes on a spring pick and a stump growing back at dawn', () => {

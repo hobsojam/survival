@@ -11,7 +11,8 @@ const legend = {
   a: 'hair0', b: 'hair2', c: 'skin1', d: 'skin3', e: 'skin4',
   f: 'coat0', g: 'coat1', h: 'coat2', i: 'coat3', j: 'coat4',
   k: 'scarf1', l: 'scarf3', m: 'scarf4', n: 'canvas1', o: 'canvas2', p: 'canvas3',
-  q: 'wood1', r: 'wood3', s: 'shadow', t: 'frost', u: 'berry2', v: 'berry4'
+  q: 'wood1', r: 'wood3', s: 'shadow', t: 'frost', u: 'berry2', v: 'berry4',
+  w: 'stone4', x: 'canvas4'
 } as const;
 
 type Pose = 'down' | 'up' | 'side';
@@ -149,6 +150,33 @@ function hungry(phase: number): string[] {
   });
 }
 
+/** Pale and slumped, the right hand raised to the mouth; the second frame coughs with the eyes screwed shut. */
+function sick(name: string, phase: number): string[] {
+  return stand(name, 'down', 0, 0, 1, g => {
+    for (let y = 0; y < 12; y++) for (let x = 0; x < 16; x++) {
+      if (g[y][x] === 'd') g[y][x] = 'w';
+      else if (g[y][x] === 'e') g[y][x] = 'x';
+    }
+    box(g, 13, 14, 2, 7, '.'); box(g, 12, 14, 1, 7, 'f');
+    box(g, 10, 11, 3, 3, 'g');
+    box(g, 8 - phase, 10, 2, 2, 'c');
+    if (phase) { box(g, 6, 8, 2, 1, 'a'); box(g, 10, 8, 2, 1, 'a'); }
+  });
+}
+
+/** Lying still on the ground, head to the left, eyes closed: the end of the story. */
+function lying(): string[] {
+  const g = blank();
+  box(g, 1, 21, 15, 1, 's'); box(g, 2, 22, 13, 1, 's');
+  box(g, 1, 15, 6, 6, 'a'); box(g, 2, 16, 4, 4, 'w'); box(g, 3, 16, 2, 2, 'x');
+  box(g, 2, 18, 2, 1, 'a');
+  box(g, 6, 16, 2, 5, 'k'); box(g, 6, 17, 2, 3, 'l');
+  box(g, 8, 16, 6, 5, 'f'); box(g, 8, 17, 6, 3, 'h'); box(g, 9, 18, 4, 1, 'i');
+  box(g, 8, 19, 3, 2, 'g'); box(g, 10, 20, 2, 1, 'c');
+  box(g, 14, 17, 2, 3, 'q'); dot(g, 15, 17, 'r');
+  return g.map(row => row.join(''));
+}
+
 function reaching(): string[] {
   const g = blank();
   box(g, 5, 21, 7, 1, 's'); box(g, 3, 22, 11, 1, 's'); box(g, 5, 23, 7, 1, 's');
@@ -177,7 +205,9 @@ const frames: Record<string, string[]> = {
   shiver0: stand('shiver0', 'down', -1, 0, 1, g => { dot(g, 2, 8, 't'); }),
   shiver1: stand('shiver1', 'down', 1, 0, 1, g => { dot(g, 14, 8, 't'); }),
   tired0: tired('tired0', false), tired1: tired('tired1', true),
-  hungry0: hungry(0), hungry1: hungry(1)
+  hungry0: hungry(0), hungry1: hungry(1),
+  sick0: sick('sick0', 0), sick1: sick('sick1', 1),
+  lying: lying()
 };
 
 /** How each frame wears the pack: its view, how far it is slumped or seated, and its sideways sway. */
@@ -201,20 +231,25 @@ function standingPose(name: string): Pose {
   return 'down';
 }
 
+/** Where the front pack's rim would hang in the air below an arm brought across the body. */
+function bareRim(name: string, lean: number): [number, number][] {
+  return name.startsWith('hungry') || name.startsWith('sick') ? [[13, 13 + lean], [14, 13 + lean]] : [];
+}
+
 // Every frame has a twin with the woven pack on, named `${name}Pack`; the scene picks it once the pack is woven.
 for (const [name, rows] of Object.entries(frames)) {
   const g = rows.map(row => row.split(''));
   const [view, lean, dx] = packFit(name);
-  // The hungry frames bring the right arm across, leaving nothing behind it for the front pack's rim to hang on.
-  wearPack(g, view, lean, dx, name.startsWith('hungry') ? [[13, 13], [14, 13]] : []);
+  // The hungry and sick frames bring the right arm across, leaving nothing behind it for the front pack's rim to hang on.
+  wearPack(g, view, lean, dx, bareRim(name, lean));
   frames[`${name}Pack`] = g.map(row => row.join(''));
 }
 
 const animations: NonNullable<SpriteDef['animations']> = {};
-for (const [name, count] of Object.entries({ idleDown: 2, walkDown: 4, walkUp: 4, walkSide: 4, gather: 2, rest: 2, cook: 2, stargaze: 2, shiver: 2, tired: 2, hungry: 2 })) {
+for (const [name, count] of Object.entries({ idleDown: 2, walkDown: 4, walkUp: 4, walkSide: 4, gather: 2, rest: 2, cook: 2, stargaze: 2, shiver: 2, tired: 2, hungry: 2, sick: 2 })) {
   let frameRate = 4;
   if (name.startsWith('walk')) frameRate = 8;
-  else if (['idleDown', 'shiver', 'tired', 'hungry'].includes(name)) frameRate = 2;
+  else if (['idleDown', 'shiver', 'tired', 'hungry', 'sick'].includes(name)) frameRate = 2;
   animations[name] = { frames: Array.from({ length: count }, (_, index) => `${name}${index}`), frameRate, repeat: name === 'gather' ? 0 : -1 };
 }
 

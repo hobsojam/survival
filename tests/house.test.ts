@@ -6,7 +6,7 @@ import { CLEARING_STEPS, STEP_IDS, clearingReach, inClearing, placeBranches } fr
 import { applyAction, buildStatus, groundBlocker } from '../src/game/rules';
 import { workSeconds } from '../src/game/needs';
 import { HOUSE_SPOT, livesInHouse, woodStoreCapacity } from '../src/game/home';
-import { loadGame, saveGame, SAVE_KEY } from '../src/game/save';
+import { loadGame, saveGame, SAVE_KEY, SAVE_VERSION } from '../src/game/save';
 import { bagView } from '../src/ui/panels';
 import { CAMP_STRUCTURES, sceneVisuals, stockFrame } from '../src/scene/visuals';
 import { PATH_DESTINATIONS, segmentDistance } from './placement';
@@ -210,7 +210,7 @@ describe('the house in the save', () => {
     expect(save(housed(), 22)).toBe('invalid');
     const storage = new MemoryStorage();
     expect(saveGame(storage, housed({ woodpile: true }, { storedWood: 30, fireplaceFuel: 120 })).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(23);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(SAVE_VERSION);
   });
 
   it('holds up to the whole wood store', () => {

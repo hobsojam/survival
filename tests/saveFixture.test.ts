@@ -60,13 +60,14 @@ describe('the frozen version 23 save', () => {
     const was = frozen.state;
     expect(state.day).toBe(was.day);
     expect(state.player).toEqual(was.player);
-    expect(state.inventory).toEqual(was.inventory);
+    // The upgrade to version 24 adds fish to the bag and the larder, and adds nothing else to them.
+    expect(state.inventory).toEqual({ ...was.inventory, food: { ...was.inventory.food, fish: 0 } });
     const built = (structures: GameState['structures']) => Object.entries(structures).filter(([, up]) => up).map(([id]) => id);
     expect(built(state.structures)).toEqual(expect.arrayContaining(built(was.structures)));
     expect(state.progress.workshop).toEqual(was.progress.workshop);
     expect({ cartWood: state.cartWood, storedWood: state.storedWood, storedStone: state.storedStone, storedFiber: state.storedFiber })
       .toEqual({ cartWood: was.cartWood, storedWood: was.storedWood, storedStone: was.storedStone, storedFiber: was.storedFiber });
-    expect(state.larder).toEqual(was.larder);
+    expect(state.larder).toEqual({ ...was.larder, fish: 0 });
     expect(state.beds).toEqual(was.beds);
     expect({ friend: state.companion.friend, cloak: state.companion.cloak }).toEqual({ friend: was.companion.friend, cloak: was.companion.cloak });
     expect(state.journal.map(entry => `${entry.year}:${entry.id}`)).toEqual(was.journal.map(entry => `${entry.year}:${entry.id}`));

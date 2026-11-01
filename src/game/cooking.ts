@@ -8,9 +8,10 @@ import { BALANCE, type GameState } from './state';
 // Cooking at the evening fire. Without the pot it is one berry toasted on a stick; the pot, made at the toolshed,
 // adds tea, salad, roasted nuts, honey cake and, once the well stands, vegetable stew. Every dish is cooked after dark, at camp, at a lit fire.
 
-export type DishId = 'berries' | 'pineTea' | 'salad' | 'roastedHazelnuts' | 'honeyCake' | 'stew';
+export type DishId = 'fish' | 'berries' | 'pineTea' | 'salad' | 'roastedHazelnuts' | 'honeyCake' | 'stew';
 
 export const DISHES: Record<DishId, { name: string; ingredients: Partial<Record<FoodItem, number>>; potOnly: boolean }> = {
+  fish: { name: 'a fish', ingredients: { fish: 1 }, potOnly: false },
   berries: { name: 'a berry', ingredients: { berry: 1 }, potOnly: false },
   pineTea: { name: 'pine needle tea', ingredients: { pineNeedles: 1 }, potOnly: true },
   salad: { name: 'greens and berry salad', ingredients: { greens: 1, berry: 1 }, potOnly: true },
@@ -19,7 +20,7 @@ export const DISHES: Record<DishId, { name: string; ingredients: Partial<Record<
   stew: { name: 'vegetable stew', ingredients: { vegetables: 2 }, potOnly: true }
 };
 
-export const DISH_ORDER: readonly DishId[] = ['berries', 'pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew'];
+export const DISH_ORDER: readonly DishId[] = ['fish', 'berries', 'pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew'];
 
 export const POT_COST = { wood: 1, fiber: 0, stone: 2 } as const;
 
@@ -55,7 +56,7 @@ export function cookBlocker(state: GameState): string | null {
 const FOOD_WORDS: Record<FoodItem, [string, string]> = {
   berry: ['berry', 'berries'], greens: ['greens', 'greens'], hazelnut: ['hazelnut', 'hazelnuts'], honey: ['honey', 'honey'],
   pineNeedles: ['pine needles', 'pine needles'], roastedHazelnuts: ['roasted hazelnuts', 'roasted hazelnuts'], trailFood: ['ration', 'rations'],
-  vegetables: ['vegetable', 'vegetables']
+  vegetables: ['vegetable', 'vegetables'], fish: ['fish', 'fish']
 };
 
 /** An item's name for a count of it: "berry" or "berries". */
@@ -76,9 +77,10 @@ export function spendIngredients(state: GameState, dish: DishId): GameState | nu
 
 /** Why this dish can't be cooked now, or null. Includes cookBlocker's time/place/fire checks. */
 export function dishBlocker(state: GameState, dish: DishId): string | null {
-  if (!DISHES[dish].potOnly) return cookBlocker(state);
+  if (dish === 'berries') return cookBlocker(state);
   if (dish === 'stew' && !state.structures.well) return 'Build the well to cook stew.';
-  if (!state.progress.potCrafted) return 'Make a cooking pot first.';
+  // A fish cooks on a stick at the fire, like a berry: no pot needed.
+  if (DISHES[dish].potOnly && !state.progress.potCrafted) return 'Make a cooking pot first.';
   if (state.timeOfDay < nightStart(state.day)) return 'Cook after nightfall.';
   const fire = cookingFireBlocker(state);
   if (fire) return fire;
@@ -105,6 +107,10 @@ export function packDish(paid: GameState, dish: DishId): GameState {
 export function serveDish(cooked: GameState, dish: DishId, dryingRack: boolean): { state: GameState; message: string } {
   const { player } = cooked;
   switch (dish) {
+    case 'fish': return {
+      state: { ...cooked, player: { ...player, hunger: up(player.hunger, BALANCE.cookedFishHunger), warmth: up(player.warmth, BALANCE.cookWarmthGain) } },
+      message: 'You cook the fish over the fire. A warm, filling meal.'
+    };
     case 'berries': return {
       state: { ...cooked, player: { ...player,
         hunger: up(player.hunger, dryingRack ? BALANCE.rackCookHungerGain : BALANCE.cookHungerGain),

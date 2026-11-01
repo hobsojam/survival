@@ -14,9 +14,12 @@ import { gateTap, nextOpenTab, wireSidebarTabs, type DockTab } from './dock';
 import { createPause, wirePause, type PauseControl } from './pause';
 import { journalView } from './journal';
 import { renderRegionOverview } from './regionOverview';
-import { currentPage, journalPageView, renderJournalPage, turnPage } from './yearJournal';
+import { currentPage, journalPageView, journalText, renderJournalPage, turnPage } from './yearJournal';
+import { GAVE_OUT_MESSAGE } from '../game/sickness';
+import { ENDING_FADE_MS, endingMarkup, endingView, showEnding } from './ending';
+import { browserDownloadDoc, downloadText } from './download';
 import { showBuildList, showCampStores } from './showPanels';
-import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, bedMarkup, bedsPanelView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
+import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
 import type { UpgradeId } from '../game/workshop';
 import { Soundscape } from '../game/soundscape';
 
@@ -45,6 +48,7 @@ export class App {
   private previousSave: LoadResult = { kind: 'empty' };
   private lastSaveAt = 0;
   private saveFailures = 0;
+  private endingTimer?: number;
   private openTab: DockTab | null = null;
   /** The journal page being read, or null to follow the current season. */
   private journalPage: number | null = null;
@@ -67,7 +71,7 @@ export class App {
       <div class="shell">
         <header class="topbar">
           <div class="brand"><span class="brand-icon">✦</span><div><strong>Hearthwild</strong><small>A little place to begin again</small></div></div>
-          <div class="top-actions"><button type="button" id="sound-toggle" class="sound-toggle" aria-pressed="true" aria-label="Mute game sounds" title="Mute game sounds"><span aria-hidden="true">♫</span><span class="sound-toggle-label">Sound on</span></button><button type="button" id="pause-toggle" class="sound-toggle pause-toggle" aria-pressed="false" title="Pause the game (Esc)"><span class="pause-icon" aria-hidden="true">❚❚</span><span class="pause-label">Pause</span></button><span id="save-status" class="save-status">Local save</span><button id="restart-game" class="restart-button" hidden>New game</button><div class="day-pill" id="day-pill"><span id="day-label"><span id="day-season">Autumn</span> · <span id="day-number">Day 1</span><span class="day-phase-part"> · <span id="day-phase">Morning</span></span></span><span id="day-cold" class="day-cold" aria-hidden="true"></span><span class="day-dial" aria-hidden="true"><span id="day-dial-night" class="day-dial-night"></span><span id="day-dial-hand" class="day-dial-hand"></span></span><span id="day-countdown" class="day-countdown"></span></div></div>
+          <div class="top-actions"><button type="button" id="sound-toggle" class="sound-toggle" aria-pressed="true" aria-label="Mute game sounds" title="Mute game sounds"><span aria-hidden="true">♫</span><span class="sound-toggle-label">Sound on</span></button><button type="button" id="pause-toggle" class="sound-toggle pause-toggle" aria-pressed="false" title="Pause the game (Esc)"><span class="pause-icon" aria-hidden="true">❚❚</span><span class="pause-label">Pause</span></button><span id="save-status" class="save-status">Local save</span><button id="restart-game" class="restart-button" hidden>New game</button><div class="day-pill" id="day-pill"><span id="day-label"><span id="day-season">Autumn</span> · <span id="day-number">Day 1</span><span class="day-phase-part"> · <span id="day-phase">Morning</span></span></span><span id="day-cold" class="day-cold" aria-hidden="true"></span><span id="day-winter" class="day-winter"></span><span class="day-dial" aria-hidden="true"><span id="day-dial-night" class="day-dial-night"></span><span id="day-dial-hand" class="day-dial-hand"></span></span><span id="day-countdown" class="day-countdown"></span></div></div>
         </header>
         <div class="layout">
           <main class="game-panel">
@@ -84,9 +88,9 @@ export class App {
             </section>
             <div class="sidebar-tabs" role="tablist" aria-label="Sidebar"><button type="button" role="tab" data-sidebar-button="bag">🎒 Bag</button><button type="button" role="tab" data-sidebar-button="build">🔨 Build</button><button type="button" role="tab" data-sidebar-button="camp">🌙 Camp</button></div>
             <div class="sidebar-pages">
-              <section class="panel forecast-panel" id="forecast-panel" data-tab="camp"><p class="eyebrow">THE FORECAST</p><h2 id="forecast-title">A cold night is coming</h2><p id="forecast-copy" class="forecast-copy"></p><div class="forecast-checks"><span id="forecast-shelter"></span><span id="forecast-fire"></span></div></section>
+              <section class="panel forecast-panel" id="forecast-panel" data-tab="camp"><p class="eyebrow">THE FORECAST</p><h2 id="forecast-title">A cold night is coming</h2><p id="forecast-copy" class="forecast-copy"></p><div class="forecast-checks"><span id="forecast-shelter"></span><span id="forecast-fire"></span><span id="forecast-food"></span></div></section>
               <section class="panel lookout-panel" id="lookout-panel" data-tab="build"><p class="eyebrow">A PLACE BEYOND CAMP</p><h2 id="lookout-title">The old lookout</h2><p id="lookout-copy" class="lookout-copy"></p><button type="button" id="lookout-button" data-action="repairLookout">Repair lookout</button><small id="lookout-cost">4 wood · 2 fiber · 2 stone</small></section>
-              <section class="panel axe-panel" data-tab="build"><p class="eyebrow">FOREST TOOLS</p><div class="tool-row"><h2 id="axe-title">Stone axe</h2><p id="axe-copy" class="lookout-copy"></p><button type="button" id="axe-button" data-action="craftAxe">Craft stone axe</button><small id="axe-cost">1 wood · 1 fiber · 1 stone</small></div><div id="pickaxe-row" class="tool-row" hidden><h2 id="pickaxe-title">Pickaxe</h2><p id="pickaxe-copy" class="lookout-copy"></p><button type="button" id="pickaxe-button" data-action="craftPickaxe">Craft pickaxe</button><small id="pickaxe-cost">2 wood · 1 fiber · 2 stone</small></div><div id="pot-row" class="tool-row"><h2 id="pot-title">Cooking pot</h2><p id="pot-copy" class="lookout-copy"></p><button type="button" id="pot-button" data-action="craftPot">Make a cooking pot</button><small id="pot-cost">1 wood · 2 stone</small></div><div id="pack-row" class="tool-row"><h2 id="pack-title">Woven pack</h2><p id="pack-copy" class="lookout-copy"></p><button type="button" id="pack-button" data-action="craftPack">Weave a pack</button><small id="pack-cost">2 wood · 4 fiber</small></div><div id="pillow-row" class="tool-row" hidden><h2 id="pillow-title">Feather pillow</h2><p id="pillow-copy" class="lookout-copy"></p><button type="button" id="pillow-button" data-action="craftPillow">Stitch a pillow</button><small id="pillow-cost">6 feathers</small></div><div id="cloak-row" class="tool-row" hidden><h2 id="cloak-title">Fur cloak</h2><p id="cloak-copy" class="lookout-copy"></p><button type="button" id="cloak-button" data-action="craftCloak">Make a cloak</button><small id="cloak-cost">6 fur</small></div></section>
+              <section class="panel axe-panel" data-tab="build"><p class="eyebrow">FOREST TOOLS</p><div class="tool-row"><h2 id="axe-title">Stone axe</h2><p id="axe-copy" class="lookout-copy"></p><button type="button" id="axe-button" data-action="craftAxe">Craft stone axe</button><small id="axe-cost">1 wood · 1 fiber · 1 stone</small></div><div id="pickaxe-row" class="tool-row" hidden><h2 id="pickaxe-title">Pickaxe</h2><p id="pickaxe-copy" class="lookout-copy"></p><button type="button" id="pickaxe-button" data-action="craftPickaxe">Craft pickaxe</button><small id="pickaxe-cost">2 wood · 1 fiber · 2 stone</small></div><div id="pot-row" class="tool-row"><h2 id="pot-title">Cooking pot</h2><p id="pot-copy" class="lookout-copy"></p><button type="button" id="pot-button" data-action="craftPot">Make a cooking pot</button><small id="pot-cost">1 wood · 2 stone</small></div><div id="pack-row" class="tool-row"><h2 id="pack-title">Woven pack</h2><p id="pack-copy" class="lookout-copy"></p><button type="button" id="pack-button" data-action="craftPack">Weave a pack</button><small id="pack-cost">2 wood · 4 fiber</small></div><div id="line-row" class="tool-row"><h2 id="line-title">Fishing line</h2><p id="line-copy" class="lookout-copy"></p><button type="button" id="line-button" data-action="makeFishingLine">Make a fishing line</button><small id="line-cost">1 wood · 1 fiber</small></div><div id="pillow-row" class="tool-row" hidden><h2 id="pillow-title">Feather pillow</h2><p id="pillow-copy" class="lookout-copy"></p><button type="button" id="pillow-button" data-action="craftPillow">Stitch a pillow</button><small id="pillow-cost">6 feathers</small></div><div id="cloak-row" class="tool-row" hidden><h2 id="cloak-title">Fur cloak</h2><p id="cloak-copy" class="lookout-copy"></p><button type="button" id="cloak-button" data-action="craftCloak">Make a cloak</button><small id="cloak-cost">6 fur</small></div></section>
               <section class="panel workshop-panel" id="workshop-panel" data-tab="build" hidden><p class="eyebrow">THE WORKSHOP</p><div id="saw-row" class="tool-row"><h2 id="saw-title"></h2><p id="saw-copy" class="lookout-copy"></p><button type="button" id="saw-button" data-upgrade="saw">Make a saw</button><small id="saw-cost"></small></div><div id="handcart-row" class="tool-row"><h2 id="handcart-title"></h2><p id="handcart-copy" class="lookout-copy"></p><button type="button" id="handcart-button" data-upgrade="handcart">Build a handcart</button><small id="handcart-cost"></small></div><div id="bedtools-row" class="tool-row"><h2 id="bedtools-title"></h2><p id="bedtools-copy" class="lookout-copy"></p><button type="button" id="bedtools-button" data-upgrade="bedTools">Make bed tools</button><small id="bedtools-cost"></small></div></section>
               <section class="panel ration-panel" data-tab="bag"><p class="eyebrow">TRAIL FOOD</p><h2>Drying rack</h2><p class="lookout-copy">Dry a berry at camp for a ration you can eat anywhere. Each restores 45 hunger.</p><button type="button" id="prepare-button" data-action="prepareTrailFood">Prepare trail ration</button><small id="prepare-hint">Build a drying rack first.</small></section>
               <section class="panel sites-panel" data-tab="camp"><p class="eyebrow">BEYOND CAMP</p><h2>Follow the paths</h2><p class="lookout-copy">An old basket, a quiet spring, and a stone cairn wait beyond the clearing.</p><button type="button" id="site-button">Explore nearby place</button><small>Stand beside a place and press V</small></section>
@@ -122,11 +126,11 @@ export class App {
           <div class="dock-tabs"><button type="button" data-tab-button="bag">🎒 Bag</button><button type="button" data-tab-button="build">🔨 Build</button><button type="button" data-tab-button="camp">🌙 Camp</button></div>
         </nav>
         <div id="start-screen" class="start-screen"><div class="start-card"><div class="start-mark">✦</div><p class="eyebrow">A SMALL SURVIVAL STORY</p><h1>Make a little place<br>feel like home.</h1><p class="start-copy">Gather what you need, keep a fire glowing, and build a refuge one day at a time.</p><p id="start-note" class="start-note"></p><div class="start-buttons"><button id="continue-game" class="primary-button" hidden>Continue your camp</button><button id="new-game" class="secondary-button">Start a new game</button></div><small>Single player · Saves in this browser</small></div></div>
-        <div id="lookout-ending" class="lookout-ending hidden" role="dialog" aria-modal="true" aria-labelledby="ending-title"><div class="start-card"><div class="start-mark">✦</div><p class="eyebrow">A VIEW FROM ABOVE</p><h1 id="ending-title">A place to call home.</h1><p class="start-copy">The lookout stands again. Beyond your camp, the old quarry lies to the west with stone among its rubble. Your field journal now shows the areas you can explore.</p><div class="start-buttons"><button id="continue-exploring" class="primary-button">Keep exploring</button></div></div></div>
+        <div id="lookout-ending" class="lookout-ending hidden" role="dialog" aria-modal="true" aria-labelledby="ending-title"><div class="start-card"><div class="start-mark">✦</div><p class="eyebrow">A VIEW FROM ABOVE</p><h1 id="ending-title">A place to call home.</h1><p class="start-copy">The lookout stands again. Beyond your camp, the old quarry lies to the west with stone among its rubble. Your field journal now shows the areas you can explore.</p><div class="start-buttons"><button id="continue-exploring" class="primary-button">Keep exploring</button></div></div></div>${endingMarkup()}
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeFood' | 'takeFood' | 'drawWater';
+        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'makeFishingLine' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeFood' | 'takeFood' | 'drawWater';
         const item = button.dataset.item as FoodItem | undefined;
         const dish = button.dataset.dish as DishId | undefined;
         if (type === 'storeFood' || type === 'takeFood') {
@@ -182,6 +186,9 @@ export class App {
       this.root.querySelector('#lookout-ending')?.classList.add('hidden');
       this.game?.scene.resume('GameScene');
     });
+    this.root.querySelector('#download-journal')!.addEventListener('click', () =>
+      downloadText(browserDownloadDoc(document), 'hearthwild-journal.txt', journalText(this.state)));
+    this.root.querySelector('#begin-again')!.addEventListener('click', () => this.beginNewGame());
     window.addEventListener('pagehide', () => { if (this.scene) this.saveCurrent(); });
     document.addEventListener('visibilitychange', () => { if (document.hidden && this.scene) this.saveCurrent(); });
     this.showStartScreen();
@@ -194,6 +201,8 @@ export class App {
     this.game?.destroy(true);
     this.root.querySelector('#start-screen')?.classList.add('hidden');
     this.root.querySelector('#lookout-ending')?.classList.add('hidden');
+    this.root.querySelector('#story-ending')?.classList.add('hidden');
+    window.clearTimeout(this.endingTimer);
     const restart = this.root.querySelector<HTMLButtonElement>('#restart-game');
     if (restart) restart.hidden = false;
     this.setOpenTab(null);
@@ -210,6 +219,7 @@ export class App {
       this.state = next;
       this.soundscape.update(next);
       this.render();
+      if (!previous.ending && next.ending) this.endStory(next, cause === 'action');
       if (cause === 'action' && !previous.progress.lookoutRepaired && next.progress.lookoutRepaired) {
         this.root.querySelector('#lookout-ending')?.classList.remove('hidden');
         this.game?.scene.pause('GameScene');
@@ -262,6 +272,14 @@ export class App {
     this.render();
   }
 
+  /** Sickness has won: the save goes, and once the view has faded the ending card offers the journal and a new start. */
+  private endStory(ended: GameState, byAction: boolean): void {
+    this.saveCurrent();
+    // An action that ended the story already said so; the passing night says it here.
+    if (!byAction) this.setMessage(GAVE_OUT_MESSAGE);
+    this.endingTimer = window.setTimeout(() => showEnding(selector => this.root.querySelector(selector), endingView(ended)), ENDING_FADE_MS);
+  }
+
   private showStartScreen(): void {
     const note = this.root.querySelector<HTMLElement>('#start-note');
     const continueButton = this.root.querySelector<HTMLButtonElement>('#continue-game');
@@ -294,7 +312,8 @@ export class App {
     this.lastSaveAt = Date.now();
     const status = this.root.querySelector<HTMLElement>('#save-status');
     if (result.ok) {
-      this.previousSave = { kind: 'loaded', state: this.state };
+      // An ended story leaves no save behind, so beginning again asks nothing.
+      this.previousSave = this.state.ending ? { kind: 'empty' } : { kind: 'loaded', state: this.state };
       this.saveFailures = 0;
       this.setText('save-status', 'Saved locally');
       status?.removeAttribute('title');
@@ -489,6 +508,7 @@ export class App {
     this.renderActionPanel('pickaxe', pickaxe);
     this.renderActionPanel('pot', potView(this.state));
     this.renderActionPanel('pack', packView(this.state));
+    this.renderActionPanel('line', fishingLineView(this.state));
     for (const [name, view] of [['pillow', pillowView(this.state)], ['cloak', cloakView(this.state)]] as const) {
       const row = this.root.querySelector<HTMLElement>(`#${name}-row`);
       if (row) row.hidden = !view.shown;
@@ -539,6 +559,7 @@ export class App {
     this.setText('forecast-copy', view.copy);
     this.setText('forecast-shelter', view.shelter);
     this.setText('forecast-fire', view.fire);
+    this.setText('forecast-food', view.food);
   }
 
   private renderGarden(): void {

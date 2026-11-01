@@ -61,7 +61,7 @@ describe('the bag across a dawn with the fox\'s gift due', () => {
   });
 
   it.each(DISH_ORDER)('cooks %s from the larder without overfilling the bag', dish => {
-    const state = lateNight({ berry: 1, greens: 1, pineNeedles: 1, hazelnut: 2, honey: 1, vegetables: 2 });
+    const state = lateNight({ berry: 1, greens: 1, pineNeedles: 1, hazelnut: 2, honey: 1, vegetables: 2, fish: 1 });
     expectWithinBag(state, { type: 'cook', dish });
   });
 

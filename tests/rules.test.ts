@@ -1392,8 +1392,10 @@ describe('winter larder', () => {
 
   it('freezes the quiet spring, but still marks it found', () => {
     const result = applyAction(atSpringInWinter, { type: 'visitSite', siteId: 'spring' });
-    expect(result.message).toBe('The spring is frozen over.');
+    expect(result.message).toBe('The spring is frozen over. With a fishing line, you could fish through the ice.');
     expect(result.state.player.energy).toBe(atSpringInWinter.player.energy);
+    const lined = { ...atSpringInWinter, progress: { ...atSpringInWinter.progress, fishingLine: true } };
+    expect(applyAction(lined, { type: 'visitSite', siteId: 'spring' }).message).toBe('The spring is frozen over.');
     expect(result.state.timeOfDay).toBe(atSpringInWinter.timeOfDay);
     expect(result.state.progress.discoveries.spring).toBe(true);
   });

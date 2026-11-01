@@ -86,7 +86,7 @@ function validProgress({ structures, progress, area }: SaveShape): boolean {
   // Exactly the buildings there are, and no others.
   if (Object.keys(structures).length !== buildingIds.length || !buildingIds.every(id => bool(structures[id]))) return false;
   if (!validStructureDependencies(structures)) return false;
-  const flags = ['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'pickaxeCrafted', 'potCrafted', 'packWoven'] as const;
+  const flags = ['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'pickaxeCrafted', 'potCrafted', 'packWoven', 'fishingLine'] as const;
   return flags.every(key => bool(progress[key])) && validWorkshop(structures, progress) && validProgressDependencies(structures, progress, area);
 }
 
@@ -276,10 +276,23 @@ function validCompanion({ companion, day, structures }: SaveShape): boolean {
   return validBefriendedCompanion(companion, day as number, structures);
 }
 
-/** Checks a version 23 save: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, the workshop and its handcart, shelter upgrades, garden plots, vegetable beds, tools, quarry timers, the year journal and companion. */
+/** No more than two empty goes at the ice in a row; well, or sick since a lived day with fewer cared-for and uncared-for days than settle it; a story that has ended, ended on a lived day. */
+function validSickness({ sickness, ending, day, fishingMisses }: SaveShape): boolean {
+  if (!count(fishingMisses) || fishingMisses > BALANCE.fishingMaxMisses) return false;
+  if (!object(sickness) || !finite(sickness.starvedSeconds) || sickness.starvedSeconds < 0) return false;
+  const { sick, sickFromDay, cared, uncared, ateWarm, restedWarm } = sickness;
+  if (!bool(sick) || !bool(ateWarm) || !bool(restedWarm) || !count(cared) || !count(uncared)) return false;
+  const endingOk = ending === null || (object(ending) && whole(ending.day) && ending.day >= 1 && ending.day <= (day as number));
+  if (!endingOk) return false;
+  if (!sick) return sickFromDay === null && cared === 0 && uncared === 0 && !ateWarm && !restedWarm;
+  return whole(sickFromDay) && sickFromDay >= 1 && sickFromDay <= (day as number)
+    && cared < BALANCE.sickDaysToRecover && (uncared < BALANCE.sickDaysToDie || ending !== null);
+}
+
+/** Checks a version 24 save, with the survivor's sickness and whether their story has ended, and: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, the workshop and its handcart, shelter upgrades, garden plots, vegetable beds, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion];
+  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validSickness];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 
@@ -293,6 +306,15 @@ export function autosaveDelayMs(failures: number): number {
 }
 
 export function saveGame(storage: Storage, state: GameState): SaveResult {
+  // A story that has ended is never kept: the camp must not come back on the next visit.
+  if (state.ending) {
+    try {
+      storage.removeItem(SAVE_KEY);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: errorText(error) };
+    }
+  }
   if (!validState(state)) return { ok: false, error: 'The game state is invalid and was not saved.' };
   try {
     storage.setItem(SAVE_KEY, JSON.stringify({ version: SAVE_VERSION, state }));

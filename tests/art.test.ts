@@ -17,7 +17,7 @@ describe('sprite pipeline', () => {
     const survivor = sprites.survivor;
     expect(survivor.size).toEqual([16, 24]);
     expect(survivor.anchor).toEqual([8, 22]);
-    const counts = { idleDown: 2, walkDown: 4, walkUp: 4, walkSide: 4, gather: 2, rest: 2, cook: 2, stargaze: 2, shiver: 2, tired: 2, hungry: 2 };
+    const counts = { idleDown: 2, walkDown: 4, walkUp: 4, walkSide: 4, gather: 2, rest: 2, cook: 2, stargaze: 2, shiver: 2, tired: 2, hungry: 2, sick: 2 };
     for (const [name, count] of Object.entries(counts)) {
       const frameNames = Array.from({ length: count }, (_, index) => `${name}${index}`);
       for (const frame of frameNames) expect(survivor.frames[frame], frame).toBeDefined();
@@ -26,7 +26,7 @@ describe('sprite pipeline', () => {
       expect(animation?.frames, name).toEqual(frameNames.map(frame => ({ key: `survivor:${frame}` })));
       let expectedRate = 4;
       if (name.startsWith('walk')) expectedRate = 8;
-      else if (['idleDown', 'shiver', 'tired', 'hungry'].includes(name)) expectedRate = 2;
+      else if (['idleDown', 'shiver', 'tired', 'hungry', 'sick'].includes(name)) expectedRate = 2;
       expect(animation?.frameRate, name).toBe(expectedRate);
       if (name === 'gather') expect(animation?.repeat).toBe(0);
     }
@@ -192,7 +192,7 @@ describe('sprite pipeline', () => {
 
 describe('food icons', () => {
   it('draws every food on the journal icon grid, each its own picture', () => {
-    expect(Object.keys(FOOD_ICONS).sort()).toEqual(['greens', 'hazelnut', 'honey', 'honeyCake', 'pineNeedles', 'pineTea', 'roastedHazelnuts', 'salad', 'stew', 'vegetables']);
+    expect(Object.keys(FOOD_ICONS).sort()).toEqual(['fish', 'greens', 'hazelnut', 'honey', 'honeyCake', 'pineNeedles', 'pineTea', 'roastedHazelnuts', 'salad', 'stew', 'vegetables']);
     for (const [id, { legend, rows }] of Object.entries(FOOD_ICONS)) {
       expect(rows, id).toHaveLength(JOURNAL_ICON_SIZE);
       for (const row of rows) {
@@ -200,7 +200,7 @@ describe('food icons', () => {
         for (const pixel of row) if (pixel !== '.') expect(legend[pixel], `${id} '${pixel}'`).toBeDefined();
       }
     }
-    expect(new Set(Object.values(FOOD_ICONS).map(icon => icon.rows.join(''))).size).toBe(10);
+    expect(new Set(Object.values(FOOD_ICONS).map(icon => icon.rows.join(''))).size).toBe(11);
   });
 
   it('paints a food icon as a crisp SVG data URL', () => {

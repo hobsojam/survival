@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from '../src/game/state';
 import { CLEARING_STEPS } from '../src/game/clearing';
-import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, campStoresView, cloakView, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishesView, nightHint, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
+import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, campStoresView, cloakView, foodLaidByDays, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishesView, nightHint, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
 import { dishBlocker } from '../src/game/cooking';
 import { addFood, emptyFood } from '../src/game/food';
 import { stock } from './stock';
@@ -130,6 +130,21 @@ describe('night hint', () => {
   });
 });
 
+describe('food laid by for winter', () => {
+  it('counts the days of hunger the kept food in the bag and the larder would fill', () => {
+    expect(foodLaidByDays(game({ inventory: { food: { ...emptyFood(), trailFood: 2, hazelnut: 1 } } }))).toBe(3);
+    expect(foodLaidByDays(game({}, { larder: { ...emptyFood(), trailFood: 20 } }))).toBe(10);
+  });
+
+  it('counts a fish as the cooked meal it makes', () => {
+    expect(foodLaidByDays(game({ inventory: { food: { ...emptyFood(), fish: 2 } } }))).toBe(Math.floor(2 * BALANCE.cookedFishHunger / 30));
+  });
+
+  it('counts neither pine needles nor fresh food', () => {
+    expect(foodLaidByDays(game({ inventory: { food: { ...emptyFood(), pineNeedles: 40, berry: [9, 9, 9, 9, 9, 9], greens: [9, 9, 9] } } }))).toBe(0);
+  });
+});
+
 describe('forecast panel', () => {
   it('names the cold night day ahead of time', () => {
     const view = forecastView(game());
@@ -157,7 +172,7 @@ describe('forecast panel', () => {
     // nightStart(12) is 152, so the night needs (240 - 152) × 2 = 176 s of fire.
     expect(forecastView(winter)).toEqual({ active: false, shown: true, title: 'Winter nights',
       copy: 'Winter nights are bitter. Keep the fire alive until dawn, or the wolves will come close.',
-      shelter: '○ Shelter needed', fire: '○ Fire: 0 / 176s for the night · 2 more logs' });
+      shelter: '○ Shelter needed', fire: '○ Fire: 0 / 176s for the night · 2 more logs', food: '' });
     expect(forecastView({ ...winter, timeOfDay: nightStart(12) + 1 })).toMatchObject({ active: true, title: 'A bitter night' });
   });
 
@@ -173,20 +188,35 @@ describe('forecast panel', () => {
     expect(forecastView(pending).title).toBe('Cold night · day 12');
   });
 
-  it('warns of the bare bushes on autumn days 8 to 10 once no cold night is pending', () => {
+  it('warns that winter is coming on autumn days 8 to 10 once no cold night is pending', () => {
     for (const day of [8, 9, 10]) {
-      const view = forecastView(game({ progress: afterColdNight, inventory: { food: { ...emptyFood(), hazelnut: 2, honey: 1 } } }, { day }));
-      expect(view).toEqual({ active: false, shown: true, title: 'The bushes will soon be bare',
-        copy: 'Berries go soft in a few days, and the bushes stay bare all winter. Dry rations and gather hazelnuts before the snow comes.',
-        shelter: 'Food that keeps: 3', fire: '' });
+      const view = forecastView(game({ progress: afterColdNight, inventory: { food: { ...emptyFood(), trailFood: 2, hazelnut: 1 } } }, { day }));
+      expect(view).toEqual({ active: false, shown: true, title: 'Winter is coming',
+        copy: 'The bushes stay bare all winter. Lay by food that keeps: dry rations and gather hazelnuts. The quiet spring freezes in winter, and a fishing line could see you through.',
+        shelter: '', fire: '', food: '○ Food laid by: enough for 3 of 10 days' });
     }
     expect(forecastView(game({ progress: afterColdNight }, { day: 7 })).shown).toBe(false);
     expect(forecastView(game({ progress: afterColdNight }, { day: 38 })).shown).toBe(false);
   });
 
-  it('counts the larder in the food that keeps, wherever the survivor stands', () => {
+  it('ticks the food laid by once there is enough for the whole winter', () => {
+    const stocked = game({ progress: afterColdNight }, { day: 9, larder: { ...emptyFood(), trailFood: 20 } });
+    expect(forecastView(stocked).food).toBe('✓ Food laid by: enough for 10 of 10 days');
+  });
+
+  it('counts the larder in the food laid by, wherever the survivor stands', () => {
     const away = game({ progress: afterColdNight }, { day: 9, larder: { ...emptyFood(), roastedHazelnuts: 4 }, area: 'quarry' });
-    expect(forecastView(away).shelter).toBe('Food that keeps: 4');
+    expect(forecastView(away).food).toBe('○ Food laid by: enough for 6 of 10 days');
+  });
+
+  it('adds the food laid by to a cold night card in late autumn, and nowhere else', () => {
+    const pending = game({}, { day: 9 });
+    pending.progress.nextStormDay = 9;
+    expect(forecastView(pending).food).toBe('○ Food laid by: enough for 0 of 10 days');
+    const early = game({}, { day: 4 });
+    early.progress.nextStormDay = 5;
+    expect(forecastView(early).food).toBe('');
+    expect(forecastView(game({ progress: afterColdNight }, { day: 12 })).food).toBe('');
   });
 
   it('lets a pending cold night win over the bare-bushes card', () => {
@@ -239,7 +269,7 @@ describe('bag panel', () => {
   });
 
   it('draws each forage cell with its icon, and an Eat button for all but pine needles', () => {
-    expect(BAG_FOODS.map(cell => cell.item)).toEqual(['greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'vegetables']);
+    expect(BAG_FOODS.map(cell => cell.item)).toEqual(['greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'vegetables', 'fish']);
     const markup = bagFoodMarkup();
     for (const { item } of BAG_FOODS) {
       const cell = markup.split('</div>').find(part => part.includes(`data-food="${item}"`))!;
@@ -485,7 +515,7 @@ describe('eating from the bag panel with a larder', () => {
 
   it('enables Eat for food within reach, the larder included in the clearing', () => {
     const view = bagView(atCamp);
-    expect(view.eatable).toEqual({ berry: true, trailFood: true, greens: false, hazelnut: true, honey: false, roastedHazelnuts: false, vegetables: false });
+    expect(view.eatable).toEqual({ berry: true, trailFood: true, greens: false, hazelnut: true, honey: false, roastedHazelnuts: false, vegetables: false, fish: false });
     expect(view.foods.hazelnut).toEqual({ count: 0, shown: true, note: '' });
     expect(view.foods.pineNeedles.shown).toBe(false);
   });
@@ -493,7 +523,7 @@ describe('eating from the bag panel with a larder', () => {
   it('follows the bag alone away from camp', () => {
     const away = { ...atCamp, player: { ...atCamp.player, x: 5, y: 5 }, inventory: { ...atCamp.inventory, food: addFood(emptyFood(), 'honey', 1, 1) } };
     const view = bagView(away);
-    expect(view.eatable).toEqual({ berry: false, trailFood: false, greens: false, hazelnut: false, honey: true, roastedHazelnuts: false, vegetables: false });
+    expect(view.eatable).toEqual({ berry: false, trailFood: false, greens: false, hazelnut: false, honey: true, roastedHazelnuts: false, vegetables: false, fish: false });
     expect(view.foods.hazelnut.shown).toBe(false);
   });
 });

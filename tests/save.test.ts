@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { addFood, emptyFood, type FoodStore } from '../src/game/food';
 import { placeBranches } from '../src/game/clearing';
-import { autosaveDelayMs, loadGame, saveGame, SAVE_KEY } from '../src/game/save';
+import { autosaveDelayMs, loadGame, saveGame, SAVE_KEY, SAVE_VERSION } from '../src/game/save';
 import { carriedCount } from '../src/game/rules';
 import { stock } from './stock';
 
@@ -113,7 +113,7 @@ describe('local save', () => {
     state.nodes.find(node => node.kind === 'fiber')!.amount = 0;
     state.nodes.find(node => node.kind === 'fiber')!.readyDay = 4;
     expect(saveGame(storage, state).ok).toBe(true);
-    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(23);
+    expect(JSON.parse(storage.getItem(SAVE_KEY)!).version).toBe(SAVE_VERSION);
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind === 'loaded') expect(loaded.state).toEqual(state);

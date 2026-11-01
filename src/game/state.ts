@@ -120,6 +120,8 @@ export interface GameState {
   structures: Record<StructureId, boolean>;
   progress: { nextStormDay: number | null; hearthUnlocked: boolean; lookoutRepaired: boolean; axeCrafted: boolean;
     quarryFound: boolean; pickaxeCrafted: boolean; potCrafted: boolean; packWoven: boolean;
+    /** A fishing line, for the frozen spring in winter. */
+    fishingLine: boolean;
     /** The workshop's upgrades, each made once. */
     workshop: Record<UpgradeId, boolean>;
     discoveries: Record<SiteId, boolean> };
@@ -154,6 +156,12 @@ export interface GameState {
   companion: Companion;
   /** How far the camp clearing has been widened, and the step whose trees are being felled. */
   clearing: ClearingState;
+  /** Seconds spent at zero hunger, and the sickness a whole day of them brings: each sick day is judged at dawn. */
+  sickness: { starvedSeconds: number; sick: boolean; sickFromDay: number | null; cared: number; uncared: number; ateWarm: boolean; restedWarm: boolean };
+  /** The day the survivor's story ended, or null while it goes on. */
+  ending: { day: number } | null;
+  /** Goes at the frozen spring that came up empty in a row: the third always catches. */
+  fishingMisses: number;
 }
 
 export const BALANCE = {
@@ -234,6 +242,21 @@ export const BALANCE = {
   hungrySleepCap: 50,
   /** Extra energy lost each second at zero hunger, whatever the survivor is doing. */
   starvingEnergyDrainPerSecond: 0.25,
+  /** A whole day at zero hunger makes the survivor sick; sickness then drains energy and warmth each second. */
+  starvedSecondsToSicken: 240,
+  sickEnergyDrainPerSecond: 0.1,
+  sickWarmthDrainPerSecond: 0.05,
+  /** Cared-for days that make a sick survivor well, and days without care that end the run. */
+  sickDaysToRecover: 2,
+  sickDaysToDie: 3,
+  /** Ice fishing at the frozen spring: each go's seconds, longer when weak; about one go in three comes up empty, never more than two in a row. */
+  fishingSeconds: 30,
+  fishingWeakFactor: 1.5,
+  fishingMissChance: 1 / 3,
+  fishingMaxMisses: 2,
+  /** A fish eaten raw barely helps; cooked at the fire it is a proper meal. */
+  fishHunger: 10,
+  cookedFishHunger: 45,
   fireSecondsPerWood: 90,
   /** Kindling: the same with or without the hearth. */
   fiberFireSeconds: 30,
@@ -330,7 +353,7 @@ export function createGame(): GameState {
     fireplaceFuel: 0,
     structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
-      quarryFound: false, pickaxeCrafted: false, potCrafted: false, packWoven: false,
+      quarryFound: false, pickaxeCrafted: false, potCrafted: false, packWoven: false, fishingLine: false,
       workshop: { saw: false, handcart: false, bedTools: false },
       discoveries: { basket: false, spring: false, cairn: false } },
     nodes,
@@ -352,6 +375,9 @@ export function createGame(): GameState {
     companion: {
       friend: null, since: null, trust: { bird: 0, fox: 0, wolf: 0 }, lastOffer: { bird: 0, fox: 0, wolf: 0 },
       keepsakes: 0, keepsakeLying: false, lastFind: 0, lastGift: 0, pillow: false, cloak: false, alarmDay: 0, foxFled: 0
-    }
+    },
+    sickness: { starvedSeconds: 0, sick: false, sickFromDay: null, cared: 0, uncared: 0, ateWarm: false, restedWarm: false },
+    ending: null,
+    fishingMisses: 0
   };
 }
