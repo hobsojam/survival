@@ -43,7 +43,8 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'wolfTracks', lines: ['Paw prints round the fire this morning.'], silent: true },
     { id: 'frozenSpring', lines: ['The quiet spring had frozen over.'] },
     { id: 'winterFire', lines: ['Kept the fire alive through a whole winter night.'] },
-    { id: 'winterCooking', lines: ['Cooked berries by the fire, with the snow coming down.', 'Cooked a fish by the fire, with the snow coming down.'] },
+    { id: 'winterCooking', lines: ['Cooked berries by the fire, with the snow coming down.', 'Cooked a fish by the fire, with the snow coming down.',
+      'Cooked a warm supper by the fire, with the snow coming down.'] },
     { id: 'pineTea', lines: ['Pine needle tea, hot in the snow.'] }
   ],
   spring: [
@@ -94,6 +95,12 @@ const cooked = (m: Moment, dish: DishId): boolean =>
 /** A visit to the quiet spring, or a go at fishing through its ice. */
 const atSpring = (m: Moment): boolean => ((m.action?.type === 'visitSite' && m.action.siteId === 'spring') || m.action?.type === 'fish') && done(m);
 
+/** Which winter cooking line a meal gets: berries, a fish, or any other supper. */
+function winterMealLine(m: Moment): number {
+  if (cooked(m, 'berries')) return 0;
+  return cooked(m, 'fish') ? 1 : 2;
+}
+
 const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   // Not in the day's first moments, so the morning's own message (a new game, a waking) stays on screen.
   leaves: m => onAfter(m, awake(m) && m.before.timeOfDay >= 30 && isInClearing(m.after) && daylight(m.after)),
@@ -113,8 +120,8 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   // Before lying down, a fire that went out brought a wolf (or the friend's chase); a ration left out says nothing either way.
   winterFire: m => onBefore(m, acted(m, 'sleep') && dawn(m) && isAtHome(m.before) && fuelLeft(m.after) > 0
     && (m.before.lastWolf?.day !== m.before.day || m.before.lastWolf.took === 'offered')),
-  // A fish caught through the ice gets its own line; anything else cooked keeps the berries' one.
-  winterCooking: m => (acted(m, 'cook') ? { day: m.before.day, variant: cooked(m, 'fish') ? 1 : 0 } : null),
+  // A meal cooked in the snow, told by what it was. Tea has a line of its own, and is no meal.
+  winterCooking: m => (acted(m, 'cook') && !cooked(m, 'pineTea') ? { day: m.before.day, variant: winterMealLine(m) } : null),
   firstRain: m => onAfter(m, rainMessage(m.before, m.after) !== null),
   rabbits: m => onAfter(m, awake(m) && m.after.area === 'camp' && daylight(m.after) && RABBIT_HOMES.some(home => within(m.after, home, 4))),
   bushesFull: m => onBefore(m, m.action?.type === 'gather' && done(m) && berries(m.after) > berries(m.before)),

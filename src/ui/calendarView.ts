@@ -90,6 +90,8 @@ export function renderDayPill(root: CalendarRoot, view: DayPillView): void {
   // The pill's class shows the countdown; with no text it stays hidden.
   setText(root, '#day-winter', view.winterIn);
   root.querySelector('#day-pill')?.classList.toggle('winter-soon', view.winterIn !== '');
+  // The countdown wears the same snowflake as the cold night.
+  if (view.winterIn) root.querySelector('#day-winter')?.setAttribute('style', `background-image: url("${journalIconUrl('coldFront')}")`);
   // The snowflake shows on phones too, where the phase's name is hidden for room.
   if (view.cold) root.querySelector('#day-cold')?.setAttribute('style', `background-image: url("${journalIconUrl('coldFront')}")`);
   const hand = root.querySelector('#day-dial-hand');

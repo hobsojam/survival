@@ -67,6 +67,7 @@ describe('the winter warning on the day pill', () => {
     renderDayPill(root, dayPillView(at(9, 0)));
     expect(get('#day-winter').textContent).toBe('Winter in 2 days');
     expect(get('#day-pill').classes.has('winter-soon')).toBe(true);
+    expect(get('#day-winter').attributes.style).toBe(`background-image: url("${journalIconUrl('coldFront')}")`);
     renderDayPill(root, dayPillView(at(11, 0)));
     expect(get('#day-winter').textContent).toBe('');
     expect(get('#day-pill').classes.has('winter-soon')).toBe(false);
