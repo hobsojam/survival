@@ -156,6 +156,11 @@ describe('each moment of the year', () => {
     expect(written(act(spring(22), visit), 'frozenSpring')).toBe(false);
   });
 
+  it('notes the frozen spring for a survivor who comes to fish it', () => {
+    const fishing = withPlayer(at(12, 60, { progress: { ...base.progress, nextStormDay: null, hearthUnlocked: true, fishingLine: true } }), SITES.spring.x, SITES.spring.y);
+    expect(written(act(fishing, { type: 'fish', roll: 0.9 }), 'frozenSpring')).toBe(true);
+  });
+
   it('notes full bushes on a spring pick and a stump growing back at dawn', () => {
     const picking = withPlayer(at(22, 60), 19, 14);
     expect(written(act(picking, { type: 'gather', nodeId: 'berry-0' }), 'bushesFull')).toBe(true);

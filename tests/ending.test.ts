@@ -72,13 +72,18 @@ describe('the journal as text', () => {
 });
 
 describe('downloading the journal', () => {
-  it('makes one named link from the text, clicks it, and lets the address go', () => {
+  it('makes one named link from the text, clicks it, and lets the address go only afterwards', () => {
     const calls: string[] = [];
+    let later: (() => void) | undefined;
     downloadText({
       urlFor: text => { calls.push(`url:${text}`); return 'blob:1'; },
-      createLink: (href, name) => { calls.push(`link:${href}:${name}`); return { click: () => calls.push('click') }; },
-      release: url => calls.push(`release:${url}`)
+      createLink: (href, name) => { calls.push(`link:${href}:${name}`); return { click: () => calls.push('click'), remove: () => calls.push('remove') }; },
+      release: url => calls.push(`release:${url}`),
+      later: run => { later = run; }
     }, 'hearthwild-journal.txt', 'Day 2 · Leaves.');
-    expect(calls).toEqual(['url:Day 2 · Leaves.', 'link:blob:1:hearthwild-journal.txt', 'click', 'release:blob:1']);
+    // Some phone browsers cancel a download whose address is let go at once, so that waits a moment.
+    expect(calls).toEqual(['url:Day 2 · Leaves.', 'link:blob:1:hearthwild-journal.txt', 'click']);
+    later!();
+    expect(calls).toEqual(['url:Day 2 · Leaves.', 'link:blob:1:hearthwild-journal.txt', 'click', 'remove', 'release:blob:1']);
   });
 });

@@ -10,7 +10,10 @@ export type Sickness = GameState['sickness'];
 export const ENDED_MESSAGE = 'Your story has ended.';
 /** Said when the story ends overnight, as it does at the dawn that judges the last sick day. */
 export const GAVE_OUT_MESSAGE = 'Your strength gave out in the night.';
-export const FALLING_ILL_MESSAGE = "You've gone too long without food, and you're falling ill.";
+export const FALLING_ILL_MESSAGE = "You've gone too long without food, and you're falling ill. Eat something warm and rest by the fire to get well.";
+export const BETTER_MESSAGE = 'You feel a little better this morning.';
+export const WORSE_MESSAGE = 'You feel worse this morning. A warm meal and a rest by the fire would help.';
+export const WELL_AGAIN_MESSAGE = "You're well again.";
 
 export function wellSickness(): Sickness {
   return { starvedSeconds: 0, sick: false, sickFromDay: null, cared: 0, uncared: 0, ateWarm: false, restedWarm: false };
@@ -33,7 +36,9 @@ export function sicknessTick(next: GameState, step: number): void {
 export function judgeSickDay(next: GameState, endedDay: number): void {
   const sickness = next.sickness;
   if (!sickness.sick || sickness.sickFromDay === null || sickness.sickFromDay >= endedDay) return;
-  const caredFor = sickness.ateWarm && sickness.restedWarm;
+  // Tea fills no stomach: a day spent starving from dawn to dawn isn't cared for, however warm it was.
+  const starvedAllDay = sickness.starvedSeconds >= BALANCE.starvedSecondsToSicken - 0.000001;
+  const caredFor = sickness.ateWarm && sickness.restedWarm && !starvedAllDay;
   const cared = sickness.cared + (caredFor ? 1 : 0);
   const uncared = sickness.uncared + (caredFor ? 0 : 1);
   if (cared >= BALANCE.sickDaysToRecover) {
@@ -62,4 +67,13 @@ export function markWarmRest(state: GameState): GameState {
 /** The morning-style note when the survivor has just fallen sick, or null. */
 export function fallingIllMessage(before: GameState, after: GameState): string | null {
   return !before.sickness.sick && after.sickness.sick ? FALLING_ILL_MESSAGE : null;
+}
+
+/** The dawn's word on a judged sick day: better, worse, or well again. Nothing when the run has just ended. */
+export function sickDayMessage(before: GameState, after: GameState): string | null {
+  if (!before.sickness.sick || after.ending) return null;
+  if (!after.sickness.sick) return WELL_AGAIN_MESSAGE;
+  if (after.sickness.cared > before.sickness.cared) return BETTER_MESSAGE;
+  if (after.sickness.uncared > before.sickness.uncared) return WORSE_MESSAGE;
+  return null;
 }

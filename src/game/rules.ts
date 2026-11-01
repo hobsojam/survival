@@ -706,9 +706,10 @@ const cook: ActionHandler<'cook'> = (state, action) => {
   const blocker = dishBlocker(state, dish);
   const spent = spendIngredients(state, dish);
   if (blocker || !spent) return refuse(state, blocker ?? 'No food in your bag.');
-  const served = serveDish(advanceTime(packDish(spent, dish), BALANCE.cookSeconds, 'resting'), dish, state.structures.dryingRack);
-  // Roasted nuts are packed for later, not eaten, so only the other dishes are a warm meal.
-  return dish === 'roastedHazelnuts' ? served : { ...served, state: markWarmMeal(served.state) };
+  // Roasted nuts are packed for later, not eaten, so only the other dishes are a warm meal. It counts toward the day
+  // the cooking began, as a rest does, even if the cooking runs on past dawn.
+  const packed = dish === 'roastedHazelnuts' ? packDish(spent, dish) : markWarmMeal(packDish(spent, dish));
+  return serveDish(advanceTime(packed, BALANCE.cookSeconds, 'resting'), dish, state.structures.dryingRack);
 };
 
 /** A honey cake's extra energy for this rest or sleep, if one was eaten. */

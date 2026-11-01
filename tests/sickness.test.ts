@@ -59,8 +59,19 @@ describe('falling sick', () => {
   it('says so, plainly', () => {
     const before = advanceTime(winter(), BALANCE.starvedSecondsToSicken - 1, 'resting');
     const after = advanceTime(before, 1, 'resting');
-    expect(newsBetween(before, after)).toContain("You've gone too long without food, and you're falling ill.");
-    expect(newsBetween(after, advanceTime(after, 1, 'resting'))).not.toContain("You've gone too long without food, and you're falling ill.");
+    expect(newsBetween(before, after)).toContain("You've gone too long without food, and you're falling ill. Eat something warm and rest by the fire to get well.");
+    expect(newsBetween(after, advanceTime(after, 1, 'resting')).some(line => line.includes('falling ill'))).toBe(false);
+  });
+
+  it('says at dawn whether the sick day went well or badly, and when the survivor is well again', () => {
+    const dawnAfter = (sickness: Partial<Sickness>) => {
+      const before = sick(sickness, { timeOfDay: BALANCE.daySeconds - 1 }, { hunger: 40 });
+      return newsBetween(before, advanceTime(before, 2, 'resting'));
+    };
+    expect(dawnAfter({ ateWarm: true, restedWarm: true })).toContain('You feel a little better this morning.');
+    expect(dawnAfter({})).toContain('You feel worse this morning. A warm meal and a rest by the fire would help.');
+    expect(dawnAfter({ cared: 1, ateWarm: true, restedWarm: true })).toContain("You're well again.");
+    expect(dawnAfter({ uncared: 2 }).some(line => line.includes('worse'))).toBe(false);
   });
 
   it('drains energy and warmth on top of everything else', () => {
@@ -100,6 +111,26 @@ describe('judging a sick day at dawn', () => {
     expect(judged({ cared: 1, uncared: 2 }).ending).toEqual({ day: WINTER_DAY });
   });
 
+  it("doesn't count a day spent starving from dawn to dawn, however warm the tea and the rest", () => {
+    const starving = judged({ ateWarm: true, restedWarm: true, starvedSeconds: BALANCE.starvedSecondsToSicken + 100 });
+    expect(starving.sickness).toMatchObject({ cared: 0, uncared: 1 });
+    expect(judged({ ateWarm: true, restedWarm: true, starvedSeconds: BALANCE.starvedSecondsToSicken - 1 }).sickness).toMatchObject({ cared: 1 });
+  });
+
+  it('ends the run for a survivor living on tea alone, warm by the fire every night', () => {
+    const food = addFood(createGame().inventory.food, 'pineNeedles', 20, WINTER_DAY);
+    let state = sick({}, { inventory: { ...createGame().inventory, food }, progress: { ...winter().progress, potCrafted: true } });
+    for (let day = 0; day < 6 && !state.ending; day++) {
+      state = advanceTime(state, nightStart(state.day) + 1 - state.timeOfDay, 'resting');
+      state = { ...state, fireFuel: 300 };
+      const tea = applyAction(state, { type: 'cook', dish: 'pineTea' }).state;
+      expect(tea, 'the tea is made').not.toBe(state);
+      state = applyAction(tea, { type: 'rest' }).state;
+      state = advanceTime(state, BALANCE.daySeconds - state.timeOfDay + 1, 'resting');
+    }
+    expect(state.ending).not.toBeNull();
+  });
+
   it("doesn't judge the day the sickness began", () => {
     const next = structuredClone(sick({ sickFromDay: WINTER_DAY }));
     judgeSickDay(next, WINTER_DAY);
@@ -122,6 +153,15 @@ describe('warm food and warm rest', () => {
     expect(applyAction(stocked, { type: 'cook', dish: 'berries' }).state.sickness.ateWarm).toBe(true);
     expect(applyAction(stocked, { type: 'eat', item: 'berry' }).state.sickness.ateWarm).toBe(false);
     expect(applyAction(stocked, { type: 'cook', dish: 'roastedHazelnuts' }).state.sickness.ateWarm).toBe(false);
+  });
+
+  it('counts a meal cooked in the last seconds before dawn toward the day it was cooked on', () => {
+    const food = addFood(createGame().inventory.food, 'berry', 1, WINTER_DAY);
+    const late = night({ timeOfDay: BALANCE.daySeconds - 3, inventory: { ...createGame().inventory, food },
+      sickness: { ...WELL, sick: true, sickFromDay: WINTER_DAY - 1, restedWarm: true } });
+    const after = applyAction(late, { type: 'cook', dish: 'berries' }).state;
+    expect(after.day).toBe(WINTER_DAY + 1);
+    expect(after.sickness).toMatchObject({ cared: 1, uncared: 0 });
   });
 
   it('counts pine needle tea as warm', () => {

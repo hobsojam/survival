@@ -91,7 +91,8 @@ const gathered = (m: Moment, item: FoodItem): boolean =>
 /** A successful cook of this dish: the one named, or on a bare C press the one C picks, wherever its ingredients were kept. */
 const cooked = (m: Moment, dish: DishId): boolean =>
   m.action?.type === 'cook' && done(m) && (m.action.dish ?? defaultDish(m.before)) === dish;
-const atSpring = (m: Moment): boolean => m.action?.type === 'visitSite' && m.action.siteId === 'spring' && done(m);
+/** A visit to the quiet spring, or a go at fishing through its ice. */
+const atSpring = (m: Moment): boolean => ((m.action?.type === 'visitSite' && m.action.siteId === 'spring') || m.action?.type === 'fish') && done(m);
 
 const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   // Not in the day's first moments, so the morning's own message (a new game, a waking) stays on screen.
