@@ -22,7 +22,8 @@ describe('the ending card', () => {
 
   it('sums up the days lived, the buildings raised and the friend made', () => {
     const base = createGame();
-    const built = Object.fromEntries(Object.keys(base.structures).map((id, index) => [id, index < 12])) as GameState['structures'];
+    const buildings = Object.keys(base.structures).filter(id => !id.startsWith('shelter') || id === 'shelter');
+    const built = Object.fromEntries(Object.keys(base.structures).map(id => [id, buildings.indexOf(id) >= 0 && buildings.indexOf(id) < 12])) as GameState['structures'];
     const withFox = endedOn(46, { structures: built, companion: { ...base.companion, friend: 'fox' } });
     expect(endingView(withFox).summary).toBe('46 days lived · 12 buildings raised · a friend in the fox');
     expect(endingView(endedOn(16)).summary).toBe('16 days lived · 0 buildings raised');
@@ -30,11 +31,18 @@ describe('the ending card', () => {
     expect(endingView(one).summary).toBe('1 day lived · 1 building raised');
   });
 
+  it("counts the shelter's roof, footing, porch and door as the one shelter, not as buildings of their own", () => {
+    const base = createGame();
+    const finished = endedOn(30, { structures: { ...base.structures, shelter: true, shelterThatched: true, shelterStonework: true, shelterPorch: true, shelterFinished: true, bed: true } });
+    expect(endingView(finished).summary).toBe('30 days lived · 2 buildings raised');
+  });
+
   it('is a quiet dialog with the journal to keep and a way to begin again', () => {
     const markup = endingMarkup();
     expect(markup).toContain('role="dialog"');
     expect(markup).toContain('id="download-journal"');
     expect(markup).toContain('id="begin-again"');
+    expect(markup).toContain('>Download your journal</button>');
     expect(markup.toLowerCase()).not.toContain('game over');
   });
 

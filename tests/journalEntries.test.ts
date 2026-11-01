@@ -142,6 +142,15 @@ describe('each moment of the year', () => {
     expect(result.messages).toContain('Written in your journal: Cooked a fish by the fire, with the snow coming down.');
   });
 
+  it('writes a plain winter supper line for a pot dish that is neither berries nor fish', () => {
+    const stew = at(12, nightStart(12) + 5, { fireFuel: 100, structures: { ...base.structures, well: true },
+      progress: { ...base.progress, nextStormDay: null, hearthUnlocked: true, potCrafted: true },
+      inventory: { ...base.inventory, food: { ...emptyFood(), vegetables: 2 } } });
+    const result = act(stew, { type: 'cook', dish: 'stew' });
+    expect(result.state.journal).toContainEqual({ year: 1, id: 'winterCooking', day: 12, variant: 2 });
+    expect(result.messages).toContain('Written in your journal: Cooked a warm supper by the fire, with the snow coming down.');
+  });
+
   it('notes paw prints quietly when a wolf comes to the dark camp', () => {
     const dark = tick(at(12, nightStart(12) + 5, { fireFuel: 0 }));
     expect(written(dark, 'wolfTracks')).toBe(true);
@@ -231,7 +240,8 @@ describe('each moment of the year', () => {
         const tea = act(withLarder(evening(12, {}), { pineNeedles: 1 }), action);
         expect(tea.state.larder.pineNeedles).toBe(0);
         expect(tea.state.journal).toContainEqual({ year: 1, id: 'pineTea', day: 12, variant: 0 });
-        expect(tea.state.journal).toContainEqual({ year: 1, id: 'winterCooking', day: 12, variant: 0 });
+        // Tea has its own line; the winter cooking line is for a meal.
+        expect(tea.state.journal.some(entry => entry.id === 'winterCooking')).toBe(false);
       }
     });
 

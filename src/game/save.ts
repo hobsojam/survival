@@ -305,16 +305,24 @@ export function autosaveDelayMs(failures: number): number {
   return [10000, 10000, 30000][failures] ?? 60000;
 }
 
-export function saveGame(storage: Storage, state: GameState): SaveResult {
-  // A story that has ended is never kept: the camp must not come back on the next visit.
-  if (state.ending) {
+/** Removes the save of an ended story; if the browser won't, writes the ended story over it, which loads as no camp at all. */
+function forgetSave(storage: Storage, state: GameState): SaveResult {
+  try {
+    storage.removeItem(SAVE_KEY);
+    return { ok: true };
+  } catch {
     try {
-      storage.removeItem(SAVE_KEY);
+      storage.setItem(SAVE_KEY, JSON.stringify({ version: SAVE_VERSION, state }));
       return { ok: true };
     } catch (error) {
       return { ok: false, error: errorText(error) };
     }
   }
+}
+
+export function saveGame(storage: Storage, state: GameState): SaveResult {
+  // A story that has ended is never kept: the camp must not come back on the next visit.
+  if (state.ending) return forgetSave(storage, state);
   if (!validState(state)) return { ok: false, error: 'The game state is invalid and was not saved.' };
   try {
     storage.setItem(SAVE_KEY, JSON.stringify({ version: SAVE_VERSION, state }));
@@ -361,5 +369,7 @@ export function loadGame(storage: Storage): LoadResult {
   if (!upgraded.ok) return { kind: 'invalid', reason: upgraded.reason };
   movedBranches(upgraded.state);
   if (!validState(upgraded.state)) return { kind: 'invalid', reason: 'The local save contains invalid game data.' };
+  // A story that has ended is over: its save holds no camp to continue.
+  if (upgraded.state.ending) return { kind: 'empty' };
   return { kind: 'loaded', state: upgraded.state };
 }

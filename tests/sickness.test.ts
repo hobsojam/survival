@@ -4,7 +4,7 @@ import { addFood } from '../src/game/food';
 import { HOUSE_SPOT } from '../src/game/home';
 import { newsBetween } from '../src/game/news';
 import { advanceTime, applyAction } from '../src/game/rules';
-import { loadGame, saveGame, SAVE_KEY } from '../src/game/save';
+import { loadGame, saveGame, SAVE_KEY, SAVE_VERSION } from '../src/game/save';
 import { upgradeSave } from '../src/game/saveUpgrades';
 import { ENDED_MESSAGE, isSick, isWarmRestHere, judgeSickDay } from '../src/game/sickness';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
@@ -229,6 +229,20 @@ describe('saving sickness', () => {
     expect(saveGame(storage, winter()).ok).toBe(true);
     expect(saveGame(storage, { ...sick(), ending: { day: WINTER_DAY } })).toEqual({ ok: true });
     expect(storage.getItem(SAVE_KEY)).toBeNull();
+    expect(loadGame(storage)).toEqual({ kind: 'empty' });
+  });
+
+  it('finds no camp in a save whose story had ended', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: SAVE_VERSION, state: { ...sick({ uncared: 2 }), ending: { day: WINTER_DAY } } }));
+    expect(loadGame(storage)).toEqual({ kind: 'empty' });
+  });
+
+  it('overwrites the save with the ended story when the browser will not remove it, so the camp still never comes back', () => {
+    const storage = new MemoryStorage();
+    expect(saveGame(storage, winter()).ok).toBe(true);
+    storage.removeItem = () => { throw new Error('storage is locked'); };
+    expect(saveGame(storage, { ...sick({ uncared: 2 }), ending: { day: WINTER_DAY } })).toEqual({ ok: true });
     expect(loadGame(storage)).toEqual({ kind: 'empty' });
   });
 });

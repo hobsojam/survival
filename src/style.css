@@ -59,7 +59,7 @@ button:focus-visible { outline: 3px solid #d69c5d; outline-offset: 3px; }
 .game-frame.frosty::after { opacity: 1; }
 .day-countdown { min-width: 86px; font-weight: 600; opacity: .85; }
 /* Autumn's last three days: the pill counts down to winter, on phones too. */
-.day-winter { display: none; flex: none; padding: 2px 7px; border-radius: 999px; background: #e3eef2; color: #34576b; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.day-winter { display: none; flex: none; padding: 2px 7px 2px 23px; border-radius: 999px; background-color: #e3eef2; background-repeat: no-repeat; background-position: 5px center; background-size: 14px 14px; image-rendering: pixelated; color: #34576b; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .day-pill.winter-soon .day-winter { display: inline-block; }
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
 .game-panel, .panel { background: #fffdf7; border: 1px solid #e3e5d9; box-shadow: 0 10px 30px #38503c15, 0 2px 5px #38503c08; }
