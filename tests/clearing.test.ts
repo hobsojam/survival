@@ -149,10 +149,7 @@ describe('the outer ground', () => {
   });
 
   it('takes no wild tree into camp', () => {
-    const withoutNooks = STEP_IDS.filter(id => stepDepth(id) !== 'outer');
-    for (const tree of createGame().trees) {
-      if (!inClearing(tree.x, tree.y, withoutNooks)) expect(inClearing(tree.x, tree.y, STEP_IDS), tree.id).toBe(false);
-    }
+    for (const tree of createGame().trees) expect(inClearing(tree.x, tree.y, STEP_IDS), tree.id).toBe(false);
   });
 
   it('keeps the outer trees clear of the field and the wild grain', () => {

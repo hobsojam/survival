@@ -180,3 +180,29 @@ describe('the version 28 upgrade: the beehive', () => {
     expect(loaded.kind === 'loaded' && [loaded.state.structures.beehive, loaded.state.beehive]).toEqual([false, { honey: 0, nextHoney: null }]);
   });
 });
+
+describe('the version 29 upgrade: the wild tree out of camp', () => {
+  /** A version 28 camp: today's game with the broadleaf still standing on the north far ground. */
+  function version28(readyDay = 1) {
+    const game = createGame();
+    return { ...game, trees: game.trees.map(tree => tree.id === 'tree-1' ? { ...tree, x: 17, y: 9, readyDay } : tree) };
+  }
+
+  it('moves the broadleaf off the north far ground, keeping its stump\'s regrowth', () => {
+    const upgraded = SAVE_UPGRADES[28](structuredClone(version28(30))) as ReturnType<typeof createGame>;
+    expect(upgraded.trees.find(tree => tree.id === 'tree-1')).toEqual({ id: 'tree-1', x: 16, y: 4, sprite: 'treeBroadleaf', readyDay: 30 });
+    expect(upgraded.trees.filter(tree => tree.id !== 'tree-1')).toEqual(createGame().trees.filter(tree => tree.id !== 'tree-1'));
+  });
+
+  it('leaves a camp whose tree has already moved as it was', () => {
+    const current = createGame();
+    expect(SAVE_UPGRADES[28](structuredClone(current))).toEqual(current);
+  });
+
+  it('loads a version 28 camp', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 28, state: version28() }));
+    const loaded = loadGame(storage);
+    expect(loaded.kind === 'loaded' && loaded.state.trees.find(tree => tree.id === 'tree-1')).toMatchObject({ x: 16, y: 4 });
+  });
+});

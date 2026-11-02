@@ -65,7 +65,7 @@ export function fireflyGlow(index: number, timeMs: number, dark: number): number
 /** Where autumn leaves start: two under the crown of each broadleaf tree at camp. */
 export const LEAF_HOMES: (Point & { treeId: string })[] = [
   { x: 19.6, y: 3.6, treeId: 'tree-0' }, { x: 20.8, y: 4.2, treeId: 'tree-0' },
-  { x: 16.6, y: 7.6, treeId: 'tree-1' }, { x: 17.8, y: 8.2, treeId: 'tree-1' },
+  { x: 15.6, y: 2.6, treeId: 'tree-1' }, { x: 16.8, y: 3.2, treeId: 'tree-1' },
   { x: 26.6, y: 3.6, treeId: 'tree-2' }, { x: 27.6, y: 4.2, treeId: 'tree-2' }
 ];
 const LEAF_CYCLE = 9;

@@ -74,10 +74,12 @@ describe('the frozen version 23 save', () => {
   });
 
   it('keeps everything the camp had: upgrades may only add', () => {
-    // The wild grain is added on the end of the nodes; every node the camp had keeps its place.
+    // The wild grain is added on the end of the nodes; every node the camp had keeps its place. The one exception: the
+    // broadleaf that stood on the north far ground moved out into the woods in version 29, keeping its regrowth.
     const { nodes, ...rest } = loaded();
     const { nodes: frozenNodes, ...frozenRest } = frozen.state;
-    expect(rest).toMatchObject(frozenRest);
+    const moved = { ...frozenRest, trees: frozenRest.trees.map((tree: { id: string }) => tree.id === 'tree-1' ? { ...tree, x: 16, y: 4 } : tree) };
+    expect(rest).toMatchObject(moved);
     expect(nodes.slice(0, frozenNodes.length)).toEqual(frozenNodes);
   });
 
