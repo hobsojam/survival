@@ -357,6 +357,14 @@ describe('the build list shows only what can be built', () => {
     expect(buildListView(game())).toMatchObject({ empty: false, hint: 'In the clearing — click an upgrade to build.' });
     expect(buildListView(game({}, { area: 'quarry' }))).toMatchObject({ empty: false, hint: 'Stand anywhere in the clearing to build.' });
   });
+
+  it('points to the workshop while ripe grain waits for a sickle and flail', () => {
+    const ripe = withField({ ...fieldCamp(), day: 36 }, { strips: [strip({ sownDay: 22 }), strip(), strip(), strip()] });
+    expect(buildListView(ripe).hint).toMatch(/ Ripe grain is waiting\. Make a sickle and flail at the workshop\.$/);
+    const tooled = { ...ripe, progress: { ...ripe.progress, workshop: { ...ripe.progress.workshop, harvestTools: true } } };
+    expect(buildListView(tooled).hint).not.toContain('Ripe grain');
+    expect(buildListView({ ...ripe, day: 33 }).hint).not.toContain('Ripe grain');
+  });
 });
 
 describe('the camp stores panel', () => {

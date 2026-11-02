@@ -578,6 +578,10 @@ export function buildButtonView(state: GameState, id: StructureId): BuildButtonV
 
 const SHELTER_UPGRADES: readonly StructureId[] = ['shelterThatched', 'shelterStonework', 'shelterPorch', 'shelterFinished'];
 
+/** Whether a gold strip stands in the field with no sickle and flail made to bring it in. */
+const ripeGrainWaitsForTools = (state: GameState): boolean => state.structures.field && !state.progress.workshop.harvestTools
+  && state.field.strips.some(strip => stripStage(strip, state.day) === 'gold');
+
 export interface BuildListView { shelterHeading: boolean; empty: boolean; hint: string }
 
 export function buildListView(state: GameState): BuildListView {
@@ -586,6 +590,7 @@ export function buildListView(state: GameState): BuildListView {
   let hint = isInClearing(state) ? 'In the clearing — click an upgrade to build.' : 'Stand anywhere in the clearing to build.';
   if (empty) hint = 'Nothing new to build for now. Clear more land or explore to find what comes next.';
   if (empty && STEP_IDS.every(id => state.clearing.cleared.includes(id))) hint = 'No structures left to build.';
+  if (ripeGrainWaitsForTools(state)) hint += ' Ripe grain is waiting. Make a sickle and flail at the workshop.';
   return { shelterHeading: SHELTER_UPGRADES.some(id => shown.includes(id)), empty, hint };
 }
 
