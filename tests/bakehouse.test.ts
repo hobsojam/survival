@@ -6,6 +6,7 @@ import { bakeryNews, millGrainBlocker, milledFlour, takeLoafBlocker } from '../s
 import { newsBetween } from '../src/game/news';
 import { addFood, availableFood, emptyFood, reachableMillFlour, spendFood } from '../src/game/food';
 import { dishBlocker } from '../src/game/cooking';
+import { bakeryPanelView, foodLaidByDays, windmillPanelView } from '../src/ui/panels';
 import { nightStart } from '../src/game/calendar';
 import { TOO_TIRED_MESSAGE, workSeconds } from '../src/game/needs';
 import { bakehouseCamp } from './bakehouseCamp';
@@ -213,5 +214,27 @@ describe('taking a loaf', () => {
   it('lets a four-day-old loaf taken into the bag go soft at the next dawn, by the bag\'s rule', () => {
     const taken = applyAction(bakehouseCamp({ shelf: [19], lastBaked: 19 }), { type: 'takeLoaf' }).state;
     expect(acrossDawn(taken).inventory.food.bread).toEqual([]);
+  });
+});
+
+describe('the windmill and bakery panels', () => {
+  it('shows the mill\'s flour and why milling waits', () => {
+    expect(windmillPanelView(bakehouseCamp({ millFlour: 3, grain: 6 }))).toEqual({ shown: true, stored: '3 of 8 flour', mill: { disabled: false, hint: '' } });
+    expect(windmillPanelView(bakehouseCamp({ grain: 1 })).mill).toEqual({ disabled: true, hint: 'There isn\'t enough grain in the granary to mill.' });
+    expect(windmillPanelView(bakehouseCamp({ windmill: false })).shown).toBe(false);
+  });
+
+  it('shows the loaves on the shelf, one going soft, and the take button', () => {
+    expect(bakeryPanelView(bakehouseCamp({ shelf: [22], lastBaked: 22 }))).toEqual({ shown: true, shelf: '1 of 2 loaves on the shelf', note: '', take: { disabled: false, hint: '' } });
+    expect(bakeryPanelView(bakehouseCamp({ shelf: [18, 22], lastBaked: 22 }))).toMatchObject({ shelf: '2 of 2 loaves on the shelf', note: '(1 going soft)' });
+    expect(bakeryPanelView(bakehouseCamp()).take).toEqual({ disabled: true, hint: 'There\'s no loaf on the shelf yet.' });
+    expect(bakeryPanelView(bakehouseCamp({ bakery: false })).shown).toBe(false);
+  });
+
+  it('counts the mill\'s flour and the shelf\'s loaves as food laid by', () => {
+    expect(foodLaidByDays(bakehouseCamp())).toBe(0);
+    expect(foodLaidByDays(bakehouseCamp({ millFlour: 4, shelf: [22, 22], lastBaked: 22 }))).toBe(10);
+    expect(foodLaidByDays(bakehouseCamp({ millFlour: 1 }))).toBe(1);
+    expect(foodLaidByDays(bakehouseCamp({ shelf: [22], lastBaked: 22 }))).toBe(1);
   });
 });

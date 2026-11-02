@@ -1,6 +1,7 @@
 import { cutStripBlocker, grindGrainBlocker, sowStripBlocker, stripStage, threshStripBlocker, type StripStage } from '../game/field';
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isWinter, nightStart, season } from '../game/calendar';
-import { FOOD_ITEMS, availableFood, foodCount, goingSoft, isFresh, storeTotal, type FoodItem, type KeptFood } from '../game/food';
+import { millGrainBlocker, takeLoafBlocker } from '../game/bakehouse';
+import { FOOD_ITEMS, availableFood, emptyFood, foodCount, goingSoft, isFresh, storeTotal, type FoodItem, type KeptFood } from '../game/food';
 import { foodIconUrl } from '../art/foodIcons';
 import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
@@ -143,6 +144,29 @@ export function granaryPanelView(state: GameState): { shown: boolean; stored: st
     stored: `${grain} of ${BALANCE.granaryCapacity} grain`,
     seed: seedLine,
     grind: { shown: state.progress.workshop.quern, disabled: Boolean(blocker), hint: blocker ?? '' }
+  };
+}
+
+/** The Windmill panel, once built: the flour in its bin against its room, and whether milling can go ahead. */
+export function windmillPanelView(state: GameState): { shown: boolean; stored: string; mill: { disabled: boolean; hint: string } } {
+  const blocker = millGrainBlocker(state);
+  return {
+    shown: state.structures.windmill,
+    stored: `${state.millFlour} of ${BALANCE.millFlourCapacity} flour`,
+    mill: { disabled: Boolean(blocker), hint: blocker ?? '' }
+  };
+}
+
+/** The Bakery panel, once built: the loaves on the shelf, any going soft at the next dawn, and whether one can be taken. */
+export function bakeryPanelView(state: GameState): { shown: boolean; shelf: string; note: string; take: { disabled: boolean; hint: string } } {
+  const { shelf } = state.bakery;
+  const soft = goingSoft({ ...emptyFood(), bread: shelf }, 'bread', state.day, BALANCE.larderFreshDays);
+  const blocker = takeLoafBlocker(state);
+  return {
+    shown: state.structures.bakery,
+    shelf: `${shelf.length} of ${BALANCE.bakeryShelfCapacity} loaves on the shelf`,
+    note: soft ? `(${soft} going soft)` : '',
+    take: { disabled: Boolean(blocker), hint: blocker ?? '' }
   };
 }
 
@@ -343,8 +367,9 @@ const LAID_BY_HUNGER: Record<KeptFood, number> = {
 export function foodLaidByDays(state: GameState): number {
   const kept = (Object.keys(LAID_BY_HUNGER) as KeptFood[])
     .reduce((total, item) => total + (state.inventory.food[item] + state.larder[item]) * LAID_BY_HUNGER[item], 0);
-  // The granary's grain counts as the loaves it would make, as flour does.
-  const hunger = kept + Math.floor(state.field.grain / BALANCE.grainPerFlour) * BALANCE.breadHunger;
+  // The granary's grain counts as the loaves it would make, as flour does; the mill's flour and the bakery's loaves count too.
+  const loaves = Math.floor(state.field.grain / BALANCE.grainPerFlour) + state.millFlour + state.bakery.shelf.length;
+  const hunger = kept + loaves * BALANCE.breadHunger;
   return Math.min(SEASON_LENGTH, Math.floor(hunger / HUNGER_A_DAY));
 }
 
