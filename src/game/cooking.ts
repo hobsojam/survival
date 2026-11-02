@@ -1,12 +1,11 @@
-import { nightStart } from './calendar';
 import { availableStone, availableWood, freeSpaces, isAtCamp, isInClearing } from './camp';
 import { fuelLeft, isAtHome, livesInHouse } from './home';
 import { addFood, availableFood, spendFood, type FoodItem } from './food';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { BALANCE, type GameState } from './state';
 
-// Cooking at the evening fire. Without the pot it is one berry toasted on a stick; the pot, made at the toolshed,
-// adds tea, salad, roasted nuts, honey cake and, once the well stands, vegetable stew. Every dish is cooked after dark, at camp, at a lit fire.
+// Cooking at the fire. Without the pot it is fish or one berry toasted on a stick; the pot, made at the toolshed,
+// adds tea, salad, roasted nuts, honey cake and, once the well stands, vegetable stew. Every dish needs a usable fire at home or camp.
 
 export type DishId = 'fish' | 'berries' | 'pineTea' | 'salad' | 'roastedHazelnuts' | 'honeyCake' | 'stew';
 
@@ -46,7 +45,6 @@ function cookingFireBlocker(state: GameState): string | null {
 
 /** Why the survivor can't toast a berry right now, or null if they can: the cooking there is without the pot. */
 export function cookBlocker(state: GameState): string | null {
-  if (state.timeOfDay < nightStart(state.day)) return 'Cook berries after nightfall.';
   const fire = cookingFireBlocker(state);
   if (fire) return fire;
   if (availableFood(state, 'berry') <= 0) return 'Gather a berry to cook.';
@@ -75,13 +73,12 @@ export function spendIngredients(state: GameState, dish: DishId): GameState | nu
   return recipe(dish).reduce<GameState | null>((paid, [item, n]) => paid && spendFood(paid, item, n), state);
 }
 
-/** Why this dish can't be cooked now, or null. Includes cookBlocker's time/place/fire checks. */
+/** Why this dish can't be cooked now, or null. Uses the same place and fire rules as berries. */
 export function dishBlocker(state: GameState, dish: DishId): string | null {
   if (dish === 'berries') return cookBlocker(state);
   if (dish === 'stew' && !state.structures.well) return 'Build the well to cook stew.';
   // A fish cooks on a stick at the fire, like a berry: no pot needed.
   if (DISHES[dish].potOnly && !state.progress.potCrafted) return 'Make a cooking pot first.';
-  if (state.timeOfDay < nightStart(state.day)) return 'Cook after nightfall.';
   const fire = cookingFireBlocker(state);
   if (fire) return fire;
   const paid = spendIngredients(state, dish);

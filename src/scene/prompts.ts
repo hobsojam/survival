@@ -124,7 +124,12 @@ function campPrompt(state: GameState): string {
   if (!isInClearing(state)) return 'WASD / arrows  Move';
   if (livesInHouse(state)) return housePrompt(state);
   if (!isAtCamp(state)) return 'In the clearing · G Stargaze · Click an upgrade to build';
-  if (sleepBlocker(state) && state.timeOfDay < nightStart(state.day)) return 'At camp · F Fire · R Rest · Click an upgrade to build';
+  if (state.timeOfDay < nightStart(state.day)) {
+    const dish = defaultDish(state);
+    return dish
+      ? `C  Cook ${DISHES[dish].name} · F Fire · R Rest · Click an upgrade to build`
+      : 'At camp · C Cook · F Fire · R Rest · Click an upgrade to build';
+  }
   const evening = sleepBlocker(state) ? 'G Stargaze · F Fire · R Rest' : 'G Stargaze · Z Sleep · F Fire';
   // Once there is something to cook, C names it.
   const dish = defaultDish(state);
@@ -135,8 +140,10 @@ function campPrompt(state: GameState): string {
 function housePrompt(state: GameState): string {
   const night = state.timeOfDay >= nightStart(state.day);
   if (isAtHome(state)) {
-    if (!night) return 'At home · R Rest · Click an upgrade to build';
     const dish = defaultDish(state);
+    if (!night) return dish
+      ? `C  Cook ${DISHES[dish].name} · R Rest · Click an upgrade to build`
+      : 'At home · C Cook · R Rest · Click an upgrade to build';
     return dish ? `C  Cook ${DISHES[dish].name} · G Stargaze · Z Sleep` : 'At home · C Cook · G Stargaze · Z Sleep';
   }
   if (!isAtCamp(state)) return 'In the clearing · G Stargaze · Click an upgrade to build';

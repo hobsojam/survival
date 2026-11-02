@@ -35,10 +35,10 @@ describe('build buttons', () => {
   });
 });
 
-describe('after-dark actions', () => {
-  it('wait for nightfall, camp, and (for cooking) a lit fire and a berry', () => {
+describe('camp actions', () => {
+  it('allows cooking by day with a fire and berry, while stargazing waits for nightfall', () => {
     const state = createGame();
-    expect(cookBlocker(state)).toMatch(/nightfall/);
+    expect(cookBlocker(state)).toMatch(/campfire/);
     expect(stargazeBlocker(state)).toMatch(/nightfall/);
     state.timeOfDay = nightStart(1);
     expect(stargazeBlocker(state)).toBeNull();

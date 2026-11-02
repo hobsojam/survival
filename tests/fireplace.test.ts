@@ -192,6 +192,13 @@ describe('cooking at home', () => {
   const food = { inventory: { ...createGame().inventory, food: stock(3) } };
   const pot = (state: GameState): GameState => ({ ...state, progress: { ...state.progress, potCrafted: true } });
 
+  it('offers and cooks a daytime meal over banked fireplace fuel', () => {
+    const home = housed({ ...food, fireplaceFuel: 30 });
+    expect(promptFor({ ...home, nodes: [] })).toContain('C  Cook a berry');
+    expect(cookBlocker(home)).toBeNull();
+    expect(act(home, { type: 'cook', dish: 'berries' }).message).toBe('You toast a berry by the fire. A warm little meal.');
+  });
+
   it('sends the survivor home to cook', () => {
     const atCamp = pot(atFire(housed({ ...night(), ...food, fireFuel: 100, fireplaceFuel: 100 })));
     expect(cookBlocker(atCamp)).toBe('Go home to cook.');

@@ -16,8 +16,15 @@ function bareCamp(x: number = BALANCE.campX, y: number = BALANCE.campY): GameSta
 const at = (state: GameState, x: number, y: number): GameState => ({ ...state, player: { ...state.player, x, y } });
 
 describe('camp prompts', () => {
-  it('offers the fire, rest and building by day at camp', () => {
-    expect(promptFor(bareCamp())).toBe('At camp · F Fire · R Rest · Click an upgrade to build');
+  it('offers cooking, fire, rest and building by day at camp', () => {
+    expect(promptFor(bareCamp())).toBe('At camp · C Cook · F Fire · R Rest · Click an upgrade to build');
+  });
+
+  it('names a daytime meal when the fire is lit', () => {
+    const camp = bareCamp();
+    const ready = { ...camp, fireFuel: 30, companion: { ...camp.companion, lastOffer: { bird: 1, fox: 1, wolf: 1 } },
+      inventory: { ...camp.inventory, food: stock(1) } };
+    expect(promptFor(ready)).toBe('C  Cook a berry · F Fire · R Rest · Click an upgrade to build');
   });
 
   it('offers only clearing comforts on grown ground away from the fire', () => {
@@ -241,7 +248,7 @@ describe('winter prompts', () => {
 describe('offering prompts', () => {
   it('offers the fox a berry with O while it sits at dusk', () => {
     const dusk = { ...bareCamp(), timeOfDay: nightStart(1) - 5, inventory: { ...createGame().inventory, food: stock(1) } };
-    expect(promptFor(dusk)).toBe('O  Leave a berry for the fox · At camp · F Fire · R Rest · Click an upgrade to build');
+    expect(promptFor(dusk)).toBe('O  Leave a berry for the fox · At camp · C Cook · F Fire · R Rest · Click an upgrade to build');
     expect(KEY_ACTIONS).toContainEqual(['O', { type: 'befriend' }]);
   });
 
