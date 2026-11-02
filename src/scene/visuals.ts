@@ -54,7 +54,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
   for (const tree of state.trees) add(tree.id, tree.readyDay <= state.day ? `${tree.sprite}:mature` : 'stump:still', tree.x, tree.y);
   // Trees marked for clearing wear a tie of fibre; once felled they leave a stump that is cleared away with the ground.
   for (const tree of markedTrees(state)) add(tree.id, tree.readyDay <= state.day ? `${tree.sprite}:marked` : 'stump:still', tree.x, tree.y);
-  addCamp(state, add);
+  addCamp(state, add, timeMs);
   addFire(state, timeMs, visuals, add);
   return visuals;
 }
@@ -116,7 +116,7 @@ function addPuddles(state: GameState, add: AddVisual): void {
 }
 
 /** Small camp structures: where each stands from the fire, drawn as a flat site until built; one on cleared ground only once it is clear. */
-export const CAMP_STRUCTURES = [['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3], ['larder', 2.5, -4.5], ['woodpile', 5.5, -1.5], ['fibreStack', 5.5, 1.5], ['house', -0.5, -6.5], ['vegetableBeds', -4.5, 0], ['well', -7, -1.5], ['workshop', 8, -1], ['granary', 3, 4.5], ['field', -1.5, 7]] as const;
+export const CAMP_STRUCTURES = [['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3], ['larder', 2.5, -4.5], ['woodpile', 5.5, -1.5], ['fibreStack', 5.5, 1.5], ['house', -0.5, -6.5], ['vegetableBeds', -4.5, 0], ['well', -7, -1.5], ['workshop', 8, -1], ['granary', 3, 4.5], ['field', -1.5, 7], ['windmill', -2.75, 9.75], ['bakery', -2, -10]] as const;
 
 /** Where each of the field's four strips stands across from the field's spot, in tiles. */
 export const FIELD_STRIP_OFFSETS = [-1.5, -0.5, 0.5, 1.5] as const;
@@ -141,7 +141,18 @@ export function woodshedFrame(state: GameState): StockLevel {
   return state.storedWood >= woodStoreCapacity(state) / 2 ? 'full' : 'some';
 }
 
-function builtTexture(state: GameState, id: (typeof CAMP_STRUCTURES)[number][0]): string {
+/** How long each of the windmill's four sail frames shows. */
+const SAIL_FRAME_MS = 700;
+
+/** The bakery: smoke from the chimney until noon on a morning it baked, loaves on the shelf while there are any, or cold. */
+function bakeryTexture(state: GameState): string {
+  if (state.bakery.lastBaked === state.day && state.timeOfDay < BALANCE.daySeconds / 2) return 'bakery:baking';
+  return state.bakery.shelf.length > 0 ? 'bakery:loaves' : 'bakery:cold';
+}
+
+function builtTexture(state: GameState, id: (typeof CAMP_STRUCTURES)[number][0], timeMs: number): string {
+  if (id === 'windmill') return `windmill:turn${Math.floor(timeMs / SAIL_FRAME_MS) % 4}`;
+  if (id === 'bakery') return bakeryTexture(state);
   if (id === 'woodpile') return `woodpile:${stockFrame(state.storedWood)}`;
   if (id === 'fibreStack') return `fibreStack:${stockFrame(state.storedFiber)}`;
   if (id === 'house') return fireplaceBurning(state) ? 'house:lit' : 'house:dark';
@@ -172,7 +183,7 @@ function addVegetableBeds(state: GameState, add: AddVisual, x: number, y: number
   });
 }
 
-function addBuildableStructures(state: GameState, add: AddVisual, x: number, y: number): void {
+function addBuildableStructures(state: GameState, add: AddVisual, x: number, y: number, timeMs: number): void {
   const { structures } = state;
   for (const [id, dx, dy] of CAMP_STRUCTURES) {
     if (groundBlocker(state, id)) continue;
@@ -184,7 +195,7 @@ function addBuildableStructures(state: GameState, add: AddVisual, x: number, y: 
       addFieldStrips(state, add, x + dx, y + dy);
       continue;
     }
-    add(id, structures[id] ? builtTexture(state, id) : `${id}Site:still`, x + dx, y + dy, structures[id] ? undefined : GROUND_DECAL_DEPTH);
+    add(id, structures[id] ? builtTexture(state, id, timeMs) : `${id}Site:still`, x + dx, y + dy, structures[id] ? undefined : GROUND_DECAL_DEPTH);
   }
   if (state.progress.workshop.handcart && !groundBlocker(state, 'workshop')) {
     add('handcart', `handcart:${stockFrame(state.cartWood)}`, x + CART_SPOT.dx, y + CART_SPOT.dy);
@@ -199,11 +210,11 @@ function addGardenPlants(state: GameState, add: AddVisual, x: number, y: number)
   });
 }
 
-function addCamp(state: GameState, add: AddVisual): void {
+function addCamp(state: GameState, add: AddVisual, timeMs: number): void {
   const { campX: x, campY: y } = BALANCE;
   const { structures, progress } = state;
   add('shelter', shelterTexture(state), x - 3, y - 2, structures.shelter ? undefined : GROUND_DECAL_DEPTH);
-  addBuildableStructures(state, add, x, y);
+  addBuildableStructures(state, add, x, y, timeMs);
   addGardenPlants(state, add, x, y);
   add('logSeat', 'logSeat:still', x - 1, y + 1);
   add('lookout', progress.lookoutRepaired ? 'lookout:restored' : 'lookout:damaged', LOOKOUT.x, LOOKOUT.y);

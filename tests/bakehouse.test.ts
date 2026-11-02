@@ -9,6 +9,10 @@ import { currentPage, journalPageView } from '../src/ui/yearJournal';
 import { addFood, availableFood, emptyFood, reachableMillFlour, spendFood } from '../src/game/food';
 import { dishBlocker } from '../src/game/cooking';
 import { bakeryPanelView, foodLaidByDays, windmillPanelView } from '../src/ui/panels';
+import { CAMP_STRUCTURES, sceneVisuals } from '../src/scene/visuals';
+import { sprites } from '../src/art/sprites';
+import { inClearing } from '../src/game/clearing';
+import { PATH_DESTINATIONS, segmentDistance } from './placement';
 import { nightStart } from '../src/game/calendar';
 import { TOO_TIRED_MESSAGE, workSeconds } from '../src/game/needs';
 import { bakehouseCamp } from './bakehouseCamp';
@@ -259,5 +263,67 @@ describe('the oven in the year journal', () => {
   it('leaves the oven line off the spring page until the bakery stands', () => {
     const spring = (bakery: boolean) => journalPageView(bakehouseCamp({ bakery, day: 22 }), currentPage(22)).blanks;
     expect(spring(true) - spring(false)).toBe(1);
+  });
+});
+
+describe('the windmill and bakery in camp', () => {
+  const { campX, campY } = BALANCE;
+  const spot = (id: 'windmill' | 'bakery') => {
+    const entry = CAMP_STRUCTURES.find(([other]) => other === id)!;
+    return { x: campX + entry[1], y: campY + entry[2] };
+  };
+  const others = (id: string) => [{ x: campX - 3, y: campY - 2 },
+    ...CAMP_STRUCTURES.filter(([other]) => other !== id).map(([, dx, dy]) => ({ x: campX + dx, y: campY + dy }))];
+  const textures = (state: GameState, prefix: string, timeMs = 0) =>
+    sceneVisuals(state, timeMs).filter(visual => visual.id === prefix || visual.id === `${prefix}Site`).map(visual => visual.texture);
+
+  it('stands each on its own nook, which the far ground alone doesn\'t reach', () => {
+    expect(CAMP_STRUCTURES).toContainEqual(['windmill', -2.75, 9.75]);
+    expect(CAMP_STRUCTURES).toContainEqual(['bakery', -2, -10]);
+    const mill = spot('windmill'), bakery = spot('bakery');
+    expect(inClearing(mill.x, mill.y, ['south-near', 'south-far', 'south-outer'])).toBe(true);
+    expect(inClearing(mill.x, mill.y, ['south-near', 'south-far'])).toBe(false);
+    expect(inClearing(bakery.x, bakery.y, ['north-near', 'north-far', 'north-outer'])).toBe(true);
+    expect(inClearing(bakery.x, bakery.y, ['north-near', 'north-far'])).toBe(false);
+  });
+
+  it('keeps 2 tiles from the other buildings, clear of the paths and the forage', () => {
+    const forage = createGame().nodes.filter(node => node.kind !== 'branch');
+    for (const id of ['windmill', 'bakery'] as const) {
+      const at = spot(id);
+      for (const other of others(id)) expect(Math.hypot(at.x - other.x, at.y - other.y), `${id} by ${other.x},${other.y}`).toBeGreaterThanOrEqual(2);
+      for (const [dx, dy] of PATH_DESTINATIONS) expect(segmentDistance(at.x, at.y, dx, dy)).toBeGreaterThanOrEqual(1.5);
+      for (const node of forage) expect(Math.hypot(at.x - node.x, at.y - node.y), `${id} by ${node.id}`).toBeGreaterThanOrEqual(2);
+      for (const tree of createGame().trees) expect(Math.hypot(at.x - tree.x, at.y - tree.y), `${id} by ${tree.id}`).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('shows each site once its nook is clear, and nothing before', () => {
+    const bare = bakehouseCamp({ windmill: false });
+    expect(textures(bare, 'windmill')).toEqual(['windmillSite:still']);
+    expect(textures(bare, 'bakery')).toEqual(['bakerySite:still']);
+    const uncleared = { ...bare, clearing: { ...bare.clearing, cleared: bare.clearing.cleared.filter(id => id !== 'south-outer' && id !== 'north-outer') } };
+    expect(textures(uncleared, 'windmill')).toEqual([]);
+    expect(textures(uncleared, 'bakery')).toEqual([]);
+  });
+
+  it('turns the sails a frame every 700 ms', () => {
+    const state = bakehouseCamp();
+    expect(textures(state, 'windmill', 0)).toEqual(['windmill:turn0']);
+    expect(textures(state, 'windmill', 700)).toEqual(['windmill:turn1']);
+    expect(textures(state, 'windmill', 2800)).toEqual(['windmill:turn0']);
+  });
+
+  it('smokes the bakery chimney through the morning it baked, and shows the loaves on its shelf', () => {
+    expect(textures({ ...bakehouseCamp({ shelf: [22], lastBaked: 22 }), timeOfDay: 10 }, 'bakery')).toEqual(['bakery:baking']);
+    expect(textures({ ...bakehouseCamp({ shelf: [22], lastBaked: 22 }), timeOfDay: BALANCE.daySeconds / 2 }, 'bakery')).toEqual(['bakery:loaves']);
+    expect(textures(bakehouseCamp({ shelf: [20], lastBaked: 20 }), 'bakery')).toEqual(['bakery:loaves']);
+    expect(textures(bakehouseCamp(), 'bakery')).toEqual(['bakery:cold']);
+  });
+
+  it('draws every frame', () => {
+    for (const [name, frames] of [['windmill', ['turn0', 'turn1', 'turn2', 'turn3']], ['bakery', ['cold', 'loaves', 'baking']], ['windmillSite', ['still']], ['bakerySite', ['still']]] as const) {
+      expect(Object.keys(sprites[name].frames)).toEqual(frames);
+    }
   });
 });
