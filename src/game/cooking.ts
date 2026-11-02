@@ -102,6 +102,9 @@ const up = (value: number, gain: number): number => Math.min(100, value + gain);
 /** The dishes kept in the bag for later rather than eaten at once, and what each leaves there. */
 const PACKED: Partial<Record<DishId, FoodItem>> = { roastedHazelnuts: 'roastedHazelnuts', loaf: 'bread' };
 
+/** Whether a dish is kept in the bag for later rather than eaten at the fire. */
+export const isPackedDish = (dish: DishId): boolean => PACKED[dish] !== undefined;
+
 /** The paid state with what a dish leaves in the bag, put there before the cooking time runs so a dawn's gift can't take its space. */
 export function packDish(paid: GameState, dish: DishId): GameState {
   const kept = PACKED[dish];

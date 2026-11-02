@@ -155,6 +155,14 @@ describe('warm food and warm rest', () => {
     expect(applyAction(stocked, { type: 'cook', dish: 'roastedHazelnuts' }).state.sickness.ateWarm).toBe(false);
   });
 
+  it('does not count a loaf baked for later as a warm meal', () => {
+    const food = addFood(createGame().inventory.food, 'flour', 1, WINTER_DAY);
+    const baking = night({ inventory: { ...createGame().inventory, food } });
+    const { state: after, message } = applyAction(baking, { type: 'cook', dish: 'loaf' });
+    expect(message).toBe('You bake a loaf on the hot stones by the fire and keep it for later.');
+    expect(after.sickness.ateWarm).toBe(false);
+  });
+
   it('counts a meal cooked in the last seconds before dawn toward the day it was cooked on', () => {
     const food = addFood(createGame().inventory.food, 'berry', 1, WINTER_DAY);
     const late = night({ timeOfDay: BALANCE.daySeconds - 3, inventory: { ...createGame().inventory, food },

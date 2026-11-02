@@ -4,7 +4,7 @@ import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSec
 import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
 import { availableFiber, availableStone, availableWood, spendFiber, spendWood, bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
-import { POT_COST, cookBlocker, defaultDish, dishBlocker, foodWord, packDish, potBlocker, serveDish, spendIngredients, type DishId } from './cooking';
+import { POT_COST, cookBlocker, defaultDish, dishBlocker, foodWord, isPackedDish, packDish, potBlocker, serveDish, spendIngredients, type DishId } from './cooking';
 import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
 import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, type StepId } from './clearing';
 import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
@@ -728,9 +728,9 @@ const cook: ActionHandler<'cook'> = (state, action) => {
   const blocker = dishBlocker(state, dish);
   const spent = spendIngredients(state, dish);
   if (blocker || !spent) return refuse(state, blocker ?? 'No food in your bag.');
-  // Roasted nuts are packed for later, not eaten, so only the other dishes are a warm meal. It counts toward the day
-  // the cooking began, as a rest does, even if the cooking runs on past dawn.
-  const packed = dish === 'roastedHazelnuts' ? packDish(spent, dish) : markWarmMeal(packDish(spent, dish));
+  // Roasted nuts and loaves are packed for later, not eaten, so only the other dishes are a warm meal. It counts toward
+  // the day the cooking began, as a rest does, even if the cooking runs on past dawn.
+  const packed = isPackedDish(dish) ? packDish(spent, dish) : markWarmMeal(packDish(spent, dish));
   return serveDish(advanceTime(packed, BALANCE.cookSeconds, 'resting'), dish, state.structures.dryingRack);
 };
 
