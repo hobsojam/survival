@@ -434,7 +434,9 @@ const fish: ActionHandler<'fish'> = (state, action) => {
   const blocker = fishingBlocker(state);
   if (blocker) return refuse(state, blocker);
   const caught = catches(state, action.roll);
-  const waited = advanceTime(state, fishingSecondsFor(state), 'working');
+  // Fishing there is finding the spring: it is never left to explore afterwards.
+  const found = { ...state, progress: { ...state.progress, discoveries: { ...state.progress.discoveries, spring: true } } };
+  const waited = advanceTime(found, fishingSecondsFor(state), 'working');
   if (!caught) return { state: { ...waited, fishingMisses: state.fishingMisses + 1 }, message: 'You wait by the hole in the ice, but nothing bites.' };
   const food = addFood(waited.inventory.food, 'fish', 1, waited.day);
   return { state: { ...waited, fishingMisses: 0, inventory: { ...waited.inventory, food } }, message: 'You break the ice and wait. A fish takes the line.' };

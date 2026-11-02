@@ -97,6 +97,13 @@ describe('fishing through the ice', () => {
     expect(missed.state.fishingMisses).toBe(1);
   });
 
+  it('counts as finding the quiet spring, caught or not, so it is never left to explore afterwards', () => {
+    const ready = withLine(atSpring(winter()));
+    expect(ready.progress.discoveries.spring).toBe(false);
+    expect(applyAction(ready, { type: 'fish', roll: 0.5 }).state.progress.discoveries.spring).toBe(true);
+    expect(applyAction(ready, { type: 'fish', roll: 0.1 }).state.progress.discoveries.spring).toBe(true);
+  });
+
   it('never comes up empty more than twice in a row', () => {
     let state = withLine(atSpring(winter()));
     const messages: string[] = [];
