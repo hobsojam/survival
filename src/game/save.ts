@@ -183,6 +183,13 @@ function validBakehouse({ millFlour, bakery, structures, day }: SaveShape): bool
   return structures.bakery === true || (bakery.shelf.length === 0 && bakery.lastBaked === null && bakery.resumed === null);
 }
 
+/** Honey only in a built hive and no more than it holds; a built hive always knows its next honey day, an unbuilt one never. */
+function validBeehive({ beehive, structures }: SaveShape): boolean {
+  if (!object(beehive) || !count(beehive.honey) || beehive.honey > BALANCE.hiveHoneyCapacity) return false;
+  if (structures.beehive !== true) return beehive.honey === 0 && beehive.nextHoney === null;
+  return whole(beehive.nextHoney) && beehive.nextHoney >= 1;
+}
+
 /** Cleared steps are real, once each, and a far step follows its near one; the marked step is still to do; felled trees are the marked step's own. */
 function validClearing({ clearing }: SaveShape): boolean {
   if (!object(clearing) || !Array.isArray(clearing.cleared) || !Array.isArray(clearing.felled)) return false;
@@ -322,7 +329,7 @@ function validSickness({ sickness, ending, day, fishingMisses }: SaveShape): boo
 /** Checks a version 24 save, with the survivor's sickness and whether their story has ended, and: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, the workshop and its handcart, shelter upgrades, garden plots, vegetable beds, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validSickness];
+  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validBeehive, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validSickness];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

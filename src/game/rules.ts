@@ -11,6 +11,7 @@ import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, sp
 import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
 import { bakeryDawn, millGrainBlocker, milledState, takeLoafBlocker, takenLoaf } from './bakehouse';
+import { beehiveDawn, takeHoneyBlocker, takenHoney } from './beehive';
 import { cutField, cutStripBlocker, grindGrainBlocker, seededField, sowStripBlocker, sownField, threshStripBlocker, threshedField, wildGrainBlocker } from './field';
 import { BED_CROPS, bedsDawn, drawWaterBlocker, emptyBed, harvestBedBlocker, needsWater, sowBedBlocker } from './beds';
 import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
@@ -39,6 +40,7 @@ export type GameAction =
   | { type: 'grindGrain' }
   | { type: 'millGrain' }
   | { type: 'takeLoaf' }
+  | { type: 'takeHoney' }
   | { type: 'drawWater' }
   | { type: 'makeUpgrade'; upgrade: UpgradeId }
   | { type: 'eat'; item?: FoodItem }
@@ -290,6 +292,7 @@ function dawn(next: GameState, home: boolean): void {
   next.inventory = { ...next.inventory, food: bag.store };
   next.larder = larder.store;
   const shelf = bakeryDawn(next);
+  beehiveDawn(next);
   const lost = { berry: bag.lost.berry + larder.lost.berry, greens: bag.lost.greens + larder.lost.greens, bread: bag.lost.bread + larder.lost.bread + shelf.lost };
   if (lost.berry + lost.greens + lost.bread > 0) next.lastSpoiled = { day: next.day, ...lost };
   if (!stormEnded) return;
@@ -908,6 +911,14 @@ const millGrain: ActionHandler<'millGrain'> = state => {
   return { state: advanceTime(worked, workSeconds(state, BALANCE.fieldWorkSeconds), 'working'), message: milled.message };
 };
 
+/** Takes the honey waiting in the hive into the bag, as much as fits, as quick as taking a loaf. */
+const takeHoney: ActionHandler<'takeHoney'> = state => {
+  const blocker = takeHoneyBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  const { state: taken, taken: count } = takenHoney(state);
+  return { state: taken, message: `You take ${count} honey from the hive.` };
+};
+
 /** Takes the oldest loaf off the bakery shelf into the bag, as quick as taking food from the larder. */
 const takeLoaf: ActionHandler<'takeLoaf'> = state => {
   const blocker = takeLoafBlocker(state);
@@ -960,8 +971,10 @@ const build: ActionHandler<'build'> = (state, action) => {
   const blocker = buildBlocker(state, action.structureId);
   if (blocker) return refuse(state, blocker);
   const house = action.structureId === 'house';
+  // A new hive's bees make their first honey a few dawns on.
+  const hive = action.structureId === 'beehive' ? { beehive: { honey: 0, nextHoney: state.day + BALANCE.hiveHoneyDays } } : {};
   return {
-    state: payAndBuild(state, buildingCost(action.structureId), { structures: { ...state.structures, [action.structureId]: true } },
+    state: payAndBuild(state, buildingCost(action.structureId), { structures: { ...state.structures, [action.structureId]: true }, ...hive },
       house ? BALANCE.houseBuildSeconds : undefined),
     message: house ? MOVING_IN_MESSAGE : `Built the ${BUILDINGS[action.structureId].name.toLowerCase()}.`
   };
@@ -1048,7 +1061,7 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak,
+  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak,
   makeFishingLine, fish
 };
 

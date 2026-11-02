@@ -19,7 +19,7 @@ import { GAVE_OUT_MESSAGE } from '../game/sickness';
 import { ENDING_FADE_MS, endingMarkup, endingView, showEnding } from './ending';
 import { browserDownloadDoc, downloadText } from './download';
 import { showBuildList, showCampStores } from './showPanels';
-import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
+import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
 import type { UpgradeId } from '../game/workshop';
 import { Soundscape } from '../game/soundscape';
 
@@ -119,6 +119,7 @@ export class App {
               <section class="panel granary-panel" data-tab="camp" hidden><p class="eyebrow">THE SOUTH GROUND</p><h2>Granary</h2><p class="garden-hint"><span id="granary-stored"></span> · <span id="granary-seed"></span></p><div class="tool-row" id="grind-row" hidden><button type="button" id="grind-button" data-action="grindGrain">Grind flour</button><small id="grind-hint"></small></div></section>
               <section class="panel windmill-panel" data-tab="camp" hidden><p class="eyebrow">THE SOUTH GROUND</p><h2>Windmill</h2><p class="garden-hint" id="windmill-stored"></p><div class="tool-row"><button type="button" id="mill-button" data-action="millGrain">Mill the grain</button><small id="mill-hint"></small></div></section>
               <section class="panel bakery-panel" data-tab="camp" hidden><p class="eyebrow">THE NORTH GROUND</p><h2>Bakery</h2><p class="garden-hint"><span id="bakery-shelf"></span> <span id="bakery-note"></span></p><div class="tool-row"><button type="button" id="take-loaf-button" data-action="takeLoaf">Take a loaf</button><small id="take-loaf-hint"></small></div></section>
+              <section class="panel beehive-panel" data-tab="camp" hidden><p class="eyebrow">THE NORTH GROUND</p><h2>Beehive</h2><p class="garden-hint"><span id="hive-honey"></span></p><div class="tool-row"><button type="button" id="take-honey-button" data-action="takeHoney">Take the honey</button><small id="take-honey-hint"></small></div></section>
               <section class="panel night-panel" data-tab="camp"><p class="eyebrow">CAMP MOMENTS</p><h2>Cook or unwind</h2><p class="night-hint" id="night-hint">Cook by the fire any time. Stargazing waits for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" data-dish="berries" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button>${nightDishMarkup()}</div></section>
               <section class="panel build-panel" data-tab="build"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand anywhere in the clearing to build.</p><div id="build-list">${buildListMarkup()}</div><div id="clearing-group" hidden><h3 class="build-group-heading">Clear the land</h3><p id="clearing-progress" class="build-hint" hidden></p><div id="clearing-sides">${clearingMarkup}</div><div class="tool-row" id="clear-row"><h3 id="clear-title">Clear the ground</h3><p id="clear-copy" class="lookout-copy"></p><button type="button" id="clear-button" data-action="clearGround">Clear the ground</button><small id="clear-cost"></small></div></div></section>
               <section class="panel phone-only" data-tab="camp"><p class="eyebrow">THIS CAMP</p><button type="button" id="phone-new-game" class="secondary-button">Start a new game</button></section>
@@ -134,7 +135,7 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'makeFishingLine' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeFood' | 'takeFood' | 'drawWater' | 'grindGrain' | 'millGrain' | 'takeLoaf';
+        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'makeFishingLine' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeFood' | 'takeFood' | 'drawWater' | 'grindGrain' | 'millGrain' | 'takeLoaf' | 'takeHoney';
         const item = button.dataset.item as FoodItem | undefined;
         const dish = button.dataset.dish as DishId | undefined;
         if (type === 'storeFood' || type === 'takeFood') {
@@ -617,7 +618,7 @@ export class App {
     this.renderBakehouse();
   }
 
-  /** The Windmill and Bakery panels, laid out by their tested views. */
+  /** The Windmill, Bakery and Beehive panels, laid out by their tested views. */
   private renderBakehouse(): void {
     const windmill = windmillPanelView(this.state);
     const windmillPanel = this.root.querySelector<HTMLElement>('.windmill-panel');
@@ -632,6 +633,12 @@ export class App {
     this.setText('bakery-note', bakery.note);
     this.setActionButton('take-loaf-button', bakery.take.disabled);
     this.setText('take-loaf-hint', bakery.take.hint);
+    const beehive = beehivePanelView(this.state);
+    const beehivePanel = this.root.querySelector<HTMLElement>('.beehive-panel');
+    if (beehivePanel) beehivePanel.hidden = !beehive.shown;
+    this.setText('hive-honey', beehive.stored);
+    this.setActionButton('take-honey-button', beehive.take.disabled);
+    this.setText('take-honey-hint', beehive.take.hint);
   }
 
   /** Enables an action button and marks it ready, or disables it. */

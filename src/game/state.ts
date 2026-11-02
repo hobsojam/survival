@@ -32,7 +32,9 @@ export const BUILDINGS = {
   field: { name: 'Field', description: 'Four strips of grain on the south ground', symbol: '≡', cost: { wood: 4, fiber: 2 }, prerequisite: null, ground: 'south-far' },
   granary: { name: 'Granary', description: 'Keep a harvest of grain dry on stone legs', symbol: '⌂', cost: { wood: 8, fiber: 2, stone: 4 }, prerequisite: 'field', ground: 'south-near' },
   windmill: { name: 'Windmill', description: 'Grind a whole granary of grain in one go', symbol: '✣', cost: { wood: 12, fiber: 4, stone: 10 }, prerequisite: 'granary', ground: 'south-outer' },
-  bakery: { name: 'Bakery', description: 'Bake a fresh loaf every morning', symbol: '⌂', cost: { wood: 10, fiber: 2, stone: 10 }, prerequisite: 'windmill', ground: 'north-outer' }
+  bakery: { name: 'Bakery', description: 'Bake a fresh loaf every morning', symbol: '⌂', cost: { wood: 10, fiber: 2, stone: 10 }, prerequisite: 'windmill', ground: 'north-outer' },
+  /** A straw skep: the bees make honey every few dawns, all year, and keep a little for the taking. */
+  beehive: { name: 'Beehive', description: 'Keep bees for honey all year', symbol: '❀', cost: { wood: 4, fiber: 6 }, prerequisite: null, ground: 'north-far' }
 } as const;
 
 export type StructureId = keyof typeof BUILDINGS;
@@ -142,6 +144,8 @@ export interface GameState {
   millFlour: number;
   /** The bakery's shelf, as the bake day of each loaf on it; the last morning its oven baked; and the last morning it began baking again after a morning it didn't. */
   bakery: { shelf: number[]; lastBaked: number | null; resumed: number | null };
+  /** Honey waiting in the hive, and the first dawn the bees may make more; null while the hive is unbuilt. */
+  beehive: { honey: number; nextHoney: number | null };
   /** Stone kept in the camp stone pile, outside the bag. */
   storedStone: number;
   /** Wood split and stacked on the woodpile, outside the bag: it counts for building and the fire, from anywhere. */
@@ -321,6 +325,10 @@ export const BALANCE = {
   millFlourCapacity: 8,
   /** Loaves the bakery shelf holds; while it is full the oven waits. */
   bakeryShelfCapacity: 2,
+  /** Honey the beehive holds; while it is full the bees wait. */
+  hiveHoneyCapacity: 2,
+  /** Dawns between one honey from the hive and the next, in every season. */
+  hiveHoneyDays: 3,
   /** Berries a summer bush gives with each gather. */
   summerBerries: 2,
   thatchedShelteredWarmthLossPerSecond: 0.2,
@@ -384,7 +392,7 @@ export function createGame(): GameState {
     inventory: { wood: 0, fiber: 0, stone: 0, food: emptyFood() },
     fireFuel: 0,
     fireplaceFuel: 0,
-    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false, field: false, granary: false, windmill: false, bakery: false },
+    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false, field: false, granary: false, windmill: false, bakery: false, beehive: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
       quarryFound: false, pickaxeCrafted: false, potCrafted: false, packWoven: false, fishingLine: false,
       workshop: { saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false },
@@ -397,6 +405,7 @@ export function createGame(): GameState {
     field: emptyField(),
     millFlour: 0,
     bakery: { shelf: [], lastBaked: null, resumed: null },
+    beehive: { honey: 0, nextHoney: null },
     storedStone: 0,
     storedWood: 0, cartWood: 0,
     storedFiber: 0,

@@ -1,6 +1,7 @@
 import { cutStripBlocker, grindGrainBlocker, sowStripBlocker, stripStage, threshStripBlocker, type StripStage } from '../game/field';
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isWinter, nightStart, season } from '../game/calendar';
 import { millGrainBlocker, takeLoafBlocker } from '../game/bakehouse';
+import { takeHoneyBlocker } from '../game/beehive';
 import { FOOD_ITEMS, availableFood, emptyFood, foodCount, goingSoft, isFresh, storeTotal, type FoodItem, type KeptFood } from '../game/food';
 import { foodIconUrl } from '../art/foodIcons';
 import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
@@ -166,6 +167,16 @@ export function bakeryPanelView(state: GameState): { shown: boolean; shelf: stri
     shown: state.structures.bakery,
     shelf: `${shelf.length} of ${BALANCE.bakeryShelfCapacity} loaves on the shelf`,
     note: soft ? `(${soft} going soft)` : '',
+    take: { disabled: Boolean(blocker), hint: blocker ?? '' }
+  };
+}
+
+/** The Beehive panel, once built: the honey waiting in the hive, and whether it can be taken. */
+export function beehivePanelView(state: GameState): { shown: boolean; stored: string; take: { disabled: boolean; hint: string } } {
+  const blocker = takeHoneyBlocker(state);
+  return {
+    shown: state.structures.beehive,
+    stored: `${state.beehive.honey} of ${BALANCE.hiveHoneyCapacity} honey`,
     take: { disabled: Boolean(blocker), hint: blocker ?? '' }
   };
 }
@@ -363,13 +374,13 @@ const LAID_BY_HUNGER: Record<KeptFood, number> = {
   flour: BALANCE.breadHunger
 };
 
-/** Whole days of winter hunger the kept food in the bag and the larder, and the granary's grain, would fill, up to the season's ten. */
+/** Whole days of winter hunger the kept food in the bag and the larder, the granary's grain and the hive's honey would fill, up to the season's ten. */
 export function foodLaidByDays(state: GameState): number {
   const kept = (Object.keys(LAID_BY_HUNGER) as KeptFood[])
     .reduce((total, item) => total + (state.inventory.food[item] + state.larder[item]) * LAID_BY_HUNGER[item], 0);
   // The granary's grain counts as the loaves it would make, as flour does; the mill's flour and the bakery's loaves count too.
   const loaves = Math.floor(state.field.grain / BALANCE.grainPerFlour) + state.millFlour + state.bakery.shelf.length;
-  const hunger = kept + loaves * BALANCE.breadHunger;
+  const hunger = kept + loaves * BALANCE.breadHunger + state.beehive.honey * BALANCE.honeyHunger;
   return Math.min(SEASON_LENGTH, Math.floor(hunger / HUNGER_A_DAY));
 }
 
