@@ -166,7 +166,7 @@ export function pickaxeView(state: GameState): ActionPanelView & { shown: boolea
 
 export function potView(state: GameState): ActionPanelView {
   if (state.progress.potCrafted) {
-    return { title: 'Cooking pot', copy: 'It hangs over the fire. Cook tea, salad, roasted nuts and honey cake after dark.', cost: 'Made', disabled: true, ready: false };
+    return { title: 'Cooking pot', copy: 'It hangs over the fire. Cook tea, salad, roasted nuts and honey cake whenever the fire is ready.', cost: 'Made', disabled: true, ready: false };
   }
   const blocker = potBlocker(state);
   return { title: 'Cooking pot', copy: blocker ?? 'A pot on a little tripod, for tea, salad, roasted nuts and honey cake.', cost: '1 wood · 2 stone', disabled: false, ready: !blocker };
@@ -191,7 +191,7 @@ export function fishingLineView(state: GameState): ActionPanelView {
 
 export interface DishView { dish: Exclude<DishId, 'berries'>; name: string; icon: string; cost: string; disabled: boolean; title: string }
 
-/** The After dark panel's dishes beyond a toasted berry: a fish whenever there is one, and the pot dishes once the pot is made. Each says why it can't be cooked yet. */
+/** The camp panel's dishes beyond a toasted berry: a fish whenever there is one, and the pot dishes once the pot is made. Each says why it can't be cooked yet. */
 export function nightDishesView(state: GameState): DishView[] {
   const offered = (dish: DishId): dish is DishView['dish'] =>
     dish === 'fish' ? availableFood(state, 'fish') > 0 : DISHES[dish].potOnly && state.progress.potCrafted;
@@ -202,7 +202,7 @@ export function nightDishesView(state: GameState): DishView[] {
   });
 }
 
-/** A hidden button for each dish beyond a toasted berry in the After dark panel, shown once it can be offered. */
+/** A hidden button for each dish beyond a toasted berry in the camp panel, shown once it can be offered. */
 export function nightDishMarkup(): string {
   return DISH_ORDER.filter(dish => dish !== 'berries').map(dish =>
     `<button type="button" data-action="cook" data-dish="${dish}" id="dish-${dish}" hidden><img class="food-icon" src="${foodIconUrl(dish as DishView['dish'])}" alt=""><strong>${capitalised(DISHES[dish].name)}</strong><small>${ingredientList(dish)} · ${BALANCE.cookSeconds} seconds</small></button>`
@@ -239,8 +239,8 @@ export function cloakView(state: GameState): ActionPanelView & { shown: boolean 
 
 /** The places along the paths found so far, for the Follow the paths panel. */
 export function nightHint(state: GameState): string {
-  if (state.timeOfDay < nightStart(state.day)) return 'These small moments are waiting for nightfall.';
-  if (!isInClearing(state)) return 'Return to the clearing for a quiet evening.';
+  if (!isInClearing(state)) return 'Return to the clearing to cook or stargaze.';
+  if (state.timeOfDay < nightStart(state.day)) return 'Cook by the fire any time. Stargazing waits for nightfall.';
   return 'Optional comforts while the night passes.';
 }
 

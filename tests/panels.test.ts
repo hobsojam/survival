@@ -121,12 +121,14 @@ describe('pickaxe panel', () => {
   });
 });
 
-describe('night hint', () => {
-  it('waits for nightfall, then invites the survivor back to camp', () => {
-    expect(nightHint(game())).toBe('These small moments are waiting for nightfall.');
+describe('camp activity hint', () => {
+  it('offers daytime cooking while keeping stargazing for night', () => {
+    const day = game();
+    expect(nightHint(day)).toBe('Cook by the fire any time. Stargazing waits for nightfall.');
     const night = game({}, { timeOfDay: nightStart(1) + 1 });
     expect(nightHint(night)).toBe('Optional comforts while the night passes.');
-    expect(nightHint({ ...night, player: { ...night.player, x: 5, y: 25 } })).toBe('Return to the clearing for a quiet evening.');
+    expect(nightHint({ ...night, player: { ...night.player, x: 5, y: 25 } })).toBe('Return to the clearing to cook or stargaze.');
+    expect(nightHint({ ...day, player: { ...day.player, x: 5, y: 25 } })).toBe('Return to the clearing to cook or stargaze.');
   });
 });
 
@@ -478,7 +480,7 @@ describe('cooking pot panel', () => {
     expect(potView(game({ inventory: supplies }))).toMatchObject({ title: 'Cooking pot', copy: 'Build a toolshed first.', cost: '1 wood · 2 stone', ready: false });
     const shed = game({ structures: { shelter: true, toolshed: true }, inventory: supplies });
     expect(potView(shed)).toMatchObject({ title: 'Cooking pot', cost: '1 wood · 2 stone', ready: true, disabled: false });
-    expect(potView({ ...shed, progress: { ...shed.progress, potCrafted: true } })).toMatchObject({ title: 'Cooking pot', cost: 'Made', disabled: true, ready: false });
+    expect(potView({ ...shed, progress: { ...shed.progress, potCrafted: true } })).toMatchObject({ title: 'Cooking pot', copy: 'It hangs over the fire. Cook tea, salad, roasted nuts and honey cake whenever the fire is ready.', cost: 'Made', disabled: true, ready: false });
   });
 });
 

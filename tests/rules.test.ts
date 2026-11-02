@@ -544,12 +544,11 @@ describe('optional night activities', () => {
     expect(state.inventory.food.berry.length).toBe(1);
   });
 
-  it('does not cook in daylight, away from camp, without berries, or without fire', () => {
+  it('does not cook away from camp, without berries, or without fire', () => {
     const state = createGame();
     state.inventory.food = stock(1);
     state.fireFuel = 20;
     for (const setup of [
-      (s: typeof state) => { s.timeOfDay = 100; },
       (s: typeof state) => { s.timeOfDay = NIGHT + 10; s.player.x = 0; },
       (s: typeof state) => { s.timeOfDay = NIGHT + 10; s.inventory.food = stock(0); },
       (s: typeof state) => { s.timeOfDay = NIGHT + 10; s.fireFuel = 0; }

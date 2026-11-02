@@ -128,13 +128,25 @@ describe('the dishes', () => {
     expect(dishBlocker(state, 'pineTea')).toBe('You need 1 pine needles for pine needle tea.');
   });
 
-  it('cooks only after nightfall, at camp, at a lit fire', () => {
+  it('cooks every dish by day when its fire and ingredients are ready', () => {
+    const ingredients: Record<keyof typeof DISHES, Partial<Record<FoodItem, number>>> = {
+      fish: { fish: 1 }, berries: { berry: 1 }, pineTea: { pineNeedles: 1 },
+      salad: { greens: 1, berry: 1 }, roastedHazelnuts: { hazelnut: 2 },
+      honeyCake: { honey: 1, hazelnut: 1, berry: 1 }, stew: { vegetables: 2 }
+    };
+    for (const dish of DISH_ORDER) {
+      const state = evening(ingredients[dish]);
+      state.timeOfDay = 30;
+      state.structures.well = true;
+      expect(dishBlocker(state, dish), dish).toBeNull();
+      expect(applyAction(state, { type: 'cook', dish }).state.timeOfDay, dish).toBe(30 + BALANCE.cookSeconds);
+    }
+  });
+
+  it('still needs camp and a lit fire', () => {
     const state = evening({ pineNeedles: 1 });
-    const day = { ...state, timeOfDay: 100 };
-    expect(applyAction(day, { type: 'cook', dish: 'pineTea' })).toEqual({ state: day, message: 'Cook after nightfall.' });
     expect(dishBlocker({ ...state, player: { ...state.player, x: 0 } }, 'pineTea')).toBe('Return to camp to cook.');
     expect(dishBlocker({ ...state, fireFuel: 0 }, 'pineTea')).toBe('Light the campfire before cooking.');
-    expect(applyAction({ ...state, timeOfDay: 100, progress: { ...state.progress, potCrafted: false } }, { type: 'cook' }).message).toBe('Cook berries after nightfall.');
   });
 
   it('refuses to roast into a bag still full after paying', () => {

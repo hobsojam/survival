@@ -159,7 +159,7 @@ describe('eating fish', () => {
     expect(cooked.state.sickness.ateWarm).toBe(true);
     expect(fishIn(cooked.state)).toBe(0);
     expect(applyAction(night(emptyFood()), { type: 'cook', dish: 'fish' }).message).toBe('You need 1 fish for a fish.');
-    expect(applyAction({ ...night(), timeOfDay: 30 }, { type: 'cook', dish: 'fish' }).message).toBe('Cook after nightfall.');
+    expect(applyAction({ ...night(), timeOfDay: 30 }, { type: 'cook', dish: 'fish' }).message).toBe('You cook the fish over the fire. A warm, filling meal.');
   });
 });
 
