@@ -60,9 +60,19 @@ function reachableStores(state: GameState): FoodStore[] {
   return larder ? [state.inventory.food, larder] : [state.inventory.food];
 }
 
-/** The food the survivor can reach: the bag, plus the larder in the clearing. */
-export function availableFood(state: GameState, item: FoodItem): number {
+/** The windmill's flour when it stands and the survivor is in the clearing, else none. */
+export function reachableMillFlour(state: GameState): number {
+  return state.structures.windmill && isInClearing(state) ? state.millFlour : 0;
+}
+
+/** Food the survivor can reach in the bag and the larder in the clearing. */
+function storedFood(state: GameState, item: FoodItem): number {
   return reachableStores(state).reduce((total, store) => total + foodCount(store, item), 0);
+}
+
+/** The food the survivor can reach: the bag, plus the larder in the clearing, plus the windmill's flour there. */
+export function availableFood(state: GameState, item: FoodItem): number {
+  return storedFood(state, item) + (item === 'flour' ? reachableMillFlour(state) : 0);
 }
 
 /** How many of n come from the bag: kept food bag-first, fresh food oldest-first across both, a tie going to the bag. */
@@ -77,11 +87,21 @@ function bagShare(bag: FoodStore, larder: FoodStore, item: FoodItem, n: number):
   return b;
 }
 
-/** Spends n of an item from reachable food: fresh oldest-first, kept bag-first. Null if there isn't enough. */
+/** Spends n of an item from reachable food: fresh oldest-first, kept bag-first, and flour from the windmill last. Null if there isn't enough. */
 export function spendFood(state: GameState, item: FoodItem, n: number): GameState | null {
+  if (item !== 'flour') return spendStored(state, item, n);
+  const fromStores = Math.min(n, storedFood(state, item));
+  const fromMill = n - fromStores;
+  if (fromMill > reachableMillFlour(state)) return null;
+  const paid = fromStores > 0 ? spendStored(state, item, fromStores) : state;
+  return paid && (fromMill > 0 ? { ...paid, millFlour: paid.millFlour - fromMill } : paid);
+}
+
+/** Spends n of an item from the bag and the larder in reach. */
+function spendStored(state: GameState, item: FoodItem, n: number): GameState | null {
   const larder = reachableLarder(state);
   if (!larder) return takeFromBag(state, item, n);
-  if (availableFood(state, item) < n) return null;
+  if (storedFood(state, item) < n) return null;
   const fromBag = bagShare(state.inventory.food, larder, item, n);
   const food = takeFrom(state.inventory.food, item, fromBag);
   const kept = takeFrom(larder, item, n - fromBag);

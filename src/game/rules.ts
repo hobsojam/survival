@@ -10,6 +10,7 @@ import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, ma
 import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
 import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
+import { millGrainBlocker, milledState } from './bakehouse';
 import { cutField, cutStripBlocker, grindGrainBlocker, seededField, sowStripBlocker, sownField, threshStripBlocker, threshedField, wildGrainBlocker } from './field';
 import { BED_CROPS, bedsDawn, drawWaterBlocker, emptyBed, harvestBedBlocker, needsWater, sowBedBlocker } from './beds';
 import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
@@ -36,6 +37,7 @@ export type GameAction =
   | { type: 'cutStrip'; index: number }
   | { type: 'threshStrip'; index: number }
   | { type: 'grindGrain' }
+  | { type: 'millGrain' }
   | { type: 'drawWater' }
   | { type: 'makeUpgrade'; upgrade: UpgradeId }
   | { type: 'eat'; item?: FoodItem }
@@ -895,6 +897,15 @@ const grindGrain: ActionHandler<'grindGrain'> = state => {
   return { state: advanceTime(ground, workSeconds(state, BALANCE.gatherSeconds), 'working'), message: 'You grind a little grain into flour.' };
 };
 
+/** One heavy job at the windmill grinds the whole granary, as far as the flour bin has room. */
+const millGrain: ActionHandler<'millGrain'> = state => {
+  const blocker = millGrainBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  const milled = milledState(state);
+  const worked = { ...milled.state, player: tire(state, BALANCE.fieldWorkEnergy) };
+  return { state: advanceTime(worked, workSeconds(state, BALANCE.fieldWorkSeconds), 'working'), message: milled.message };
+};
+
 /** One bucket from the well waters every bed still growing, for today. It takes the time and energy of gathering. */
 const drawWater: ActionHandler<'drawWater'> = state => {
   const blocker = drawWaterBlocker(state);
@@ -1028,7 +1039,7 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak,
+  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak,
   makeFishingLine, fish
 };
 
