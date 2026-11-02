@@ -366,7 +366,7 @@ const honeyPositions = [[16, 6.5]];
 /** Wild grain at the south edge of the clearing, just beyond the widest it can grow, toward where the field will stand. */
 const wildGrainPosition = [25, 23];
 const treePositions = [
-  [20, 5, 'treeBroadleaf'], [17, 9, 'treeBroadleaf'], [27, 5, 'treeBroadleaf'],
+  [20, 5, 'treeBroadleaf'], [16, 4, 'treeBroadleaf'], [27, 5, 'treeBroadleaf'],
   [22, 23, 'treePine'], [32, 14, 'treePine'], [15, 24, 'treePine']
 ] as const;
 

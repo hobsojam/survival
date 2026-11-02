@@ -6,7 +6,7 @@ import { emptyField } from './field';
 // anything the player had. Loading runs every step a save needs, in order, then validates the result as usual.
 
 /** The saved shape's version. Bump it by one with every change to the shape, and add its upgrade step below. */
-export const SAVE_VERSION = 28;
+export const SAVE_VERSION = 29;
 
 /** The oldest save that can still be brought up to date: earlier formats were never upgraded and don't load. */
 export const OLDEST_UPGRADABLE_VERSION = 23;
@@ -69,6 +69,12 @@ export const SAVE_UPGRADES: Readonly<Record<number, SaveUpgrade>> = {
     return { ...state,
       structures: { beehive: false, ...state.structures },
       beehive: state.beehive ?? { honey: 0, nextHoney: null } };
+  },
+  // Version 29: the broadleaf that stood on the north far ground moves out into the woods, so no wild tree stands in camp.
+  // It keeps its regrowth; a camp whose tree has already moved is left as it was.
+  28: old => {
+    const state = old as Upgradable & { trees: (Upgradable & { id?: unknown })[] };
+    return { ...state, trees: state.trees.map(tree => tree.id === 'tree-1' && tree.x === 17 && tree.y === 9 ? { ...tree, x: 16, y: 4 } : tree) };
   }
 };
 
