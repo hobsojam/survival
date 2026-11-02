@@ -172,6 +172,16 @@ function validField({ field, structures, day }: SaveShape): boolean {
   return stripsOk && seedOk && grainOk;
 }
 
+/** Flour only in a built windmill's bin and no more than it holds; loaves only on a built bakery's shelf, no more than it holds, each baked on a day already lived, as is the last bake. */
+function validBakehouse({ millFlour, bakery, structures, day }: SaveShape): boolean {
+  const today = day as number;
+  if (!count(millFlour) || millFlour > BALANCE.millFlourCapacity || (millFlour > 0 && structures.windmill !== true)) return false;
+  if (!object(bakery) || !Array.isArray(bakery.shelf) || bakery.shelf.length > BALANCE.bakeryShelfCapacity) return false;
+  if (!bakery.shelf.every(baked => readyBy(baked, today))) return false;
+  if (bakery.lastBaked !== null && !readyBy(bakery.lastBaked, today)) return false;
+  return structures.bakery === true || (bakery.shelf.length === 0 && bakery.lastBaked === null);
+}
+
 /** Cleared steps are real, once each, and a far step follows its near one; the marked step is still to do; felled trees are the marked step's own. */
 function validClearing({ clearing }: SaveShape): boolean {
   if (!object(clearing) || !Array.isArray(clearing.cleared) || !Array.isArray(clearing.felled)) return false;
@@ -311,7 +321,7 @@ function validSickness({ sickness, ending, day, fishingMisses }: SaveShape): boo
 /** Checks a version 24 save, with the survivor's sickness and whether their story has ended, and: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, the workshop and its handcart, shelter upgrades, garden plots, vegetable beds, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validSickness];
+  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validSickness];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

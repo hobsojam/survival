@@ -467,7 +467,7 @@ describe('clearing panel', () => {
     expect(near.detail).toBe(`${CLEARING_STEPS['north-far'].trees.length} trees, then 6 wood and 3 fiber. There's room for a house now.`);
     const far = clearingView(withAxe({ cleared: ['north-near', 'north-far'] })).sides[0];
     expect(far.label).toBe('North · outer');
-    expect(far.detail).toBe('3 trees, then 8 wood, 4 fiber and 2 stone');
+    expect(far.detail).toBe('3 trees, then 8 wood, 4 fiber and 2 stone. There\'s room for a bakery now.');
     const done = clearingView(withAxe({ cleared: ['north-near', 'north-far', 'north-outer'] })).sides[0];
     expect(done).toMatchObject({ label: 'North · cleared', done: true, disabled: true });
     expect(clearingView(withAxe({ cleared: ['north-near', 'north-far'] })).progress).toBe('Cleared ground: north near, north far.');
