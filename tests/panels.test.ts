@@ -638,6 +638,12 @@ describe('the field and granary panels', () => {
     expect(fieldPanelView(withField(tools(fieldCamp(), { harvestTools: true }), { seed: 1 })).hint).toBe(base);
   });
 
+  it('leaves out the wild grain once every strip is sown, though the seed is all used', () => {
+    const base = 'Sow in spring, and the grain grows by itself through summer. Once it turns gold, cut it and thresh it. Ripe grain waits for you.';
+    const sown = strips(strip({ sownDay: 22 }), strip({ sownDay: 22 }), strip({ sownDay: 23 }), strip({ sownDay: 23 }));
+    expect(fieldPanelView(withField(tools({ ...fieldCamp(), day: 24 }, { harvestTools: true }), { strips: sown, seed: 0 })).hint).toBe(base);
+  });
+
   it('marks up a strip with its job, or none', () => {
     const job = stripMarkup({ label: 'Strip 1 · Gold, ready to cut', action: 'cutStrip', verb: 'Cut', disabled: false, title: 'Cut the strip.' }, 0);
     expect(job).toContain('data-action="cutStrip" data-strip-index="0"');
@@ -651,7 +657,7 @@ describe('the field and granary panels', () => {
     const state = withField(fieldCamp({ granary: true }), { grain: 12, seed: 3 });
     expect(granaryPanelView(state)).toMatchObject({ shown: true, stored: '12 of 16 grain', seed: 'Seed for 3 strips', grind: { shown: false } });
     expect(granaryPanelView(withField(state, { seed: 1 })).seed).toBe('Seed for 1 strip');
-    expect(granaryPanelView(withField(state, { seed: 0 })).seed).toBe('No seed yet');
+    expect(granaryPanelView(withField(state, { seed: 0 })).seed).toBe('No seed kept');
     const quern = tools(state, { quern: true });
     expect(granaryPanelView(quern).grind).toEqual({ shown: true, disabled: false, hint: '' });
     expect(granaryPanelView(withField(quern, { grain: 1 })).grind)

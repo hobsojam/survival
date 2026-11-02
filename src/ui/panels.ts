@@ -120,7 +120,8 @@ export function fieldPanelView(state: GameState): { shown: boolean; hint: string
     return { label, action: job.action, verb: job.verb, disabled: Boolean(blocker), title: blocker ?? job.done };
   });
   const tools = state.progress.workshop.harvestTools ? '' : ' The workshop can make a sickle and flail.';
-  const seed = state.field.seed > 0 ? '' : ' Wild grain grows at the edge of the clearing.';
+  const wantsSeed = state.field.seed === 0 && state.field.strips.some(strip => strip.sownDay === null);
+  const seed = wantsSeed ? ' Wild grain grows at the edge of the clearing.' : '';
   const hint = `Sow in spring, and the grain grows by itself through summer. Once it turns gold, cut it and thresh it. Ripe grain waits for you.${tools}${seed}`;
   return { shown: state.structures.field, hint, strips };
 }
@@ -135,7 +136,7 @@ export function stripMarkup(strip: StripPanelView, index: number): string {
 /** The Granary panel, once built: the grain stored against its room, the seed kept, and Grind once the quern is made. */
 export function granaryPanelView(state: GameState): { shown: boolean; stored: string; seed: string; grind: { shown: boolean; disabled: boolean; hint: string } } {
   const { grain, seed } = state.field;
-  const seedLine = seed === 0 ? 'No seed yet' : `Seed for ${seed} ${seed === 1 ? 'strip' : 'strips'}`;
+  const seedLine = seed === 0 ? 'No seed kept' : `Seed for ${seed} ${seed === 1 ? 'strip' : 'strips'}`;
   const blocker = grindGrainBlocker(state);
   return {
     shown: state.structures.granary,
