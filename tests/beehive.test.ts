@@ -4,6 +4,7 @@ import { loadGame, SAVE_KEY, SAVE_VERSION } from '../src/game/save';
 import { advanceTime, applyAction, groundBlocker } from '../src/game/rules';
 import { availableFood } from '../src/game/food';
 import { takeHoneyBlocker } from '../src/game/beehive';
+import { beehivePanelView, foodLaidByDays } from '../src/ui/panels';
 import { beehiveCamp } from './beehiveCamp';
 
 class MemoryStorage implements Storage {
@@ -150,5 +151,18 @@ describe('taking the honey', () => {
 
   it('keeps hive honey out of reach for eating and cooking', () => {
     expect(availableFood(beehiveCamp({ honey: 2 }), 'honey')).toBe(0);
+  });
+});
+
+describe('the Beehive panel', () => {
+  it('shows the honey waiting and whether it can be taken', () => {
+    expect(beehivePanelView(beehiveCamp({ honey: 1 }))).toEqual({ shown: true, stored: '1 of 2 honey', take: { disabled: false, hint: '' } });
+    expect(beehivePanelView(beehiveCamp()).take).toEqual({ disabled: true, hint: 'The bees have no honey for you yet.' });
+    expect(beehivePanelView(beehiveCamp({ built: false })).shown).toBe(false);
+  });
+
+  it('counts the hive\'s honey as food laid by', () => {
+    expect(foodLaidByDays(beehiveCamp())).toBe(0);
+    expect(foodLaidByDays(beehiveCamp({ honey: 2 }))).toBe(1);
   });
 });
