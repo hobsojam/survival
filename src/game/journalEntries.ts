@@ -16,7 +16,8 @@ export type JournalId =
   | 'firstSnow' | 'wolfTracks' | 'frozenSpring' | 'winterFire' | 'winterCooking'
   | 'firstRain' | 'rabbits' | 'bushesFull' | 'stumpGrowing' | 'springRest'
   | 'fireflies' | 'twoHandfuls' | 'goldEvening' | 'warmSleep' | 'lookoutEvening'
-  | 'hazelnuts' | 'pineTea' | 'salad' | 'wildHoney' | 'fireside' | 'grainIn' | 'winterBread';
+  | 'hazelnuts' | 'pineTea' | 'salad' | 'wildHoney' | 'fireside' | 'grainIn' | 'winterBread'
+  | 'autumnGrain' | 'summerBread';
 
 export interface JournalEntry { year: number; id: JournalId; day: number; variant: number }
 
@@ -36,7 +37,8 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'driedBerries', lines: ['Dried berries for the winter.'] },
     { id: 'stars', lines: ['Lay back and counted stars.'] },
     { id: 'hazelnuts', lines: ['Found hazelnuts in the leaf litter.'] },
-    { id: 'fireside', lines: ['A night by the fireplace, the door shut against the wind.'] }
+    { id: 'fireside', lines: ['A night by the fireplace, the door shut against the wind.'] },
+    { id: 'autumnGrain', lines: ['Threshed the grain with the leaves coming down.'] }
   ],
   winter: [
     { id: 'firstSnow', lines: ['Snow fell in the night.'], silent: true },
@@ -63,7 +65,8 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'warmSleep', lines: ['Slept out without a fire, and it was warm.'] },
     { id: 'lookoutEvening', lines: ['Watched the land from the lookout on a long evening.'] },
     { id: 'wildHoney', lines: ['Wild honey from the hollow tree.'] },
-    { id: 'grainIn', lines: ['Brought the grain in. The granary smells of summer.'] }
+    { id: 'grainIn', lines: ['Brought the grain in. The granary smells of summer.'] },
+    { id: 'summerBread', lines: ['The first loaf from the new grain, still warm.'] }
   ]
 };
 
@@ -96,6 +99,9 @@ const cooked = (m: Moment, dish: DishId): boolean =>
   m.action?.type === 'cook' && done(m) && (m.action.dish ?? defaultDish(m.before)) === dish;
 /** A visit to the quiet spring, or a go at fishing through its ice. */
 const atSpring = (m: Moment): boolean => ((m.action?.type === 'visitSite' && m.action.siteId === 'spring') || m.action?.type === 'fish') && done(m);
+
+/** A strip threshed that put grain into the granary, not into a granary already full. */
+const grainWentIn = (m: Moment): boolean => acted(m, 'threshStrip') && m.after.field.grain > m.before.field.grain;
 
 /** Which winter cooking line a meal gets: berries, a fish, or any other supper. */
 function winterMealLine(m: Moment): number {
@@ -141,7 +147,11 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   pineTea: m => onBefore(m, cooked(m, 'pineTea')),
   salad: m => onBefore(m, cooked(m, 'salad')),
   wildHoney: m => onBefore(m, gathered(m, 'honey')),
-  grainIn: m => onBefore(m, acted(m, 'threshStrip')),
+  // The harvest is told on whichever page it lands: summer's last days, or the autumn after.
+  grainIn: m => onBefore(m, grainWentIn(m)),
+  autumnGrain: m => onBefore(m, grainWentIn(m)),
+  // A loaf is told on summer's page or winter's, each with its own line.
+  summerBread: m => onBefore(m, cooked(m, 'loaf')),
   winterBread: m => onBefore(m, cooked(m, 'loaf')),
   // Slept through at home in the house, the fireplace still alight at dawn.
   fireside: m => onBefore(m, acted(m, 'sleep') && dawn(m) && livesInHouse(m.before) && isAtHome(m.before) && fuelLeft(m.after) > 0)

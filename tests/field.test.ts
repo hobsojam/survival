@@ -6,7 +6,7 @@ import { TOO_TIRED_MESSAGE, workSeconds } from '../src/game/needs';
 import { advanceTime, applyAction } from '../src/game/rules';
 import { nodeShown } from '../src/game/forage';
 import { newsBetween } from '../src/game/news';
-import { journalEntry, recordJournal } from '../src/game/journalEntries';
+import { journalEntry, journalSeason, recordJournal } from '../src/game/journalEntries';
 import { nightStart } from '../src/game/calendar';
 import { addFood, emptyFood } from '../src/game/food';
 import { CAMP_STRUCTURES, FIELD_STRIP_OFFSETS, sceneVisuals } from '../src/scene/visuals';
@@ -322,6 +322,42 @@ describe('the harvest in the year journal', () => {
     const { state: written, messages } = recordJournal(summer, applyAction(summer, action).state, action);
     expect(written.journal.map(entry => entry.id)).toContain('grainIn');
     expect(messages).toContain('Written in your journal: Brought the grain in. The granary smells of summer.');
+  });
+
+  it('writes nothing when the granary was already full and no grain went in', () => {
+    const state = withField(tooled(fieldCamp({ granary: true })), { strips: [strip({ sownDay: 22, cut: true }), strip(), strip(), strip()], grain: 16 });
+    const summer = { ...state, day: 36 };
+    const action = { type: 'threshStrip', index: 0 } as const;
+    const ids = recordJournal(summer, applyAction(summer, action).state, action).state.journal.map(entry => entry.id);
+    expect(ids).not.toContain('grainIn');
+  });
+
+  it('writes down grain threshed in autumn on the autumn page', () => {
+    const state = withField(tooled(fieldCamp({ granary: true })), { strips: [strip({ sownDay: 22, cut: true }), strip(), strip(), strip()] });
+    const autumn = { ...state, day: 43 };
+    const action = { type: 'threshStrip', index: 0 } as const;
+    const { state: written, messages } = recordJournal(autumn, applyAction(autumn, action).state, action);
+    expect(written.journal.map(entry => entry.id)).toContain('autumnGrain');
+    expect(written.journal.map(entry => entry.id)).not.toContain('grainIn');
+    expect(messages).toContain('Written in your journal: Threshed the grain with the leaves coming down.');
+    expect(journalSeason('autumnGrain')).toBe('autumn');
+  });
+
+  it('writes nothing for an autumn threshing into a full granary', () => {
+    const state = withField(tooled(fieldCamp({ granary: true })), { strips: [strip({ sownDay: 22, cut: true }), strip(), strip(), strip()], grain: 16 });
+    const autumn = { ...state, day: 43 };
+    const action = { type: 'threshStrip', index: 0 } as const;
+    expect(recordJournal(autumn, applyAction(autumn, action).state, action).state.journal.map(entry => entry.id)).not.toContain('autumnGrain');
+  });
+
+  it('writes down a summer loaf from the new grain', () => {
+    const base = fieldCamp();
+    const state = { ...base, day: 37, timeOfDay: nightStart(37) + 5, fireFuel: 60, inventory: { ...base.inventory, food: addFood(emptyFood(), 'flour', 1, 37) } };
+    const action = { type: 'cook', dish: 'loaf' } as const;
+    const { state: written, messages } = recordJournal(state, applyAction(state, action).state, action);
+    expect(written.journal.map(entry => entry.id)).toContain('summerBread');
+    expect(messages).toContain('Written in your journal: The first loaf from the new grain, still warm.');
+    expect(journalSeason('summerBread')).toBe('summer');
   });
 
   it('writes down the first winter loaf, and not as an ordinary winter supper', () => {

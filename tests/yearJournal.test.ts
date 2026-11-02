@@ -38,8 +38,16 @@ describe('the year journal pages', () => {
     expect(view.title).toBe('Winter, year one');
     expect(view.days).toBe('Days 11–20');
     expect(view.entries).toEqual([]);
-    expect(view.blanks).toBe(7);
+    expect(view.blanks).toBe(6);
     expect(view.hasPrevious && view.hasNext).toBe(true);
+  });
+
+  it('leaves the grain and bread lines off the pages until the field is built', () => {
+    const withField = (state: GameState): GameState => ({ ...state, structures: { ...state.structures, field: true } });
+    const blanks = (state: GameState, page: number): number => journalPageView(state, page).blanks;
+    expect(blanks(withField(on(45)), 0) - blanks(on(45), 0)).toBe(1);
+    expect(blanks(withField(on(45)), 1) - blanks(on(45), 1)).toBe(1);
+    expect(blanks(withField(on(45)), 3) - blanks(on(45), 3)).toBe(2);
   });
 
   it('shows the cold night line that matched the night', () => {

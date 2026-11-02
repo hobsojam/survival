@@ -38,6 +38,32 @@ export const JOURNAL_ICONS: Record<JournalId, JournalIcon> = {
     '.b......b.',
     '..........'
   ] },
+  // A sheaf of grain with an autumn leaf falling past it.
+  autumnGrain: { legend: { g: 'scarf2', G: 'scarf3', t: 'wood1', o: 'fire1', O: 'fire2' }, rows: [
+    '......oO..',
+    '.......o..',
+    '.G.G.G....',
+    '..GgG.....',
+    '...g......',
+    '..ttt.....',
+    '...g......',
+    '..g.g.....',
+    '.g..g.g...',
+    '..........'
+  ] },
+  // A loaf on a board under a summer sun.
+  summerBread: { legend: { k: 'wood1', c: 'earth2', C: 'earth3', W: 'earth4', b: 'wood3', y: 'fire3', Y: 'fire4' }, rows: [
+    '.......y.y',
+    '........Y.',
+    '.......y.y',
+    '..kkkk....',
+    '.kCWWCk...',
+    'kCWCCWCk..',
+    'kcCCCCck..',
+    'bbbbbbbbbb',
+    '.b......b.',
+    '..........'
+  ] },
   leaves: { legend: { o: 'fire1', O: 'fire2', s: 'wood2' }, rows: [
     '..........',
     '.....oo...',
