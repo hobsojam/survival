@@ -134,7 +134,7 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'makeFishingLine' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeFood' | 'takeFood' | 'drawWater' | 'grindGrain' | 'millGrain' | 'takeLoaf';
+        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'makeFishingLine' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeFood' | 'takeFood' | 'drawWater' | 'grindGrain' | 'millGrain' | 'takeLoaf' | 'takeHoney';
         const item = button.dataset.item as FoodItem | undefined;
         const dish = button.dataset.dish as DishId | undefined;
         if (type === 'storeFood' || type === 'takeFood') {
