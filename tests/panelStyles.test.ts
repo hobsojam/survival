@@ -1,10 +1,10 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import STYLES from '../src/style.css?raw';
 
-const css = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+const css = STYLES.replace(/\/\*[\s\S]*?\*\//g, '');
 /** The declarations of every rule whose selector list names the selector, joined. */
 const rulesFor = (selector: string): string => [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)]
-  .filter(([, selectors]) => selectors.split(/,(?![^(]*\))/).some(item => item.replace(/\s+/g, ' ').trim() === selector
+  .filter(([, selectors]) => selectors.split(/,(?![^(]*\))/).some((item: string) => item.replace(/\s+/g, ' ').trim() === selector
     || item.includes(':is(') && expandIs(item).includes(selector)))
   .map(([, , body]) => body).join(';');
 /** `:is(.a, .b) .c` as ['.a .c', '.b .c']. */
