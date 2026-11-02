@@ -814,6 +814,85 @@ function granary(g: Grid, stock: StockLevel): void {
   line(g, 11, 0, 16, 0, 'a'); line(g, 0, 11, 27, 11, 'a');
 }
 
+function windmillSite(g: Grid): void {
+  for (const [x, y] of [[2, 6], [20, 6], [2, 11], [20, 11]]) stake(g, x, y);
+  oval(g, 11, 10, 6, 2, 'o'); oval(g, 11, 10, 4, 1, 'z');
+  for (const x of [6, 15]) { box(g, x, 12, 2, 2, 'n'); dot(g, x, 12, 'p'); }
+}
+
+/** One lattice sail from the hub at (16, 15), turned `degrees` clockwise from straight up. */
+function windmillSail(g: Grid, degrees: number): void {
+  const radians = degrees * Math.PI / 180;
+  const along = (r: number): [number, number] => [16 + Math.sin(radians) * r, 15 - Math.cos(radians) * r];
+  const across = (r: number, side: number): [number, number] => {
+    const [x, y] = along(r);
+    return [x + Math.cos(radians) * side, y + Math.sin(radians) * side];
+  };
+  // The canvas sail on one side of the stock, then the stock itself drawn over its edge.
+  for (let r = 4; r <= 14; r++) for (let side = 1; side <= 3; side++) {
+    const [x, y] = across(r, side);
+    dot(g, Math.round(x), Math.round(y), (r + side) % 3 === 0 ? 'h' : 'i');
+  }
+  for (let r = 1; r <= 15; r++) {
+    const [x, y] = along(r);
+    dot(g, Math.round(x), Math.round(y), 'a');
+  }
+}
+
+/**
+ * A small stone tower mill with a timber cap and four lattice sails, turned a quarter of the way between frames so the
+ * four frames loop. The tower tapers upward, edged in dark stone so it reads against the earth.
+ */
+function windmill(g: Grid, turn: number): void {
+  oval(g, 16, 45, 11, 2, 's');
+  for (let y = 18; y <= 44; y++) {
+    const half = 6 + Math.floor((y - 18) / 7);
+    box(g, 16 - half, y, half * 2, 1, (y % 5 === 0) ? 'n' : 'o');
+    dot(g, 16 - half, y, 'm'); dot(g, 15 + half, y, 'm');
+  }
+  box(g, 14, 37, 4, 8, 'a'); box(g, 15, 38, 2, 7, 'b');
+  box(g, 15, 26, 2, 3, 'a');
+  // The cap, a timber hood the sails hang from.
+  for (let y = 11; y <= 18; y++) {
+    const half = Math.min(8, y - 9);
+    box(g, 16 - half, y, half * 2, 1, y % 2 ? 'c' : 'd');
+    dot(g, 16 - half, y, 'a'); dot(g, 15 + half, y, 'a');
+  }
+  for (let arm = 0; arm < 4; arm++) windmillSail(g, turn * 22.5 + arm * 90);
+  box(g, 15, 14, 3, 3, 'a'); dot(g, 16, 15, 'e');
+}
+
+function bakerySite(g: Grid): void {
+  for (const [x, y] of [[2, 6], [28, 6], [2, 11], [28, 11]]) stake(g, x, y);
+  line(g, 4, 7, 28, 7, 'h'); line(g, 4, 12, 28, 12, 'h');
+  box(g, 20, 8, 4, 3, 'n'); dot(g, 20, 8, 'p');
+}
+
+/**
+ * A stone bakehouse with a thatched roof and a tall chimney. Loaves sit on a shelf by the door when there are any, and
+ * smoke rises from the chimney the morning the oven bakes.
+ */
+function bakery(g: Grid, look: 'cold' | 'loaves' | 'baking'): void {
+  oval(g, 16, 30, 14, 2, 's');
+  box(g, 3, 15, 26, 14, 'o');
+  for (const y of [18, 22, 26]) for (let x = 3 + (y % 4); x < 29; x += 5) line(g, x, y, x + 3, y, 'n');
+  line(g, 3, 15, 3, 28, 'm'); line(g, 28, 15, 28, 28, 'm'); line(g, 3, 28, 28, 28, 'm');
+  // The door, and the oven's glowing mouth beside it.
+  box(g, 7, 20, 6, 9, 'a'); box(g, 8, 21, 4, 8, 'b');
+  box(g, 18, 22, 6, 4, 'm'); box(g, 19, 23, 4, 3, look === 'baking' ? 'u' : 'a');
+  // The shelf under the window, with the loaves on it.
+  line(g, 16, 27, 26, 27, 'c');
+  if (look !== 'cold') { box(g, 17, 25, 3, 2, 'A'); dot(g, 17, 25, 'B'); box(g, 21, 25, 3, 2, 'A'); dot(g, 21, 25, 'B'); }
+  // The chimney, then the thatch drawn over the walls' top.
+  box(g, 22, 3, 4, 10, 'n'); box(g, 22, 3, 4, 1, 'p'); line(g, 22, 3, 22, 12, 'm');
+  for (let y = 6; y <= 15; y++) {
+    const half = Math.min(15, y + 3);
+    box(g, 16 - half, y, half * 2, 1, y % 2 ? 'C' : 'i');
+    dot(g, 16 - half, y, 'a'); dot(g, 15 + half, y, 'a');
+  }
+  if (look === 'baking') for (const [x, y] of [[24, 1], [23, 0], [25, 0], [26, 2]]) dot(g, x, y, 'q');
+}
+
 const BED_FRAMES = Object.fromEntries((['potatoes', 'beans', 'carrots'] as const).flatMap(crop =>
   (['empty', 'sprout', 'growing', 'ripe'] as const).flatMap(stage =>
     (['fresh', 'dry', 'wilted', 'frost'] as const).map(soil => [`${crop}-${stage}-${soil}`, (g: Grid) => vegBed(g, crop, stage, soil)]))));
@@ -889,6 +968,10 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   fieldStrip: define(16, 24, fieldLegend, Object.fromEntries((['bare', 'shoots', 'green', 'gold', 'stooks'] as const).map(stage => [stage, (g: Grid) => fieldStrip(g, stage)]))),
   granarySite: define(28, 16, campLegend, { still: granarySite }),
   granary: define(28, 32, campLegend, { empty: g => granary(g, 'empty'), some: g => granary(g, 'some'), full: g => granary(g, 'full') }),
+  windmillSite: define(24, 16, campLegend, { still: windmillSite }),
+  windmill: define(32, 48, campLegend, Object.fromEntries([0, 1, 2, 3].map(turn => [`turn${turn}`, (g: Grid) => windmill(g, turn)]))),
+  bakerySite: define(32, 16, campLegend, { still: bakerySite }),
+  bakery: define(32, 32, campLegend, { cold: g => bakery(g, 'cold'), loaves: g => bakery(g, 'loaves'), baking: g => bakery(g, 'baking') }),
   pileCount: define(13, 7, countLegend, {
     ...Object.fromEntries([2, 3, 4, 5, 6, 7, 8, 9].map(n => [`n${n}`, (g: Grid) => pileCount(g, [String(n)])])),
     lots: g => pileCount(g, ['9', '+'])

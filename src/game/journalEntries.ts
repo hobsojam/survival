@@ -17,7 +17,7 @@ export type JournalId =
   | 'firstRain' | 'rabbits' | 'bushesFull' | 'stumpGrowing' | 'springRest'
   | 'fireflies' | 'twoHandfuls' | 'goldEvening' | 'warmSleep' | 'lookoutEvening'
   | 'hazelnuts' | 'pineTea' | 'salad' | 'wildHoney' | 'fireside' | 'grainIn' | 'winterBread'
-  | 'autumnGrain' | 'summerBread';
+  | 'autumnGrain' | 'summerBread' | 'ovenBread';
 
 export interface JournalEntry { year: number; id: JournalId; day: number; variant: number }
 
@@ -56,7 +56,8 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'bushesFull', lines: ['The bushes are full again.'] },
     { id: 'stumpGrowing', lines: ['A stump I cut is growing back already.'] },
     { id: 'springRest', lines: ['Sat a while at the spring, now that it\'s thawed.'] },
-    { id: 'salad', lines: ['Greens and berries, the first salad of spring.'] }
+    { id: 'salad', lines: ['Greens and berries, the first salad of spring.'] },
+    { id: 'ovenBread', lines: ['Woke to warm bread from my own oven.'] }
   ],
   summer: [
     { id: 'fireflies', lines: ['Fireflies over camp.'] },
@@ -153,6 +154,8 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   // A loaf is told on summer's page or winter's, each with its own line.
   summerBread: m => onBefore(m, cooked(m, 'loaf')),
   winterBread: m => onBefore(m, cooked(m, 'loaf')),
+  // Woke in camp on a dawn the bakery's oven baked its loaf.
+  ovenBread: m => onAfter(m, dawn(m) && m.after.bakery.lastBaked === m.after.day && isInClearing(m.after)),
   // Slept through at home in the house, the fireplace still alight at dawn.
   fireside: m => onBefore(m, acted(m, 'sleep') && dawn(m) && livesInHouse(m.before) && isAtHome(m.before) && fuelLeft(m.after) > 0)
 };

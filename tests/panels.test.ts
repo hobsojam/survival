@@ -465,9 +465,19 @@ describe('clearing panel', () => {
     const near = clearingView(withAxe({ cleared: ['north-near'] })).sides[0];
     expect(near.label).toBe('North · far');
     expect(near.detail).toBe(`${CLEARING_STEPS['north-far'].trees.length} trees, then 6 wood and 3 fiber. There's room for a house now.`);
-    const done = clearingView(withAxe({ cleared: ['north-near', 'north-far'] })).sides[0];
+    const far = clearingView(withAxe({ cleared: ['north-near', 'north-far'] })).sides[0];
+    expect(far.label).toBe('North · outer');
+    expect(far.detail).toBe('3 trees, then 8 wood, 4 fiber and 2 stone. There\'s room for a bakery now.');
+    const done = clearingView(withAxe({ cleared: ['north-near', 'north-far', 'north-outer'] })).sides[0];
     expect(done).toMatchObject({ label: 'North · cleared', done: true, disabled: true });
     expect(clearingView(withAxe({ cleared: ['north-near', 'north-far'] })).progress).toBe('Cleared ground: north near, north far.');
+  });
+
+  it('names the stone in the price of clearing an outer nook', () => {
+    const felled = CLEARING_STEPS['north-outer'].trees.map((_, i) => i);
+    const marked = withAxe({ cleared: ['north-near', 'north-far'], marked: 'north-outer', felled });
+    expect(clearingView(marked).clear.cost).toBe('8 wood · 4 fiber · 2 stone');
+    expect(clearingView(withAxe({ cleared: [], marked: 'north-near', felled: [] })).clear.cost).toBe('4 wood · 2 fiber');
   });
 
   it('keeps only a compact status once every side is cleared', () => {

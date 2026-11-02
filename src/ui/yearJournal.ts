@@ -1,7 +1,7 @@
 import { SEASON_LENGTH, YEAR_LENGTH, seasonName, type Season } from '../game/calendar';
 import { journalIconUrl } from '../art/journalIcons';
 import { JOURNAL_PAGES, journalEntry, journalSeason, type JournalId } from '../game/journalEntries';
-import type { GameState } from '../game/state';
+import type { GameState, StructureId } from '../game/state';
 
 const YEAR: readonly Season[] = ['autumn', 'winter', 'spring', 'summer'];
 const WORDS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve',
@@ -22,8 +22,10 @@ export interface JournalPageView {
   hasNext: boolean;
 }
 
-/** The journal moments that only a camp with a grain field can have. */
-const FIELD_ENTRIES: ReadonlySet<JournalId> = new Set(['grainIn', 'autumnGrain', 'summerBread', 'winterBread']);
+/** The journal moments that wait on a building: the fireside on the house, the grain and bread on the field, the oven on the bakery. */
+const WAITS_ON: Partial<Record<JournalId, StructureId>> = {
+  fireside: 'house', grainIn: 'field', autumnGrain: 'field', summerBread: 'field', winterBread: 'field', ovenBread: 'bakery'
+};
 
 /** One season's page of the year journal; pages before the first or after today show the nearest real one. */
 export function journalPageView(state: GameState, page: number): JournalPageView {
@@ -32,9 +34,11 @@ export function journalPageView(state: GameState, page: number): JournalPageView
   const year = Math.floor(index / 4) + 1;
   const s = YEAR[index % 4];
   const first = (year - 1) * YEAR_LENGTH + (index % 4) * SEASON_LENGTH + 1;
-  // The fireside moment waits on the house, and the grain and bread on the field, so a camp without them keeps its page as it was.
-  const entries = JOURNAL_PAGES[s].filter(entry => (entry.id !== 'fireside' || state.structures.house)
-    && (!FIELD_ENTRIES.has(entry.id) || state.structures.field));
+  // A moment that waits on a building stays off the page until it stands, so a camp without it keeps its page as it was.
+  const entries = JOURNAL_PAGES[s].filter(entry => {
+    const building = WAITS_ON[entry.id];
+    return !building || state.structures[building];
+  });
   const order = entries.map(entry => entry.id);
   const written = state.journal
     .filter(entry => entry.year === year && journalSeason(entry.id) === s)

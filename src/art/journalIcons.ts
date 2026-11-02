@@ -64,6 +64,19 @@ export const JOURNAL_ICONS: Record<JournalId, JournalIcon> = {
     '.b......b.',
     '..........'
   ] },
+  // A stone oven's arched mouth with a loaf inside, smoke curling from its chimney.
+  ovenBread: { legend: { s: 'stone1', S: 'stone2', k: 'ink', c: 'earth2', C: 'earth3', m: 'frost' }, rows: [
+    '.......m..',
+    '......m...',
+    '......SS..',
+    '..SSSSSS..',
+    '.SSSSSSSS.',
+    '.SSkkkkSS.',
+    '.SkcCCckS.',
+    '.SkkkkkkS.',
+    'ssssssssss',
+    '..........'
+  ] },
   leaves: { legend: { o: 'fire1', O: 'fire2', s: 'wood2' }, rows: [
     '..........',
     '.....oo...',

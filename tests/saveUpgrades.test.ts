@@ -117,3 +117,32 @@ describe('the version 26 upgrade: the grain field', () => {
     expect(loadGame(storage).kind).toBe('loaded');
   });
 });
+
+describe('the version 27 upgrade: the windmill and bakery', () => {
+  /** A version 26 camp: today's game without anything the windmill and bakery brought. */
+  function version26(changes: Record<string, unknown> = {}) {
+    const game = createGame() as unknown as Record<string, any>;
+    const { windmill: _w, bakery: _b, ...structures } = game.structures;
+    const { millFlour: _m, bakery: _s, ...state } = game;
+    return { ...state, structures, ...changes };
+  }
+
+  it('adds no windmill or bakery, an empty flour bin and a bare shelf', () => {
+    const upgraded = SAVE_UPGRADES[26](structuredClone(version26())) as ReturnType<typeof createGame>;
+    const fresh = createGame();
+    expect(upgraded.structures).toEqual(fresh.structures);
+    expect(upgraded.millFlour).toBe(0);
+    expect(upgraded.bakery).toEqual({ shelf: [], lastBaked: null, resumed: null });
+  });
+
+  it('leaves a camp that already has them as it was', () => {
+    const current = { ...createGame(), millFlour: 3, bakery: { shelf: [4], lastBaked: 4, resumed: 4 } };
+    expect(SAVE_UPGRADES[26](structuredClone(current))).toEqual(current);
+  });
+
+  it('loads a version 26 camp', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 26, state: version26() }));
+    expect(loadGame(storage).kind).toBe('loaded');
+  });
+});

@@ -3,7 +3,7 @@ import { bagCapacity, carriedCount } from './rules';
 import { season, yearOf } from './calendar';
 import { journalEntry, journalSeason, type JournalId } from './journalEntries';
 import type { ClearingState, StepId } from './clearing';
-import { CLEARING_STEPS, STEP_IDS, placeBranches } from './clearing';
+import { CLEARING_STEPS, STEP_IDS, placeBranches, previousStep } from './clearing';
 import { KEEPSAKES_NEEDED, TRUST_TARGET } from './companion';
 import { FOOD_ITEMS, isFresh, storeTotal, type FoodStore } from './food';
 import { FORAGE, isForage } from './forage';
@@ -172,13 +172,24 @@ function validField({ field, structures, day }: SaveShape): boolean {
   return stripsOk && seedOk && grainOk;
 }
 
+/** Flour only in a built windmill's bin and no more than it holds; loaves only on a built bakery's shelf, no more than it holds, each baked on a day already lived, as are the last bake and the last fresh start, which comes no later than it. */
+function validBakehouse({ millFlour, bakery, structures, day }: SaveShape): boolean {
+  const today = day as number;
+  if (!count(millFlour) || millFlour > BALANCE.millFlourCapacity || (millFlour > 0 && structures.windmill !== true)) return false;
+  if (!object(bakery) || !Array.isArray(bakery.shelf) || bakery.shelf.length > BALANCE.bakeryShelfCapacity) return false;
+  if (!bakery.shelf.every(baked => readyBy(baked, today))) return false;
+  if (bakery.lastBaked !== null && !readyBy(bakery.lastBaked, today)) return false;
+  if (bakery.resumed !== null && (!readyBy(bakery.resumed, today) || bakery.lastBaked === null || (bakery.resumed as number) > (bakery.lastBaked as number))) return false;
+  return structures.bakery === true || (bakery.shelf.length === 0 && bakery.lastBaked === null && bakery.resumed === null);
+}
+
 /** Cleared steps are real, once each, and a far step follows its near one; the marked step is still to do; felled trees are the marked step's own. */
 function validClearing({ clearing }: SaveShape): boolean {
   if (!object(clearing) || !Array.isArray(clearing.cleared) || !Array.isArray(clearing.felled)) return false;
   const { cleared, marked, felled } = clearing as ObjectValue & { cleared: unknown[]; felled: unknown[] };
   const step = (value: unknown): value is StepId => typeof value === 'string' && (STEP_IDS as readonly string[]).includes(value);
   if (!cleared.every(step) || new Set(cleared).size !== cleared.length) return false;
-  const nearDone = (id: StepId): boolean => !id.endsWith('-far') || cleared.includes(id.replace('-far', '-near') as StepId);
+  const nearDone = (id: StepId): boolean => { const before = previousStep(id); return !before || cleared.includes(before); };
   if (!cleared.every(nearDone)) return false;
   if (marked === null) return felled.length === 0;
   if (!step(marked) || cleared.includes(marked) || !nearDone(marked)) return false;
@@ -311,7 +322,7 @@ function validSickness({ sickness, ending, day, fishingMisses }: SaveShape): boo
 /** Checks a version 24 save, with the survivor's sickness and whether their story has ended, and: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, the workshop and its handcart, shelter upgrades, garden plots, vegetable beds, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validSickness];
+  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validSickness];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

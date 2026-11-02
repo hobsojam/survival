@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CLEARING_STEPS, STEP_IDS, choppableTrees, clearGroundBlocker, placeBranches, roomLine, clearingKey, clearingReach, inClearing, markBlocker, markedTrees, nextStep, sideAt, type StepId } from '../src/game/clearing';
+import { CLEARING_STEPS, STEP_IDS, previousStep, stepDepth, choppableTrees, clearGroundBlocker, placeBranches, roomLine, clearingKey, clearingReach, inClearing, markBlocker, markedTrees, nextStep, sideAt, type StepId } from '../src/game/clearing';
 import { BALANCE, LOOKOUT, SITES, createGame } from '../src/game/state';
 import { applyAction } from '../src/game/rules';
 import { TOO_TIRED_MESSAGE } from '../src/game/needs';
@@ -40,11 +40,21 @@ describe('clearingReach', () => {
     expect(clearingReach(...at(180), cleared)).toBe(4);
   });
 
-  it('reaches furthest north, east and west once every step is done', () => {
+  it('reaches furthest north, east and west once every step is done, outside the nooks', () => {
     expect(clearingReach(...at(0), STEP_IDS)).toBe(9);
     expect(clearingReach(...at(180), STEP_IDS)).toBe(9);
     expect(clearingReach(...at(-90), STEP_IDS)).toBe(9);
     expect(clearingReach(...at(90), STEP_IDS)).toBe(8);
+  });
+
+  it('reaches into each nook only within its arc, blending back over a few degrees', () => {
+    const north: StepId[] = ['north-near', 'north-far', 'north-outer'];
+    expect(clearingReach(...at(-103), north)).toBe(11);
+    expect(clearingReach(...at(-103), ['north-near', 'north-far'])).toBe(9);
+    expect(clearingReach(...at(-93), north)).toBeCloseTo(10);
+    expect(clearingReach(...at(-91), north)).toBe(9);
+    expect(clearingReach(...at(106), STEP_IDS)).toBe(11.5);
+    expect(clearingReach(...at(120), STEP_IDS)).toBe(8);
   });
 
   it('averages the two sides at a boundary and takes one side well clear of it', () => {
@@ -61,7 +71,10 @@ describe('clearingReach', () => {
 
 describe('clearing steps', () => {
   const game = createGame();
-  const previousReach = (id: StepId): number => (id.endsWith('far') ? CLEARING_STEPS[`${CLEARING_STEPS[id].side}-near`].reach : 4);
+  const previousReach = (id: StepId): number => {
+    const before = previousStep(id);
+    return before ? CLEARING_STEPS[before].reach : 4;
+  };
 
   it('keeps each marked tree on its side, just past the old edge and within the new one', () => {
     for (const id of STEP_IDS) {
@@ -90,21 +103,23 @@ describe('clearing steps', () => {
     }
   });
 
-  it('prices near and far steps', () => {
+  it('prices near, far and outer steps', () => {
+    const COSTS = { near: { wood: 4, fiber: 2, stone: 0 }, far: { wood: 6, fiber: 3, stone: 0 }, outer: { wood: 8, fiber: 4, stone: 2 } };
     for (const id of STEP_IDS) {
-      const far = id.endsWith('far');
+      const depth = stepDepth(id);
       // The west wedge is narrow and split by the quarry path, so west-near has room for only two.
-      expect(CLEARING_STEPS[id].trees).toHaveLength(id === 'west-near' ? 2 : far ? 6 : 4);
-      expect(CLEARING_STEPS[id].cost).toEqual(far ? { wood: 6, fiber: 3, stone: 0 } : { wood: 4, fiber: 2, stone: 0 });
+      if (depth === 'outer') expect(CLEARING_STEPS[id].trees).toHaveLength(3);
+      else expect(CLEARING_STEPS[id].trees).toHaveLength(id === 'west-near' ? 2 : depth === 'far' ? 6 : 4);
+      expect(CLEARING_STEPS[id].cost).toEqual(COSTS[depth]);
     }
   });
 
   it('makes room for the buildings', () => {
     const room = Object.fromEntries(STEP_IDS.map(id => [id, CLEARING_STEPS[id].room]));
     expect(room).toEqual({
-      'north-near': ['larder'], 'north-far': ['house'],
+      'north-near': ['larder'], 'north-far': ['house'], 'north-outer': ['bakery'],
       'east-near': ['woodpile', 'fibreStack'], 'east-far': ['workshop'],
-      'south-near': ['granary'], 'south-far': ['field'],
+      'south-near': ['granary'], 'south-far': ['field'], 'south-outer': ['windmill'],
       'west-near': ['vegetableBeds'], 'west-far': ['well']
     });
   });
@@ -116,6 +131,35 @@ describe('clearing steps', () => {
         const edge = Math.min(x, y, BALANCE.mapWidth - 1 - x, BALANCE.mapHeight - 1 - y);
         if (edge < 2) expect(inClearing(x, y, STEP_IDS), `${x},${y}`).toBe(false);
       }
+    }
+  });
+});
+
+describe('the outer ground', () => {
+  it('opens a third step on the north and south sides only', () => {
+    expect(STEP_IDS).toEqual(['north-near', 'north-far', 'north-outer', 'east-near', 'east-far', 'south-near', 'south-far', 'south-outer', 'west-near', 'west-far']);
+    expect(previousStep('north-outer')).toBe('north-far');
+    expect(previousStep('south-far')).toBe('south-near');
+    expect(previousStep('east-near')).toBeNull();
+    expect(stepDepth('south-outer')).toBe('outer');
+    expect(stepDepth('west-far')).toBe('far');
+    expect(stepDepth('east-near')).toBe('near');
+    expect(CLEARING_STEPS['north-outer']).toMatchObject({ side: 'north', reach: 11, cost: { wood: 8, fiber: 4, stone: 2 }, room: ['bakery'], arc: { from: -107, to: -95 } });
+    expect(CLEARING_STEPS['south-outer']).toMatchObject({ side: 'south', reach: 11.5, cost: { wood: 8, fiber: 4, stone: 2 }, room: ['windmill'], arc: { from: 98, to: 114 } });
+  });
+
+  it('takes no wild tree into camp', () => {
+    const withoutNooks = STEP_IDS.filter(id => stepDepth(id) !== 'outer');
+    for (const tree of createGame().trees) {
+      if (!inClearing(tree.x, tree.y, withoutNooks)) expect(inClearing(tree.x, tree.y, STEP_IDS), tree.id).toBe(false);
+    }
+  });
+
+  it('keeps the outer trees clear of the field and the wild grain', () => {
+    const field = { x: FIRE.x - 1.5, y: FIRE.y + 7 };
+    for (const tree of CLEARING_STEPS['south-outer'].trees) {
+      expect(Math.abs(tree.x - field.x) > 3 || Math.abs(tree.y - field.y) > 1.5, `${tree.x},${tree.y}`).toBe(true);
+      expect(Math.hypot(tree.x - 25, tree.y - 23)).toBeGreaterThanOrEqual(1.5);
     }
   });
 });
@@ -147,6 +191,10 @@ describe('marking a side and felling its trees', () => {
     away.player.y = 5;
     expect(markBlocker(away, 'east-near')).toBe('Return to camp to clear land.');
     expect(markBlocker(state, 'east-far')).toBe('Clear the near ground on that side first.');
+    state.clearing.cleared = ['north-near'];
+    expect(markBlocker(state, 'north-outer')).toBe('Clear the far ground on that side first.');
+    state.clearing.cleared = ['north-near', 'north-far'];
+    expect(markBlocker(state, 'north-outer')).toBeNull();
     state.clearing.cleared = ['east-near'];
     expect(markBlocker(state, 'east-near')).toBe('That ground is already clear.');
     state.clearing = { cleared: [], marked: 'north-near', felled: [0] };
@@ -279,6 +327,22 @@ describe('clearing the ground', () => {
     expect(next.nodes.some((node, index) => node.x !== state.nodes[index].x || node.y !== state.nodes[index].y)).toBe(true);
   });
 
+  it('asks for stone as well as wood and fiber on the outer ground, and spends it', () => {
+    const outer = (stone: number) => {
+      const state = createGame();
+      state.progress.axeCrafted = true;
+      state.clearing = { cleared: ['north-near', 'north-far'], marked: 'north-outer', felled: CLEARING_STEPS['north-outer'].trees.map((_, i) => i) };
+      state.inventory.wood = 8;
+      state.inventory.fiber = 4;
+      state.inventory.stone = stone;
+      return state;
+    };
+    expect(clearGroundBlocker(outer(1))).toBe('Need 8 wood, 4 fiber and 2 stone to clear this.');
+    const after = applyAction(outer(2), { type: 'clearGround' }).state;
+    expect(after.clearing.cleared).toContain('north-outer');
+    expect(after.inventory).toMatchObject({ wood: 0, fiber: 0, stone: 0 });
+  });
+
   it('refuses when blocked', () => {
     const state = createGame();
     const result = applyAction(state, { type: 'clearGround' });
@@ -299,9 +363,9 @@ describe('clearing the ground', () => {
 describe('moving the branches', () => {
   const subsets = (): StepId[][] => {
     const all: StepId[][] = [];
-    for (let mask = 0; mask < 256; mask++) {
+    for (let mask = 0; mask < 1 << STEP_IDS.length; mask++) {
       const set = STEP_IDS.filter((_, i) => mask & (1 << i));
-      if (set.every(id => !id.endsWith('-far') || set.includes(id.replace('far', 'near') as StepId))) all.push(set);
+      if (set.every(id => { const before = previousStep(id); return !before || set.includes(before); })) all.push(set);
     }
     return all;
   };

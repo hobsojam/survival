@@ -6,10 +6,11 @@ import { wolfVisit } from './wolves';
 import { availableFiber, availableStone, availableWood, spendFiber, spendWood, bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
 import { POT_COST, cookBlocker, defaultDish, dishBlocker, foodWord, isPackedDish, packDish, potBlocker, serveDish, spendIngredients, type DishId } from './cooking';
 import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
-import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, type StepId } from './clearing';
+import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, stepDepth, type StepId } from './clearing';
 import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
 import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
+import { bakeryDawn, millGrainBlocker, milledState, takeLoafBlocker, takenLoaf } from './bakehouse';
 import { cutField, cutStripBlocker, grindGrainBlocker, seededField, sowStripBlocker, sownField, threshStripBlocker, threshedField, wildGrainBlocker } from './field';
 import { BED_CROPS, bedsDawn, drawWaterBlocker, emptyBed, harvestBedBlocker, needsWater, sowBedBlocker } from './beds';
 import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
@@ -36,6 +37,8 @@ export type GameAction =
   | { type: 'cutStrip'; index: number }
   | { type: 'threshStrip'; index: number }
   | { type: 'grindGrain' }
+  | { type: 'millGrain' }
+  | { type: 'takeLoaf' }
   | { type: 'drawWater' }
   | { type: 'makeUpgrade'; upgrade: UpgradeId }
   | { type: 'eat'; item?: FoodItem }
@@ -157,7 +160,7 @@ export function groundBlocker(state: GameState, id: StructureId): string | null 
   const definition = BUILDINGS[id];
   if (!('ground' in definition) || state.clearing.cleared.includes(definition.ground)) return null;
   const step = definition.ground;
-  return `Clear the ${CLEARING_STEPS[step].side} side's ${step.endsWith('-far') ? 'far' : 'near'} ground first.`;
+  return `Clear the ${CLEARING_STEPS[step].side} side's ${stepDepth(step)} ground first.`;
 }
 
 /** How a structure's build button should look: built, locked, blocked by a missing shelter or uncleared ground, ready to build here, or not yet. */
@@ -281,12 +284,13 @@ function dawn(next: GameState, home: boolean): void {
   // Rocks give their stone once; everything else grows back at dawn.
   next.nodes = next.nodes.map(node => node.kind !== 'stone' && node.readyDay <= next.day ? { ...node, amount: 1 } : node);
   companionDawn(next);
-  // The bag and the larder both throw out what has gone soft, wherever the survivor is; one note covers both.
+  // The bag, the larder and the bakery shelf all throw out what has gone soft, wherever the survivor is; one note covers them.
   const bag = spoil(next.inventory.food, next.day, BALANCE.bagFreshDays);
   const larder = spoil(next.larder, next.day, BALANCE.larderFreshDays);
   next.inventory = { ...next.inventory, food: bag.store };
   next.larder = larder.store;
-  const lost = { berry: bag.lost.berry + larder.lost.berry, greens: bag.lost.greens + larder.lost.greens, bread: bag.lost.bread + larder.lost.bread };
+  const shelf = bakeryDawn(next);
+  const lost = { berry: bag.lost.berry + larder.lost.berry, greens: bag.lost.greens + larder.lost.greens, bread: bag.lost.bread + larder.lost.bread + shelf.lost };
   if (lost.berry + lost.greens + lost.bread > 0) next.lastSpoiled = { day: next.day, ...lost };
   if (!stormEnded) return;
   if (weathered) {
@@ -895,6 +899,22 @@ const grindGrain: ActionHandler<'grindGrain'> = state => {
   return { state: advanceTime(ground, workSeconds(state, BALANCE.gatherSeconds), 'working'), message: 'You grind a little grain into flour.' };
 };
 
+/** One heavy job at the windmill grinds the whole granary, as far as the flour bin has room. */
+const millGrain: ActionHandler<'millGrain'> = state => {
+  const blocker = millGrainBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  const milled = milledState(state);
+  const worked = { ...milled.state, player: tire(state, BALANCE.fieldWorkEnergy) };
+  return { state: advanceTime(worked, workSeconds(state, BALANCE.fieldWorkSeconds), 'working'), message: milled.message };
+};
+
+/** Takes the oldest loaf off the bakery shelf into the bag, as quick as taking food from the larder. */
+const takeLoaf: ActionHandler<'takeLoaf'> = state => {
+  const blocker = takeLoafBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  return { state: takenLoaf(state), message: 'You take a loaf from the bakery shelf.' };
+};
+
 /** One bucket from the well waters every bed still growing, for today. It takes the time and energy of gathering. */
 const drawWater: ActionHandler<'drawWater'> = state => {
   const blocker = drawWaterBlocker(state);
@@ -1028,7 +1048,7 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak,
+  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak,
   makeFishingLine, fish
 };
 
