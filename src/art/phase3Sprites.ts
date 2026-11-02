@@ -103,6 +103,22 @@ function greens(g: Grid, ready: boolean): void {
   box(g, 5, 11, 6, 2, 'j'); line(g, 4, 12, 12, 12, 'r'); dot(g, 3, 12, 'q'); dot(g, 12, 11, 't');
   for (const [x, y] of [[5, 4], [11, 4]]) { dot(g, x, y, 'w'); dot(g, x, y + 1, 'q'); }
 }
+/** A tuft of wild grain: thin pale stalks, each bending under a golden seed head; gathered, only short stubble is left. */
+function wildGrain(g: Grid, ready: boolean): void {
+  oval(g, 8, 14, 6, 2, 's');
+  const stalks = [[4, 6], [6, 4], [8, 3], [10, 4], [12, 6]];
+  if (!ready) {
+    for (const [x] of stalks) line(g, x, 13, x, 11, 'r');
+    dot(g, 6, 11, 'v'); dot(g, 10, 11, 'v');
+    return;
+  }
+  for (const [x, top] of stalks) {
+    line(g, x, 13, x, top + 3, 'r');
+    // The seed head leans a little, dark-edged so it reads against the meadow.
+    line(g, x, top + 2, x + 1, top, 'v'); dot(g, x, top + 1, 'w'); dot(g, x + 1, top + 2, 'u');
+  }
+  line(g, 5, 13, 11, 13, 'q');
+}
 type HollowFrame = 'ready' | 'gathered' | 'bees0' | 'bees1';
 function hollowTree(g: Grid, frame: HollowFrame): void {
   oval(g, 12, 30, 9, 2, 's');
@@ -745,6 +761,7 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   hazelSpot: define(16, 16, forageLegend, { ready: g => hazel(g, true), gathered: g => hazel(g, false) }, [8, 14]),
   pineForage: define(16, 16, forageLegend, { ready: g => pineSapling(g, true), gathered: g => pineSapling(g, false) }, [8, 14]),
   greensPatch: define(16, 16, forageLegend, { ready: g => greens(g, true), gathered: g => greens(g, false) }, [8, 14]),
+  wildGrain: define(16, 16, forageLegend, { ready: g => wildGrain(g, true), gathered: g => wildGrain(g, false) }, [8, 14]),
   hollowTree: define(24, 32, forageLegend, {
     ready: g => hollowTree(g, 'ready'), gathered: g => hollowTree(g, 'gathered'), bees0: g => hollowTree(g, 'bees0'), bees1: g => hollowTree(g, 'bees1')
   }, [12, 30], { buzz: { frames: ['ready', 'bees0', 'ready', 'bees1'], frameRate: 2, repeat: -1 } }),

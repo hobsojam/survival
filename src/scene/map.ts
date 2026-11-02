@@ -48,7 +48,7 @@ function earthAt(x: number, y: number, site: CampSite): boolean {
 }
 const nearSign = (x: number, y: number, sign: { x: number; y: number }): boolean => Math.hypot(x - sign.x, y - sign.y) < 1.5;
 /** How far trees keep from each kind of node: branches lie under them and a hazel grows at the foot of its tree. */
-const TREE_CLEARANCE: Record<ResourceKind, number> = { branch: 1.5, berry: 3.5, fiber: 3.5, stone: 3.5, hazel: 1.4, pine: 2.5, greens: 2.5, honey: 2.5 };
+const TREE_CLEARANCE: Record<ResourceKind, number> = { branch: 1.5, berry: 3.5, fiber: 3.5, stone: 3.5, hazel: 1.4, pine: 2.5, greens: 2.5, honey: 2.5, wildGrain: 2.5 };
 function clearForTree(x: number, y: number, site: CampSite): boolean {
   return Math.hypot(x - BALANCE.campX, y - BALANCE.campY) > clearingReach(x, y, site.cleared) + 1 && !nearSign(x, y, CAMP_SIGN) &&
     site.nodes.every(node => Math.hypot(x - node.x, y - node.y) >= TREE_CLEARANCE[node.kind]) &&

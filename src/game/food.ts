@@ -8,21 +8,21 @@ export type { FoodStore } from './foodStore';
 // Food the survivor carries. Fresh food remembers the day each piece was picked, so it can spoil;
 // kept food is just a count. Every eater goes through availableFood and spendFood, which reach into the larder at camp.
 
-export type FreshFood = 'berry' | 'greens';
-export type KeptFood = 'hazelnut' | 'honey' | 'pineNeedles' | 'roastedHazelnuts' | 'trailFood' | 'vegetables' | 'fish' | 'rabbit';
+export type FreshFood = 'berry' | 'greens' | 'bread';
+export type KeptFood = 'hazelnut' | 'honey' | 'pineNeedles' | 'roastedHazelnuts' | 'trailFood' | 'vegetables' | 'fish' | 'rabbit' | 'flour';
 export type FoodItem = FreshFood | KeptFood;
 
-export const FOOD_ITEMS: readonly FoodItem[] = ['berry', 'greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood', 'vegetables', 'fish', 'rabbit'];
+export const FOOD_ITEMS: readonly FoodItem[] = ['berry', 'greens', 'bread', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood', 'vegetables', 'fish', 'rabbit', 'flour'];
 
 export function isFresh(item: FoodItem): item is FreshFood {
-  return item === 'berry' || item === 'greens';
+  return item === 'berry' || item === 'greens' || item === 'bread';
 }
 
 export function foodCount(store: FoodStore, item: FoodItem): number {
   return isFresh(item) ? store[item].length : store[item];
 }
 
-const KEPT_FOODS: readonly KeptFood[] = ['hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood', 'vegetables', 'fish', 'rabbit'];
+const KEPT_FOODS: readonly KeptFood[] = ['hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood', 'vegetables', 'fish', 'rabbit', 'flour'];
 
 /** Kept food held, bag and larder together, wherever the survivor is: hazelnuts, honey, pine needles, roasted hazelnuts, rations, vegetables. */
 export function keptFoodTotal(state: GameState): number {
@@ -92,7 +92,7 @@ export function takeFromBag(state: GameState, item: FoodItem, n: number): GameSt
 }
 
 /** Food eaten as it is. Pine needles are for tea, and rations have their own key. */
-export type EdibleFood = 'berry' | 'greens' | 'hazelnut' | 'honey' | 'roastedHazelnuts' | 'vegetables' | 'fish';
+export type EdibleFood = 'berry' | 'greens' | 'hazelnut' | 'honey' | 'roastedHazelnuts' | 'vegetables' | 'fish' | 'bread';
 
 /** What eating one of each gives, as BALANCE keys: state.ts loads this module first, so BALANCE is read only when eating. */
 const EAT_EFFECTS: Record<EdibleFood, { hunger: keyof typeof BALANCE; energy?: keyof typeof BALANCE; message: string }> = {
@@ -102,7 +102,8 @@ const EAT_EFFECTS: Record<EdibleFood, { hunger: keyof typeof BALANCE; energy?: k
   honey: { hunger: 'honeyHunger', energy: 'honeyEnergy', message: 'Ate some honey.' },
   roastedHazelnuts: { hunger: 'roastedHazelnutHunger', message: 'Ate the roasted hazelnuts.' },
   vegetables: { hunger: 'vegetableHunger', message: 'Ate some raw vegetables.' },
-  fish: { hunger: 'fishHunger', message: 'Ate the raw fish. It barely helps.' }
+  fish: { hunger: 'fishHunger', message: 'Ate the raw fish. It barely helps.' },
+  bread: { hunger: 'breadHunger', message: 'Ate a loaf of bread.' }
 };
 
 /** The hunger and energy one of an item gives, and the line said on eating it. */
@@ -136,7 +137,7 @@ const gone = (picked: number, day: number, keepDays: number): boolean => day - p
 /** What a dawn on `day` throws out of a store, and what is left. */
 export function spoil(store: FoodStore, day: number, keepDays: number): { store: FoodStore; lost: Record<FreshFood, number> } {
   const kept: FoodStore = { ...store };
-  const lost: Record<FreshFood, number> = { berry: 0, greens: 0 };
+  const lost: Record<FreshFood, number> = { berry: 0, greens: 0, bread: 0 };
   for (const item of ['berry', 'greens'] as const) {
     kept[item] = store[item].filter(picked => !gone(picked, day, keepDays));
     lost[item] = store[item].length - kept[item].length;

@@ -99,7 +99,15 @@ export interface ActionPanelView { title: string; copy: string; cost: string; di
 const UPGRADE_COPY: Record<UpgradeId, { title: string; copy: string; made: string }> = {
   saw: { title: 'Saw', copy: 'Felling a tree gives four wood instead of two.', made: 'Felling a tree gives four wood.' },
   handcart: { title: 'Handcart', copy: 'Felled wood goes into a cart by the workshop, and counts as stored wood.', made: 'Felled wood goes into the cart, and from there onto the wood store whenever it has room.' },
-  bedTools: { title: 'Hoe and watering can', copy: 'A dry bed holds on a day longer before it withers.', made: 'A dry bed holds on a day longer before it withers.' }
+  bedTools: { title: 'Hoe and watering can', copy: 'A dry bed holds on a day longer before it withers.', made: 'A dry bed holds on a day longer before it withers.' },
+  harvestTools: { title: 'Sickle and flail', copy: 'Cut and thresh the grain field.', made: 'Cut and thresh the grain field.' },
+  quern: { title: 'Hand quern', copy: 'Grind the granary\'s grain into flour.', made: 'Grind the granary\'s grain into flour.' }
+};
+
+/** Whether an upgrade's row shows: the bed tools once there are beds, the harvest tools once there is a field, the quern once there is a granary. */
+const UPGRADE_SHOWN: Record<UpgradeId, (state: GameState) => boolean> = {
+  saw: () => true, handcart: () => true, bedTools: state => state.structures.vegetableBeds,
+  harvestTools: state => state.structures.field, quern: state => state.structures.granary
 };
 
 /** "3 wood · 3 stone": an upgrade's cost, leaving out what it doesn't need. */
@@ -115,12 +123,12 @@ export interface WorkshopView {
 export function workshopView(state: GameState): WorkshopView {
   const row = (id: UpgradeId): ActionPanelView & { shown: boolean } => {
     const { title, copy, made } = UPGRADE_COPY[id];
-    const shown = id !== 'bedTools' || state.structures.vegetableBeds;
+    const shown = UPGRADE_SHOWN[id](state);
     if (state.progress.workshop[id]) return { shown: false, title, copy: made, cost: 'Made', disabled: true, ready: false };
     const blocker = upgradeBlocker(state, id);
     return { shown, title, copy: blocker ?? copy, cost: costLabel(WORKSHOP_UPGRADES[id].cost), disabled: false, ready: !blocker };
   };
-  const rows = { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools') };
+  const rows = { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools'), harvestTools: row('harvestTools'), quern: row('quern') };
   return { shown: state.structures.workshop && Object.values(rows).some(item => item.shown), rows };
 }
 
@@ -270,7 +278,8 @@ const HUNGER_A_DAY = 30;
 /** The hunger each kept food fills, for the food laid by: a fish counts as the cooked meal it makes, and pine needles make tea, not meals. */
 const LAID_BY_HUNGER: Record<KeptFood, number> = {
   hazelnut: BALANCE.hazelnutHunger, honey: BALANCE.honeyHunger, pineNeedles: 0, roastedHazelnuts: BALANCE.roastedHazelnutHunger,
-  trailFood: BALANCE.trailFoodHungerGain, vegetables: BALANCE.vegetableHunger, fish: BALANCE.cookedFishHunger, rabbit: BALANCE.cookedRabbitHunger
+  trailFood: BALANCE.trailFoodHungerGain, vegetables: BALANCE.vegetableHunger, fish: BALANCE.cookedFishHunger, rabbit: BALANCE.cookedRabbitHunger,
+  flour: BALANCE.breadHunger
 };
 
 /** Whole days of winter hunger the kept food in the bag and the larder would fill, up to the season's ten. */
@@ -404,7 +413,7 @@ function fireLine(state: GameState): string {
 }
 
 const LARDER_LABELS: Record<FoodItem, string> = {
-  berry: 'Berries', greens: 'Greens', hazelnut: 'Hazelnuts', honey: 'Honey', pineNeedles: 'Pine needles', roastedHazelnuts: 'Roasted hazelnuts', trailFood: 'Rations', vegetables: 'Vegetables', fish: 'Fish', rabbit: 'Rabbit'
+  berry: 'Berries', greens: 'Greens', hazelnut: 'Hazelnuts', honey: 'Honey', pineNeedles: 'Pine needles', roastedHazelnuts: 'Roasted hazelnuts', trailFood: 'Rations', vegetables: 'Vegetables', fish: 'Fish', rabbit: 'Rabbit', flour: 'Flour', bread: 'Bread'
 };
 
 export interface LarderRowView { item: FoodItem; label: string; kept: number; storeDisabled: boolean; storeTitle: string; takeDisabled: boolean; takeTitle: string }

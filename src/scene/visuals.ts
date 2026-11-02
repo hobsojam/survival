@@ -79,10 +79,10 @@ function pileSize(count: number): string {
 
 const NODE_SPRITES: Record<ResourceNode['kind'], string> = {
   branch: 'branchPile', berry: 'berryBush', fiber: 'fiberReeds', stone: 'rock0',
-  hazel: 'hazelSpot', pine: 'pineForage', greens: 'greensPatch', honey: 'hollowTree'
+  hazel: 'hazelSpot', pine: 'pineForage', greens: 'greensPatch', honey: 'hollowTree', wildGrain: 'wildGrain'
 };
 const EMPTY_FRAMES: Record<ResourceNode['kind'], string> = {
-  branch: 'depleted', berry: 'picked', fiber: 'cut', stone: 'depleted', hazel: 'gathered', pine: 'gathered', greens: 'gathered', honey: 'gathered'
+  branch: 'depleted', berry: 'picked', fiber: 'cut', stone: 'depleted', hazel: 'gathered', pine: 'gathered', greens: 'gathered', honey: 'gathered', wildGrain: 'gathered'
 };
 /** Reeds sway and bees drift about the hollow tree, slowly, each out of step with its neighbours. */
 const IDLE_FRAMES: Partial<Record<ResourceNode['kind'], readonly string[]>> = {

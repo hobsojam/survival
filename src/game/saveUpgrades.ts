@@ -1,10 +1,12 @@
+import { emptyField } from './field';
+
 // Bringing an older save up to date as it loads. Every change to the saved shape bumps SAVE_VERSION by one and adds
 // the step that upgrades a save from the version before: SAVE_UPGRADES[23] turns a version 23 save into version 24.
 // A step gives anything new its starting value (a new building unbuilt, a new store empty) and never takes away
 // anything the player had. Loading runs every step a save needs, in order, then validates the result as usual.
 
 /** The saved shape's version. Bump it by one with every change to the shape, and add its upgrade step below. */
-export const SAVE_VERSION = 25;
+export const SAVE_VERSION = 26;
 
 /** The oldest save that can still be brought up to date: earlier formats were never upgraded and don't load. */
 export const OLDEST_UPGRADABLE_VERSION = 23;
@@ -34,6 +36,23 @@ export const SAVE_UPGRADES: Readonly<Record<number, SaveUpgrade>> = {
     return { ...state,
       inventory: { ...state.inventory, food: { ...state.inventory.food, rabbit: 0 } },
       larder: { ...state.larder, rabbit: 0 } };
+  },
+  // Version 26: a grain field and a granary on the south ground, wild grain for seed, and flour and bread.
+  // An older camp has neither building, no harvest tools or quern, a bare field, and no flour or bread.
+  25: old => {
+    const state = old as Upgradable & { structures: Upgradable; progress: Upgradable & { workshop: Upgradable }; nodes: { id?: unknown }[];
+      inventory: Upgradable & { food: Upgradable }; larder: Upgradable; lastSpoiled: Upgradable | null };
+    // Each part is added only where it is missing, so a step run on a camp that already has it leaves it as it was.
+    const withFlour = (store: Upgradable) => ({ flour: 0, bread: [], ...store });
+    return { ...state,
+      structures: { field: false, granary: false, ...state.structures },
+      progress: { ...state.progress, workshop: { harvestTools: false, quern: false, ...state.progress.workshop } },
+      field: state.field ?? emptyField(),
+      nodes: state.nodes.some(node => node.id === 'wildGrain-0') ? state.nodes
+        : [...state.nodes, { id: 'wildGrain-0', kind: 'wildGrain', x: 25, y: 23, amount: 1, readyDay: 1 }],
+      inventory: { ...state.inventory, food: withFlour(state.inventory.food) },
+      larder: withFlour(state.larder),
+      lastSpoiled: state.lastSpoiled && { bread: 0, ...state.lastSpoiled } };
   }
 };
 

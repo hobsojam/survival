@@ -281,8 +281,8 @@ function dawn(next: GameState, home: boolean): void {
   const larder = spoil(next.larder, next.day, BALANCE.larderFreshDays);
   next.inventory = { ...next.inventory, food: bag.store };
   next.larder = larder.store;
-  const lost = { berry: bag.lost.berry + larder.lost.berry, greens: bag.lost.greens + larder.lost.greens };
-  if (lost.berry + lost.greens > 0) next.lastSpoiled = { day: next.day, ...lost };
+  const lost = { berry: bag.lost.berry + larder.lost.berry, greens: bag.lost.greens + larder.lost.greens, bread: bag.lost.bread + larder.lost.bread };
+  if (lost.berry + lost.greens + lost.bread > 0) next.lastSpoiled = { day: next.day, ...lost };
   if (!stormEnded) return;
   if (weathered) {
     next.progress = { ...next.progress, nextStormDay: null, hearthUnlocked: true };
@@ -346,11 +346,12 @@ const cross: ActionHandler<'cross'> = state => {
 type Supply = keyof GameState['inventory'];
 // Berries and forage go into the food store.
 const NODE_RESOURCE: Record<GameState['nodes'][number]['kind'], Supply> = {
-  branch: 'wood', berry: 'food', fiber: 'fiber', stone: 'stone', hazel: 'food', pine: 'food', greens: 'food', honey: 'food'
+  branch: 'wood', berry: 'food', fiber: 'fiber', stone: 'stone', hazel: 'food', pine: 'food', greens: 'food', honey: 'food', wildGrain: 'food'
 };
 const GATHER_MESSAGE: Record<GameState['nodes'][number]['kind'], string> = {
   branch: 'Picked up fallen branches.', berry: 'Picked berries.', fiber: 'Gathered fiber.', stone: 'Collected stone.',
-  hazel: 'Gathered a hazelnut.', pine: 'Gathered a bunch of pine needles.', greens: 'Picked wild greens.', honey: 'Took a little honey from the hollow tree.'
+  hazel: 'Gathered a hazelnut.', pine: 'Gathered a bunch of pine needles.', greens: 'Picked wild greens.', honey: 'Took a little honey from the hollow tree.',
+  wildGrain: 'Gathered wild grain: seed for one strip of a field on the south ground.'
 };
 
 /** The bag with n more of a supply; food comes in as the item given (berries unless said), picked today. */
@@ -679,6 +680,7 @@ const eat: ActionHandler<'eat'> = (state, action) => {
   const item = action.item ?? quickEatItem(state);
   if (item === 'pineNeedles') return refuse(state, 'Pine needles are for tea.');
   if (item === 'rabbit') return refuse(state, 'Roast the rabbit at the fire first.');
+  if (item === 'flour') return refuse(state, 'Bake the flour into a loaf at the fire first.');
   if (item === 'trailFood') return eatRation(state);
   const fed = item && spendFood(state, item, 1);
   if (!item || !fed) return refuse(state, 'No food in your bag.');

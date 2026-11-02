@@ -104,7 +104,7 @@ describe('clearing steps', () => {
     expect(room).toEqual({
       'north-near': ['larder'], 'north-far': ['house'],
       'east-near': ['woodpile', 'fibreStack'], 'east-far': ['workshop'],
-      'south-near': [], 'south-far': [],
+      'south-near': ['granary'], 'south-far': ['field'],
       'west-near': ['vegetableBeds'], 'west-far': ['well']
     });
   });
@@ -290,7 +290,8 @@ describe('clearing the ground', () => {
     expect(roomLine('north-near', {}, id => id === 'larder')).toBe(" There's room for a larder now.");
     expect(roomLine('east-near', {}, () => true)).toBe(" There's room for a woodpile and a fibre stack now.");
     expect(roomLine('north-near', { larder: true }, () => true)).toBe('');
-    expect(roomLine('south-near', {}, () => true)).toBe('');
+    expect(roomLine('south-near', {}, () => true)).toBe(" There's room for a granary now.");
+    expect(roomLine('south-far', { field: true }, () => true)).toBe('');
     expect(roomLine('north-near', {}, () => false)).toBe('');
   });
 });

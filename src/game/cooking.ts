@@ -55,7 +55,8 @@ export function cookBlocker(state: GameState): string | null {
 const FOOD_WORDS: Record<FoodItem, [string, string]> = {
   berry: ['berry', 'berries'], greens: ['greens', 'greens'], hazelnut: ['hazelnut', 'hazelnuts'], honey: ['honey', 'honey'],
   pineNeedles: ['pine needles', 'pine needles'], roastedHazelnuts: ['roasted hazelnuts', 'roasted hazelnuts'], trailFood: ['ration', 'rations'],
-  vegetables: ['vegetable', 'vegetables'], fish: ['fish', 'fish'], rabbit: ['rabbit', 'rabbits']
+  vegetables: ['vegetable', 'vegetables'], fish: ['fish', 'fish'], rabbit: ['rabbit', 'rabbits'],
+  flour: ['flour', 'flour'], bread: ['loaf', 'loaves']
 };
 
 /** An item's name for a count of it: "berry" or "berries". */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createGame } from '../src/game/state';
 import { loadGame, saveGame, SAVE_KEY, SAVE_VERSION } from '../src/game/save';
+import { emptyField } from '../src/game/field';
 import { OLDEST_UPGRADABLE_VERSION, SAVE_UPGRADES, upgradeSave, type SaveUpgrade } from '../src/game/saveUpgrades';
 
 class MemoryStorage implements Storage {
@@ -76,6 +77,43 @@ describe('loading through the upgrades', () => {
   it('still loads a current save', () => {
     const storage = new MemoryStorage();
     expect(saveGame(storage, createGame()).ok).toBe(true);
+    expect(loadGame(storage).kind).toBe('loaded');
+  });
+});
+
+describe('the version 26 upgrade: the grain field', () => {
+  /** A version 25 camp: today's game without anything the field brought. */
+  function version25(changes: Record<string, unknown> = {}) {
+    const game = createGame() as unknown as Record<string, any>;
+    const { flour: _f, bread: _b, ...food } = game.inventory.food;
+    const { flour: _lf, bread: _lb, ...larder } = game.larder;
+    const { field: _sf, granary: _sg, ...structures } = game.structures;
+    const { harvestTools: _ht, quern: _q, ...workshop } = game.progress.workshop;
+    const { field: _drop, ...state } = game;
+    return { ...state, structures, progress: { ...game.progress, workshop }, nodes: game.nodes.filter((node: { kind: string }) => node.kind !== 'wildGrain'),
+      inventory: { ...game.inventory, food }, larder, ...changes };
+  }
+
+  it('adds an empty field, no new buildings or tools, the wild grain, and no flour or bread', () => {
+    const upgraded = SAVE_UPGRADES[25](structuredClone(version25())) as ReturnType<typeof createGame>;
+    const fresh = createGame();
+    expect(upgraded.field).toEqual(emptyField());
+    expect(upgraded.structures).toEqual(fresh.structures);
+    expect(upgraded.progress.workshop).toEqual(fresh.progress.workshop);
+    expect(upgraded.nodes).toEqual(fresh.nodes);
+    expect(upgraded.inventory.food).toEqual(fresh.inventory.food);
+    expect(upgraded.larder).toEqual(fresh.larder);
+    expect(upgraded.lastSpoiled).toBeNull();
+  });
+
+  it('counts no spoiled bread on the last spoiled dawn', () => {
+    const upgraded = SAVE_UPGRADES[25](structuredClone(version25({ day: 5, lastSpoiled: { day: 4, berry: 1, greens: 0 } }))) as ReturnType<typeof createGame>;
+    expect(upgraded.lastSpoiled).toEqual({ day: 4, berry: 1, greens: 0, bread: 0 });
+  });
+
+  it('loads a version 25 camp', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 25, state: version25() }));
     expect(loadGame(storage).kind).toBe('loaded');
   });
 });

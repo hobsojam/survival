@@ -371,7 +371,7 @@ describe('the camp stores panel', () => {
   });
 
   it('counts the whole wood store, the fibre stack and the cart', () => {
-    const base = game({ structures: { ...FINISHED_SHELTER, woodpile: true, house: true, fibreStack: true }, progress: { workshop: { saw: false, handcart: true, bedTools: false } } },
+    const base = game({ structures: { ...FINISHED_SHELTER, woodpile: true, house: true, fibreStack: true }, progress: { workshop: { saw: false, handcart: true, bedTools: false, harvestTools: false, quern: false } } },
       { storedWood: 20, storedFiber: 5, cartWood: 3 });
     expect(shownLines(base)).toEqual([{ id: 'wood', text: 'Wood 20/36' }, { id: 'fiber', text: 'Fiber 5/12' }, { id: 'cart', text: 'Cart 3/12' }]);
   });
