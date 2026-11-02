@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type SiteId, type StructureId } from '../game/state';
 import { GameScene } from '../scene/GameScene';
-import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
+import { canvasLayout, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
 import { availableFiber, availableWood, cookBlocker, isAtCamp, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { nextStep, type Side } from '../game/clearing';
@@ -263,19 +263,16 @@ export class App {
     const frame = this.root.querySelector<HTMLElement>('.game-frame')!;
     const fitCanvas = () => {
       if (!this.game?.canvas) return;
-      const portrait = portraitViewport(frame.clientWidth, frame.clientHeight);
-      const scale = portrait?.scale ?? displayScale(frame.clientWidth, frame.clientHeight);
-      let viewport = scale === 1 ? viewportSize(frame.clientWidth, frame.clientHeight) : { width: LOGICAL_WIDTH, height: LOGICAL_HEIGHT };
-      if (portrait) viewport = { width: portrait.width, height: portrait.height };
+      // On a high-density screen, a scale between whole numbers can still put each art pixel on whole screen pixels.
+      const holder = this.game.canvas.parentElement!.getBoundingClientRect();
+      const { scale, viewport, size, offset } = canvasLayout(frame.clientWidth, frame.clientHeight, window.devicePixelRatio || 1, { x: holder.left, y: holder.top });
       if (this.game.scale.gameSize.width !== viewport.width || this.game.scale.gameSize.height !== viewport.height) {
         this.game.scale.setGameSize(viewport.width, viewport.height);
         this.scene?.resizeViewport(viewport.width, viewport.height);
       }
       if (this.game.scale.zoom !== scale) this.game.scale.setZoom(scale);
       else this.game.scale.refresh();
-      const offset = canvasOffset(frame.clientWidth, frame.clientHeight, viewport.width, viewport.height, scale);
-      this.game.canvas.style.marginLeft = `${offset.x}px`;
-      this.game.canvas.style.marginTop = `${offset.y}px`;
+      Object.assign(this.game.canvas.style, { width: `${size.width}px`, height: `${size.height}px`, marginLeft: `${offset.x}px`, marginTop: `${offset.y}px` });
     };
     this.gameResize = new ResizeObserver(fitCanvas);
     this.gameResize.observe(frame);

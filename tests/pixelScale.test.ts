@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { displayScale, viewportSize, canvasOffset, portraitViewport } from '../src/scene/pixelScale';
+import { displayScale, viewportSize, canvasOffset, canvasDisplaySize, canvasLayout, portraitViewport } from '../src/scene/pixelScale';
 
 describe('pixel canvas scale', () => {
   it('uses whole-number desktop magnification and centers spare space', () => {
@@ -33,5 +33,69 @@ describe('pixel canvas scale', () => {
 
   it('places the canvas on whole CSS pixels', () => {
     expect(canvasOffset(1001, 641, 480, 300, 2)).toEqual({ x: 20, y: 20 });
+  });
+
+  it('places the canvas on whole screen pixels on high-density screens', () => {
+    expect(canvasOffset(861, 537, 480, 300, 1.5, 2)).toEqual({ x: 70.5, y: 43.5 });
+    expect(canvasOffset(861, 537, 480, 300, 4 / 3, 1.5)).toEqual({ x: 110, y: 68 });
+  });
+
+  it('allows for a frame that itself starts between screen pixels', () => {
+    // A frame at 151 CSS px on a 150% screen starts at 226.5 screen pixels; the canvas must still start on a whole one.
+    const origin = { x: 151, y: 171 };
+    const offset = canvasOffset(860, 536, 480, 300, 4 / 3, 1.5, origin);
+    for (const [start, at] of [[origin.x, offset.x], [origin.y, offset.y]]) {
+      expect(Number.isInteger(Math.round((start + at) * 1.5 * 1e6) / 1e6)).toBe(true);
+      expect(Math.abs(at - (start === origin.x ? 110 : 68))).toBeLessThan(1);
+    }
+  });
+});
+
+describe('crisp sizes on high-density screens', () => {
+  it('draws a 1920x1200 laptop at 150% at two screen pixels per art pixel, not at 1x', () => {
+    const scale = displayScale(860, 536, 1.5);
+    expect(scale).toBeCloseTo(4 / 3, 10);
+    expect(canvasDisplaySize(480, 300, scale, 1.5)).toEqual({ width: 640, height: 400 });
+  });
+
+  it('draws a 2x screen too small for 2x at three screen pixels per art pixel', () => {
+    expect(displayScale(860, 536, 2)).toBe(1.5);
+    expect(canvasDisplaySize(480, 300, 1.5, 2)).toEqual({ width: 720, height: 450 });
+  });
+
+  it('keeps the whole-number size where it is bigger, and ordinary screens as they were', () => {
+    expect(displayScale(1116, 696, 1.25)).toBe(2);
+    expect(displayScale(1480, 924, 1.5)).toBe(3);
+    expect(displayScale(860, 536, 1)).toBe(1);
+    expect(displayScale(860, 536)).toBe(1);
+    expect(displayScale(400, 250, 2)).toBe(1);
+  });
+
+  it('sizes the canvas on whole CSS pixels at whole-number scales', () => {
+    expect(canvasDisplaySize(480, 300, 2, 1)).toEqual({ width: 960, height: 600 });
+  });
+});
+
+describe('laying out the canvas in its frame', () => {
+  it('lays a 1920x1200 laptop at 150% out crisp and centred on whole screen pixels', () => {
+    const layout = canvasLayout(860, 536, 1.5, { x: 151, y: 171 });
+    expect(layout.scale).toBeCloseTo(4 / 3, 10);
+    expect(layout.viewport).toEqual({ width: 480, height: 300 });
+    expect(layout.size).toEqual({ width: 640, height: 400 });
+    expect(layout.offset).toEqual(canvasOffset(860, 536, 480, 300, layout.scale, 1.5, { x: 151, y: 171 }));
+  });
+
+  it('shows less of the world in a compact frame at 1x', () => {
+    expect(canvasLayout(350, 219)).toEqual({ scale: 1, viewport: { width: 350, height: 219 }, size: { width: 350, height: 219 }, offset: { x: 0, y: 0 } });
+  });
+
+  it('fills a portrait phone frame with magnified art', () => {
+    const layout = canvasLayout(390, 679, 3);
+    expect([layout.scale, layout.viewport]).toEqual([2, { width: 195, height: 339 }]);
+    expect(layout.size).toEqual({ width: 390, height: 678 });
+  });
+
+  it('keeps whole-number desktop scales as they were', () => {
+    expect(canvasLayout(1001, 641)).toEqual({ scale: 2, viewport: { width: 480, height: 300 }, size: { width: 960, height: 600 }, offset: { x: 20, y: 20 } });
   });
 });
