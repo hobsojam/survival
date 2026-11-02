@@ -868,6 +868,42 @@ function bakerySite(g: Grid): void {
   box(g, 20, 8, 4, 3, 'n'); dot(g, 20, 8, 'p');
 }
 
+function beehiveSite(g: Grid): void {
+  box(g, 3, 3, 10, 4, 'z'); stake(g, 2, 2); stake(g, 12, 2);
+  line(g, 4, 3, 12, 3, 'h');
+}
+
+const hiveLegend = { s: 'shadow', a: 'wood0', b: 'wood1', c: 'wood2', f: 'canvas1', g: 'canvas2', h: 'canvas3', i: 'canvas4', k: 'ink', y: 'fire4' } as const;
+type HiveLook = 'still' | 'bees0' | 'bees1' | 'winter0' | 'winter1';
+
+/** A bee: a dark body with a bright stripe, a pixel of wing above. */
+function bee(g: Grid, x: number, y: number): void {
+  dot(g, x, y, 'k'); dot(g, x + 1, y, 'y'); dot(g, x, y - 1, 'i');
+}
+
+/**
+ * A domed straw skep on a little wooden stand: coils of straw in bands, shaded on the right, with a dark entrance at the
+ * foot. By day a bee or two drift around it, only one in winter.
+ */
+function beehive(g: Grid, look: HiveLook): void {
+  oval(g, 8, 15, 6, 1, 's');
+  box(g, 3, 12, 10, 2, 'b'); line(g, 3, 12, 12, 12, 'c'); dot(g, 4, 14, 'a'); dot(g, 11, 14, 'a');
+  // The dome, widest at the bottom, in coils of straw.
+  for (let y = 3; y <= 11; y++) {
+    const half = Math.min(5, Math.round(Math.sqrt(Math.max(0, 1 - ((11 - y) / 8.5) ** 2)) * 5));
+    box(g, 8 - half, y, half * 2, 1, y % 2 ? 'h' : 'g');
+    dot(g, 8 + half - 1, y, 'f');
+    if (half > 1) dot(g, 8 - half, y, 'g');
+  }
+  dot(g, 7, 2, 'g'); dot(g, 8, 2, 'f');
+  for (const [x, y] of [[5, 5], [6, 7], [5, 9], [9, 6], [10, 8]]) dot(g, x, y, 'i');
+  box(g, 7, 10, 2, 2, 'a');
+  if (look === 'bees0') { bee(g, 1, 6); bee(g, 13, 3); }
+  if (look === 'bees1') { bee(g, 2, 3); bee(g, 13, 8); }
+  if (look === 'winter0') bee(g, 12, 4);
+  if (look === 'winter1') bee(g, 13, 6);
+}
+
 /**
  * A stone bakehouse with a thatched roof and a tall chimney. Loaves sit on a shelf by the door when there are any, and
  * smoke rises from the chimney the morning the oven bakes.
@@ -971,6 +1007,8 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   windmillSite: define(24, 16, campLegend, { still: windmillSite }),
   windmill: define(32, 48, campLegend, Object.fromEntries([0, 1, 2, 3].map(turn => [`turn${turn}`, (g: Grid) => windmill(g, turn)]))),
   bakerySite: define(32, 16, campLegend, { still: bakerySite }),
+  beehiveSite: define(16, 8, campLegend, { still: beehiveSite }),
+  beehive: define(16, 16, hiveLegend, Object.fromEntries((['still', 'bees0', 'bees1', 'winter0', 'winter1'] as const).map(look => [look, (g: Grid) => beehive(g, look)]))),
   bakery: define(32, 32, campLegend, { cold: g => bakery(g, 'cold'), loaves: g => bakery(g, 'loaves'), baking: g => bakery(g, 'baking') }),
   pileCount: define(13, 7, countLegend, {
     ...Object.fromEntries([2, 3, 4, 5, 6, 7, 8, 9].map(n => [`n${n}`, (g: Grid) => pileCount(g, [String(n)])])),

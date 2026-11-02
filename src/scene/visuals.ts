@@ -116,7 +116,7 @@ function addPuddles(state: GameState, add: AddVisual): void {
 }
 
 /** Small camp structures: where each stands from the fire, drawn as a flat site until built; one on cleared ground only once it is clear. */
-export const CAMP_STRUCTURES = [['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3], ['larder', 2.5, -4.5], ['woodpile', 5.5, -1.5], ['fibreStack', 5.5, 1.5], ['house', -0.5, -6.5], ['vegetableBeds', -4.5, 0], ['well', -7, -1.5], ['workshop', 8, -1], ['granary', 3, 4.5], ['field', -1.5, 7], ['windmill', -2.75, 9.75], ['bakery', -2, -10]] as const;
+export const CAMP_STRUCTURES = [['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3], ['larder', 2.5, -4.5], ['woodpile', 5.5, -1.5], ['fibreStack', 5.5, 1.5], ['house', -0.5, -6.5], ['vegetableBeds', -4.5, 0], ['well', -7, -1.5], ['workshop', 8, -1], ['granary', 3, 4.5], ['field', -1.5, 7], ['windmill', -2.75, 9.75], ['bakery', -2, -10], ['beehive', 1.75, -7.25]] as const;
 
 /** Where each of the field's four strips stands across from the field's spot, in tiles. */
 export const FIELD_STRIP_OFFSETS = [-1.5, -0.5, 0.5, 1.5] as const;
@@ -153,6 +153,7 @@ function bakeryTexture(state: GameState): string {
 function builtTexture(state: GameState, id: (typeof CAMP_STRUCTURES)[number][0], timeMs: number): string {
   if (id === 'windmill') return `windmill:turn${Math.floor(timeMs / SAIL_FRAME_MS) % 4}`;
   if (id === 'bakery') return bakeryTexture(state);
+  if (id === 'beehive') return beehiveTexture(state, timeMs);
   if (id === 'woodpile') return `woodpile:${stockFrame(state.storedWood)}`;
   if (id === 'fibreStack') return `fibreStack:${stockFrame(state.storedFiber)}`;
   if (id === 'house') return fireplaceBurning(state) ? 'house:lit' : 'house:dark';
@@ -181,6 +182,16 @@ function addVegetableBeds(state: GameState, add: AddVisual, x: number, y: number
   state.beds.forEach((bed, index) => {
     add(`vegBed-${index}`, `vegBed:${BED_CROPS[index]}-${bedStage(bed)}-${bedSoil(state, bed)}`, x + (index - 1) * BED_SPACING, y);
   });
+}
+
+/** How long each frame of the bees around the hive shows. */
+const BEE_FRAME_MS = 400;
+
+/** The beehive: still at night; by day a bee or two drift around it, only one in winter. */
+function beehiveTexture(state: GameState, timeMs: number): string {
+  if (state.timeOfDay >= nightStart(state.day)) return 'beehive:still';
+  const frame = Math.floor(timeMs / BEE_FRAME_MS) % 2;
+  return isWinter(state.day) ? `beehive:winter${frame}` : `beehive:bees${frame}`;
 }
 
 function addBuildableStructures(state: GameState, add: AddVisual, x: number, y: number, timeMs: number): void {

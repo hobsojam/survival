@@ -5,6 +5,10 @@ import { advanceTime, applyAction, groundBlocker } from '../src/game/rules';
 import { availableFood } from '../src/game/food';
 import { takeHoneyBlocker } from '../src/game/beehive';
 import { beehivePanelView, foodLaidByDays } from '../src/ui/panels';
+import { CAMP_STRUCTURES, sceneVisuals } from '../src/scene/visuals';
+import { inClearing } from '../src/game/clearing';
+import { nightStart } from '../src/game/calendar';
+import { PATH_DESTINATIONS, segmentDistance } from './placement';
 import { beehiveCamp } from './beehiveCamp';
 
 class MemoryStorage implements Storage {
@@ -164,5 +168,43 @@ describe('the Beehive panel', () => {
   it('counts the hive\'s honey as food laid by', () => {
     expect(foodLaidByDays(beehiveCamp())).toBe(0);
     expect(foodLaidByDays(beehiveCamp({ honey: 2 }))).toBe(1);
+  });
+});
+
+describe('the beehive in camp', () => {
+  const { campX, campY } = BALANCE;
+  const entry = () => CAMP_STRUCTURES.find(([other]) => other === 'beehive')!;
+  const spot = () => ({ x: campX + entry()[1], y: campY + entry()[2] });
+  const textures = (state: GameState, timeMs = 0) =>
+    sceneVisuals(state, timeMs).filter(visual => visual.id === 'beehive' || visual.id === 'beehiveSite').map(visual => visual.texture);
+
+  it('stands east of the house on the north far ground', () => {
+    expect(CAMP_STRUCTURES).toContainEqual(['beehive', 1.75, -7.25]);
+    expect(inClearing(spot().x, spot().y, ['north-near', 'north-far'])).toBe(true);
+    expect(inClearing(spot().x, spot().y, ['north-near'])).toBe(false);
+  });
+
+  it('keeps 2 tiles from the other buildings, clear of the paths and the forage', () => {
+    const at = spot();
+    const others = [{ x: campX - 3, y: campY - 2 }, ...CAMP_STRUCTURES.filter(([other]) => other !== 'beehive').map(([, dx, dy]) => ({ x: campX + dx, y: campY + dy }))];
+    for (const other of others) expect(Math.hypot(at.x - other.x, at.y - other.y), `by ${other.x},${other.y}`).toBeGreaterThanOrEqual(2);
+    for (const [dx, dy] of PATH_DESTINATIONS) expect(segmentDistance(at.x, at.y, dx, dy)).toBeGreaterThanOrEqual(1.5);
+    for (const node of createGame().nodes.filter(item => item.kind !== 'branch')) expect(Math.hypot(at.x - node.x, at.y - node.y), node.id).toBeGreaterThanOrEqual(2);
+    for (const tree of createGame().trees) expect(Math.hypot(at.x - tree.x, at.y - tree.y), tree.id).toBeGreaterThanOrEqual(2);
+  });
+
+  it('shows the site once the far ground is clear, then the hive', () => {
+    expect(textures(beehiveCamp({ built: false }))).toEqual(['beehiveSite:still']);
+    const near = beehiveCamp({ built: false });
+    expect(textures({ ...near, clearing: { ...near.clearing, cleared: ['north-near'] } })).toEqual([]);
+    expect(textures(beehiveCamp())[0]).toMatch(/^beehive:/);
+  });
+
+  it('has bees by day, fewer in winter, and none at night', () => {
+    const summer = beehiveCamp({ day: 32 });
+    expect(textures(summer, 0)).toEqual(['beehive:bees0']);
+    expect(textures(summer, 400)).toEqual(['beehive:bees1']);
+    expect(textures(beehiveCamp({ day: 15 }), 0)).toEqual(['beehive:winter0']);
+    expect(textures({ ...summer, timeOfDay: nightStart(32) }, 0)).toEqual(['beehive:still']);
   });
 });
