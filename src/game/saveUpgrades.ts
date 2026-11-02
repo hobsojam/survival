@@ -60,7 +60,7 @@ export const SAVE_UPGRADES: Readonly<Record<number, SaveUpgrade>> = {
     return { ...state,
       structures: { windmill: false, bakery: false, ...state.structures },
       millFlour: state.millFlour ?? 0,
-      bakery: state.bakery ?? { shelf: [], lastBaked: null } };
+      bakery: { resumed: null, ...(state.bakery ?? { shelf: [], lastBaked: null }) } };
   }
 };
 

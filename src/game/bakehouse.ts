@@ -43,15 +43,16 @@ export function bakeryDawn(next: GameState): { lost: number } {
   const kept = spoil({ ...emptyFood(), bread: next.bakery.shelf }, next.day, BALANCE.larderFreshDays);
   const shelf = kept.store.bread;
   const bakes = next.millFlour >= 1 && shelf.length < BALANCE.bakeryShelfCapacity;
-  next.bakery = bakes ? { shelf: [...shelf, next.day], lastBaked: next.day } : { ...next.bakery, shelf };
+  // A bake the morning after another carries on; any other starts the oven afresh, which the morning line remarks on.
+  const resumed = bakes && next.bakery.lastBaked !== next.day - 1 ? next.day : next.bakery.resumed;
+  next.bakery = bakes ? { shelf: [...shelf, next.day], lastBaked: next.day, resumed } : { ...next.bakery, shelf };
   if (bakes) next.millFlour -= 1;
   return { lost: kept.lost.bread };
 }
 
-/** The morning line when the oven bakes for the first time, or again after a morning it didn't. */
+/** The morning line when the oven bakes for the first time, or again after a morning it didn't, however many dawns passed. */
 export function bakeryNews(before: GameState, after: GameState): string | null {
-  if (after.day <= before.day || after.bakery.lastBaked !== after.day) return null;
-  return before.bakery.lastBaked === before.day ? null : 'Fresh bread from the oven this morning.';
+  return after.day > before.day && after.bakery.resumed === after.day ? 'Fresh bread from the oven this morning.' : null;
 }
 
 /** Why a loaf can't come off the bakery shelf now, or null. */

@@ -172,14 +172,15 @@ function validField({ field, structures, day }: SaveShape): boolean {
   return stripsOk && seedOk && grainOk;
 }
 
-/** Flour only in a built windmill's bin and no more than it holds; loaves only on a built bakery's shelf, no more than it holds, each baked on a day already lived, as is the last bake. */
+/** Flour only in a built windmill's bin and no more than it holds; loaves only on a built bakery's shelf, no more than it holds, each baked on a day already lived, as are the last bake and the last fresh start, which comes no later than it. */
 function validBakehouse({ millFlour, bakery, structures, day }: SaveShape): boolean {
   const today = day as number;
   if (!count(millFlour) || millFlour > BALANCE.millFlourCapacity || (millFlour > 0 && structures.windmill !== true)) return false;
   if (!object(bakery) || !Array.isArray(bakery.shelf) || bakery.shelf.length > BALANCE.bakeryShelfCapacity) return false;
   if (!bakery.shelf.every(baked => readyBy(baked, today))) return false;
   if (bakery.lastBaked !== null && !readyBy(bakery.lastBaked, today)) return false;
-  return structures.bakery === true || (bakery.shelf.length === 0 && bakery.lastBaked === null);
+  if (bakery.resumed !== null && (!readyBy(bakery.resumed, today) || bakery.lastBaked === null || (bakery.resumed as number) > (bakery.lastBaked as number))) return false;
+  return structures.bakery === true || (bakery.shelf.length === 0 && bakery.lastBaked === null && bakery.resumed === null);
 }
 
 /** Cleared steps are real, once each, and a far step follows its near one; the marked step is still to do; felled trees are the marked step's own. */

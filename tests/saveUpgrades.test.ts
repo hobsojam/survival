@@ -132,11 +132,11 @@ describe('the version 27 upgrade: the windmill and bakery', () => {
     const fresh = createGame();
     expect(upgraded.structures).toEqual(fresh.structures);
     expect(upgraded.millFlour).toBe(0);
-    expect(upgraded.bakery).toEqual({ shelf: [], lastBaked: null });
+    expect(upgraded.bakery).toEqual({ shelf: [], lastBaked: null, resumed: null });
   });
 
   it('leaves a camp that already has them as it was', () => {
-    const current = { ...createGame(), millFlour: 3, bakery: { shelf: [4], lastBaked: 4 } };
+    const current = { ...createGame(), millFlour: 3, bakery: { shelf: [4], lastBaked: 4, resumed: 4 } };
     expect(SAVE_UPGRADES[26](structuredClone(current))).toEqual(current);
   });
 

@@ -140,8 +140,8 @@ export interface GameState {
   field: FieldState;
   /** Flour ground at the windmill and kept in its bin. */
   millFlour: number;
-  /** The bakery's shelf, as the bake day of each loaf on it, and the last morning its oven baked. */
-  bakery: { shelf: number[]; lastBaked: number | null };
+  /** The bakery's shelf, as the bake day of each loaf on it; the last morning its oven baked; and the last morning it began baking again after a morning it didn't. */
+  bakery: { shelf: number[]; lastBaked: number | null; resumed: number | null };
   /** Stone kept in the camp stone pile, outside the bag. */
   storedStone: number;
   /** Wood split and stacked on the woodpile, outside the bag: it counts for building and the fire, from anywhere. */
@@ -396,7 +396,7 @@ export function createGame(): GameState {
     beds: Array.from({ length: 3 }, () => ({ sown: false, grown: 0, dryDays: 0, wateredDay: null })),
     field: emptyField(),
     millFlour: 0,
-    bakery: { shelf: [], lastBaked: null },
+    bakery: { shelf: [], lastBaked: null, resumed: null },
     storedStone: 0,
     storedWood: 0, cartWood: 0,
     storedFiber: 0,

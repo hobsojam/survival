@@ -8,6 +8,7 @@ export interface BakehouseOptions {
   millFlour?: number;
   shelf?: number[];
   lastBaked?: number | null;
+  resumed?: number | null;
   grain?: number;
   day?: number;
   windmill?: boolean;
@@ -29,7 +30,7 @@ export function bakehouseCamp(options: BakehouseOptions = {}): GameState {
     structures: { ...base.structures, field: true, granary: true, windmill, bakery },
     field: { ...base.field, grain: options.grain ?? 0 },
     millFlour: options.millFlour ?? 0,
-    bakery: { shelf: options.shelf ?? [], lastBaked: options.lastBaked ?? null },
+    bakery: { shelf: options.shelf ?? [], lastBaked: options.lastBaked ?? null, resumed: options.resumed ?? null },
     player: { ...base.player, x: campX, y: campY }
   };
 }

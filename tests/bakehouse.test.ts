@@ -39,7 +39,7 @@ describe('the windmill and bakery to begin with', () => {
     const game = createGame();
     expect(game.structures).toMatchObject({ windmill: false, bakery: false });
     expect(game.millFlour).toBe(0);
-    expect(game.bakery).toEqual({ shelf: [], lastBaked: null });
+    expect(game.bakery).toEqual({ shelf: [], lastBaked: null, resumed: null });
     expect(BALANCE).toMatchObject({ millFlourCapacity: 8, bakeryShelfCapacity: 2 });
   });
 
@@ -52,10 +52,10 @@ describe('the windmill and bakery to begin with', () => {
 
 describe('saving the windmill and bakery', () => {
   it('saves and loads flour in the bin and loaves on the shelf', () => {
-    const state = bakehouseCamp({ millFlour: 8, shelf: [21, 22], lastBaked: 22 });
+    const state = bakehouseCamp({ millFlour: 8, shelf: [21, 22], lastBaked: 22, resumed: 21 });
     const loaded = roundTrip(state);
     expect(loaded.kind).toBe('loaded');
-    expect(loaded.kind === 'loaded' && [loaded.state.millFlour, loaded.state.bakery]).toEqual([8, { shelf: [21, 22], lastBaked: 22 }]);
+    expect(loaded.kind === 'loaded' && [loaded.state.millFlour, loaded.state.bakery]).toEqual([8, { shelf: [21, 22], lastBaked: 22, resumed: 21 }]);
   });
 
   it('refuses mill flour without a windmill or beyond the bin, and a windmill on uncleared ground', () => {
@@ -77,6 +77,9 @@ describe('saving the windmill and bakery', () => {
       bakehouseCamp({ shelf: [20, 21, 22] }),
       bakehouseCamp({ shelf: [23] }),
       bakehouseCamp({ lastBaked: 23 }),
+      bakehouseCamp({ bakery: false, lastBaked: null, resumed: 22 }),
+      bakehouseCamp({ lastBaked: 20, resumed: 21 }),
+      bakehouseCamp({ lastBaked: null, resumed: 20 }),
       bakehouseCamp({ shelf: [1.5] })
     ];
     for (const state of bad) expect(roundTrip(state).kind).toBe('invalid');
@@ -174,12 +177,12 @@ describe('the morning loaf', () => {
     const after = acrossDawn(away(bakehouseCamp({ millFlour: 3 })));
     expect(after.day).toBe(23);
     expect(after.millFlour).toBe(2);
-    expect(after.bakery).toEqual({ shelf: [23], lastBaked: 23 });
+    expect(after.bakery).toEqual({ shelf: [23], lastBaked: 23, resumed: 23 });
   });
 
   it('waits while the shelf is full or the bin is empty, using nothing', () => {
     expect(acrossDawn(bakehouseCamp({ millFlour: 3, shelf: [21, 22], lastBaked: 22 }))).toMatchObject({ millFlour: 3, bakery: { shelf: [21, 22], lastBaked: 22 } });
-    expect(acrossDawn(bakehouseCamp({ millFlour: 0, lastBaked: 20 })).bakery).toEqual({ shelf: [], lastBaked: 20 });
+    expect(acrossDawn(bakehouseCamp({ millFlour: 0, lastBaked: 20 })).bakery).toEqual({ shelf: [], lastBaked: 20, resumed: null });
     expect(acrossDawn(bakehouseCamp({ millFlour: 3, bakery: false })).millFlour).toBe(3);
   });
 
@@ -204,6 +207,25 @@ describe('the morning loaf', () => {
     expect(bakeryNews(...pair(20, 0))).toBeNull();
     const before = bakehouseCamp({ millFlour: 1 });
     expect(newsBetween(before, acrossDawn(before))).toContain('Fresh bread from the oven this morning.');
+  });
+});
+
+describe('the morning line across more than one dawn', () => {
+  const twoDawns = (state: GameState): GameState => advanceTime({ ...state, timeOfDay: BALANCE.daySeconds - 1 }, BALANCE.daySeconds + 2, 'resting');
+
+  it('says so when the oven waited one morning and baked the next', () => {
+    const before = bakehouseCamp({ millFlour: 1, shelf: [19, 22], lastBaked: 22 });
+    const after = twoDawns(before);
+    expect(after.day).toBe(24);
+    expect(after.bakery.shelf).toEqual([22, 24]);
+    expect(bakeryNews(before, after)).toBe('Fresh bread from the oven this morning.');
+  });
+
+  it('stays quiet when the oven baked both mornings', () => {
+    const before = bakehouseCamp({ millFlour: 2, shelf: [], lastBaked: 22 });
+    const after = twoDawns(before);
+    expect(after.bakery.shelf).toEqual([23, 24]);
+    expect(bakeryNews(before, after)).toBeNull();
   });
 });
 
