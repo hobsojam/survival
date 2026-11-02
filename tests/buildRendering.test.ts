@@ -11,6 +11,7 @@ function element() {
     hidden: false,
     disabled: false,
     textContent: '',
+    style: { width: '' },
     classList: { toggle: () => undefined },
     querySelector: () => element()
   };
@@ -82,5 +83,25 @@ describe('completed Build actions', () => {
     app['renderWorkshop']();
     expect(get('#workshop-panel').hidden).toBe(false);
     expect(get('#bedtools-row, #bedtools-panel').hidden).toBe(false);
+  });
+});
+
+describe('completed Camp discoveries', () => {
+  it('hides the Follow the paths panel only after every place is found', () => {
+    const { app, get } = renderer();
+    const state = createGame();
+    Object.assign(app, { state });
+
+    app['renderSurvivor']();
+    expect(get('.sites-panel').hidden).toBe(false);
+
+    state.progress.discoveries.basket = true;
+    state.progress.discoveries.spring = true;
+    app['renderSurvivor']();
+    expect(get('.sites-panel').hidden).toBe(false);
+
+    state.progress.discoveries.cairn = true;
+    app['renderSurvivor']();
+    expect(get('.sites-panel').hidden).toBe(true);
   });
 });
