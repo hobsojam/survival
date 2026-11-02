@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from '../src/game/state';
 import { CLEARING_STEPS } from '../src/game/clearing';
-import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, campStoresView, cloakView, foodLaidByDays, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishesView, nightHint, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
+import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, campStoresView, cloakView, foodLaidByDays, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
 import { dishBlocker } from '../src/game/cooking';
 import { addFood, emptyFood } from '../src/game/food';
 import { stock } from './stock';
@@ -64,7 +64,7 @@ describe('lookout panel', () => {
       copy: 'A damaged lookout waits along the northeast path. Weather the cold night before repairing it.',
       cost: 'Unlocks after the cold night', disabled: true, ready: false });
     expect(lookoutView(game({ progress: afterColdNight }))).toMatchObject({ title: 'Restore the old lookout', cost: '4 wood · 2 fiber · 2 stone', disabled: false, copy: expect.stringMatching(/survey.*areas/i) });
-    expect(lookoutView(game({ progress: { ...afterColdNight, lookoutRepaired: true } }))).toMatchObject({ title: 'A place to call home', cost: 'Restored', disabled: true, copy: expect.stringMatching(/journal.*areas/i) });
+    expect(lookoutView(game({ progress: { ...afterColdNight, lookoutRepaired: true } }))).toMatchObject({ shown: false, title: 'A place to call home', cost: 'Restored', disabled: true, copy: expect.stringMatching(/journal.*areas/i) });
   });
 
   it('is ready only beside the lookout with the materials', () => {
@@ -89,7 +89,7 @@ describe('axe panel', () => {
 
   it('reads as crafted once made', () => {
     expect(axeView(game({ progress: { ...afterColdNight, axeCrafted: true }, structures: { toolshed: true } })))
-      .toMatchObject({ title: 'Stone axe ready', cost: 'Crafted', disabled: true, ready: false,
+      .toMatchObject({ shown: false, title: 'Stone axe ready', cost: 'Crafted', disabled: true, ready: false,
         copy: 'Tap a mature tree, or stand by one and press X, to gather two wood. Stumps regrow after three dawns.' });
   });
 });
@@ -116,7 +116,7 @@ describe('pickaxe panel', () => {
 
   it('reads as crafted once made', () => {
     expect(pickaxeView(game({ progress: { quarryFound: true, pickaxeCrafted: true }, structures: { shelter: true, toolshed: true } })))
-      .toMatchObject({ title: 'Pickaxe ready', cost: 'Crafted', disabled: true, ready: false,
+      .toMatchObject({ shown: false, title: 'Pickaxe ready', cost: 'Crafted', disabled: true, ready: false,
         copy: 'Tap the quarry face, or stand at it and press E, to dig a stone. It is ready again each dawn.' });
   });
 });
@@ -348,6 +348,9 @@ describe('the build list shows only what can be built', () => {
   it('says so when there is nothing new to build, and otherwise keeps its usual hint', () => {
     expect(buildListView(game({ structures: everything }))).toEqual({ shelterHeading: false, empty: true,
       hint: 'Nothing new to build for now. Clear more land or explore to find what comes next.' });
+    const allGround = Object.keys(CLEARING_STEPS) as GameState['clearing']['cleared'];
+    expect(buildListView(game({ structures: everything }, { clearing: { cleared: allGround, marked: null, felled: [] } })).hint)
+      .toBe('No structures left to build.');
     expect(buildListView(game())).toMatchObject({ empty: false, hint: 'In the clearing — click an upgrade to build.' });
     expect(buildListView(game({}, { area: 'quarry' }))).toMatchObject({ empty: false, hint: 'Stand anywhere in the clearing to build.' });
   });
@@ -423,7 +426,8 @@ describe('keepsakes and what they make', () => {
     expect(pillowView(createGame()).shown).toBe(false);
     expect([pillowView(friend('bird')).shown, cloakView(friend('bird')).shown]).toEqual([true, false]);
     expect(cloakView(friend('fox')).shown).toBe(true);
-    expect(cloakView(friend('fox', { cloak: true }))).toMatchObject({ title: 'Fur cloak', cost: 'Made', disabled: true });
+    expect(cloakView(friend('fox', { cloak: true }))).toMatchObject({ shown: false, title: 'Fur cloak', cost: 'Made', disabled: true });
+    expect(pillowView(friend('bird', { pillow: true }))).toMatchObject({ shown: false, title: 'Feather pillow', cost: 'Made', disabled: true });
     expect(pillowView(friend('bird', { keepsakes: 2 }))).toMatchObject({ copy: 'Build a toolshed first.', cost: '6 feathers', ready: false });
   });
 });
@@ -452,6 +456,15 @@ describe('clearing panel', () => {
     expect(near.detail).toBe(`${CLEARING_STEPS['north-far'].trees.length} trees, then 6 wood and 3 fiber. There's room for a house now.`);
     const done = clearingView(withAxe({ cleared: ['north-near', 'north-far'] })).sides[0];
     expect(done).toMatchObject({ label: 'North · cleared', done: true, disabled: true });
+    expect(clearingView(withAxe({ cleared: ['north-near', 'north-far'] })).progress).toBe('Cleared ground: north near, north far.');
+  });
+
+  it('keeps only a compact status once every side is cleared', () => {
+    const cleared = Object.keys(CLEARING_STEPS) as GameState['clearing']['cleared'];
+    const view = clearingView(withAxe({ cleared }));
+    expect(view.sides.every(side => side.done)).toBe(true);
+    expect(view.clear).toMatchObject({ shown: false, ready: false });
+    expect(view.progress).toBe('All ground cleared.');
   });
 
   it('shows the marked side as chosen and locks the others once a tree is down', () => {
@@ -480,7 +493,14 @@ describe('cooking pot panel', () => {
     expect(potView(game({ inventory: supplies }))).toMatchObject({ title: 'Cooking pot', copy: 'Build a toolshed first.', cost: '1 wood · 2 stone', ready: false });
     const shed = game({ structures: { shelter: true, toolshed: true }, inventory: supplies });
     expect(potView(shed)).toMatchObject({ title: 'Cooking pot', cost: '1 wood · 2 stone', ready: true, disabled: false });
-    expect(potView({ ...shed, progress: { ...shed.progress, potCrafted: true } })).toMatchObject({ title: 'Cooking pot', copy: 'It hangs over the fire. Cook tea, salad, roasted nuts and honey cake whenever the fire is ready.', cost: 'Made', disabled: true, ready: false });
+    expect(potView({ ...shed, progress: { ...shed.progress, potCrafted: true } })).toMatchObject({ shown: false, title: 'Cooking pot', copy: 'It hangs over the fire. Cook tea, salad, roasted nuts and honey cake whenever the fire is ready.', cost: 'Made', disabled: true, ready: false });
+  });
+});
+
+describe('woven pack panel', () => {
+  it('disappears once the pack is woven', () => {
+    expect(packView(game())).toMatchObject({ disabled: false });
+    expect(packView(game({ progress: { packWoven: true } }))).toMatchObject({ shown: false, disabled: true, cost: 'Made' });
   });
 });
 

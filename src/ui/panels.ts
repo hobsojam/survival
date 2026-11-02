@@ -11,7 +11,7 @@ import { WORKSHOP_UPGRADES, upgradeBlocker, type UpgradeId } from '../game/works
 import { logsInStore } from '../game/wood';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
-import { CLEARING_STEPS, clearGroundBlocker, markBlocker, nextStep, roomLine, type Side } from '../game/clearing';
+import { CLEARING_STEPS, STEP_IDS, clearGroundBlocker, markBlocker, nextStep, roomLine, type Side } from '../game/clearing';
 import { KEEPSAKES_NEEDED, cloakBlocker, keepsakeKind, pillowBlocker } from '../game/companion';
 import { DISHES, DISH_ORDER, dishBlocker, foodWord, ingredientList, potBlocker, type DishId } from '../game/cooking';
 import { fishingLineBlocker } from '../game/fishing';
@@ -93,7 +93,7 @@ export function bedMarkup(bed: BedPanelView, index: number): string {
 }
 
 /** What a panel with one action button shows: its heading, its copy, its price line and its button state. */
-export interface ActionPanelView { title: string; copy: string; cost: string; disabled: boolean; ready: boolean }
+export interface ActionPanelView { title: string; copy: string; cost: string; disabled: boolean; ready: boolean; shown?: boolean }
 
 /** What each workshop upgrade does, shown while it can be made. */
 const UPGRADE_COPY: Record<UpgradeId, { title: string; copy: string; made: string }> = {
@@ -116,21 +116,19 @@ export function workshopView(state: GameState): WorkshopView {
   const row = (id: UpgradeId): ActionPanelView & { shown: boolean } => {
     const { title, copy, made } = UPGRADE_COPY[id];
     const shown = id !== 'bedTools' || state.structures.vegetableBeds;
-    if (state.progress.workshop[id]) return { shown, title, copy: made, cost: 'Made', disabled: true, ready: false };
+    if (state.progress.workshop[id]) return { shown: false, title, copy: made, cost: 'Made', disabled: true, ready: false };
     const blocker = upgradeBlocker(state, id);
     return { shown, title, copy: blocker ?? copy, cost: costLabel(WORKSHOP_UPGRADES[id].cost), disabled: false, ready: !blocker };
   };
-  return {
-    shown: state.structures.workshop,
-    rows: { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools') }
-  };
+  const rows = { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools') };
+  return { shown: state.structures.workshop && Object.values(rows).some(item => item.shown), rows };
 }
 
 export function lookoutView(state: GameState): ActionPanelView {
   const { hearthUnlocked, lookoutRepaired } = state.progress;
   const button = { disabled: !hearthUnlocked || lookoutRepaired, ready: !lookoutRepairBlocker(state) };
   if (lookoutRepaired) {
-    return { ...button, title: 'A place to call home', copy: 'The old lookout stands again. Your journal surveys the areas beyond camp.', cost: 'Restored' };
+    return { ...button, shown: false, title: 'A place to call home', copy: 'The old lookout stands again. Your journal surveys the areas beyond camp.', cost: 'Restored' };
   }
   if (hearthUnlocked) {
     return { ...button, title: 'Restore the old lookout', copy: 'Repair it to survey the areas beyond camp. Follow the northeast path and stand beside it.', cost: '4 wood · 2 fiber · 2 stone' };
@@ -142,7 +140,7 @@ export function axeView(state: GameState): ActionPanelView {
   const { hearthUnlocked, axeCrafted } = state.progress;
   const button = { disabled: !hearthUnlocked || axeCrafted, ready: !axeBlocker(state) };
   if (axeCrafted) {
-    return { ...button, title: 'Stone axe ready', copy: `Tap a mature tree, or stand by one and press X, to gather two wood. Stumps regrow after ${treeRegrowDays(state.day) === 2 ? 'two' : 'three'} dawns.`, cost: 'Crafted' };
+    return { ...button, shown: false, title: 'Stone axe ready', copy: `Tap a mature tree, or stand by one and press X, to gather two wood. Stumps regrow after ${treeRegrowDays(state.day) === 2 ? 'two' : 'three'} dawns.`, cost: 'Crafted' };
   }
   if (hearthUnlocked) {
     const copy = state.structures.toolshed
@@ -157,7 +155,7 @@ export function axeView(state: GameState): ActionPanelView {
 export function pickaxeView(state: GameState): ActionPanelView & { shown: boolean } {
   const { quarryFound, pickaxeCrafted } = state.progress;
   const blocker = pickaxeBlocker(state);
-  const button = { shown: quarryFound, disabled: !quarryFound || pickaxeCrafted, ready: quarryFound && !blocker };
+  const button = { shown: quarryFound && !pickaxeCrafted, disabled: !quarryFound || pickaxeCrafted, ready: quarryFound && !blocker };
   if (pickaxeCrafted) {
     return { ...button, title: 'Pickaxe ready', copy: 'Tap the quarry face, or stand at it and press E, to dig a stone. It is ready again each dawn.', cost: 'Crafted' };
   }
@@ -166,7 +164,7 @@ export function pickaxeView(state: GameState): ActionPanelView & { shown: boolea
 
 export function potView(state: GameState): ActionPanelView {
   if (state.progress.potCrafted) {
-    return { title: 'Cooking pot', copy: 'It hangs over the fire. Cook tea, salad, roasted nuts and honey cake whenever the fire is ready.', cost: 'Made', disabled: true, ready: false };
+    return { shown: false, title: 'Cooking pot', copy: 'It hangs over the fire. Cook tea, salad, roasted nuts and honey cake whenever the fire is ready.', cost: 'Made', disabled: true, ready: false };
   }
   const blocker = potBlocker(state);
   return { title: 'Cooking pot', copy: blocker ?? 'A pot on a little tripod, for tea, salad, roasted nuts and honey cake.', cost: '1 wood · 2 stone', disabled: false, ready: !blocker };
@@ -174,7 +172,7 @@ export function potView(state: GameState): ActionPanelView {
 
 export function packView(state: GameState): ActionPanelView {
   if (state.progress.packWoven) {
-    return { title: 'Woven pack', copy: `You wear it on your back. It carries ${BALANCE.packCapacity}.`, cost: 'Made', disabled: true, ready: false };
+    return { shown: false, title: 'Woven pack', copy: `You wear it on your back. It carries ${BALANCE.packCapacity}.`, cost: 'Made', disabled: true, ready: false };
   }
   const blocker = packBlocker(state);
   return { title: 'Woven pack', copy: blocker ?? `A pack of woven fiber on a wooden frame, to carry ${BALANCE.packCapacity}.`, cost: '2 wood · 4 fiber', disabled: false, ready: !blocker };
@@ -183,7 +181,7 @@ export function packView(state: GameState): ActionPanelView {
 /** The Forest tools panel's fishing line: made in the clearing from a wood and a fiber, for the frozen spring. */
 export function fishingLineView(state: GameState): ActionPanelView {
   if (state.progress.fishingLine) {
-    return { title: 'Fishing line', copy: 'In winter, fish through the ice at the quiet spring.', cost: 'Made', disabled: true, ready: false };
+    return { shown: false, title: 'Fishing line', copy: 'In winter, fish through the ice at the quiet spring.', cost: 'Made', disabled: true, ready: false };
   }
   const blocker = fishingLineBlocker(state);
   return { title: 'Fishing line', copy: blocker ?? 'A line of twisted fiber on a stick, to fish through the frozen spring in winter.', cost: '1 wood · 1 fiber', disabled: false, ready: !blocker };
@@ -218,7 +216,7 @@ export function keepsakeView(state: GameState): { shown: boolean; text: string }
 
 function keepsakeItemView(made: boolean, shown: boolean, blocker: string | null,
   words: { title: string; ready: string; done: string; cost: string }): ActionPanelView & { shown: boolean } {
-  if (made) return { shown, title: words.title, copy: words.done, cost: 'Made', disabled: true, ready: false };
+  if (made) return { shown: false, title: words.title, copy: words.done, cost: 'Made', disabled: true, ready: false };
   return { shown, title: words.title, copy: blocker ?? words.ready, cost: words.cost, disabled: false, ready: !blocker };
 }
 
@@ -514,6 +512,7 @@ export function buildListView(state: GameState): BuildListView {
   const empty = shown.length === 0;
   let hint = isInClearing(state) ? 'In the clearing — click an upgrade to build.' : 'Stand anywhere in the clearing to build.';
   if (empty) hint = 'Nothing new to build for now. Clear more land or explore to find what comes next.';
+  if (empty && STEP_IDS.every(id => state.clearing.cleared.includes(id))) hint = 'No structures left to build.';
   return { shelterHeading: SHELTER_UPGRADES.some(id => shown.includes(id)), empty, hint };
 }
 
@@ -540,14 +539,18 @@ function clearingSideView(state: GameState, side: Side): ClearingSideView {
   };
 }
 
-/** The Build tab's "Clear the land" group: one choice per side, then the button that clears the marked ground. */
-export function clearingView(state: GameState): { shown: boolean; sides: ClearingSideView[]; clear: ActionPanelView } {
+/** The Build tab's "Clear the land" group: unfinished sides, compact progress, then the active ground action. */
+export function clearingView(state: GameState): { shown: boolean; sides: ClearingSideView[]; progress: string; clear: ActionPanelView } {
   const { marked, felled } = state.clearing;
   const blocker = clearGroundBlocker(state);
-  const clear = { title: 'Clear the ground', disabled: Boolean(blocker), ready: !blocker };
   const sides = CLEARING_SIDES.map(side => clearingSideView(state, side));
+  const complete = sides.every(side => side.done);
+  const clear = { title: 'Clear the ground', shown: !complete, disabled: Boolean(blocker), ready: !blocker };
+  let progress = '';
+  if (complete) progress = 'All ground cleared.';
+  else if (state.clearing.cleared.length > 0) progress = `Cleared ground: ${state.clearing.cleared.map(step => step.replace('-', ' ')).join(', ')}.`;
   const shown = state.progress.axeCrafted;
-  if (!marked) return { shown, sides, clear: { ...clear, copy: 'Choose a side to mark its trees for felling.', cost: 'Choose a side first' } };
+  if (!marked) return { shown, sides, progress, clear: { ...clear, copy: 'Choose a side to mark its trees for felling.', cost: 'Choose a side first' } };
   const { side, trees, cost } = CLEARING_STEPS[marked];
   const left = trees.length - felled.length;
   let copy = `Ready to clear the ${side} side.`;
@@ -555,5 +558,5 @@ export function clearingView(state: GameState): { shown: boolean; sides: Clearin
     const treeWord = left === 1 ? 'tree' : 'trees';
     copy = `Fell the ${left} marked ${treeWord} left on the ${side} side.`;
   }
-  return { shown, sides, clear: { ...clear, copy, cost: `${cost.wood} wood · ${cost.fiber} fiber` } };
+  return { shown, sides, progress, clear: { ...clear, copy, cost: `${cost.wood} wood · ${cost.fiber} fiber` } };
 }
