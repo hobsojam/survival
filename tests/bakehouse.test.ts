@@ -4,6 +4,8 @@ import { loadGame, SAVE_KEY, SAVE_VERSION } from '../src/game/save';
 import { advanceTime, applyAction, groundBlocker } from '../src/game/rules';
 import { bakeryNews, millGrainBlocker, milledFlour, takeLoafBlocker } from '../src/game/bakehouse';
 import { newsBetween } from '../src/game/news';
+import { journalSeason, recordJournal } from '../src/game/journalEntries';
+import { currentPage, journalPageView } from '../src/ui/yearJournal';
 import { addFood, availableFood, emptyFood, reachableMillFlour, spendFood } from '../src/game/food';
 import { dishBlocker } from '../src/game/cooking';
 import { bakeryPanelView, foodLaidByDays, windmillPanelView } from '../src/ui/panels';
@@ -236,5 +238,26 @@ describe('the windmill and bakery panels', () => {
     expect(foodLaidByDays(bakehouseCamp({ millFlour: 4, shelf: [22, 22], lastBaked: 22 }))).toBe(10);
     expect(foodLaidByDays(bakehouseCamp({ millFlour: 1 }))).toBe(1);
     expect(foodLaidByDays(bakehouseCamp({ shelf: [22], lastBaked: 22 }))).toBe(1);
+  });
+});
+
+describe('the oven in the year journal', () => {
+  it('writes down a spring morning the oven bakes', () => {
+    const before = bakehouseCamp({ millFlour: 1, day: 21 });
+    const after = acrossDawn(before);
+    const { state: written, messages } = recordJournal(before, after);
+    expect(written.journal.map(entry => entry.id)).toContain('ovenBread');
+    expect(messages).toContain('Written in your journal: Woke to warm bread from my own oven.');
+    expect(journalSeason('ovenBread')).toBe('spring');
+  });
+
+  it('writes nothing on a morning the oven waits', () => {
+    const before = bakehouseCamp({ day: 21 });
+    expect(recordJournal(before, acrossDawn(before)).state.journal.map(entry => entry.id)).not.toContain('ovenBread');
+  });
+
+  it('leaves the oven line off the spring page until the bakery stands', () => {
+    const spring = (bakery: boolean) => journalPageView(bakehouseCamp({ bakery, day: 22 }), currentPage(22)).blanks;
+    expect(spring(true) - spring(false)).toBe(1);
   });
 });
