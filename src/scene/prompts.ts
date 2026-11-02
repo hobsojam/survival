@@ -10,7 +10,7 @@ import { isAtHome, livesInHouse } from '../game/home';
 import { closestGatherable, type Gatherable } from './tapTarget';
 import type { SurvivorAction } from './survivorVisual';
 
-/** Single-press keys that map straight to an action; E, X and V need a target and are handled apart. */
+/** Older single-press keys, still working though no longer shown: only E (use), R (rest) and Z (sleep) are named on screen. */
 export const KEY_ACTIONS: readonly [string, GameAction][] = [
   ['F', { type: 'stokeFire' }], ['R', { type: 'rest' }], ['Q', { type: 'eat' }], ['T', { type: 'eatTrailFood' }],
   ['P', { type: 'prepareTrailFood' }], ['C', { type: 'cook' }], ['G', { type: 'stargaze' }], ['Z', { type: 'sleep' }],
@@ -28,27 +28,49 @@ export function actionPose(type: GameAction['type']): SurvivorAction | undefined
 }
 
 const GATHER_PROMPTS: Record<ResourceKind, string> = {
-  branch: 'E  Pick up fallen branches', berry: 'E  Pick berries', fiber: 'E  Gather fiber', stone: 'E  Collect stone',
-  hazel: 'E  Gather hazelnuts', pine: 'E  Gather pine needles', greens: 'E  Pick wild greens', honey: 'E  Take wild honey'
+  branch: 'Pick up fallen branches', berry: 'Pick berries', fiber: 'Gather fiber', stone: 'Collect stone',
+  hazel: 'Gather hazelnuts', pine: 'Gather pine needles', greens: 'Pick wild greens', honey: 'Take wild honey'
 };
 
-function gatherPrompt(found: Gatherable, winter: boolean): string {
-  // E still tries a bare winter bush, so the survivor hears why it is empty.
-  if (found.kind === 'node' && found.node.kind === 'berry' && winter) return 'E  Search the bare bush';
-  if (found.kind === 'pile') return `E  Pick up stone (×${found.pile.count})`;
-  return found.kind === 'node' ? GATHER_PROMPTS[found.node.kind] : GATHER_PROMPTS.branch;
+/** One thing within reach: what the prompt calls it, and what E (like a tap) would do with it, if anything. */
+interface Choice { label: string; action?: GameAction }
+
+/** Gathering what is in reach; at the quarry face, digging it. */
+function gatherChoice(state: GameState, found: Gatherable): Choice {
+  switch (found.kind) {
+    case 'node': {
+      // E still tries a bare winter bush, so the survivor hears why it is empty.
+      const bare = found.node.kind === 'berry' && isWinter(state.day);
+      return { label: bare ? 'Search the bare bush' : GATHER_PROMPTS[found.node.kind], action: { type: 'gather', nodeId: found.node.id } };
+    }
+    case 'pile': return { label: `Pick up stone (×${found.pile.count})`, action: { type: 'pickUpStone', pileId: found.pile.id } };
+    case 'rubble': return { label: 'Gather rubble', action: { type: 'gatherRubble' } };
+    default: return state.progress.pickaxeCrafted
+      ? { label: 'Dig the quarry', action: { type: 'digQuarry' } }
+      : { label: 'Quarry · craft a pickaxe at the toolshed' };
+  }
 }
 
-/** What E does: gather the nearest thing in reach, or rest when there is nothing to gather at camp. */
-export function gatherKeyAction(state: GameState): GameAction | undefined {
+/** Everything in reach at camp, in the order E would use it: gathering, then the lookout, a place or a tree, then an offering. */
+function campChoices(state: GameState): Choice[] {
   const found = closestGatherable(state);
-  switch (found?.kind) {
-    case 'node': return { type: 'gather', nodeId: found.node.id };
-    case 'pile': return { type: 'pickUpStone', pileId: found.pile.id };
-    case 'rubble': return { type: 'gatherRubble' };
-    case 'quarry': return { type: 'digQuarry' };
-    default: return isAtHome(state) ? { type: 'rest' } : undefined;
-  }
+  const site = closestSite(state);
+  const nearby = lookoutChoice(state) ?? (site ? { label: sitePrompt(state, site.id), action: { type: 'visitSite', siteId: site.id } as GameAction } : null) ?? treeChoice(state);
+  const animal = offerFor(state);
+  const offer: Choice | null = animal ? { label: offerPrompt(state, animal), action: { type: 'befriend' } } : null;
+  return [found ? gatherChoice(state, found) : null, nearby, offer].filter((choice): choice is Choice => choice !== null);
+}
+
+/** E gets the first choice it would act on; the rest are named plainly, to click. */
+function choiceLabels(choices: Choice[]): string[] {
+  const used = choices.findIndex(choice => choice.action);
+  return choices.map((choice, index) => (index === used ? `E  ${choice.label}` : choice.label));
+}
+
+/** What E does: the first thing in reach it can use, as a tap on it would, or a rest at home with nothing to use. */
+export function useKeyAction(state: GameState): GameAction | undefined {
+  const choices = state.area === 'quarry' ? quarryChoices(state) : campChoices(state);
+  return choices.find(choice => choice.action)?.action ?? (isAtHome(state) ? { type: 'rest' } : undefined);
 }
 
 /** Where a gathering action happened, read from the state before it, for the pick-up sparkle. */
@@ -89,51 +111,47 @@ export function closestSite(state: GameState): { id: SiteId; name: string; x: nu
 
 /** The hint line under the game: what the keys would do here, now. */
 export function promptFor(state: GameState): string {
-  const found = closestGatherable(state);
-  if (state.area === 'quarry') return quarryPrompt(state, found);
-  const site = closestSite(state);
-  const nearby = lookoutPrompt(state) || (site ? sitePrompt(state, site.id) : '') || treePrompt(state);
-  const animal = offerFor(state);
-  const offer = animal ? `O  ${offerPrompt(state, animal)}` : '';
-  const gather = found ? gatherPrompt(found, isWinter(state.day)) : '';
-  const parts = [gather, nearby, offer].filter(Boolean);
-  if (gather && parts.length === 1 && !sleepBlocker(state)) return `${gather} · Z Sleep until morning`;
+  if (state.area === 'quarry') return quarryPrompt(state);
+  const choices = campChoices(state);
+  const labels = choiceLabels(choices);
+  const only = choices.length === 1 ? choices[0] : null;
+  if (only && only.action?.type === 'gather' && !sleepBlocker(state)) return `${labels[0]} · Z Sleep until morning`;
   // An offering alone keeps the camp's own hints beside it.
-  if (parts.length === 1 && offer) return `${offer} · ${campPrompt(state)}`;
-  return parts.length ? parts.join(' · ') : campPrompt(state);
+  if (only?.action?.type === 'befriend') return `${labels[0]} · ${campPrompt(state)}`;
+  return labels.length ? labels.join(' · ') : campPrompt(state);
 }
 
-function lookoutPrompt(state: GameState): string {
-  if (!within(state, LOOKOUT)) return '';
-  if (state.progress.lookoutRepaired) return 'The lookout stands again';
-  if (state.progress.hearthUnlocked) return 'L  Repair lookout';
-  return 'Lookout · weather the cold night first';
+function lookoutChoice(state: GameState): Choice | null {
+  if (!within(state, LOOKOUT)) return null;
+  if (state.progress.lookoutRepaired) return { label: 'The lookout stands again' };
+  if (state.progress.hearthUnlocked) return { label: 'Repair lookout', action: { type: 'repairLookout' } };
+  return { label: 'Lookout · weather the cold night first' };
 }
 
-function treePrompt(state: GameState): string {
+function treeChoice(state: GameState): Choice | null {
   const tree = closestTree(state);
-  if (!tree) return '';
-  if (isClearingStump(tree)) return 'Stump · this ground is being cleared';
-  if (tree.readyDay > state.day) return `Stump · regrows day ${tree.readyDay}`;
-  if (state.progress.axeCrafted) return 'X  Chop mature tree';
-  return 'Mature tree · craft an axe at camp';
+  if (!tree) return null;
+  if (isClearingStump(tree)) return { label: 'Stump · this ground is being cleared' };
+  if (tree.readyDay > state.day) return { label: `Stump · regrows day ${tree.readyDay}` };
+  if (state.progress.axeCrafted) return { label: 'Chop mature tree', action: { type: 'chopTree', treeId: tree.id } };
+  return { label: 'Mature tree · craft an axe at camp' };
 }
 
 function campPrompt(state: GameState): string {
   if (pathOpen(state) && within(state, CAMP_EXIT)) return 'Walk west to leave camp';
   if (!isInClearing(state)) return 'WASD / arrows  Move';
   if (livesInHouse(state)) return housePrompt(state);
-  if (!isAtCamp(state)) return 'In the clearing · G Stargaze · Click an upgrade to build';
+  if (!isAtCamp(state)) return 'In the clearing · Watch the stars · Click an upgrade to build';
   if (state.timeOfDay < nightStart(state.day)) {
     const dish = defaultDish(state);
     return dish
-      ? `C  Cook ${DISHES[dish].name} · F Fire · R Rest · Click an upgrade to build`
-      : 'At camp · C Cook · F Fire · R Rest · Click an upgrade to build';
+      ? `Cook ${DISHES[dish].name} · Feed the fire · R Rest · Click an upgrade to build`
+      : 'At camp · Cook · Feed the fire · R Rest · Click an upgrade to build';
   }
-  const evening = sleepBlocker(state) ? 'G Stargaze · F Fire · R Rest' : 'G Stargaze · Z Sleep · F Fire';
-  // Once there is something to cook, C names it.
+  const evening = sleepBlocker(state) ? 'Watch the stars · Feed the fire · R Rest' : 'Watch the stars · Z Sleep · Feed the fire';
+  // Once there is something to cook, the prompt names it.
   const dish = defaultDish(state);
-  return dish ? `C  Cook ${DISHES[dish].name} · ${evening}` : `At camp · C Cook · ${evening}`;
+  return dish ? `Cook ${DISHES[dish].name} · ${evening}` : `At camp · Cook · ${evening}`;
 }
 
 /** Living in the house: home is for resting, sleeping and cooking, and the campfire is there to feed if wanted. */
@@ -142,21 +160,26 @@ function housePrompt(state: GameState): string {
   if (isAtHome(state)) {
     const dish = defaultDish(state);
     if (!night) return dish
-      ? `C  Cook ${DISHES[dish].name} · R Rest · Click an upgrade to build`
-      : 'At home · C Cook · R Rest · Click an upgrade to build';
-    return dish ? `C  Cook ${DISHES[dish].name} · G Stargaze · Z Sleep` : 'At home · C Cook · G Stargaze · Z Sleep';
+      ? `Cook ${DISHES[dish].name} · R Rest · Click an upgrade to build`
+      : 'At home · Cook · R Rest · Click an upgrade to build';
+    return dish ? `Cook ${DISHES[dish].name} · Watch the stars · Z Sleep` : 'At home · Cook · Watch the stars · Z Sleep';
   }
-  if (!isAtCamp(state)) return 'In the clearing · G Stargaze · Click an upgrade to build';
-  return night ? 'At the campfire · G Stargaze · F Fire' : 'At the campfire · F Fire · Click an upgrade to build';
+  if (!isAtCamp(state)) return 'In the clearing · Watch the stars · Click an upgrade to build';
+  return night ? 'At the campfire · Watch the stars · Feed the fire' : 'At the campfire · Feed the fire · Click an upgrade to build';
 }
 
-function quarryPrompt(state: GameState, found: Gatherable | undefined): string {
-  if (found?.kind === 'pile') {
-    const pile = `E  Pick up stone (×${found.pile.count})`;
-    return within(state, QUARRY_SITE) ? `${pile} · ${quarryFaceNote(state)}` : pile;
+/** Everything in reach in the quarry area: a loose pile first, then the rubble or the quarry face. */
+function quarryChoices(state: GameState): Choice[] {
+  const found = closestGatherable(state);
+  return found ? [gatherChoice(state, found)] : [];
+}
+
+function quarryPrompt(state: GameState): string {
+  const found = closestGatherable(state);
+  if (found) {
+    const [label] = choiceLabels([gatherChoice(state, found)]);
+    return found.kind === 'pile' && within(state, QUARRY_SITE) ? `${label} · ${quarryFaceNote(state)}` : label;
   }
-  if (found?.kind === 'rubble') return 'E  Gather rubble';
-  if (found?.kind === 'quarry') return state.progress.pickaxeCrafted ? 'E  Dig the quarry' : 'Quarry · craft a pickaxe at the toolshed';
   if (within(state, QUARRY_SITE) && state.quarryReadyDay > state.day) return 'Quarry · worked out until morning';
   if (within(state, QUARRY_EXIT)) return 'Walk east to return to camp';
   return 'WASD / arrows  Move';

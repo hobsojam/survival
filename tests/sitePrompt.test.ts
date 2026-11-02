@@ -5,8 +5,8 @@ import { sitePrompt } from '../src/game/sitePrompt';
 describe('site prompt', () => {
   it('keeps a nearby place unnamed until the first visit', () => {
     const state = createGame();
-    expect(sitePrompt(state, 'basket')).toBe('V  Explore nearby place');
+    expect(sitePrompt(state, 'basket')).toBe('Explore nearby place');
     state.progress.discoveries.basket = true;
-    expect(sitePrompt(state, 'basket')).toBe('V  Explore old basket');
+    expect(sitePrompt(state, 'basket')).toBe('Explore old basket');
   });
 });

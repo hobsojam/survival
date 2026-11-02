@@ -134,8 +134,8 @@ describe('fishing through the ice', () => {
 
   it('prompts and hints at fishing at the frozen spring', () => {
     const discovered = (state: GameState): GameState => ({ ...state, progress: { ...state.progress, discoveries: { ...state.progress.discoveries, spring: true } } });
-    expect(sitePrompt(withLine(discovered(winter())), 'spring')).toBe('V  Fish through the ice');
-    expect(sitePrompt(discovered(winter()), 'spring')).toBe('V  Explore quiet spring');
+    expect(sitePrompt(withLine(discovered(winter())), 'spring')).toBe('Fish through the ice');
+    expect(sitePrompt(discovered(winter()), 'spring')).toBe('Explore quiet spring');
     expect(applyAction(atSpring(winter()), { type: 'visitSite', siteId: 'spring' }).message)
       .toBe('The spring is frozen over. With a fishing line, you could fish through the ice.');
   });
