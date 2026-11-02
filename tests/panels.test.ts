@@ -473,6 +473,13 @@ describe('clearing panel', () => {
     expect(clearingView(withAxe({ cleared: ['north-near', 'north-far'] })).progress).toBe('Cleared ground: north near, north far.');
   });
 
+  it('names the stone in the price of clearing an outer nook', () => {
+    const felled = CLEARING_STEPS['north-outer'].trees.map((_, i) => i);
+    const marked = withAxe({ cleared: ['north-near', 'north-far'], marked: 'north-outer', felled });
+    expect(clearingView(marked).clear.cost).toBe('8 wood · 4 fiber · 2 stone');
+    expect(clearingView(withAxe({ cleared: [], marked: 'north-near', felled: [] })).clear.cost).toBe('4 wood · 2 fiber');
+  });
+
   it('keeps only a compact status once every side is cleared', () => {
     const cleared = Object.keys(CLEARING_STEPS) as GameState['clearing']['cleared'];
     const view = clearingView(withAxe({ cleared }));

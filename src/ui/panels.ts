@@ -663,5 +663,5 @@ export function clearingView(state: GameState): { shown: boolean; sides: Clearin
     const treeWord = left === 1 ? 'tree' : 'trees';
     copy = `Fell the ${left} marked ${treeWord} left on the ${side} side.`;
   }
-  return { shown, sides, progress, clear: { ...clear, copy, cost: `${cost.wood} wood · ${cost.fiber} fiber` } };
+  return { shown, sides, progress, clear: { ...clear, copy, cost: `${cost.wood} wood · ${cost.fiber} fiber${cost.stone > 0 ? ` · ${cost.stone} stone` : ''}` } };
 }
