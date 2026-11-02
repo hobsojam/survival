@@ -393,8 +393,7 @@ export class App {
       }
       this.root.querySelector(`#${key}-value`)?.classList.toggle('low', low);
     }
-    const sitesPanel = this.root.querySelector<HTMLElement>('.sites-panel');
-    if (sitesPanel) sitesPanel.hidden = Object.values(this.state.progress.discoveries).every(Boolean);
+    this.root.querySelector<HTMLElement>('.sites-panel')!.hidden = Object.values(this.state.progress.discoveries).every(Boolean);
     const nearSite = this.state.area === 'camp' && (Object.keys(SITES) as SiteId[]).some(id => Math.hypot(player.x - SITES[id].x, player.y - SITES[id].y) <= BALANCE.interactionRadius);
     this.root.querySelector('#site-button')?.classList.toggle('ready', nearSite);
   }
