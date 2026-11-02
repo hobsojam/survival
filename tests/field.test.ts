@@ -9,8 +9,13 @@ import { newsBetween } from '../src/game/news';
 import { journalEntry, recordJournal } from '../src/game/journalEntries';
 import { nightStart } from '../src/game/calendar';
 import { addFood, emptyFood } from '../src/game/food';
+import { CAMP_STRUCTURES, FIELD_STRIP_OFFSETS, sceneVisuals } from '../src/scene/visuals';
+import { sprites } from '../src/art/sprites';
+import { PATH_DESTINATIONS, segmentDistance } from './placement';
 import { upgradeBlocker } from '../src/game/workshop';
 import { loadGame, saveGame, SAVE_KEY } from '../src/game/save';
+
+const { campX, campY } = BALANCE;
 import { fieldCamp, strip, withField } from './fieldCamp';
 
 class MemoryStorage implements Storage {
@@ -327,5 +332,76 @@ describe('the harvest in the year journal', () => {
     expect(ids).toContain('winterBread');
     expect(ids).not.toContain('winterCooking');
     expect(journalEntry('winterBread')!.lines[0]).toBe('Bread from my own field, warm by the fire.');
+  });
+});
+
+describe('the field and granary in camp', () => {
+  const FIELD_SPOT = { x: campX - 1.5, y: campY + 7 };
+  const GRANARY_SPOT = { x: campX + 3, y: campY + 4.5 };
+  const others = (id: string) => [{ x: campX - 3, y: campY - 2 },
+    ...CAMP_STRUCTURES.filter(([other]) => other !== id).map(([, dx, dy]) => ({ x: campX + dx, y: campY + dy }))];
+  const textures = (state: GameState, prefix: string) => sceneVisuals(state, 0).filter(visual => visual.id.startsWith(prefix)).map(visual => visual.texture);
+
+  it('stands the granary on the south near ground and the field beyond it, on the far ground', () => {
+    expect(CAMP_STRUCTURES).toContainEqual(['granary', 3, 4.5]);
+    expect(CAMP_STRUCTURES).toContainEqual(['field', -1.5, 7]);
+    expect(inClearing(GRANARY_SPOT.x, GRANARY_SPOT.y, ['south-near'])).toBe(true);
+    expect(inClearing(GRANARY_SPOT.x, GRANARY_SPOT.y, [])).toBe(false);
+    expect(inClearing(FIELD_SPOT.x, FIELD_SPOT.y, ['south-near'])).toBe(false);
+    for (const dx of FIELD_STRIP_OFFSETS) expect(inClearing(FIELD_SPOT.x + dx, FIELD_SPOT.y, ['south-near', 'south-far']), `strip at ${dx}`).toBe(true);
+  });
+
+  it('keeps 2 tiles from the shelter and the other camp buildings, and clear of the paths', () => {
+    for (const [id, spot] of [['granary', GRANARY_SPOT], ['field', FIELD_SPOT]] as const) {
+      for (const other of others(id)) expect(Math.hypot(spot.x - other.x, spot.y - other.y), `${id} by ${other.x},${other.y}`).toBeGreaterThanOrEqual(2);
+      for (const [dx, dy] of PATH_DESTINATIONS) expect(segmentDistance(spot.x, spot.y, dx, dy)).toBeGreaterThanOrEqual(1.5);
+    }
+  });
+
+  it('shows the sites once the ground is clear, then the granary filling and the strips as they grow', () => {
+    const bare = fieldCamp({ field: false });
+    expect(textures(bare, 'field')).toEqual(['fieldSite:still']);
+    expect(textures(bare, 'granary')).toEqual(['granarySite:still']);
+    expect(textures({ ...bare, clearing: { cleared: ['south-near'], marked: null, felled: [] } }, 'field')).toEqual([]);
+    expect(textures(fieldCamp(), 'granary')).toEqual(['granarySite:still']);
+    const growing = withField({ ...fieldCamp({ granary: true }), day: 36 }, {
+      grain: 5, strips: [strip(), strip({ sownDay: 22 }), strip({ sownDay: 22, cut: true }), strip({ sownDay: 21 })]
+    });
+    expect(textures(growing, 'granary')).toEqual(['granary:some']);
+    expect(textures(withField(growing, { grain: 0 }), 'granary')).toEqual(['granary:empty']);
+    expect(textures(withField(growing, { grain: 16 }), 'granary')).toEqual(['granary:full']);
+    expect(textures(growing, 'field')).toEqual(['fieldStrip:bare', 'fieldStrip:gold', 'fieldStrip:stooks', 'fieldStrip:gold']);
+    expect(textures({ ...growing, day: 32 }, 'field-strip-3')).toEqual(['fieldStrip:green']);
+    expect(textures({ ...growing, day: 25 }, 'field-strip-3')).toEqual(['fieldStrip:shoots']);
+  });
+
+  it('shows the wild grain in its seasons, and gathered once taken', () => {
+    const state = fieldCamp({ field: false });
+    expect(textures({ ...state, day: 2 }, 'wildGrain')).toEqual(['wildGrain:ready']);
+    expect(textures({ ...state, day: 12 }, 'wildGrain')).toEqual([]);
+    const taken = { ...state, day: 2, nodes: state.nodes.map(node => node.kind === 'wildGrain' ? { ...node, amount: 0 } : node) };
+    expect(textures(taken, 'wildGrain')).toEqual(['wildGrain:gathered']);
+  });
+
+  it('draws every stage of a strip, the granary filling, and both sites, edged in dark wood', () => {
+    expect(Object.keys(sprites.fieldStrip.frames).sort()).toEqual(['bare', 'gold', 'green', 'shoots', 'stooks']);
+    expect(Object.keys(sprites.granary.frames).sort()).toEqual(['empty', 'full', 'some']);
+    for (const id of ['fieldSite', 'granarySite']) expect(sprites[id].frames.still, id).toBeDefined();
+    for (const id of ['fieldStrip', 'granary']) {
+      for (const frame of Object.values(sprites[id].frames)) {
+        expect(frame.join('').split('').map(symbol => sprites[id].legend[symbol])).toContain('wood0');
+      }
+    }
+    const frames = Object.values(sprites.fieldStrip.frames).map(frame => frame.join(''));
+    expect(new Set(frames).size).toBe(frames.length);
+  });
+});
+
+describe('the field clear of the camp\'s trees', () => {
+  it('keeps every strip a tree\'s width from the trees that stand at camp', () => {
+    const spot = { x: campX - 1.5, y: campY + 7 };
+    for (const dx of FIELD_STRIP_OFFSETS) for (const tree of createGame().trees) {
+      expect(Math.hypot(spot.x + dx - tree.x, spot.y - tree.y), `strip at ${dx} by ${tree.id}`).toBeGreaterThanOrEqual(2);
+    }
   });
 });
