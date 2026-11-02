@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { CLEARING_STEPS, STEP_IDS, inClearing, placeBranches } from '../src/game/clearing';
-import { FIELD_STRIPS, cutStripBlocker, emptyField, ripeDay, sowStripBlocker, stripStage, threshGrain, threshStripBlocker, type FieldState, type FieldStrip } from '../src/game/field';
+import { FIELD_STRIPS, cutStripBlocker, emptyField, ripeDay, sowStripBlocker, stripStage, threshGrain, threshStripBlocker, wildGrainBlocker, type FieldState, type FieldStrip } from '../src/game/field';
 import { TOO_TIRED_MESSAGE, workSeconds } from '../src/game/needs';
-import { applyAction } from '../src/game/rules';
+import { advanceTime, applyAction } from '../src/game/rules';
+import { nodeShown } from '../src/game/forage';
 import { upgradeBlocker } from '../src/game/workshop';
 import { loadGame, saveGame, SAVE_KEY } from '../src/game/save';
 
@@ -242,5 +243,52 @@ describe('working the field', () => {
     const cut = applyAction(spring, { type: 'cutStrip', index: 0 }).state;
     const threshed = applyAction(cut, { type: 'threshStrip', index: 0 }).state;
     expect(sowStripBlocker(threshed, 0)).toBeNull();
+  });
+});
+
+describe('wild grain', () => {
+  /** Standing beside the wild grain on a given day, with the bag as full as asked. */
+  const atGrain = (day = 2, seed = 0): GameState => {
+    const base = createGame();
+    const grain = base.nodes.find(node => node.kind === 'wildGrain')!;
+    return withField({ ...base, day, progress: { ...base.progress, nextStormDay: null, hearthUnlocked: true }, player: { ...base.player, x: grain.x, y: grain.y + 1 } }, { seed });
+  };
+
+  it('gives a strip\'s seed, into no bag, in the time and energy of a gather', () => {
+    const state = atGrain();
+    const { state: after, message } = applyAction(state, { type: 'gather', nodeId: 'wildGrain-0' });
+    expect(after.field.seed).toBe(1);
+    expect(after.inventory).toEqual(state.inventory);
+    expect(message).toBe('Gathered wild grain: seed for one strip of a field on the south ground.');
+    expect(after.player.energy).toBe(state.player.energy - BALANCE.gatherEnergyCost);
+    expect(after.timeOfDay).toBeCloseTo(state.timeOfDay + workSeconds(state, BALANCE.gatherSeconds));
+    expect(after.nodes.find(node => node.id === 'wildGrain-0')).toMatchObject({ amount: 0, readyDay: 3 });
+  });
+
+  it('can be gathered with a full bag', () => {
+    const state = atGrain();
+    const full = { ...state, inventory: { ...state.inventory, wood: 8 } };
+    expect(applyAction(full, { type: 'gather', nodeId: 'wildGrain-0' }).state.field.seed).toBe(1);
+  });
+
+  it('stops once there is seed for the whole field', () => {
+    const state = atGrain(2, FIELD_STRIPS);
+    expect(wildGrainBlocker(state)).toBe('You have seed enough for the whole field.');
+    expect(wildGrainBlocker(atGrain(2, 3))).toBeNull();
+    const { state: after, message } = applyAction(state, { type: 'gather', nodeId: 'wildGrain-0' });
+    expect(after).toBe(state);
+    expect(message).toBe('You have seed enough for the whole field.');
+  });
+
+  it('is gone under the winter snow, and there in every other season', () => {
+    const node = createGame().nodes.find(item => item.kind === 'wildGrain')!;
+    expect(nodeShown(atGrain(12), node)).toBe(false);
+    for (const day of [2, 22, 32]) expect(nodeShown(atGrain(day), node)).toBe(true);
+  });
+
+  it('comes back at dawn', () => {
+    const gathered = applyAction(atGrain(), { type: 'gather', nodeId: 'wildGrain-0' }).state;
+    const dawned = advanceTime({ ...gathered, timeOfDay: BALANCE.daySeconds - 1 }, 1.5, 'resting');
+    expect(dawned.nodes.find(node => node.id === 'wildGrain-0')!.amount).toBe(1);
   });
 });

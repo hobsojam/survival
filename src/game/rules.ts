@@ -10,7 +10,7 @@ import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, ma
 import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
 import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
-import { cutField, cutStripBlocker, sowStripBlocker, sownField, threshStripBlocker, threshedField } from './field';
+import { cutField, cutStripBlocker, seededField, sowStripBlocker, sownField, threshStripBlocker, threshedField, wildGrainBlocker } from './field';
 import { BED_CROPS, bedsDawn, drawWaterBlocker, emptyBed, harvestBedBlocker, needsWater, sowBedBlocker } from './beds';
 import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
 import { logsInStore } from './wood';
@@ -18,7 +18,7 @@ import { settleStores } from './stores';
 import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, cartSpace, countWord, fellingWood, upgradeBlocker, type UpgradeId } from './workshop';
 import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishingSecondsFor, validRoll } from './fishing';
 import { ENDED_MESSAGE, GAVE_OUT_MESSAGE, judgeSickDay, markWarmMeal, markWarmRest, sicknessTick } from './sickness';
-import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
+import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, type GameState, type ResourceNode, type SiteId, type StructureId } from './state';
 
 export type GameAction =
   | { type: 'gather'; nodeId: string }
@@ -365,11 +365,23 @@ function withSupply(state: GameState, resource: Supply, n: number, item: FoodIte
   return { ...inventory, [resource]: inventory[resource] + n };
 }
 
+/** Wild grain gives seed for one strip of the field, kept apart from the bag, so it can be gathered with the bag full. */
+function gatherWildGrain(state: GameState, node: ResourceNode): ActionResult {
+  const blocker = wildGrainBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  const nodes = state.nodes.map(item => item === node ? { ...item, amount: item.amount - 1, readyDay: state.day + 1 } : item);
+  return {
+    state: advanceTime({ ...state, player: tire(state, BALANCE.gatherEnergyCost), field: seededField(state), nodes }, workSeconds(state, BALANCE.gatherSeconds), 'working'),
+    message: GATHER_MESSAGE.wildGrain
+  };
+}
+
 const gather: ActionHandler<'gather'> = (state, action) => {
   const node = state.nodes.find(item => item.id === action.nodeId);
   if (!node || state.area !== 'camp' || !nodeShown(state, node) || !near(state.player.x, state.player.y, node.x, node.y)) return refuse(state, 'Move closer to gather.');
   if (node.kind === 'berry' && isWinter(state.day)) return refuse(state, 'The bushes are bare until spring.');
   if (node.amount <= 0) return refuse(state, 'Nothing to gather yet.');
+  if (node.kind === 'wildGrain') return gatherWildGrain(state, node);
   const resource = NODE_RESOURCE[node.kind];
   if (freeSpaces(state) < spaceFor(resource)) return refuse(state, FULL_BAG_MESSAGE);
   const forage = isForage(node.kind) ? FORAGE[node.kind] : null;

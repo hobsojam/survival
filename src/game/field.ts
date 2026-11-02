@@ -114,3 +114,11 @@ export function threshedField(state: GameState, index: number): { field: FieldSt
   if (stored < BALANCE.grainPerStrip) return { field, message: 'Threshed the strip. The granary is full now, and the rest stays as straw.' };
   return { field, message: `Threshed the strip. ${stored} grain went into the granary.` };
 }
+
+/** Why the wild grain gives no seed now, or null: seed is kept for at most every strip of the field. */
+export function wildGrainBlocker(state: GameState): string | null {
+  return state.field.seed >= FIELD_STRIPS ? 'You have seed enough for the whole field.' : null;
+}
+
+/** The field with one more strip's seed, from the wild grain. */
+export const seededField = (state: GameState): FieldState => ({ ...state.field, seed: state.field.seed + 1 });

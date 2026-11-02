@@ -127,7 +127,7 @@ describe('forage in its season', () => {
   });
 
   it('always shows the branches, bushes, reeds and rocks', () => {
-    for (const day of Object.values(SEASON_DAYS)) for (const spot of game.nodes.filter(item => !isForage(item.kind))) {
+    for (const day of Object.values(SEASON_DAYS)) for (const spot of game.nodes.filter(item => !isForage(item.kind) && item.kind !== 'wildGrain')) {
       expect(nodeShown({ ...game, day }, spot), spot.id).toBe(true);
     }
   });
