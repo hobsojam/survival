@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type SiteId, type StructureId } from '../game/state';
 import { GameScene } from '../scene/GameScene';
-import { displayScale, viewportSize, canvasOffset, portraitViewport, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
+import { displayScale, viewportSize, canvasOffset, canvasDisplaySize, portraitViewport, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
 import { availableFiber, availableWood, cookBlocker, isAtCamp, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { nextStep, type Side } from '../game/clearing';
@@ -264,7 +264,9 @@ export class App {
     const fitCanvas = () => {
       if (!this.game?.canvas) return;
       const portrait = portraitViewport(frame.clientWidth, frame.clientHeight);
-      const scale = portrait?.scale ?? displayScale(frame.clientWidth, frame.clientHeight);
+      // On a high-density screen, a scale between whole numbers can still put each art pixel on whole screen pixels.
+      const pixelRatio = window.devicePixelRatio || 1;
+      const scale = portrait?.scale ?? displayScale(frame.clientWidth, frame.clientHeight, pixelRatio);
       let viewport = scale === 1 ? viewportSize(frame.clientWidth, frame.clientHeight) : { width: LOGICAL_WIDTH, height: LOGICAL_HEIGHT };
       if (portrait) viewport = { width: portrait.width, height: portrait.height };
       if (this.game.scale.gameSize.width !== viewport.width || this.game.scale.gameSize.height !== viewport.height) {
@@ -273,7 +275,11 @@ export class App {
       }
       if (this.game.scale.zoom !== scale) this.game.scale.setZoom(scale);
       else this.game.scale.refresh();
-      const offset = canvasOffset(frame.clientWidth, frame.clientHeight, viewport.width, viewport.height, scale);
+      const size = canvasDisplaySize(viewport.width, viewport.height, scale, pixelRatio);
+      this.game.canvas.style.width = `${size.width}px`;
+      this.game.canvas.style.height = `${size.height}px`;
+      const holder = this.game.canvas.parentElement!.getBoundingClientRect();
+      const offset = canvasOffset(frame.clientWidth, frame.clientHeight, viewport.width, viewport.height, scale, pixelRatio, { x: holder.left, y: holder.top });
       this.game.canvas.style.marginLeft = `${offset.x}px`;
       this.game.canvas.style.marginTop = `${offset.y}px`;
     };
