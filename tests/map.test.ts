@@ -45,7 +45,7 @@ describe('terrain composition', () => {
   });
 
   // Branches lie under trees and a hazel grows at the foot of its tree; other forage keeps a little room, the rest more.
-  const CLEARANCE: Record<ResourceKind, number> = { branch: 1.5, hazel: 1.4, pine: 2.5, greens: 2.5, honey: 2.5, berry: 3.5, fiber: 3.5, stone: 3.5 };
+  const CLEARANCE: Record<ResourceKind, number> = { branch: 1.5, hazel: 1.4, pine: 2.5, greens: 2.5, honey: 2.5, berry: 3.5, fiber: 3.5, stone: 3.5, wildGrain: 2.5 };
 
   it('is deterministic and leaves the camp and nodes clear of tree trunks', () => {
     const map = buildMap(nodes, 'camp');

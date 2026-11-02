@@ -204,9 +204,9 @@ describe('vegetable stew', () => {
     };
   };
 
-  it('is a pot dish of two vegetables, cooked last', () => {
+  it('is a pot dish of two vegetables, cooked last of the pot dishes', () => {
     expect(DISHES.stew).toEqual({ name: 'vegetable stew', ingredients: { vegetables: 2 }, potOnly: true });
-    expect(DISH_ORDER.at(-1)).toBe('stew');
+    expect(DISH_ORDER.filter(dish => DISHES[dish].potOnly).at(-1)).toBe('stew');
   });
 
   it('needs the well', () => {

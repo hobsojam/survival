@@ -4,12 +4,13 @@ import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSec
 import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
 import { availableFiber, availableStone, availableWood, spendFiber, spendWood, bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
-import { POT_COST, cookBlocker, defaultDish, dishBlocker, foodWord, packDish, potBlocker, serveDish, spendIngredients, type DishId } from './cooking';
+import { POT_COST, cookBlocker, defaultDish, dishBlocker, foodWord, isPackedDish, packDish, potBlocker, serveDish, spendIngredients, type DishId } from './cooking';
 import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
 import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, type StepId } from './clearing';
 import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
 import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
+import { cutField, cutStripBlocker, grindGrainBlocker, seededField, sowStripBlocker, sownField, threshStripBlocker, threshedField, wildGrainBlocker } from './field';
 import { BED_CROPS, bedsDawn, drawWaterBlocker, emptyBed, harvestBedBlocker, needsWater, sowBedBlocker } from './beds';
 import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
 import { logsInStore } from './wood';
@@ -17,7 +18,7 @@ import { settleStores } from './stores';
 import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, cartSpace, countWord, fellingWood, upgradeBlocker, type UpgradeId } from './workshop';
 import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishingSecondsFor, validRoll } from './fishing';
 import { ENDED_MESSAGE, GAVE_OUT_MESSAGE, judgeSickDay, markWarmMeal, markWarmRest, sicknessTick } from './sickness';
-import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, type GameState, type SiteId, type StructureId } from './state';
+import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, type GameState, type ResourceNode, type SiteId, type StructureId } from './state';
 
 export type GameAction =
   | { type: 'gather'; nodeId: string }
@@ -31,6 +32,10 @@ export type GameAction =
   | { type: 'harvestGarden'; plotIndex: number }
   | { type: 'sowBed'; index: number }
   | { type: 'harvestBed'; index: number }
+  | { type: 'sowStrip'; index: number }
+  | { type: 'cutStrip'; index: number }
+  | { type: 'threshStrip'; index: number }
+  | { type: 'grindGrain' }
   | { type: 'drawWater' }
   | { type: 'makeUpgrade'; upgrade: UpgradeId }
   | { type: 'eat'; item?: FoodItem }
@@ -281,8 +286,8 @@ function dawn(next: GameState, home: boolean): void {
   const larder = spoil(next.larder, next.day, BALANCE.larderFreshDays);
   next.inventory = { ...next.inventory, food: bag.store };
   next.larder = larder.store;
-  const lost = { berry: bag.lost.berry + larder.lost.berry, greens: bag.lost.greens + larder.lost.greens };
-  if (lost.berry + lost.greens > 0) next.lastSpoiled = { day: next.day, ...lost };
+  const lost = { berry: bag.lost.berry + larder.lost.berry, greens: bag.lost.greens + larder.lost.greens, bread: bag.lost.bread + larder.lost.bread };
+  if (lost.berry + lost.greens + lost.bread > 0) next.lastSpoiled = { day: next.day, ...lost };
   if (!stormEnded) return;
   if (weathered) {
     next.progress = { ...next.progress, nextStormDay: null, hearthUnlocked: true };
@@ -346,11 +351,12 @@ const cross: ActionHandler<'cross'> = state => {
 type Supply = keyof GameState['inventory'];
 // Berries and forage go into the food store.
 const NODE_RESOURCE: Record<GameState['nodes'][number]['kind'], Supply> = {
-  branch: 'wood', berry: 'food', fiber: 'fiber', stone: 'stone', hazel: 'food', pine: 'food', greens: 'food', honey: 'food'
+  branch: 'wood', berry: 'food', fiber: 'fiber', stone: 'stone', hazel: 'food', pine: 'food', greens: 'food', honey: 'food', wildGrain: 'food'
 };
 const GATHER_MESSAGE: Record<GameState['nodes'][number]['kind'], string> = {
   branch: 'Picked up fallen branches.', berry: 'Picked berries.', fiber: 'Gathered fiber.', stone: 'Collected stone.',
-  hazel: 'Gathered a hazelnut.', pine: 'Gathered a bunch of pine needles.', greens: 'Picked wild greens.', honey: 'Took a little honey from the hollow tree.'
+  hazel: 'Gathered a hazelnut.', pine: 'Gathered a bunch of pine needles.', greens: 'Picked wild greens.', honey: 'Took a little honey from the hollow tree.',
+  wildGrain: 'Gathered wild grain: seed for one strip of a field on the south ground.'
 };
 
 /** The bag with n more of a supply; food comes in as the item given (berries unless said), picked today. */
@@ -360,11 +366,23 @@ function withSupply(state: GameState, resource: Supply, n: number, item: FoodIte
   return { ...inventory, [resource]: inventory[resource] + n };
 }
 
+/** Wild grain gives seed for one strip of the field, kept apart from the bag, so it can be gathered with the bag full. */
+function gatherWildGrain(state: GameState, node: ResourceNode): ActionResult {
+  const blocker = wildGrainBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  const nodes = state.nodes.map(item => item === node ? { ...item, amount: item.amount - 1, readyDay: state.day + 1 } : item);
+  return {
+    state: advanceTime({ ...state, player: tire(state, BALANCE.gatherEnergyCost), field: seededField(state), nodes }, workSeconds(state, BALANCE.gatherSeconds), 'working'),
+    message: GATHER_MESSAGE.wildGrain
+  };
+}
+
 const gather: ActionHandler<'gather'> = (state, action) => {
   const node = state.nodes.find(item => item.id === action.nodeId);
   if (!node || state.area !== 'camp' || !nodeShown(state, node) || !near(state.player.x, state.player.y, node.x, node.y)) return refuse(state, 'Move closer to gather.');
   if (node.kind === 'berry' && isWinter(state.day)) return refuse(state, 'The bushes are bare until spring.');
   if (node.amount <= 0) return refuse(state, 'Nothing to gather yet.');
+  if (node.kind === 'wildGrain') return gatherWildGrain(state, node);
   const resource = NODE_RESOURCE[node.kind];
   if (freeSpaces(state) < spaceFor(resource)) return refuse(state, FULL_BAG_MESSAGE);
   const forage = isForage(node.kind) ? FORAGE[node.kind] : null;
@@ -679,6 +697,7 @@ const eat: ActionHandler<'eat'> = (state, action) => {
   const item = action.item ?? quickEatItem(state);
   if (item === 'pineNeedles') return refuse(state, 'Pine needles are for tea.');
   if (item === 'rabbit') return refuse(state, 'Roast the rabbit at the fire first.');
+  if (item === 'flour') return refuse(state, 'Bake the flour into a loaf at the fire first.');
   if (item === 'trailFood') return eatRation(state);
   const fed = item && spendFood(state, item, 1);
   if (!item || !fed) return refuse(state, 'No food in your bag.');
@@ -709,9 +728,9 @@ const cook: ActionHandler<'cook'> = (state, action) => {
   const blocker = dishBlocker(state, dish);
   const spent = spendIngredients(state, dish);
   if (blocker || !spent) return refuse(state, blocker ?? 'No food in your bag.');
-  // Roasted nuts are packed for later, not eaten, so only the other dishes are a warm meal. It counts toward the day
-  // the cooking began, as a rest does, even if the cooking runs on past dawn.
-  const packed = dish === 'roastedHazelnuts' ? packDish(spent, dish) : markWarmMeal(packDish(spent, dish));
+  // Roasted nuts and loaves are packed for later, not eaten, so only the other dishes are a warm meal. It counts toward
+  // the day the cooking began, as a rest does, even if the cooking runs on past dawn.
+  const packed = isPackedDish(dish) ? packDish(spent, dish) : markWarmMeal(packDish(spent, dish));
   return serveDish(advanceTime(packed, BALANCE.cookSeconds, 'resting'), dish, state.structures.dryingRack);
 };
 
@@ -830,6 +849,50 @@ const harvestBed: ActionHandler<'harvestBed'> = (state, action) => {
     player: tire(state, BALANCE.gatherEnergyCost)
   };
   return { state: advanceTime(harvested, workSeconds(state, BALANCE.gatherSeconds), 'working'), message: `Harvested the ${BED_CROPS[action.index]}.` };
+};
+
+/** Sowing a strip spends a strip's seed, in the time and energy of planting. */
+const sowStrip: ActionHandler<'sowStrip'> = (state, action) => {
+  const blocker = sowStripBlocker(state, action.index);
+  if (blocker) return refuse(state, blocker);
+  return {
+    state: advanceTime({ ...state, field: sownField(state, action.index), player: tire(state, BALANCE.gatherEnergyCost) }, workSeconds(state, BALANCE.gatherSeconds), 'working'),
+    message: 'Sowed a strip of grain.'
+  };
+};
+
+/** Cutting and threshing a strip are the heavy work of the harvest. */
+function fieldWork(state: GameState, field: GameState['field'], message: string): ActionResult {
+  return {
+    state: advanceTime({ ...state, field, player: tire(state, BALANCE.fieldWorkEnergy) }, workSeconds(state, BALANCE.fieldWorkSeconds), 'working'),
+    message
+  };
+}
+
+const cutStrip: ActionHandler<'cutStrip'> = (state, action) => {
+  const blocker = cutStripBlocker(state, action.index);
+  if (blocker) return refuse(state, blocker);
+  return fieldWork(state, cutField(state, action.index), 'Cut the strip and stood the sheaves in stooks.');
+};
+
+const threshStrip: ActionHandler<'threshStrip'> = (state, action) => {
+  const blocker = threshStripBlocker(state, action.index);
+  if (blocker) return refuse(state, blocker);
+  const { field, message } = threshedField(state, action.index);
+  return fieldWork(state, field, message);
+};
+
+/** The quern grinds a flour's grain from the granary into the bag, in the time and energy of a gather. */
+const grindGrain: ActionHandler<'grindGrain'> = state => {
+  const blocker = grindGrainBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  const ground = {
+    ...state,
+    field: { ...state.field, grain: state.field.grain - BALANCE.grainPerFlour },
+    inventory: { ...state.inventory, food: addFood(state.inventory.food, 'flour', 1, state.day) },
+    player: tire(state, BALANCE.gatherEnergyCost)
+  };
+  return { state: advanceTime(ground, workSeconds(state, BALANCE.gatherSeconds), 'working'), message: 'You grind a little grain into flour.' };
 };
 
 /** One bucket from the well waters every bed still growing, for today. It takes the time and energy of gathering. */
@@ -965,7 +1028,7 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak,
+  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak,
   makeFishingLine, fish
 };
 

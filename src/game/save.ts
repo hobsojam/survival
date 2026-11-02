@@ -10,6 +10,7 @@ import { FORAGE, isForage } from './forage';
 import { woodStoreCapacity } from './home';
 import { BED_CROPS, dryLimitsFor } from './beds';
 import { WORKSHOP_UPGRADES, type UpgradeId } from './workshop';
+import { FIELD_STRIPS, ripeDay } from './field';
 
 import { SAVE_VERSION, upgradeSave } from './saveUpgrades';
 
@@ -77,6 +78,8 @@ function validWorkshop(structures: ObjectValue, progress: ObjectValue): boolean 
   const ids = Object.keys(WORKSHOP_UPGRADES) as UpgradeId[];
   if (!object(made) || Object.keys(made).length !== ids.length || !ids.every(id => bool(made[id]))) return false;
   if (made.bedTools && !structures.vegetableBeds) return false;
+  if (made.harvestTools && !structures.field) return false;
+  if (made.quern && !structures.granary) return false;
   return structures.workshop === true || !ids.some(id => made[id]);
 }
 
@@ -154,6 +157,21 @@ function validBeds({ beds, structures, progress, day }: SaveShape): boolean {
   });
 }
 
+/** Four strips, each bare, or sown on a day already lived and cut only once ripe; sown only once the field stands; seed for at most every strip; grain only in a built granary, no more than it holds. */
+function validField({ field, structures, day }: SaveShape): boolean {
+  if (!object(field) || !Array.isArray(field.strips) || field.strips.length !== FIELD_STRIPS) return false;
+  const today = day as number;
+  const stripsOk = field.strips.every(strip => {
+    if (!object(strip) || !bool(strip.cut)) return false;
+    if (strip.sownDay === null) return !strip.cut;
+    if (!readyBy(strip.sownDay, today) || structures.field !== true) return false;
+    return !strip.cut || ripeDay(strip.sownDay as number) <= today;
+  });
+  const seedOk = count(field.seed) && field.seed <= FIELD_STRIPS;
+  const grainOk = count(field.grain) && field.grain <= BALANCE.granaryCapacity && (structures.granary === true || field.grain === 0);
+  return stripsOk && seedOk && grainOk;
+}
+
 /** Cleared steps are real, once each, and a far step follows its near one; the marked step is still to do; felled trees are the marked step's own. */
 function validClearing({ clearing }: SaveShape): boolean {
   if (!object(clearing) || !Array.isArray(clearing.cleared) || !Array.isArray(clearing.felled)) return false;
@@ -205,7 +223,8 @@ const WOLF_TAKES: readonly unknown[] = ['ration', 'berry', 'nothing', 'offered',
 function validSpoiled({ lastSpoiled, day }: SaveShape): boolean {
   if (lastSpoiled === null) return true;
   return object(lastSpoiled) && whole(lastSpoiled.day) && lastSpoiled.day >= 1 && lastSpoiled.day <= (day as number)
-    && count(lastSpoiled.berry) && count(lastSpoiled.greens) && (lastSpoiled.berry as number) + (lastSpoiled.greens as number) >= 1;
+    && count(lastSpoiled.berry) && count(lastSpoiled.greens) && count(lastSpoiled.bread)
+    && (lastSpoiled.berry as number) + (lastSpoiled.greens as number) + (lastSpoiled.bread as number) >= 1;
 }
 
 /** No wolf yet, or one that came on a day already lived, taking something it could take. */
@@ -292,7 +311,7 @@ function validSickness({ sickness, ending, day, fishingMisses }: SaveShape): boo
 /** Checks a version 24 save, with the survivor's sickness and whether their story has ended, and: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, the workshop and its handcart, shelter upgrades, garden plots, vegetable beds, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validSickness];
+  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validSickness];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

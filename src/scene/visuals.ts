@@ -1,3 +1,4 @@
+import { stripStage } from '../game/field';
 import { isWinter, nightStart } from '../game/calendar';
 import { gardenPlotStage } from '../game/garden';
 import { BED_CROPS, bedSoil, bedStage } from '../game/beds';
@@ -79,10 +80,10 @@ function pileSize(count: number): string {
 
 const NODE_SPRITES: Record<ResourceNode['kind'], string> = {
   branch: 'branchPile', berry: 'berryBush', fiber: 'fiberReeds', stone: 'rock0',
-  hazel: 'hazelSpot', pine: 'pineForage', greens: 'greensPatch', honey: 'hollowTree'
+  hazel: 'hazelSpot', pine: 'pineForage', greens: 'greensPatch', honey: 'hollowTree', wildGrain: 'wildGrain'
 };
 const EMPTY_FRAMES: Record<ResourceNode['kind'], string> = {
-  branch: 'depleted', berry: 'picked', fiber: 'cut', stone: 'depleted', hazel: 'gathered', pine: 'gathered', greens: 'gathered', honey: 'gathered'
+  branch: 'depleted', berry: 'picked', fiber: 'cut', stone: 'depleted', hazel: 'gathered', pine: 'gathered', greens: 'gathered', honey: 'gathered', wildGrain: 'gathered'
 };
 /** Reeds sway and bees drift about the hollow tree, slowly, each out of step with its neighbours. */
 const IDLE_FRAMES: Partial<Record<ResourceNode['kind'], readonly string[]>> = {
@@ -115,7 +116,15 @@ function addPuddles(state: GameState, add: AddVisual): void {
 }
 
 /** Small camp structures: where each stands from the fire, drawn as a flat site until built; one on cleared ground only once it is clear. */
-export const CAMP_STRUCTURES = [['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3], ['larder', 2.5, -4.5], ['woodpile', 5.5, -1.5], ['fibreStack', 5.5, 1.5], ['house', -0.5, -6.5], ['vegetableBeds', -4.5, 0], ['well', -7, -1.5], ['workshop', 8, -1]] as const;
+export const CAMP_STRUCTURES = [['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3], ['larder', 2.5, -4.5], ['woodpile', 5.5, -1.5], ['fibreStack', 5.5, 1.5], ['house', -0.5, -6.5], ['vegetableBeds', -4.5, 0], ['well', -7, -1.5], ['workshop', 8, -1], ['granary', 3, 4.5], ['field', -1.5, 7]] as const;
+
+/** Where each of the field's four strips stands across from the field's spot, in tiles. */
+export const FIELD_STRIP_OFFSETS = [-1.5, -0.5, 0.5, 1.5] as const;
+
+/** The built field, one strip beside the next, each drawn as it stands today. */
+function addFieldStrips(state: GameState, add: AddVisual, x: number, y: number): void {
+  state.field.strips.forEach((strip, index) => add(`field-strip-${index}`, `fieldStrip:${stripStage(strip, state.day)}`, x + FIELD_STRIP_OFFSETS[index], y));
+}
 
 /** Where the handcart parks, from the fire: just below the workshop, on the same cleared ground. */
 export const CART_SPOT = { dx: 7.5, dy: 1.5 } as const;
@@ -136,6 +145,7 @@ function builtTexture(state: GameState, id: (typeof CAMP_STRUCTURES)[number][0])
   if (id === 'woodpile') return `woodpile:${stockFrame(state.storedWood)}`;
   if (id === 'fibreStack') return `fibreStack:${stockFrame(state.storedFiber)}`;
   if (id === 'house') return fireplaceBurning(state) ? 'house:lit' : 'house:dark';
+  if (id === 'granary') return `granary:${stockFrame(state.field.grain)}`;
   return id === 'larder' ? `larder:${stockFrame(storeTotal(state.larder))}` : `${id}:built`;
 }
 
@@ -168,6 +178,10 @@ function addBuildableStructures(state: GameState, add: AddVisual, x: number, y: 
     if (groundBlocker(state, id)) continue;
     if (id === 'vegetableBeds' && structures.vegetableBeds) {
       addVegetableBeds(state, add, x + dx, y + dy);
+      continue;
+    }
+    if (id === 'field' && structures.field) {
+      addFieldStrips(state, add, x + dx, y + dy);
       continue;
     }
     add(id, structures[id] ? builtTexture(state, id) : `${id}Site:still`, x + dx, y + dy, structures[id] ? undefined : GROUND_DECAL_DEPTH);

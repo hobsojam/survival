@@ -68,16 +68,16 @@ export const CLEARING_STEPS: Record<StepId, ClearingStep> = {
     ]
   },
   'south-near': {
-    side: 'south', reach: NEAR_REACH, cost: NEAR_COST, room: [],
+    side: 'south', reach: NEAR_REACH, cost: NEAR_COST, room: ['granary'],
     trees: [
       { x: 22, y: 19.25, sprite: 'treeBroadleaf' }, { x: 20.5, y: 19.5, sprite: 'treePine' },
       { x: 15.25, y: 19.75, sprite: 'treeBroadleaf' }, { x: 19.5, y: 20.5, sprite: 'treePine' }
     ]
   },
   'south-far': {
-    side: 'south', reach: 8, cost: FAR_COST, room: [],
+    side: 'south', reach: 8, cost: FAR_COST, room: ['field'],
     trees: [
-      { x: 24.75, y: 20.5, sprite: 'treeBroadleaf' }, { x: 24.25, y: 22.25, sprite: 'treePine' },
+      { x: 24.75, y: 20.5, sprite: 'treeBroadleaf' }, { x: 23.75, y: 22, sprite: 'treePine' },
       { x: 18.25, y: 22.5, sprite: 'treeBroadleaf' }, { x: 16.5, y: 22.5, sprite: 'treePine' },
       { x: 13.75, y: 20.25, sprite: 'treeBroadleaf' }, { x: 20, y: 22.75, sprite: 'treePine' }
     ]

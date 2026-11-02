@@ -29,7 +29,7 @@ export function actionPose(type: GameAction['type']): SurvivorAction | undefined
 
 const GATHER_PROMPTS: Record<ResourceKind, string> = {
   branch: 'Pick up fallen branches', berry: 'Pick berries', fiber: 'Gather fiber', stone: 'Collect stone',
-  hazel: 'Gather hazelnuts', pine: 'Gather pine needles', greens: 'Pick wild greens', honey: 'Take wild honey'
+  hazel: 'Gather hazelnuts', pine: 'Gather pine needles', greens: 'Pick wild greens', honey: 'Take wild honey', wildGrain: 'Gather wild grain'
 };
 
 /** One thing within reach: what the prompt calls it, and what E (like a tap) would do with it, if anything. */

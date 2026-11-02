@@ -1,6 +1,6 @@
 import { SEASON_LENGTH, YEAR_LENGTH, seasonName, type Season } from '../game/calendar';
 import { journalIconUrl } from '../art/journalIcons';
-import { JOURNAL_PAGES, journalEntry, journalSeason } from '../game/journalEntries';
+import { JOURNAL_PAGES, journalEntry, journalSeason, type JournalId } from '../game/journalEntries';
 import type { GameState } from '../game/state';
 
 const YEAR: readonly Season[] = ['autumn', 'winter', 'spring', 'summer'];
@@ -22,6 +22,9 @@ export interface JournalPageView {
   hasNext: boolean;
 }
 
+/** The journal moments that only a camp with a grain field can have. */
+const FIELD_ENTRIES: ReadonlySet<JournalId> = new Set(['grainIn', 'autumnGrain', 'summerBread', 'winterBread']);
+
 /** One season's page of the year journal; pages before the first or after today show the nearest real one. */
 export function journalPageView(state: GameState, page: number): JournalPageView {
   const last = currentPage(state.day);
@@ -29,8 +32,9 @@ export function journalPageView(state: GameState, page: number): JournalPageView
   const year = Math.floor(index / 4) + 1;
   const s = YEAR[index % 4];
   const first = (year - 1) * YEAR_LENGTH + (index % 4) * SEASON_LENGTH + 1;
-  // The fireside moment waits on the house, so a camp without one keeps its page as it was.
-  const entries = JOURNAL_PAGES[s].filter(entry => entry.id !== 'fireside' || state.structures.house);
+  // The fireside moment waits on the house, and the grain and bread on the field, so a camp without them keeps its page as it was.
+  const entries = JOURNAL_PAGES[s].filter(entry => (entry.id !== 'fireside' || state.structures.house)
+    && (!FIELD_ENTRIES.has(entry.id) || state.structures.field));
   const order = entries.map(entry => entry.id);
   const written = state.journal
     .filter(entry => entry.year === year && journalSeason(entry.id) === s)

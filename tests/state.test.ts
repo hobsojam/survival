@@ -14,11 +14,11 @@ describe('new game', () => {
     expect(game.player.y).toBeLessThan(30);
     expect(game.inventory).toEqual({ wood: 0, fiber: 0, stone: 0, food: emptyFood() });
     expect(game.structures).toEqual({ shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false,
-      bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false });
+      bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false, field: false, granary: false });
     expect(game.gardenPlots).toEqual(Array.from({ length: 3 }, () => ({ plantedYear: null, harvestedYear: null, harvestReady: false })));
     expect(BUILDINGS.dryingRack.cost).toEqual({ wood: 4, fiber: 0 });
     expect(BUILDINGS.windbreak.cost).toEqual({ wood: 5, fiber: 0 });
-    expect(game.progress).toEqual({ nextStormDay: 3, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false, quarryFound: false, pickaxeCrafted: false, potCrafted: false, packWoven: false, fishingLine: false, workshop: { saw: false, handcart: false, bedTools: false },
+    expect(game.progress).toEqual({ nextStormDay: 3, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false, quarryFound: false, pickaxeCrafted: false, potCrafted: false, packWoven: false, fishingLine: false, workshop: { saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false },
       discoveries: { basket: false, spring: false, cairn: false } });
     expect(game.cakeBonus).toBe(false);
     expect(game.trees).toHaveLength(6);
@@ -28,7 +28,7 @@ describe('new game', () => {
     expect(game.nodes.filter(node => node.kind === 'fiber')).toHaveLength(8);
     expect(game.nodes.filter(node => node.kind === 'stone')).toHaveLength(3);
     for (const [kind, count] of [['hazel', 3], ['pine', 3], ['greens', 5], ['honey', 1]] as const) expect(game.nodes.filter(node => node.kind === kind), kind).toHaveLength(count);
-    expect(new Set(game.nodes.map(node => node.id)).size).toBe(43);
+    expect(new Set(game.nodes.map(node => node.id)).size).toBe(44);
   });
 });
 

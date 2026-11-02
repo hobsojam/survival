@@ -1,6 +1,6 @@
 # Hearthwild
 
-A small, single-player browser survival game about making a wilderness camp feel like home. You control one survivor, gather branches, berries, and fiber, keep a fire burning, and build a shelter, bed, drying rack, windbreak, stone pile, toolshed, and eventually a stone hearth, and weave a pack to carry more. In time the camp grows a house, vegetable beds, a well and a workshop. Beyond camp, a west path leads to a second area with an old quarry. Survival is gentle: cold and hunger slow you down, and there is always a way back, but a survivor who goes too long without food falls ill, and if the sickness isn't cared for, their story ends.
+A small, single-player browser survival game about making a wilderness camp feel like home. You control one survivor, gather branches, berries, and fiber, keep a fire burning, and build a shelter, bed, drying rack, windbreak, stone pile, toolshed, and eventually a stone hearth, and weave a pack to carry more. In time the camp grows a house, vegetable beds, a well, a workshop, and a grain field with a granary. Beyond camp, a west path leads to a second area with an old quarry. Survival is gentle: cold and hunger slow you down, and there is always a way back, but a survivor who goes too long without food falls ill, and if the sickness isn't cared for, their story ends.
 
 **Play it online:** <https://hobsojam.github.io/survival/>. Every merge to `main` redeploys it.
 
@@ -72,7 +72,7 @@ Food and rest are harder to find. The **berry bushes stand bare** all winter (se
 
 #### Getting ready for winter
 
-On autumn's last three days the day pill counts down ("Winter in 3 days"), and the forecast card reads **Winter is coming** with a line for the food laid by: how many of winter's ten days the food that keeps, in your bag and the larder, would see you through ("○ Food laid by: enough for 3 of 10 days", ticked once it reaches ten). Each day needs about 30 hunger: a trail ration fills 45, roasted hazelnuts 50, a hazelnut 15, honey and vegetables 20, and a fish counts as the cooked meal it makes. Fresh food and pine needles don't count. If a cold night is still due, its card shows instead, with the same food line.
+On autumn's last three days the day pill counts down ("Winter in 3 days"), and the forecast card reads **Winter is coming** with a line for the food laid by: how many of winter's ten days the food that keeps, in your bag and the larder, would see you through ("○ Food laid by: enough for 3 of 10 days", ticked once it reaches ten). Each day needs about 30 hunger: a trail ration fills 45, roasted hazelnuts 50, a hazelnut 15, honey and vegetables 20, a fish counts as the cooked meal it makes, and flour and the granary's grain count as the loaves they would bake. Fresh food, bread included, and pine needles don't count. If a cold night is still due, its card shows instead, with the same food line.
 
 #### Ice fishing
 
@@ -152,7 +152,22 @@ Once the toolshed is built and the east side's far ground is cleared, you can bu
 - **Handcart** (eight wood, two fiber, one stone): a two-wheeled cart parks below the workshop and holds twelve wood. Felled wood goes into the cart first ("Chopped the tree. Four wood went into the cart. A stump remains."), then the bag. Wood in the cart counts as stored wood: builds, the campfire and the house fireplace all use it, spending from the bag, then the cart, then the woodpile and woodshed (the fireplace takes from the woodpile and woodshed before the cart). In the clearing, the cart empties itself onto the wood store as far as it has room, and anything left stays in the cart. The Camp stores panel reads, say, `Cart 5/12`, and the cart looks empty, part-full or full.
 - **Hoe and watering can** (three wood, one fiber, one stone; needs the vegetable beds): a dry bed holds on a day longer before it withers. A crop still stops growing on its third dry day, so it still needs water to ripen, but it withers on the fifth dry dawn instead of the fourth.
 
+- **Sickle and flail** (three wood, one fiber, two stone; needs the grain field): cut and thresh the field's grain.
+- **Hand quern** (one wood, four stone; needs the granary): grind the granary's grain into flour.
+
 If the bag (and cart) can't take all of a felled tree's wood, felling is refused and nothing is lost.
+
+### Grain field and granary
+
+Once the south side's far ground is cleared, you can build a **grain field** there for four wood and two fiber: four strips of turned earth. Once the field stands and the south side's near ground is clear, a **granary** goes up beside it for eight wood, two fiber and four stone: a little timber store raised on stone legs. The **Grain field** panel in the Camp tab has a line for each strip, such as `Strip 2 · Gold, ready to cut`, with the job it's ready for; the **Granary** panel shows the grain stored (`12 of 16 grain`) and the seed kept.
+
+**Seed.** Wild grain grows at the south edge of the clearing, in every season but winter. Gathering it gives seed for one strip, kept apart from the bag (so a full bag doesn't matter), and it grows back at dawn. You can keep seed for at most the four strips.
+
+**The year.** Sow a strip in spring, from anywhere in the clearing, with the same time and energy as planting a bush; each strip takes one strip's seed. The grain grows by itself, with no watering: green shoots in spring, tall and green through summer, and gold from summer's fifth day. A morning note says when it turns gold ("The grain has turned gold. It's ready to cut."). Ripe grain waits for you as long as it takes, through winter if need be, but a strip has to be cut and threshed before it can be sown again.
+
+**The harvest.** With the workshop's **sickle and flail**, cut a gold strip into stooks, then thresh them, all from the Grain field panel anywhere in the clearing; both are heavier work than gathering (twelve seconds and eight energy each), so bringing in all four strips takes a few goes over a day or two. Each threshed strip puts four grain into the granary and keeps back one strip's seed for next year. The granary holds one harvest, sixteen grain, and no more: once it's full, threshing still keeps the seed, but the rest stays as straw.
+
+**Bread.** With the **hand quern**, grind two grain from the Granary panel into a **flour** (one bag space; it keeps, in the bag or the larder). At any cooking fire, pot or no pot, bake a flour into a **loaf**, which goes into the bag. A loaf fills 50 hunger and goes soft like berries, after three dawns in the bag or five in the larder, so bake a little at a time. A full granary bakes eight loaves, enough to see a survivor through a winter's ten days.
 
 ### Trail rations
 

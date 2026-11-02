@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { fieldPanelView, granaryPanelView, stripMarkup, workshopView } from '../src/ui/panels';
+import type { FieldStrip } from '../src/game/field';
+import { fieldCamp, strip, withField } from './fieldCamp';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from '../src/game/state';
 import { CLEARING_STEPS } from '../src/game/clearing';
@@ -270,14 +273,14 @@ describe('bag panel', () => {
     expect(foods.roastedHazelnuts.shown).toBe(false);
   });
 
-  it('draws each forage cell with its icon, and an Eat button for all but pine needles and the rabbit', () => {
-    expect(BAG_FOODS.map(cell => cell.item)).toEqual(['greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'vegetables', 'fish', 'rabbit']);
+  it('draws each forage cell with its icon, and an Eat button for all but pine needles, flour and the rabbit', () => {
+    expect(BAG_FOODS.map(cell => cell.item)).toEqual(['greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'vegetables', 'fish', 'bread', 'flour', 'rabbit']);
     const markup = bagFoodMarkup();
     for (const { item } of BAG_FOODS) {
       const cell = markup.split('</div>').find(part => part.includes(`data-food="${item}"`))!;
       expect(cell, item).toContain('src="data:image/svg+xml,');
       expect(cell, item).toContain(`id="${item}-count"`);
-      expect(cell.includes(`data-action="eat" data-item="${item}"`), item).toBe(item !== 'pineNeedles' && item !== 'rabbit');
+      expect(cell.includes(`data-action="eat" data-item="${item}"`), item).toBe(item !== 'pineNeedles' && item !== 'rabbit' && item !== 'flour');
     }
   });
 
@@ -354,6 +357,14 @@ describe('the build list shows only what can be built', () => {
     expect(buildListView(game())).toMatchObject({ empty: false, hint: 'In the clearing — click an upgrade to build.' });
     expect(buildListView(game({}, { area: 'quarry' }))).toMatchObject({ empty: false, hint: 'Stand anywhere in the clearing to build.' });
   });
+
+  it('points to the workshop while ripe grain waits for a sickle and flail', () => {
+    const ripe = withField({ ...fieldCamp(), day: 36 }, { strips: [strip({ sownDay: 22 }), strip(), strip(), strip()] });
+    expect(buildListView(ripe).hint).toMatch(/ Ripe grain is waiting\. Make a sickle and flail at the workshop\.$/);
+    const tooled = { ...ripe, progress: { ...ripe.progress, workshop: { ...ripe.progress.workshop, harvestTools: true } } };
+    expect(buildListView(tooled).hint).not.toContain('Ripe grain');
+    expect(buildListView({ ...ripe, day: 33 }).hint).not.toContain('Ripe grain');
+  });
 });
 
 describe('the camp stores panel', () => {
@@ -371,7 +382,7 @@ describe('the camp stores panel', () => {
   });
 
   it('counts the whole wood store, the fibre stack and the cart', () => {
-    const base = game({ structures: { ...FINISHED_SHELTER, woodpile: true, house: true, fibreStack: true }, progress: { workshop: { saw: false, handcart: true, bedTools: false } } },
+    const base = game({ structures: { ...FINISHED_SHELTER, woodpile: true, house: true, fibreStack: true }, progress: { workshop: { saw: false, handcart: true, bedTools: false, harvestTools: false, quern: false } } },
       { storedWood: 20, storedFiber: 5, cartWood: 3 });
     expect(shownLines(base)).toEqual([{ id: 'wood', text: 'Wood 20/36' }, { id: 'fiber', text: 'Fiber 5/12' }, { id: 'cart', text: 'Cart 3/12' }]);
   });
@@ -537,7 +548,7 @@ describe('eating from the bag panel with a larder', () => {
 
   it('enables Eat for food within reach, the larder included in the clearing', () => {
     const view = bagView(atCamp);
-    expect(view.eatable).toEqual({ berry: true, trailFood: true, greens: false, hazelnut: true, honey: false, roastedHazelnuts: false, vegetables: false, fish: false });
+    expect(view.eatable).toEqual({ berry: true, trailFood: true, greens: false, hazelnut: true, honey: false, roastedHazelnuts: false, vegetables: false, fish: false, bread: false });
     expect(view.foods.hazelnut).toEqual({ count: 0, shown: true, note: '' });
     expect(view.foods.pineNeedles.shown).toBe(false);
   });
@@ -545,7 +556,7 @@ describe('eating from the bag panel with a larder', () => {
   it('follows the bag alone away from camp', () => {
     const away = { ...atCamp, player: { ...atCamp.player, x: 5, y: 5 }, inventory: { ...atCamp.inventory, food: addFood(emptyFood(), 'honey', 1, 1) } };
     const view = bagView(away);
-    expect(view.eatable).toEqual({ berry: false, trailFood: false, greens: false, hazelnut: false, honey: true, roastedHazelnuts: false, vegetables: false, fish: false });
+    expect(view.eatable).toEqual({ berry: false, trailFood: false, greens: false, hazelnut: false, honey: true, roastedHazelnuts: false, vegetables: false, fish: false, bread: false });
     expect(view.foods.hazelnut.shown).toBe(false);
   });
 });
@@ -588,5 +599,88 @@ describe('larder controls', () => {
   it('blocks the larder\'s build button until the north side\'s near ground is cleared', () => {
     expect(buildButtonView(game({ inventory: supplies }), 'larder')).toMatchObject({ disabled: true, locked: true, verb: 'Blocked', description: "Clear the north side's near ground first", price: '5 wood · 2 fiber · 2 stone' });
     expect(buildButtonView(game({ inventory: supplies }, { clearing: north }), 'larder')).toMatchObject({ disabled: false, ready: true, verb: 'Build', description: 'Keep up to 10 food raised off the ground' });
+  });
+});
+
+describe('the field and granary panels', () => {
+  const tools = (state: GameState, made: Partial<GameState['progress']['workshop']>): GameState =>
+    ({ ...state, progress: { ...state.progress, workshop: { ...state.progress.workshop, ...made } } });
+  const strips = (...list: FieldStrip[]) => list;
+
+  it('hides the field panel until the field is built', () => {
+    expect(fieldPanelView(fieldCamp({ field: false })).shown).toBe(false);
+    expect(fieldPanelView(fieldCamp()).shown).toBe(true);
+  });
+
+  it('names each strip\'s stage with the job it is ready for', () => {
+    const state = withField(tools({ ...fieldCamp({ granary: true }), day: 36 }, { harvestTools: true }),
+      { strips: strips(strip(), strip({ sownDay: 22 }), strip({ sownDay: 22, cut: true }), strip()) });
+    const view = fieldPanelView(state);
+    expect(view.strips.map(item => [item.label, item.verb, item.action])).toEqual([
+      ['Strip 1 · Bare, ready to sow', 'Sow', 'sowStrip'],
+      ['Strip 2 · Gold, ready to cut', 'Cut', 'cutStrip'],
+      ['Strip 3 · Sheaves in stooks', 'Thresh', 'threshStrip'],
+      ['Strip 4 · Bare, ready to sow', 'Sow', 'sowStrip']
+    ]);
+    expect(view.strips[1]).toMatchObject({ disabled: false, title: 'Cut the strip.' });
+    expect(view.strips[2]).toMatchObject({ disabled: false, title: 'Thresh the strip.' });
+    expect(view.strips[0]).toMatchObject({ disabled: true, title: 'Sow the field in spring.' });
+  });
+
+  it('shows growing strips without a button, and bare ones resting in winter', () => {
+    const growing = withField(fieldCamp(), { strips: strips(strip({ sownDay: 21 }), strip({ sownDay: 21 }), strip(), strip()) });
+    expect(fieldPanelView(growing).strips[0]).toMatchObject({ label: 'Strip 1 · Green shoots', action: null });
+    expect(fieldPanelView({ ...growing, day: 32 }).strips[0]).toMatchObject({ label: 'Strip 1 · Growing tall', action: null });
+    expect(fieldPanelView({ ...growing, day: 12 }).strips[2].label).toBe('Strip 3 · Bare, resting for winter');
+  });
+
+  it('disables a gold strip until the tools are made, saying so', () => {
+    const state = withField({ ...fieldCamp(), day: 36 }, { strips: strips(strip({ sownDay: 22 }), strip(), strip(), strip()) });
+    expect(fieldPanelView(state).strips[0]).toMatchObject({ disabled: true, title: 'Make a sickle and flail at the workshop first.' });
+  });
+
+  it('hints at the tools and the wild grain while they are wanted', () => {
+    const base = 'Sow in spring, and the grain grows by itself through summer. Once it turns gold, cut it and thresh it. Ripe grain waits for you.';
+    expect(fieldPanelView(withField(fieldCamp(), { seed: 0 })).hint)
+      .toBe(`${base} The workshop can make a sickle and flail. Wild grain grows at the edge of the clearing.`);
+    expect(fieldPanelView(withField(tools(fieldCamp(), { harvestTools: true }), { seed: 1 })).hint).toBe(base);
+  });
+
+  it('leaves out the wild grain once every strip is sown, though the seed is all used', () => {
+    const base = 'Sow in spring, and the grain grows by itself through summer. Once it turns gold, cut it and thresh it. Ripe grain waits for you.';
+    const sown = strips(strip({ sownDay: 22 }), strip({ sownDay: 22 }), strip({ sownDay: 23 }), strip({ sownDay: 23 }));
+    expect(fieldPanelView(withField(tools({ ...fieldCamp(), day: 24 }, { harvestTools: true }), { strips: sown, seed: 0 })).hint).toBe(base);
+  });
+
+  it('marks up a strip with its job, or none', () => {
+    const job = stripMarkup({ label: 'Strip 1 · Gold, ready to cut', action: 'cutStrip', verb: 'Cut', disabled: false, title: 'Cut the strip.' }, 0);
+    expect(job).toContain('data-action="cutStrip" data-strip-index="0"');
+    expect(job).toContain('Strip 1 · Gold, ready to cut');
+    const none = stripMarkup({ label: 'Strip 2 · Green shoots', action: null, verb: '', disabled: true, title: '' }, 1);
+    expect(none).not.toContain('<button');
+  });
+
+  it('shows the granary\'s grain and seed, and the grind row once the quern is made', () => {
+    expect(granaryPanelView(fieldCamp()).shown).toBe(false);
+    const state = withField(fieldCamp({ granary: true }), { grain: 12, seed: 3 });
+    expect(granaryPanelView(state)).toMatchObject({ shown: true, stored: '12 of 16 grain', seed: 'Seed for 3 strips', grind: { shown: false } });
+    expect(granaryPanelView(withField(state, { seed: 1 })).seed).toBe('Seed for 1 strip');
+    expect(granaryPanelView(withField(state, { seed: 0 })).seed).toBe('No seed kept');
+    const quern = tools(state, { quern: true });
+    expect(granaryPanelView(quern).grind).toEqual({ shown: true, disabled: false, hint: '' });
+    expect(granaryPanelView(withField(quern, { grain: 1 })).grind)
+      .toEqual({ shown: true, disabled: true, hint: 'There isn\'t enough grain in the granary to grind.' });
+  });
+
+  it('shows the harvest tools once the field stands, and the quern once the granary does', () => {
+    const workshop = { workshop: true, toolshed: true, shelter: true };
+    const bare = workshopView(fieldCamp({ field: false, ...workshop }));
+    expect(bare.rows.harvestTools.shown).toBe(false);
+    expect(bare.rows.quern.shown).toBe(false);
+    const field = workshopView(fieldCamp(workshop));
+    expect(field.rows.harvestTools).toMatchObject({ shown: true, title: 'Sickle and flail', cost: '3 wood · 1 fiber · 2 stone' });
+    expect(field.rows.quern.shown).toBe(false);
+    const granary = workshopView(fieldCamp({ granary: true, ...workshop }));
+    expect(granary.rows.quern).toMatchObject({ shown: true, title: 'Hand quern', cost: '1 wood · 4 stone' });
   });
 });

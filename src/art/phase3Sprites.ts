@@ -103,6 +103,22 @@ function greens(g: Grid, ready: boolean): void {
   box(g, 5, 11, 6, 2, 'j'); line(g, 4, 12, 12, 12, 'r'); dot(g, 3, 12, 'q'); dot(g, 12, 11, 't');
   for (const [x, y] of [[5, 4], [11, 4]]) { dot(g, x, y, 'w'); dot(g, x, y + 1, 'q'); }
 }
+/** A tuft of wild grain: thin pale stalks, each bending under a golden seed head; gathered, only short stubble is left. */
+function wildGrain(g: Grid, ready: boolean): void {
+  oval(g, 8, 14, 6, 2, 's');
+  const stalks = [[4, 6], [6, 4], [8, 3], [10, 4], [12, 6]];
+  if (!ready) {
+    for (const [x] of stalks) line(g, x, 13, x, 11, 'r');
+    dot(g, 6, 11, 'v'); dot(g, 10, 11, 'v');
+    return;
+  }
+  for (const [x, top] of stalks) {
+    line(g, x, 13, x, top + 3, 'r');
+    // The seed head leans a little, dark-edged so it reads against the meadow.
+    line(g, x, top + 2, x + 1, top, 'v'); dot(g, x, top + 1, 'w'); dot(g, x + 1, top + 2, 'u');
+  }
+  line(g, 5, 13, 11, 13, 'q');
+}
 type HollowFrame = 'ready' | 'gathered' | 'bees0' | 'bees1';
 function hollowTree(g: Grid, frame: HollowFrame): void {
   oval(g, 12, 30, 9, 2, 's');
@@ -724,6 +740,80 @@ function vegBed(g: Grid, crop: BedCrop, stage: BedStageName, soil: BedSoilName):
   }));
 }
 
+/** Where the field will go: a long staked, strung plot with a few furrows already scratched into it. */
+function fieldSite(g: Grid): void {
+  for (const [x, y] of [[1, 2], [61, 2], [1, 10], [61, 10]]) stake(g, x, y);
+  line(g, 3, 3, 61, 3, 'h'); line(g, 3, 11, 61, 11, 'h');
+  for (const y of [6, 9]) for (let x = 6; x < 58; x += 9) line(g, x, y, x + 5, y, 'z');
+}
+
+const fieldLegend = { s: 'shadow', a: 'wood0', b: 'wood1', f: 'earth0', g: 'earth1', h: 'earth2', i: 'earth3',
+  j: 'leaf2', k: 'leaf3', l: 'leaf4', n: 'grass4', p: 'scarf1', q: 'scarf2', r: 'scarf3', t: 'scarf4' } as const;
+type StripStageName = 'bare' | 'shoots' | 'green' | 'gold' | 'stooks';
+
+/** A stook: sheaves leant together into a little tent of straw, tied at the top. */
+function stook(g: Grid, x: number, y: number): void {
+  for (let row = 0; row < 6; row++) line(g, x - Math.floor(row / 2), y + row, x + 1 + Math.floor(row / 2), y + row, row % 2 ? 'r' : 'q');
+  line(g, x - 3, y + 6, x + 4, y + 6, 'p'); dot(g, x, y + 1, 'b'); dot(g, x + 1, y + 1, 'b'); dot(g, x, y, 't');
+}
+
+/**
+ * One strip of the field, running away from the fire: dark furrowed earth between edges of dark wood, so it reads on the
+ * bare camp earth. Green shoots come up in rows, grow tall, turn gold with heavy heads, and once cut leave stubble and stooks.
+ */
+function fieldStrip(g: Grid, stage: StripStageName): void {
+  line(g, 1, 23, 14, 23, 's');
+  box(g, 0, 2, 16, 21, 'a');
+  box(g, 1, 3, 14, 19, 'g');
+  for (let y = 4; y < 22; y += 3) line(g, 2, y, 13, y, 'f');
+  for (const [x, y] of [[4, 6], [10, 9], [6, 15], [12, 18]]) dot(g, x, y, 'h');
+  if (stage === 'bare') return;
+  if (stage === 'stooks') {
+    for (let y = 5; y < 22; y += 3) for (let x = 2; x < 14; x += 2) dot(g, x, y, 'p');
+    stook(g, 4, 5); stook(g, 10, 13);
+    return;
+  }
+  if (stage === 'shoots') {
+    for (let y = 5; y < 22; y += 3) for (let x = 3; x < 14; x += 3) { dot(g, x, y, 'k'); dot(g, x, y - 1, 'n'); }
+    return;
+  }
+  const gold = stage === 'gold';
+  for (let y = 6; y < 23; y += 3) for (let x = 2; x < 14; x += 2) {
+    line(g, x, y, x, y - 3, gold ? 'q' : 'j');
+    dot(g, x, y - 4, gold ? 't' : 'l'); dot(g, x + 1, y - 3, gold ? 'r' : 'k');
+  }
+}
+
+function granarySite(g: Grid): void {
+  for (const [x, y] of [[2, 7], [24, 7], [2, 12], [24, 12]]) stake(g, x, y);
+  line(g, 4, 8, 24, 8, 'h'); line(g, 4, 13, 24, 13, 'h');
+  for (const x of [6, 13, 20]) { box(g, x, 10, 2, 2, 'o'); dot(g, x, 10, 'q'); }
+}
+
+/**
+ * A small timber granary raised on stone legs to keep the grain dry, under a steep thatched roof. Its door stands open,
+ * and sacks of grain show inside as it fills. Edged in dark wood so it reads against the earth.
+ */
+function granary(g: Grid, stock: StockLevel): void {
+  oval(g, 14, 30, 12, 2, 's');
+  // Mushroom-capped stone legs, the old way of keeping mice out.
+  for (const x of [4, 12, 20]) { box(g, x, 24, 4, 5, 'n'); box(g, x + 1, 24, 2, 4, 'o'); box(g, x - 1, 22, 6, 2, 'p'); line(g, x - 1, 22, x + 4, 22, 'q'); }
+  box(g, 2, 21, 24, 2, 'a'); line(g, 2, 21, 25, 21, 'c');
+  box(g, 3, 11, 22, 10, 'c'); for (const x of [3, 9, 18, 24]) line(g, x, 11, x, 20, 'b');
+  for (const y of [14, 17]) line(g, 4, y, 23, y, 'd');
+  // The open door, dark inside.
+  box(g, 11, 13, 6, 8, 'a'); box(g, 12, 14, 4, 7, 'f');
+  if (stock !== 'empty') { box(g, 12, 18, 2, 3, 'h'); dot(g, 12, 18, 'j'); box(g, 14, 19, 2, 2, 'i'); }
+  if (stock === 'full') { box(g, 13, 15, 2, 3, 'h'); dot(g, 13, 15, 'j'); box(g, 14, 16, 2, 2, 'i'); dot(g, 15, 16, 'j'); }
+  // Steep thatch, drawn last so its eaves hang over the walls.
+  for (let y = 1; y <= 10; y++) {
+    const half = Math.min(14, y + 4);
+    box(g, 14 - half, y, half * 2, 1, y % 2 ? 'C' : 'i');
+    dot(g, 14 - half, y, 'a'); dot(g, 13 + half, y, 'a');
+  }
+  line(g, 11, 0, 16, 0, 'a'); line(g, 0, 11, 27, 11, 'a');
+}
+
 const BED_FRAMES = Object.fromEntries((['potatoes', 'beans', 'carrots'] as const).flatMap(crop =>
   (['empty', 'sprout', 'growing', 'ripe'] as const).flatMap(stage =>
     (['fresh', 'dry', 'wilted', 'frost'] as const).map(soil => [`${crop}-${stage}-${soil}`, (g: Grid) => vegBed(g, crop, stage, soil)]))));
@@ -745,6 +835,7 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   hazelSpot: define(16, 16, forageLegend, { ready: g => hazel(g, true), gathered: g => hazel(g, false) }, [8, 14]),
   pineForage: define(16, 16, forageLegend, { ready: g => pineSapling(g, true), gathered: g => pineSapling(g, false) }, [8, 14]),
   greensPatch: define(16, 16, forageLegend, { ready: g => greens(g, true), gathered: g => greens(g, false) }, [8, 14]),
+  wildGrain: define(16, 16, forageLegend, { ready: g => wildGrain(g, true), gathered: g => wildGrain(g, false) }, [8, 14]),
   hollowTree: define(24, 32, forageLegend, {
     ready: g => hollowTree(g, 'ready'), gathered: g => hollowTree(g, 'gathered'), bees0: g => hollowTree(g, 'bees0'), bees1: g => hollowTree(g, 'bees1')
   }, [12, 30], { buzz: { frames: ['ready', 'bees0', 'ready', 'bees1'], frameRate: 2, repeat: -1 } }),
@@ -794,6 +885,10 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   workshop: define(36, 28, campLegend, { built: workshop }),
   handcart: define(20, 14, campLegend, { empty: g => handcart(g, 'empty'), some: g => handcart(g, 'some'), full: g => handcart(g, 'full') }),
   well: define(20, 24, wellLegend, { built: well }),
+  fieldSite: define(64, 16, campLegend, { still: fieldSite }),
+  fieldStrip: define(16, 24, fieldLegend, Object.fromEntries((['bare', 'shoots', 'green', 'gold', 'stooks'] as const).map(stage => [stage, (g: Grid) => fieldStrip(g, stage)]))),
+  granarySite: define(28, 16, campLegend, { still: granarySite }),
+  granary: define(28, 32, campLegend, { empty: g => granary(g, 'empty'), some: g => granary(g, 'some'), full: g => granary(g, 'full') }),
   pileCount: define(13, 7, countLegend, {
     ...Object.fromEntries([2, 3, 4, 5, 6, 7, 8, 9].map(n => [`n${n}`, (g: Grid) => pileCount(g, [String(n)])])),
     lots: g => pileCount(g, ['9', '+'])

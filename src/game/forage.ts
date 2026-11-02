@@ -3,7 +3,7 @@ import type { FoodItem } from './food';
 import { rainWindow } from './rain';
 import { BALANCE, type GameState, type ResourceKind, type ResourceNode } from './state';
 
-// Wild food that comes and goes with the year: each kind of spot is there only in its season.
+// Wild food that comes and goes with the year: each kind of spot is there only in its season, and wild grain in all but winter.
 
 export type ForageKind = Extract<ResourceKind, 'hazel' | 'pine' | 'greens' | 'honey'>;
 
@@ -23,6 +23,8 @@ export function isForage(kind: ResourceKind): kind is ForageKind {
 
 /** Whether a node is there to see and gather now: forage kinds only in their season; shower greens only from the start of that day's shower. */
 export function nodeShown(state: GameState, node: ResourceNode): boolean {
+  // Wild grain lies under the snow in winter.
+  if (node.kind === 'wildGrain') return season(state.day) !== 'winter';
   if (!isForage(node.kind)) return true;
   if (season(state.day) !== FORAGE[node.kind].season) return false;
   if (!SHOWER_GREENS.includes(node.id)) return true;

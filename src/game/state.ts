@@ -3,7 +3,8 @@ import type { ClearingState } from './clearing';
 import { emptyFood, type FoodStore } from './foodStore';
 import type { Bed } from './beds';
 import type { UpgradeId } from './workshop';
-export type ResourceKind = 'branch' | 'berry' | 'fiber' | 'stone' | 'hazel' | 'pine' | 'greens' | 'honey';
+import { emptyField, type FieldState } from './field';
+export type ResourceKind = 'branch' | 'berry' | 'fiber' | 'stone' | 'hazel' | 'pine' | 'greens' | 'honey' | 'wildGrain';
 
 export const BUILDINGS = {
   shelter: { name: 'Shelter', description: 'A roof against the night cold', symbol: '⌂', cost: { wood: 6, fiber: 2 }, prerequisite: null },
@@ -27,7 +28,9 @@ export const BUILDINGS = {
   /** The survivor moves in the moment it is built, and the shelter becomes a woodshed. */
   house: { name: 'House', description: 'A home with a fireplace of its own', symbol: '⌂', cost: { wood: 12, fiber: 6, stone: 8 }, prerequisite: 'shelterFinished', alsoRequires: 'bed', ground: 'north-far' },
   /** Where the saw, the handcart and the bed tools are made, once each. */
-  workshop: { name: 'Workshop', description: 'Make a saw, a handcart and bed tools', symbol: '⚒', cost: { wood: 10, fiber: 4, stone: 6 }, prerequisite: 'toolshed', ground: 'east-far' }
+  workshop: { name: 'Workshop', description: 'Make a saw, a handcart and bed tools', symbol: '⚒', cost: { wood: 10, fiber: 4, stone: 6 }, prerequisite: 'toolshed', ground: 'east-far' },
+  field: { name: 'Field', description: 'Four strips of grain on the south ground', symbol: '≡', cost: { wood: 4, fiber: 2 }, prerequisite: null, ground: 'south-far' },
+  granary: { name: 'Granary', description: 'Keep a harvest of grain dry on stone legs', symbol: '⌂', cost: { wood: 8, fiber: 2, stone: 4 }, prerequisite: 'field', ground: 'south-near' }
 } as const;
 
 export type StructureId = keyof typeof BUILDINGS;
@@ -131,6 +134,8 @@ export interface GameState {
   gardenPlots: GardenPlot[];
   /** The three raised vegetable beds: potatoes, beans and carrots, in that order. */
   beds: Bed[];
+  /** The grain field's four strips, the seed kept for them, and the grain in the granary. */
+  field: FieldState;
   /** Stone kept in the camp stone pile, outside the bag. */
   storedStone: number;
   /** Wood split and stacked on the woodpile, outside the bag: it counts for building and the fire, from anywhere. */
@@ -148,7 +153,7 @@ export interface GameState {
   /** The last winter night a wolf came into the dark camp, and what it took. */
   lastWolf: { day: number; took: WolfTake } | null;
   /** The last dawn that threw out food gone soft, and how much. */
-  lastSpoiled: { day: number; berry: number; greens: number } | null;
+  lastSpoiled: { day: number; berry: number; greens: number; bread: number } | null;
   /** A honey cake eaten: the next rest or sleep at camp restores a little more energy. */
   cakeBonus: boolean;
   /** What the survivor has written in the year journal. */
@@ -295,6 +300,17 @@ export const BALANCE = {
   /** Days a bed's crop grows before it is ripe, and the vegetables a ripe bed gives. */
   cropGrowDays: 3,
   cropYield: 2,
+  /** Grain one threshed strip gives, and the granary's room: one full harvest of the four strips. */
+  grainPerStrip: 4,
+  granaryCapacity: 16,
+  /** Grain the quern grinds into one flour, and the hunger a loaf fills. */
+  grainPerFlour: 2,
+  breadHunger: 50,
+  /** The day of the year sown grain turns gold: summer's fifth. */
+  grainRipeDayOfYear: 35,
+  /** Cutting or threshing a strip is heavier work than gathering. */
+  fieldWorkSeconds: 12,
+  fieldWorkEnergy: 8,
   /** Berries a summer bush gives with each gather. */
   summerBerries: 2,
   thatchedShelteredWarmthLossPerSecond: 0.2,
@@ -329,6 +345,8 @@ const hazelPositions = [[15, 5], [25.5, 5.5], [26.75, 6.5]];
 const pinePositions = [[9.5, 12.5], [23, 5.5], [19.5, 25]];
 const greensPositions = [[9.5, 17.5], [12.5, 21.5], [27, 22.5], [30.5, 16.5], [12.5, 8]];
 const honeyPositions = [[16, 6.5]];
+/** Wild grain at the south edge of the clearing, just beyond the widest it can grow, toward where the field will stand. */
+const wildGrainPosition = [25, 23];
 const treePositions = [
   [20, 5, 'treeBroadleaf'], [17, 9, 'treeBroadleaf'], [27, 5, 'treeBroadleaf'],
   [22, 23, 'treePine'], [32, 14, 'treePine'], [15, 24, 'treePine']
@@ -343,7 +361,9 @@ export function createGame(): GameState {
     ...hazelPositions.map(([x, y], index) => ({ id: `hazel-${index}`, kind: 'hazel' as const, x, y, amount: 1, readyDay: 1 })),
     ...pinePositions.map(([x, y], index) => ({ id: `pine-${index}`, kind: 'pine' as const, x, y, amount: 1, readyDay: 1 })),
     ...greensPositions.map(([x, y], index) => ({ id: `greens-${index}`, kind: 'greens' as const, x, y, amount: 1, readyDay: 1 })),
-    ...honeyPositions.map(([x, y], index) => ({ id: `honey-${index}`, kind: 'honey' as const, x, y, amount: 1, readyDay: 1 }))
+    ...honeyPositions.map(([x, y], index) => ({ id: `honey-${index}`, kind: 'honey' as const, x, y, amount: 1, readyDay: 1 })),
+    // Always the last node, so an older save can add it on the end.
+    { id: 'wildGrain-0', kind: 'wildGrain', x: wildGrainPosition[0], y: wildGrainPosition[1], amount: 1, readyDay: 1 }
   ];
   const trees: TreeNode[] = treePositions.map(([x, y, sprite], index) => ({ id: `tree-${index}`, x, y, sprite, readyDay: 1 }));
   return {
@@ -354,16 +374,17 @@ export function createGame(): GameState {
     inventory: { wood: 0, fiber: 0, stone: 0, food: emptyFood() },
     fireFuel: 0,
     fireplaceFuel: 0,
-    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false },
+    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false, field: false, granary: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
       quarryFound: false, pickaxeCrafted: false, potCrafted: false, packWoven: false, fishingLine: false,
-      workshop: { saw: false, handcart: false, bedTools: false },
+      workshop: { saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false },
       discoveries: { basket: false, spring: false, cairn: false } },
     nodes,
     trees,
     stonePiles: [],
     gardenPlots: Array.from({ length: 3 }, () => ({ plantedYear: null, harvestedYear: null, harvestReady: false })),
     beds: Array.from({ length: 3 }, () => ({ sown: false, grown: 0, dryDays: 0, wateredDay: null })),
+    field: emptyField(),
     storedStone: 0,
     storedWood: 0, cartWood: 0,
     storedFiber: 0,

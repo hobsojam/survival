@@ -109,6 +109,6 @@ describe('storing after an action', () => {
     const result = loadGame({ getItem: (key: string) => storage.get(key) ?? null } as unknown as Storage);
     expect(result.kind).toBe('loaded');
     const was = JSON.parse(FIXTURE).state.inventory;
-    if (result.kind === 'loaded') expect(result.state.inventory).toEqual({ ...was, food: { ...was.food, fish: 0, rabbit: 0 } });
+    if (result.kind === 'loaded') expect(result.state.inventory).toEqual({ ...was, food: { ...was.food, fish: 0, rabbit: 0, flour: 0, bread: [] } });
   });
 });

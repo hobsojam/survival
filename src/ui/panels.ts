@@ -1,3 +1,4 @@
+import { cutStripBlocker, grindGrainBlocker, sowStripBlocker, stripStage, threshStripBlocker, type StripStage } from '../game/field';
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isWinter, nightStart, season } from '../game/calendar';
 import { FOOD_ITEMS, availableFood, foodCount, goingSoft, isFresh, storeTotal, type FoodItem, type KeptFood } from '../game/food';
 import { foodIconUrl } from '../art/foodIcons';
@@ -92,6 +93,59 @@ export function bedMarkup(bed: BedPanelView, index: number): string {
   return `<div class="garden-plot"><span><small>${bed.label}</small></span><button type="button" data-action="${bed.action}" data-bed-index="${index}" title="${bed.title}"${disabled}>${bed.verb}</button></div>`;
 }
 
+const STRIP_WORDS: Record<StripStage, string> = {
+  bare: 'Bare, ready to sow', shoots: 'Green shoots', green: 'Growing tall', gold: 'Gold, ready to cut', stooks: 'Sheaves in stooks'
+};
+
+/** The job each stage is ready for: sowing a bare strip, cutting gold grain, threshing stooks; nothing while it grows. */
+const STRIP_JOBS: Record<StripStage, { action: StripPanelView['action']; verb: string; done: string; blocker: (state: GameState, index: number) => string | null } | null> = {
+  bare: { action: 'sowStrip', verb: 'Sow', done: 'Sow the strip.', blocker: sowStripBlocker },
+  shoots: null,
+  green: null,
+  gold: { action: 'cutStrip', verb: 'Cut', done: 'Cut the strip.', blocker: cutStripBlocker },
+  stooks: { action: 'threshStrip', verb: 'Thresh', done: 'Thresh the strip.', blocker: threshStripBlocker }
+};
+
+export interface StripPanelView { label: string; action: 'sowStrip' | 'cutStrip' | 'threshStrip' | null; verb: string; disabled: boolean; title: string }
+
+/** The Grain field panel, once built: a line per strip naming how it stands, with the job it is ready for. */
+export function fieldPanelView(state: GameState): { shown: boolean; hint: string; strips: StripPanelView[] } {
+  const strips = state.field.strips.map((strip, index): StripPanelView => {
+    const stage = stripStage(strip, state.day);
+    const words = stage === 'bare' && isWinter(state.day) ? 'Bare, resting for winter' : STRIP_WORDS[stage];
+    const label = `Strip ${index + 1} · ${words}`;
+    const job = STRIP_JOBS[stage];
+    if (!job) return { label, action: null, verb: '', disabled: true, title: '' };
+    const blocker = job.blocker(state, index);
+    return { label, action: job.action, verb: job.verb, disabled: Boolean(blocker), title: blocker ?? job.done };
+  });
+  const tools = state.progress.workshop.harvestTools ? '' : ' The workshop can make a sickle and flail.';
+  const wantsSeed = state.field.seed === 0 && state.field.strips.some(strip => strip.sownDay === null);
+  const seed = wantsSeed ? ' Wild grain grows at the edge of the clearing.' : '';
+  const hint = `Sow in spring, and the grain grows by itself through summer. Once it turns gold, cut it and thresh it. Ripe grain waits for you.${tools}${seed}`;
+  return { shown: state.structures.field, hint, strips };
+}
+
+export function stripMarkup(strip: StripPanelView, index: number): string {
+  const button = strip.action
+    ? `<button type="button" data-action="${strip.action}" data-strip-index="${index}" title="${strip.title}"${strip.disabled ? ' disabled' : ''}>${strip.verb}</button>`
+    : '';
+  return `<div class="garden-plot"><span><small>${strip.label}</small></span>${button}</div>`;
+}
+
+/** The Granary panel, once built: the grain stored against its room, the seed kept, and Grind once the quern is made. */
+export function granaryPanelView(state: GameState): { shown: boolean; stored: string; seed: string; grind: { shown: boolean; disabled: boolean; hint: string } } {
+  const { grain, seed } = state.field;
+  const seedLine = seed === 0 ? 'No seed kept' : `Seed for ${seed} ${seed === 1 ? 'strip' : 'strips'}`;
+  const blocker = grindGrainBlocker(state);
+  return {
+    shown: state.structures.granary,
+    stored: `${grain} of ${BALANCE.granaryCapacity} grain`,
+    seed: seedLine,
+    grind: { shown: state.progress.workshop.quern, disabled: Boolean(blocker), hint: blocker ?? '' }
+  };
+}
+
 /** What a panel with one action button shows: its heading, its copy, its price line and its button state. */
 export interface ActionPanelView { title: string; copy: string; cost: string; disabled: boolean; ready: boolean; shown?: boolean }
 
@@ -99,7 +153,15 @@ export interface ActionPanelView { title: string; copy: string; cost: string; di
 const UPGRADE_COPY: Record<UpgradeId, { title: string; copy: string; made: string }> = {
   saw: { title: 'Saw', copy: 'Felling a tree gives four wood instead of two.', made: 'Felling a tree gives four wood.' },
   handcart: { title: 'Handcart', copy: 'Felled wood goes into a cart by the workshop, and counts as stored wood.', made: 'Felled wood goes into the cart, and from there onto the wood store whenever it has room.' },
-  bedTools: { title: 'Hoe and watering can', copy: 'A dry bed holds on a day longer before it withers.', made: 'A dry bed holds on a day longer before it withers.' }
+  bedTools: { title: 'Hoe and watering can', copy: 'A dry bed holds on a day longer before it withers.', made: 'A dry bed holds on a day longer before it withers.' },
+  harvestTools: { title: 'Sickle and flail', copy: 'Cut and thresh the grain field.', made: 'Cut and thresh the grain field.' },
+  quern: { title: 'Hand quern', copy: 'Grind the granary\'s grain into flour.', made: 'Grind the granary\'s grain into flour.' }
+};
+
+/** Whether an upgrade's row shows: the bed tools once there are beds, the harvest tools once there is a field, the quern once there is a granary. */
+const UPGRADE_SHOWN: Record<UpgradeId, (state: GameState) => boolean> = {
+  saw: () => true, handcart: () => true, bedTools: state => state.structures.vegetableBeds,
+  harvestTools: state => state.structures.field, quern: state => state.structures.granary
 };
 
 /** "3 wood · 3 stone": an upgrade's cost, leaving out what it doesn't need. */
@@ -115,12 +177,12 @@ export interface WorkshopView {
 export function workshopView(state: GameState): WorkshopView {
   const row = (id: UpgradeId): ActionPanelView & { shown: boolean } => {
     const { title, copy, made } = UPGRADE_COPY[id];
-    const shown = id !== 'bedTools' || state.structures.vegetableBeds;
+    const shown = UPGRADE_SHOWN[id](state);
     if (state.progress.workshop[id]) return { shown: false, title, copy: made, cost: 'Made', disabled: true, ready: false };
     const blocker = upgradeBlocker(state, id);
     return { shown, title, copy: blocker ?? copy, cost: costLabel(WORKSHOP_UPGRADES[id].cost), disabled: false, ready: !blocker };
   };
-  const rows = { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools') };
+  const rows = { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools'), harvestTools: row('harvestTools'), quern: row('quern') };
   return { shown: state.structures.workshop && Object.values(rows).some(item => item.shown), rows };
 }
 
@@ -189,10 +251,13 @@ export function fishingLineView(state: GameState): ActionPanelView {
 
 export interface DishView { dish: Exclude<DishId, 'berries'>; name: string; icon: string; cost: string; disabled: boolean; title: string }
 
-/** The camp panel's dishes beyond a toasted berry: a fish whenever there is one, and the pot dishes once the pot is made. Each says why it can't be cooked yet. */
+/** Dishes offered only while their one ingredient is in reach: a fish, a rabbit, and a loaf from flour. */
+const OFFERED_WHEN_HELD: Partial<Record<DishId, FoodItem>> = { fish: 'fish', rabbit: 'rabbit', loaf: 'flour' };
+
+/** The camp panel's dishes beyond a toasted berry: a fish whenever there is one, a loaf whenever there is flour, and the pot dishes once the pot is made. Each says why it can't be cooked yet. */
 export function nightDishesView(state: GameState): DishView[] {
   const offered = (dish: DishId): dish is DishView['dish'] =>
-    dish === 'fish' || dish === 'rabbit' ? availableFood(state, dish) > 0 : DISHES[dish].potOnly && state.progress.potCrafted;
+    OFFERED_WHEN_HELD[dish] ? availableFood(state, OFFERED_WHEN_HELD[dish]) > 0 : DISHES[dish].potOnly && state.progress.potCrafted;
   return DISH_ORDER.filter(offered).map(dish => {
     const blocker = dishBlocker(state, dish);
     const name = capitalised(DISHES[dish].name);
@@ -270,13 +335,16 @@ const HUNGER_A_DAY = 30;
 /** The hunger each kept food fills, for the food laid by: a fish counts as the cooked meal it makes, and pine needles make tea, not meals. */
 const LAID_BY_HUNGER: Record<KeptFood, number> = {
   hazelnut: BALANCE.hazelnutHunger, honey: BALANCE.honeyHunger, pineNeedles: 0, roastedHazelnuts: BALANCE.roastedHazelnutHunger,
-  trailFood: BALANCE.trailFoodHungerGain, vegetables: BALANCE.vegetableHunger, fish: BALANCE.cookedFishHunger, rabbit: BALANCE.cookedRabbitHunger
+  trailFood: BALANCE.trailFoodHungerGain, vegetables: BALANCE.vegetableHunger, fish: BALANCE.cookedFishHunger, rabbit: BALANCE.cookedRabbitHunger,
+  flour: BALANCE.breadHunger
 };
 
-/** Whole days of winter hunger the kept food in the bag and the larder would fill, up to the season's ten. */
+/** Whole days of winter hunger the kept food in the bag and the larder, and the granary's grain, would fill, up to the season's ten. */
 export function foodLaidByDays(state: GameState): number {
-  const hunger = (Object.keys(LAID_BY_HUNGER) as KeptFood[])
+  const kept = (Object.keys(LAID_BY_HUNGER) as KeptFood[])
     .reduce((total, item) => total + (state.inventory.food[item] + state.larder[item]) * LAID_BY_HUNGER[item], 0);
+  // The granary's grain counts as the loaves it would make, as flour does.
+  const hunger = kept + Math.floor(state.field.grain / BALANCE.grainPerFlour) * BALANCE.breadHunger;
   return Math.min(SEASON_LENGTH, Math.floor(hunger / HUNGER_A_DAY));
 }
 
@@ -329,7 +397,7 @@ export function startNote(save: LoadResult, storageAvailable: boolean): string {
   return 'A fresh camp is ready whenever you are.';
 }
 
-/** The Bag panel's forage cells, shown only while the bag holds some; all but pine needles can be eaten from here. */
+/** The Bag panel's forage cells, shown only while the bag holds some; all but pine needles, flour and the rabbit can be eaten from here. */
 export const BAG_FOODS = [
   { item: 'greens', label: 'Greens', eat: 'Eat a handful of greens' },
   { item: 'hazelnut', label: 'Hazelnuts', eat: 'Eat a hazelnut' },
@@ -338,6 +406,8 @@ export const BAG_FOODS = [
   { item: 'roastedHazelnuts', label: 'Roasted hazelnuts', eat: 'Eat the roasted hazelnuts' },
   { item: 'vegetables', label: 'Vegetables', eat: 'Eat some raw vegetables' },
   { item: 'fish', label: 'Fish', eat: 'Eat a raw fish' },
+  { item: 'bread', label: 'Bread', eat: 'Eat a loaf of bread' },
+  { item: 'flour', label: 'Flour', eat: null },
   // EASTER EGG: only ever brought by a wolf friend, and shown only while there is one. Left out of the
   // README on purpose; see the wolf's gift in src/game/companion.ts and AGENTS.md.
   { item: 'rabbit', label: 'Rabbit', eat: null }
@@ -404,7 +474,7 @@ function fireLine(state: GameState): string {
 }
 
 const LARDER_LABELS: Record<FoodItem, string> = {
-  berry: 'Berries', greens: 'Greens', hazelnut: 'Hazelnuts', honey: 'Honey', pineNeedles: 'Pine needles', roastedHazelnuts: 'Roasted hazelnuts', trailFood: 'Rations', vegetables: 'Vegetables', fish: 'Fish', rabbit: 'Rabbit'
+  berry: 'Berries', greens: 'Greens', hazelnut: 'Hazelnuts', honey: 'Honey', pineNeedles: 'Pine needles', roastedHazelnuts: 'Roasted hazelnuts', trailFood: 'Rations', vegetables: 'Vegetables', fish: 'Fish', rabbit: 'Rabbit', flour: 'Flour', bread: 'Bread'
 };
 
 export interface LarderRowView { item: FoodItem; label: string; kept: number; storeDisabled: boolean; storeTitle: string; takeDisabled: boolean; takeTitle: string }
@@ -508,6 +578,10 @@ export function buildButtonView(state: GameState, id: StructureId): BuildButtonV
 
 const SHELTER_UPGRADES: readonly StructureId[] = ['shelterThatched', 'shelterStonework', 'shelterPorch', 'shelterFinished'];
 
+/** Whether a gold strip stands in the field with no sickle and flail made to bring it in. */
+const ripeGrainWaitsForTools = (state: GameState): boolean => state.structures.field && !state.progress.workshop.harvestTools
+  && state.field.strips.some(strip => stripStage(strip, state.day) === 'gold');
+
 export interface BuildListView { shelterHeading: boolean; empty: boolean; hint: string }
 
 export function buildListView(state: GameState): BuildListView {
@@ -516,6 +590,7 @@ export function buildListView(state: GameState): BuildListView {
   let hint = isInClearing(state) ? 'In the clearing — click an upgrade to build.' : 'Stand anywhere in the clearing to build.';
   if (empty) hint = 'Nothing new to build for now. Clear more land or explore to find what comes next.';
   if (empty && STEP_IDS.every(id => state.clearing.cleared.includes(id))) hint = 'No structures left to build.';
+  if (ripeGrainWaitsForTools(state)) hint += ' Ripe grain is waiting. Make a sickle and flail at the workshop.';
   return { shelterHeading: SHELTER_UPGRADES.some(id => shown.includes(id)), empty, hint };
 }
 
