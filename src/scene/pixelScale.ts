@@ -44,3 +44,23 @@ export function portraitViewport(width: number, height: number): { scale: number
   const scale = Math.max(1, Math.floor(width / 160));
   return { scale, width: Math.min(LOGICAL_WIDTH, Math.floor(width / scale)), height: Math.min(PORTRAIT_MAX_HEIGHT, Math.floor(height / scale)) };
 }
+
+/** Everything the page needs to fit the canvas in its frame: the scale, the world viewport, and the canvas's size and place. */
+export interface CanvasLayout { scale: number; viewport: { width: number; height: number }; size: { width: number; height: number }; offset: { x: number; y: number } }
+
+/**
+ * How the canvas fits a frame of this size: phone portrait frames get magnified art filling them; elsewhere the largest
+ * crisp scale, with a compact frame at 1x showing less of the world. `origin` is where the canvas's holder starts on the page.
+ */
+export function canvasLayout(frameWidth: number, frameHeight: number, pixelRatio: number = 1, origin: { x: number; y: number } = { x: 0, y: 0 }): CanvasLayout {
+  const portrait = portraitViewport(frameWidth, frameHeight);
+  const scale = portrait?.scale ?? displayScale(frameWidth, frameHeight, pixelRatio);
+  const viewport = portrait ? { width: portrait.width, height: portrait.height }
+    : scale === 1 ? viewportSize(frameWidth, frameHeight) : { width: LOGICAL_WIDTH, height: LOGICAL_HEIGHT };
+  return {
+    scale,
+    viewport,
+    size: canvasDisplaySize(viewport.width, viewport.height, scale, pixelRatio),
+    offset: canvasOffset(frameWidth, frameHeight, viewport.width, viewport.height, scale, pixelRatio, origin)
+  };
+}
