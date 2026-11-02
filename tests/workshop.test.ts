@@ -373,7 +373,15 @@ describe('the workshop panel', () => {
   });
 
   it('marks a made upgrade as made', () => {
-    expect(workshopView(made(workshopCamp(), 'saw')).rows.saw).toMatchObject({ cost: 'Made', disabled: true, ready: false });
+    expect(workshopView(made(workshopCamp(), 'saw')).rows.saw).toMatchObject({ shown: false, cost: 'Made', disabled: true, ready: false });
+  });
+
+  it('hides an empty workshop and shows it again when bed tools become available', () => {
+    const finished = made(workshopCamp(), 'saw', 'handcart');
+    expect(workshopView(finished).shown).toBe(false);
+    const beds = { ...finished, structures: { ...finished.structures, vegetableBeds: true } };
+    expect(workshopView(beds).shown).toBe(true);
+    expect(workshopView(made(beds, 'bedTools')).shown).toBe(false);
   });
 
   it('counts the cart in the bag panel\'s wood at camp and in the fireplace\'s line', () => {

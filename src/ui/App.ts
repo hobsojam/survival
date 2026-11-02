@@ -90,7 +90,7 @@ export class App {
             <div class="sidebar-pages">
               <section class="panel forecast-panel" id="forecast-panel" data-tab="camp"><p class="eyebrow">THE FORECAST</p><h2 id="forecast-title">A cold night is coming</h2><p id="forecast-copy" class="forecast-copy"></p><div class="forecast-checks"><span id="forecast-shelter"></span><span id="forecast-fire"></span><span id="forecast-food"></span></div></section>
               <section class="panel lookout-panel" id="lookout-panel" data-tab="build"><p class="eyebrow">A PLACE BEYOND CAMP</p><h2 id="lookout-title">The old lookout</h2><p id="lookout-copy" class="lookout-copy"></p><button type="button" id="lookout-button" data-action="repairLookout">Repair lookout</button><small id="lookout-cost">4 wood · 2 fiber · 2 stone</small></section>
-              <section class="panel axe-panel" data-tab="build"><p class="eyebrow">FOREST TOOLS</p><div class="tool-row"><h2 id="axe-title">Stone axe</h2><p id="axe-copy" class="lookout-copy"></p><button type="button" id="axe-button" data-action="craftAxe">Craft stone axe</button><small id="axe-cost">1 wood · 1 fiber · 1 stone</small></div><div id="pickaxe-row" class="tool-row" hidden><h2 id="pickaxe-title">Pickaxe</h2><p id="pickaxe-copy" class="lookout-copy"></p><button type="button" id="pickaxe-button" data-action="craftPickaxe">Craft pickaxe</button><small id="pickaxe-cost">2 wood · 1 fiber · 2 stone</small></div><div id="pot-row" class="tool-row"><h2 id="pot-title">Cooking pot</h2><p id="pot-copy" class="lookout-copy"></p><button type="button" id="pot-button" data-action="craftPot">Make a cooking pot</button><small id="pot-cost">1 wood · 2 stone</small></div><div id="pack-row" class="tool-row"><h2 id="pack-title">Woven pack</h2><p id="pack-copy" class="lookout-copy"></p><button type="button" id="pack-button" data-action="craftPack">Weave a pack</button><small id="pack-cost">2 wood · 4 fiber</small></div><div id="line-row" class="tool-row"><h2 id="line-title">Fishing line</h2><p id="line-copy" class="lookout-copy"></p><button type="button" id="line-button" data-action="makeFishingLine">Make a fishing line</button><small id="line-cost">1 wood · 1 fiber</small></div><div id="pillow-row" class="tool-row" hidden><h2 id="pillow-title">Feather pillow</h2><p id="pillow-copy" class="lookout-copy"></p><button type="button" id="pillow-button" data-action="craftPillow">Stitch a pillow</button><small id="pillow-cost">6 feathers</small></div><div id="cloak-row" class="tool-row" hidden><h2 id="cloak-title">Fur cloak</h2><p id="cloak-copy" class="lookout-copy"></p><button type="button" id="cloak-button" data-action="craftCloak">Make a cloak</button><small id="cloak-cost">6 fur</small></div></section>
+              <section class="panel axe-panel" id="forest-tools-panel" data-tab="build"><p class="eyebrow">FOREST TOOLS</p><div class="tool-row" id="axe-row"><h2 id="axe-title">Stone axe</h2><p id="axe-copy" class="lookout-copy"></p><button type="button" id="axe-button" data-action="craftAxe">Craft stone axe</button><small id="axe-cost">1 wood · 1 fiber · 1 stone</small></div><div id="pickaxe-row" class="tool-row" hidden><h2 id="pickaxe-title">Pickaxe</h2><p id="pickaxe-copy" class="lookout-copy"></p><button type="button" id="pickaxe-button" data-action="craftPickaxe">Craft pickaxe</button><small id="pickaxe-cost">2 wood · 1 fiber · 2 stone</small></div><div id="pot-row" class="tool-row"><h2 id="pot-title">Cooking pot</h2><p id="pot-copy" class="lookout-copy"></p><button type="button" id="pot-button" data-action="craftPot">Make a cooking pot</button><small id="pot-cost">1 wood · 2 stone</small></div><div id="pack-row" class="tool-row"><h2 id="pack-title">Woven pack</h2><p id="pack-copy" class="lookout-copy"></p><button type="button" id="pack-button" data-action="craftPack">Weave a pack</button><small id="pack-cost">2 wood · 4 fiber</small></div><div id="line-row" class="tool-row"><h2 id="line-title">Fishing line</h2><p id="line-copy" class="lookout-copy"></p><button type="button" id="line-button" data-action="makeFishingLine">Make a fishing line</button><small id="line-cost">1 wood · 1 fiber</small></div><div id="pillow-row" class="tool-row" hidden><h2 id="pillow-title">Feather pillow</h2><p id="pillow-copy" class="lookout-copy"></p><button type="button" id="pillow-button" data-action="craftPillow">Stitch a pillow</button><small id="pillow-cost">6 feathers</small></div><div id="cloak-row" class="tool-row" hidden><h2 id="cloak-title">Fur cloak</h2><p id="cloak-copy" class="lookout-copy"></p><button type="button" id="cloak-button" data-action="craftCloak">Make a cloak</button><small id="cloak-cost">6 fur</small></div></section>
               <section class="panel workshop-panel" id="workshop-panel" data-tab="build" hidden><p class="eyebrow">THE WORKSHOP</p><div id="saw-row" class="tool-row"><h2 id="saw-title"></h2><p id="saw-copy" class="lookout-copy"></p><button type="button" id="saw-button" data-upgrade="saw">Make a saw</button><small id="saw-cost"></small></div><div id="handcart-row" class="tool-row"><h2 id="handcart-title"></h2><p id="handcart-copy" class="lookout-copy"></p><button type="button" id="handcart-button" data-upgrade="handcart">Build a handcart</button><small id="handcart-cost"></small></div><div id="bedtools-row" class="tool-row"><h2 id="bedtools-title"></h2><p id="bedtools-copy" class="lookout-copy"></p><button type="button" id="bedtools-button" data-upgrade="bedTools">Make bed tools</button><small id="bedtools-cost"></small></div></section>
               <section class="panel ration-panel" data-tab="bag"><p class="eyebrow">TRAIL FOOD</p><h2>Drying rack</h2><p class="lookout-copy">Dry a berry at camp for a ration you can eat anywhere. Each restores 45 hunger.</p><button type="button" id="prepare-button" data-action="prepareTrailFood">Prepare trail ration</button><small id="prepare-hint">Build a drying rack first.</small></section>
               <section class="panel sites-panel" data-tab="camp"><p class="eyebrow">BEYOND CAMP</p><h2>Follow the paths</h2><p class="lookout-copy">An old basket, a quiet spring, and a stone cairn wait beyond the clearing.</p><button type="button" id="site-button">Explore nearby place</button><small>Stand beside a place and press V</small></section>
@@ -116,7 +116,7 @@ export class App {
               <section class="panel garden-panel" data-tab="camp"><p class="eyebrow">GROW WITH THE SEASONS</p><h2>Berry garden</h2><p class="garden-hint" id="garden-hint"></p><div id="garden-plots"></div></section>
               <section class="panel beds-panel" data-tab="camp" hidden><p class="eyebrow">THE WEST GROUND</p><h2>Vegetable beds</h2><p class="garden-hint" id="beds-hint"></p><div id="bed-list"></div><div class="tool-row" id="draw-water-row" hidden><button type="button" id="draw-water-button" data-action="drawWater">Draw water</button><small id="draw-water-hint"></small></div></section>
               <section class="panel night-panel" data-tab="camp"><p class="eyebrow">CAMP MOMENTS</p><h2>Cook or unwind</h2><p class="night-hint" id="night-hint">Cook by the fire any time. Stargazing waits for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" data-dish="berries" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button>${nightDishMarkup()}</div></section>
-              <section class="panel build-panel" data-tab="build"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand anywhere in the clearing to build.</p><div id="build-list">${buildListMarkup()}</div><div id="clearing-group" hidden><h3 class="build-group-heading">Clear the land</h3><div id="clearing-sides">${clearingMarkup}</div><div class="tool-row"><h3 id="clear-title">Clear the ground</h3><p id="clear-copy" class="lookout-copy"></p><button type="button" id="clear-button" data-action="clearGround">Clear the ground</button><small id="clear-cost"></small></div></div></section>
+              <section class="panel build-panel" data-tab="build"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand anywhere in the clearing to build.</p><div id="build-list">${buildListMarkup()}</div><div id="clearing-group" hidden><h3 class="build-group-heading">Clear the land</h3><p id="clearing-progress" class="build-hint" hidden></p><div id="clearing-sides">${clearingMarkup}</div><div class="tool-row" id="clear-row"><h3 id="clear-title">Clear the ground</h3><p id="clear-copy" class="lookout-copy"></p><button type="button" id="clear-button" data-action="clearGround">Clear the ground</button><small id="clear-cost"></small></div></div></section>
               <section class="panel phone-only" data-tab="camp"><p class="eyebrow">THIS CAMP</p><button type="button" id="phone-new-game" class="secondary-button">Start a new game</button></section>
             </div>
           </aside>
@@ -489,6 +489,8 @@ export class App {
 
   /** Writes a one-button panel's view into the elements named after it, such as #axe-title and #axe-button. */
   private renderActionPanel(name: string, view: ActionPanelView): void {
+    const container = this.root.querySelector<HTMLElement>(`#${name}-row, #${name}-panel`);
+    if (container) container.hidden = view.shown === false;
     const button = this.root.querySelector<HTMLButtonElement>(`#${name}-button`);
     if (button) {
       button.disabled = view.disabled;
@@ -501,19 +503,14 @@ export class App {
 
   private renderTools(): void {
     this.renderActionPanel('lookout', lookoutView(this.state));
-    this.renderActionPanel('axe', axeView(this.state));
-    const pickaxe = pickaxeView(this.state);
-    const pickaxeRow = this.root.querySelector<HTMLElement>('#pickaxe-row');
-    if (pickaxeRow) pickaxeRow.hidden = !pickaxe.shown;
-    this.renderActionPanel('pickaxe', pickaxe);
-    this.renderActionPanel('pot', potView(this.state));
-    this.renderActionPanel('pack', packView(this.state));
-    this.renderActionPanel('line', fishingLineView(this.state));
-    for (const [name, view] of [['pillow', pillowView(this.state)], ['cloak', cloakView(this.state)]] as const) {
-      const row = this.root.querySelector<HTMLElement>(`#${name}-row`);
-      if (row) row.hidden = !view.shown;
-      this.renderActionPanel(name, view);
-    }
+    const tools = [
+      ['axe', axeView(this.state)], ['pickaxe', pickaxeView(this.state)], ['pot', potView(this.state)],
+      ['pack', packView(this.state)], ['line', fishingLineView(this.state)],
+      ['pillow', pillowView(this.state)], ['cloak', cloakView(this.state)]
+    ] as const;
+    for (const [name, view] of tools) this.renderActionPanel(name, view);
+    const forest = this.root.querySelector<HTMLElement>('#forest-tools-panel');
+    if (forest) forest.hidden = tools.every(([, view]) => view.shown === false);
     this.renderWorkshop();
   }
 
@@ -522,8 +519,6 @@ export class App {
     const panel = this.root.querySelector<HTMLElement>('#workshop-panel');
     if (panel) panel.hidden = !view.shown;
     for (const [name, row] of [['saw', view.rows.saw], ['handcart', view.rows.handcart], ['bedtools', view.rows.bedTools]] as const) {
-      const element = this.root.querySelector<HTMLElement>(`#${name}-row`);
-      if (element) element.hidden = !row.shown;
       this.renderActionPanel(name, row);
     }
   }
@@ -601,9 +596,15 @@ export class App {
     const view = clearingView(this.state);
     const group = this.root.querySelector<HTMLElement>('#clearing-group');
     if (group) group.hidden = !view.shown;
+    const progress = this.root.querySelector<HTMLElement>('#clearing-progress');
+    if (progress) {
+      progress.textContent = view.progress;
+      progress.hidden = !view.progress;
+    }
     for (const side of view.sides) {
       const button = this.root.querySelector<HTMLButtonElement>(`[data-clear-side="${side.side}"]`);
       if (!button) continue;
+      button.hidden = side.done;
       button.disabled = side.disabled;
       button.classList.toggle('built', side.done);
       button.classList.toggle('chosen', side.chosen);

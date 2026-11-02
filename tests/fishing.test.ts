@@ -66,7 +66,7 @@ describe('the fishing line', () => {
 
   it('shows in the Forest tools panel', () => {
     expect(fishingLineView(winter())).toMatchObject({ title: 'Fishing line', cost: '1 wood · 1 fiber', disabled: false, ready: true });
-    expect(fishingLineView(withLine(winter()))).toMatchObject({ cost: 'Made', disabled: true, ready: false });
+    expect(fishingLineView(withLine(winter()))).toMatchObject({ shown: false, cost: 'Made', disabled: true, ready: false });
   });
 });
 
