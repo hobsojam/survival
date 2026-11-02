@@ -148,6 +148,15 @@ describe('baking at the fire from the mill\'s flour', () => {
     expect(spendFood(evening({ millFlour: 1 }, 1), 'flour', 3)).toBeNull();
   });
 
+  it('spends the bag\'s flour, then the larder\'s, and the mill\'s last', () => {
+    const base = evening({ millFlour: 3 }, 1);
+    const stocked = { ...base, structures: { ...base.structures, larder: true }, larder: addFood(emptyFood(), 'flour', 1, 22) };
+    expect(availableFood(stocked, 'flour')).toBe(5);
+    expect(spendFood(stocked, 'flour', 1)).toMatchObject({ millFlour: 3, larder: { flour: 1 }, inventory: { food: { flour: 0 } } });
+    expect(spendFood(stocked, 'flour', 2)).toMatchObject({ millFlour: 3, larder: { flour: 0 }, inventory: { food: { flour: 0 } } });
+    expect(spendFood(stocked, 'flour', 3)).toMatchObject({ millFlour: 2, larder: { flour: 0 }, inventory: { food: { flour: 0 } } });
+  });
+
   it('refuses a loaf from the mill\'s flour alone when the bag is full', () => {
     const full = evening({ millFlour: 3 });
     expect(dishBlocker({ ...full, inventory: { ...full.inventory, wood: 8 } }, 'loaf')).toBe('Make room in your bag for the loaf.');

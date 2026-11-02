@@ -1,6 +1,6 @@
 # Hearthwild
 
-A small, single-player browser survival game about making a wilderness camp feel like home. You control one survivor, gather branches, berries, and fiber, keep a fire burning, and build a shelter, bed, drying rack, windbreak, stone pile, toolshed, and eventually a stone hearth, and weave a pack to carry more. In time the camp grows a house, vegetable beds, a well, a workshop, a grain field with a granary, and in time a windmill and a bakery. Beyond camp, a west path leads to a second area with an old quarry. Survival is gentle: cold and hunger slow you down, and there is always a way back, but a survivor who goes too long without food falls ill, and if the sickness isn't cared for, their story ends.
+A small, single-player browser survival game about making a wilderness camp feel like home. You control one survivor, gather branches, berries, and fiber, keep a fire burning, and build a shelter, bed, drying rack, windbreak, stone pile, toolshed, and eventually a stone hearth, and weave a pack to carry more. In time the camp grows a house, vegetable beds, a well, a workshop, a grain field with a granary, and later a windmill and a bakery. Beyond camp, a west path leads to a second area with an old quarry. Survival is gentle: cold and hunger slow you down, and there is always a way back, but a survivor who goes too long without food falls ill, and if the sickness isn't cared for, their story ends.
 
 **Play it online:** <https://hobsojam.github.io/survival/>. Every merge to `main` redeploys it.
 
