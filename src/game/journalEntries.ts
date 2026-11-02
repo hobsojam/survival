@@ -154,8 +154,8 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   // A loaf is told on summer's page or winter's, each with its own line.
   summerBread: m => onBefore(m, cooked(m, 'loaf')),
   winterBread: m => onBefore(m, cooked(m, 'loaf')),
-  // A dawn the bakery's oven baked its loaf.
-  ovenBread: m => onAfter(m, dawn(m) && m.after.bakery.lastBaked === m.after.day),
+  // Woke in camp on a dawn the bakery's oven baked its loaf.
+  ovenBread: m => onAfter(m, dawn(m) && m.after.bakery.lastBaked === m.after.day && isInClearing(m.after)),
   // Slept through at home in the house, the fireplace still alight at dawn.
   fireside: m => onBefore(m, acted(m, 'sleep') && dawn(m) && livesInHouse(m.before) && isAtHome(m.before) && fuelLeft(m.after) > 0)
 };

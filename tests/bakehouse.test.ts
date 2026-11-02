@@ -264,6 +264,13 @@ describe('the oven in the year journal', () => {
     expect(journalSeason('ovenBread')).toBe('spring');
   });
 
+  it('writes nothing on a morning the survivor wakes away from camp', () => {
+    const before = away(bakehouseCamp({ millFlour: 1, day: 21 }));
+    const after = acrossDawn(before);
+    expect(after.bakery.lastBaked).toBe(22);
+    expect(recordJournal(before, after).state.journal.map(entry => entry.id)).not.toContain('ovenBread');
+  });
+
   it('writes nothing on a morning the oven waits', () => {
     const before = bakehouseCamp({ day: 21 });
     expect(recordJournal(before, acrossDawn(before)).state.journal.map(entry => entry.id)).not.toContain('ovenBread');
