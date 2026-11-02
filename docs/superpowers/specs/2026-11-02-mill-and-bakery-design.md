@@ -26,11 +26,9 @@ These are also the first buildings of the homestead's next stage. They stand on 
 - **Making the old way obsolete or required.** The hand quern and baking at the fire keep working exactly as they do now. Someone who never builds the mill loses nothing they had before.
 - **Bread going to waste unseen.** The bakery shelf is small, and the oven waits while it's full, so loaves never pile up and quietly go soft.
 
-## Prerequisite: all cleared ground counts as camp
+## Camp means cleared ground
 
-Today "in camp" (`isInClearing`) is a fixed circle of radius 4 around the fire. It ignores the cleared ground, which reaches 8–9 tiles. Standing at your own field (7 tiles out) gets "Return to camp to work the field." The same happens by the well and the workshop. The user agreed that anywhere on cleared ground should count as camp.
-
-This is its own small change and lands **before** this design is built. `isInClearing` should use the clearing's real shape, `inClearing(x, y, state.clearing.cleared)`, which already exists in clearing.ts. Checks that really mean "at the fire", such as cooking, keep their own nearness rules. The builder checks each caller.
+Panel jobs work anywhere on cleared ground (`isInClearing`), which already follows the clearing's real shape. The windmill and bakery panels follow the same rule, and so does any new ground the outer steps clear. Only jobs done at the fire (cooking, sleeping, tending it) need the survivor beside the fire. PR #117 brought the drying rack and the cooking refusal into line with this.
 
 ## The outer ring
 
