@@ -4,6 +4,7 @@ import { BALANCE, type GameState } from './state';
 export { isInClearing } from './clearing';
 export { availableWood, spendWood } from './wood';
 export { availableFiber, spendFiber } from './fiber';
+export { availableStone } from './stone';
 
 // Where the survivor is and what their bag holds: plain reads of the state that the rules and the companion both use.
 
@@ -30,7 +31,3 @@ export function freeSpaces(state: GameState): number {
   return bagCapacity(state) - carriedCount(state);
 }
 
-/** Stone a build can use: the bag plus the camp stone pile, which counts from anywhere. */
-export function availableStone(state: GameState): number {
-  return state.inventory.stone + state.storedStone;
-}

@@ -10,7 +10,7 @@ These are also the first buildings of the homestead's next stage. They stand on 
 
 - **Windmill.** In one visit, it grinds everything in the granary into flour and keeps that flour at the mill, not in the bag.
 - **Bakery.** It bakes one loaf each morning from the mill's flour and leaves it on a shelf for the survivor to pick up.
-- **A wider ring.** A third, outer step of clearing opens on the north and south sides. The windmill stands on the south outer ground, beyond the field and granary, so grain travels field → granary → mill in a line. The bakery stands on the north outer ground, beside the house.
+- **Outer nooks.** A third, outer step of clearing opens a small nook on the north and south sides. The windmill stands on the south outer ground, beyond the field and granary, so grain travels field → granary → mill in a line. The bakery stands on the north outer ground, beside the house.
 
 ## Non-goals
 
@@ -30,13 +30,17 @@ These are also the first buildings of the homestead's next stage. They stand on 
 
 Panel jobs work anywhere on cleared ground (`isInClearing`), which already follows the clearing's real shape. The windmill and bakery panels follow the same rule, and so does any new ground the outer steps clear. Only jobs done at the fire (cooking, sleeping, tending it) need the survivor beside the fire. PR #117 brought the drying rack and the cooking refusal into line with this.
 
-## The outer ring
+## The outer nooks
 
-- **Two new steps.** They are `north-outer` and `south-outer`, the third step on their sides. Each needs that side's far step cleared first. The rules are the same as today's steps: mark the step, fell its trees, then clear the ground for wood and fiber.
-- **Reach.** The new ground runs out to about 12 tiles north and about 11.5 tiles south, inside the map. The map is 30 tall with the fire at y = 15, and the field reaches y ≈ 23.
+- **Two new steps.** `north-outer` and `south-outer` are the third step on their sides, and each needs that side's far step cleared first. They work the same way as today's steps: mark the step, fell its trees, then clear the ground for wood, fiber and stone.
+- **Nooks, not a ring.** Each step clears a small nook just big enough for its building. It runs out to about 11 tiles at a narrow angle beyond the far ground, not the whole side. The rest of that side keeps its far reach.
+- **The woods stay wild.** The user's ruling: no wild grain and no forest trees inside camp.
+  - No forage spot (wild grain, hazels, honey tree, pine needles, berries, greens) may fall inside even the fullest clearing.
+  - No wild tree (`state.trees`) may either.
+  - Each nook sits in a gap between them.
 - **Room lists.** `north-outer` makes room for the bakery, and `south-outer` for the windmill.
-- **Cost.** The outer ground costs more than the far ground, which is 6 wood and 3 fiber. My call: 8 wood, 4 fiber and 2 stone, with 6–8 trees.
-- **Builder's choice.** The exact trees, the reach and any nudges to other trees. The wild grain at (25, 23) and the field have to stay clear.
+- **Cost.** My call: 8 wood, 4 fiber and 2 stone, with 3–4 trees, since the nook is small.
+- **Later, perhaps.** A straw beehive beside the bakery came up as an idea for a future round. It is not part of this one.
 
 ## Windmill
 

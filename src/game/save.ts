@@ -3,7 +3,7 @@ import { bagCapacity, carriedCount } from './rules';
 import { season, yearOf } from './calendar';
 import { journalEntry, journalSeason, type JournalId } from './journalEntries';
 import type { ClearingState, StepId } from './clearing';
-import { CLEARING_STEPS, STEP_IDS, placeBranches } from './clearing';
+import { CLEARING_STEPS, STEP_IDS, placeBranches, previousStep } from './clearing';
 import { KEEPSAKES_NEEDED, TRUST_TARGET } from './companion';
 import { FOOD_ITEMS, isFresh, storeTotal, type FoodStore } from './food';
 import { FORAGE, isForage } from './forage';
@@ -178,7 +178,7 @@ function validClearing({ clearing }: SaveShape): boolean {
   const { cleared, marked, felled } = clearing as ObjectValue & { cleared: unknown[]; felled: unknown[] };
   const step = (value: unknown): value is StepId => typeof value === 'string' && (STEP_IDS as readonly string[]).includes(value);
   if (!cleared.every(step) || new Set(cleared).size !== cleared.length) return false;
-  const nearDone = (id: StepId): boolean => !id.endsWith('-far') || cleared.includes(id.replace('-far', '-near') as StepId);
+  const nearDone = (id: StepId): boolean => { const before = previousStep(id); return !before || cleared.includes(before); };
   if (!cleared.every(nearDone)) return false;
   if (marked === null) return felled.length === 0;
   if (!step(marked) || cleared.includes(marked) || !nearDone(marked)) return false;

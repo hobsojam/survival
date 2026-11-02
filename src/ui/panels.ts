@@ -12,7 +12,7 @@ import { WORKSHOP_UPGRADES, upgradeBlocker, type UpgradeId } from '../game/works
 import { logsInStore } from '../game/wood';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
-import { CLEARING_STEPS, STEP_IDS, clearGroundBlocker, markBlocker, nextStep, roomLine, type Side } from '../game/clearing';
+import { CLEARING_STEPS, STEP_IDS, clearGroundBlocker, markBlocker, nextStep, roomLine, stepDepth, type Side } from '../game/clearing';
 import { KEEPSAKES_NEEDED, cloakBlocker, keepsakeKind, pillowBlocker } from '../game/companion';
 import { DISHES, DISH_ORDER, dishBlocker, foodWord, ingredientList, potBlocker, type DishId } from '../game/cooking';
 import { fishingLineBlocker } from '../game/fishing';
@@ -606,10 +606,12 @@ function clearingSideView(state: GameState, side: Side): ClearingSideView {
   if (!step) return { side, label: `${name} · cleared`, detail: '', disabled: true, done: true, chosen: false };
   const { trees, cost } = CLEARING_STEPS[step];
   const room = roomLine(step, state.structures, id => Object.hasOwn(BUILDINGS, id));
-  const price = `${trees.length} trees, then ${cost.wood} wood and ${cost.fiber} fiber`;
+  const price = cost.stone > 0
+    ? `${trees.length} trees, then ${cost.wood} wood, ${cost.fiber} fiber and ${cost.stone} stone`
+    : `${trees.length} trees, then ${cost.wood} wood and ${cost.fiber} fiber`;
   return {
     side,
-    label: `${name} · ${step.endsWith('-far') ? 'far' : 'near'}`,
+    label: `${name} · ${stepDepth(step)}`,
     detail: room ? `${price}.${room}` : price,
     disabled: Boolean(markBlocker(state, step)),
     done: false,

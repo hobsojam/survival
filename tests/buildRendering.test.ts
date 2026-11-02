@@ -51,7 +51,7 @@ describe('completed Build actions', () => {
     const { app, get } = renderer();
     const state = createGame();
     state.progress.axeCrafted = true;
-    state.clearing.cleared = ['north-near', 'north-far'];
+    state.clearing.cleared = ['north-near', 'north-far', 'north-outer'];
     Object.assign(app, { state });
 
     app['renderClearing']();

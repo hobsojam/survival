@@ -2,16 +2,32 @@ import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { BALANCE, BUILDINGS, type GameState, type ResourceNode, type TreeNode } from './state';
 import { availableWood } from './wood';
 import { availableFiber } from './fiber';
+import { availableStone } from './stone';
 
-// The camp clearing starts as the ring round the fire and widens one side at a time. Each side has a near and a far step;
-// every step names the trees that stand in its way and the building the cleared ground makes room for.
+// The camp clearing starts as the ring round the fire and widens one side at a time. Each side has a near and a far step,
+// and the north and south sides an outer step beyond that; every step names the trees that stand in its way and the
+// building the cleared ground makes room for.
 
 export type Side = 'north' | 'east' | 'south' | 'west';
-export type StepId = `${Side}-${'near' | 'far'}`;
+export type StepId = `${Side}-${'near' | 'far'}` | 'north-outer' | 'south-outer';
+export type StepDepth = 'near' | 'far' | 'outer';
 
 export const STEP_IDS: readonly StepId[] = [
-  'north-near', 'north-far', 'east-near', 'east-far', 'south-near', 'south-far', 'west-near', 'west-far'
+  'north-near', 'north-far', 'north-outer', 'east-near', 'east-far', 'south-near', 'south-far', 'south-outer', 'west-near', 'west-far'
 ];
+
+/** How far out a step lies on its side: near, far or outer. */
+export function stepDepth(step: StepId): StepDepth {
+  return step.slice(step.indexOf('-') + 1) as StepDepth;
+}
+
+/** The step on the same side that must be cleared first, or null for a near step. */
+export function previousStep(step: StepId): StepId | null {
+  const side = step.slice(0, step.indexOf('-')) as Side;
+  const depth = stepDepth(step);
+  if (depth === 'near') return null;
+  return depth === 'far' ? `${side}-near` : `${side}-far`;
+}
 
 export interface ClearingStep {
   side: Side;
@@ -22,6 +38,8 @@ export interface ClearingStep {
   trees: readonly { x: number; y: number; sprite: 'treeBroadleaf' | 'treePine' }[];
   /** The buildings this step makes room for. */
   room: readonly string[];
+  /** An outer step clears only a nook: the arc of directions, in degrees from the fire, its reach applies to. */
+  arc?: { from: number; to: number };
 }
 
 export interface ClearingState {
@@ -34,6 +52,7 @@ export interface ClearingState {
 
 const NEAR_COST = { wood: 4, fiber: 2, stone: 0 };
 const FAR_COST = { wood: 6, fiber: 3, stone: 0 };
+const OUTER_COST = { wood: 8, fiber: 4, stone: 2 };
 const NEAR_REACH = 6.5;
 
 export const CLEARING_STEPS: Record<StepId, ClearingStep> = {
@@ -50,6 +69,13 @@ export const CLEARING_STEPS: Record<StepId, ClearingStep> = {
       { x: 22.75, y: 8.25, sprite: 'treeBroadleaf' }, { x: 18.75, y: 7.5, sprite: 'treePine' },
       { x: 13.75, y: 9.75, sprite: 'treeBroadleaf' }, { x: 15, y: 8.75, sprite: 'treePine' },
       { x: 17.5, y: 7.25, sprite: 'treeBroadleaf' }, { x: 21.25, y: 6.75, sprite: 'treePine' }
+    ]
+  },
+  'north-outer': {
+    // A nook between the honey tree and the wild tree due north, so the woods there stay wild.
+    side: 'north', reach: 11, cost: OUTER_COST, room: ['bakery'], arc: { from: -107, to: -95 },
+    trees: [
+      { x: 17.25, y: 4, sprite: 'treePine' }, { x: 18, y: 5.5, sprite: 'treeBroadleaf' }, { x: 18.5, y: 3.75, sprite: 'treePine' }
     ]
   },
   'east-near': {
@@ -80,6 +106,13 @@ export const CLEARING_STEPS: Record<StepId, ClearingStep> = {
       { x: 24.75, y: 20.5, sprite: 'treeBroadleaf' }, { x: 23.75, y: 22, sprite: 'treePine' },
       { x: 18.25, y: 22.5, sprite: 'treeBroadleaf' }, { x: 16.5, y: 22.5, sprite: 'treePine' },
       { x: 13.75, y: 20.25, sprite: 'treeBroadleaf' }, { x: 20, y: 22.75, sprite: 'treePine' }
+    ]
+  },
+  'south-outer': {
+    // A nook between the pine needles due south and the wild tree to the south-west, beyond the field.
+    side: 'south', reach: 11.5, cost: OUTER_COST, room: ['windmill'], arc: { from: 98, to: 114 },
+    trees: [
+      { x: 18.25, y: 24, sprite: 'treeBroadleaf' }, { x: 17, y: 25.25, sprite: 'treePine' }, { x: 15.75, y: 26, sprite: 'treeBroadleaf' }
     ]
   },
   'west-near': {
@@ -118,10 +151,24 @@ export function sideAt(x: number, y: number): Side {
   return sideAtDegrees(degreesFromFire(x, y));
 }
 
-function sideReach(side: Side, cleared: readonly StepId[]): number {
-  if (cleared.includes(`${side}-far`)) return CLEARING_STEPS[`${side}-far`].reach;
-  if (cleared.includes(`${side}-near`)) return CLEARING_STEPS[`${side}-near`].reach;
-  return BALANCE.campRadius;
+/** Degrees over which a nook's edge blends back to the ground before it. */
+const NOOK_BLEND_DEGREES = 4;
+
+/** How far a cleared step reaches at `angle`: its full reach, or for a nook only within its arc, blending back outside it. */
+function stepReach(step: StepId, angle: number): number {
+  const { reach, arc } = CLEARING_STEPS[step];
+  if (!arc) return reach;
+  const before = previousStep(step);
+  const inner = before ? stepReach(before, angle) : BALANCE.campRadius;
+  const outside = Math.max(arc.from - angle, angle - arc.to, 0);
+  if (outside >= NOOK_BLEND_DEGREES) return inner;
+  return inner + (reach - inner) * (1 - outside / NOOK_BLEND_DEGREES);
+}
+
+/** The reach of the deepest step cleared on a side at `angle`, or the camp's own radius with none. */
+function sideReach(side: Side, cleared: readonly StepId[], angle: number): number {
+  const deepest = STEP_IDS.filter(id => CLEARING_STEPS[id].side === side && cleared.includes(id)).at(-1);
+  return deepest ? stepReach(deepest, angle) : BALANCE.campRadius;
 }
 
 /** The clearing's radius in the direction of (x, y) from the fire. */
@@ -129,11 +176,11 @@ export function clearingReach(x: number, y: number, cleared: readonly StepId[]):
   const angle = degreesFromFire(x, y);
   const boundary = BOUNDARIES.reduce((nearest, b) => (Math.abs(angle - b) < Math.abs(angle - nearest) ? b : nearest));
   const away = Math.abs(angle - boundary);
-  const own = sideReach(sideAtDegrees(angle), cleared);
+  const own = sideReach(sideAtDegrees(angle), cleared, angle);
   if (away >= BLEND_DEGREES) return own;
   // Just across the boundary lies the other side; step off it by a hair to find which that is.
   const otherAngle = angle + (angle >= boundary ? -1 : 1) * (away + 0.001);
-  const other = sideReach(sideAtDegrees(otherAngle), cleared);
+  const other = sideReach(sideAtDegrees(otherAngle), cleared, otherAngle);
   return own + (other - own) * 0.5 * (1 - away / BLEND_DEGREES);
 }
 
@@ -179,8 +226,8 @@ export function choppableTrees(state: GameState): TreeNode[] {
 export function markBlocker(state: GameState, step: StepId): string | null {
   if (!state.progress.axeCrafted) return 'Craft a stone axe to clear land.';
   if (!isInClearing(state)) return 'Return to camp to clear land.';
-  const { side } = CLEARING_STEPS[step];
-  if (step.endsWith('-far') && !state.clearing.cleared.includes(`${side}-near`)) return 'Clear the near ground on that side first.';
+  const before = previousStep(step);
+  if (before && !state.clearing.cleared.includes(before)) return `Clear the ${stepDepth(before)} ground on that side first.`;
   if (state.clearing.cleared.includes(step)) return 'That ground is already clear.';
   const { marked, felled } = state.clearing;
   if (marked && marked !== step && felled.length > 0) return `Finish clearing the ${CLEARING_STEPS[marked].side} side first.`;
@@ -200,8 +247,10 @@ export function clearGroundBlocker(state: GameState): string | null {
   if (left > 0) return `Fell the ${left} marked ${left === 1 ? 'tree' : 'trees'} left first.`;
   if (!isInClearing(state)) return 'Return to camp to clear land.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
-  const { wood, fiber } = CLEARING_STEPS[marked].cost;
-  if (availableWood(state) < wood || availableFiber(state) < fiber) return `Need ${wood} wood and ${fiber} fiber to clear this.`;
+  const { wood, fiber, stone } = CLEARING_STEPS[marked].cost;
+  if (availableWood(state) < wood || availableFiber(state) < fiber || availableStone(state) < stone) {
+    return stone > 0 ? `Need ${wood} wood, ${fiber} fiber and ${stone} stone to clear this.` : `Need ${wood} wood and ${fiber} fiber to clear this.`;
+  }
   return null;
 }
 

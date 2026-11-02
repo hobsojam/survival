@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a third, outer clearing step on the north and south sides. On it go a windmill, which grinds the whole granary into a flour bin in one job, and a bakery, which bakes one loaf each dawn onto a two-loaf shelf.
+**Goal:** Add a third, outer clearing step on the north and south sides, each a small nook. On it go a windmill, which grinds the whole granary into a flour bin in one job, and a bakery, which bakes one loaf each dawn onto a two-loaf shelf.
 
 **Architecture:**
 - **Game logic:** the new logic lives in a new `src/game/bakehouse.ts`, which holds the mill job, the dawn bake, shelf spoiling, taking a loaf and the morning line.
@@ -25,7 +25,8 @@
   - outer ground: `{ wood: 8, fiber: 4, stone: 2 }`
   - windmill: `{ wood: 12, fiber: 4, stone: 10 }`, prerequisite `granary`, ground `south-outer`
   - bakery: `{ wood: 10, fiber: 2, stone: 10 }`, prerequisite `windmill`, ground `north-outer`
-- **Reach.** The outer steps reach 12 (north) and 11.5 (south). Only `north-outer` and `south-outer` exist; east and west get no outer step. The map stays 40 × 30.
+- **Nooks.** Each outer step is a nook: a narrow arc at its own reach. `north-outer` reaches 11 within −107°…−95°, and `south-outer` reaches 11.5 within 98°…114°, blending back to the far reach over 4°. Only these two exist; east and west get no outer step. The map stays 40 × 30.
+- **No wild grain, forage spot or wild tree inside even the fullest clearing** (the user's ruling).
 - **Where jobs happen.** Panel jobs work anywhere in the clearing (`isInClearing`), and refusals say "Return to camp to …".
 - **Fire bakes.** A loaf baked at the fire takes flour from the bag first, then the larder, then the mill.
 - **The morning loaf** bakes at dawn wherever the survivor is.

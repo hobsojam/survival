@@ -6,7 +6,7 @@ import { wolfVisit } from './wolves';
 import { availableFiber, availableStone, availableWood, spendFiber, spendWood, bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
 import { POT_COST, cookBlocker, defaultDish, dishBlocker, foodWord, isPackedDish, packDish, potBlocker, serveDish, spendIngredients, type DishId } from './cooking';
 import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
-import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, type StepId } from './clearing';
+import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, stepDepth, type StepId } from './clearing';
 import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
 import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
@@ -157,7 +157,7 @@ export function groundBlocker(state: GameState, id: StructureId): string | null 
   const definition = BUILDINGS[id];
   if (!('ground' in definition) || state.clearing.cleared.includes(definition.ground)) return null;
   const step = definition.ground;
-  return `Clear the ${CLEARING_STEPS[step].side} side's ${step.endsWith('-far') ? 'far' : 'near'} ground first.`;
+  return `Clear the ${CLEARING_STEPS[step].side} side's ${stepDepth(step)} ground first.`;
 }
 
 /** How a structure's build button should look: built, locked, blocked by a missing shelter or uncleared ground, ready to build here, or not yet. */
