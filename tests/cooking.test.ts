@@ -149,6 +149,12 @@ describe('the dishes', () => {
     expect(dishBlocker({ ...state, fireFuel: 0 }, 'pineTea')).toBe('Light the campfire before cooking.');
   });
 
+  it('asks to come closer to the fire from elsewhere in the clearing', () => {
+    const state = evening({ pineNeedles: 1 });
+    const edge = { ...state, clearing: { cleared: ['east-near' as const], marked: null, felled: [] }, player: { ...state.player, x: BALANCE.campX + 5.5, y: BALANCE.campY } };
+    expect(dishBlocker(edge, 'pineTea')).toBe('Move closer to the fire to cook.');
+  });
+
   it('refuses to roast into a bag still full after paying', () => {
     const state = evening({ hazelnut: 2 });
     // Ten in an eight-space bag: the two hazelnuts paid still leave it full.

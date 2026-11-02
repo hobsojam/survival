@@ -74,7 +74,7 @@ export function spendStone(state: GameState, amount: number): GameState {
 
 export function trailFoodBlocker(state: GameState): string | null {
   if (!state.structures.dryingRack) return 'Build a drying rack to prepare trail food.';
-  if (!isAtCamp(state)) return 'Return to camp to use the drying rack.';
+  if (!isInClearing(state)) return 'Return to camp to use the drying rack.';
   if (availableFood(state, 'berry') <= 0) return 'Gather a berry to prepare trail food.';
   // The berry may come from the larder, oldest first, so only a bag berry makes room for the ration.
   const spent = spendFood(state, 'berry', 1);
