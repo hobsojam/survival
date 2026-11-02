@@ -16,7 +16,7 @@ export type JournalId =
   | 'firstSnow' | 'wolfTracks' | 'frozenSpring' | 'winterFire' | 'winterCooking'
   | 'firstRain' | 'rabbits' | 'bushesFull' | 'stumpGrowing' | 'springRest'
   | 'fireflies' | 'twoHandfuls' | 'goldEvening' | 'warmSleep' | 'lookoutEvening'
-  | 'hazelnuts' | 'pineTea' | 'salad' | 'wildHoney' | 'fireside';
+  | 'hazelnuts' | 'pineTea' | 'salad' | 'wildHoney' | 'fireside' | 'grainIn' | 'winterBread';
 
 export interface JournalEntry { year: number; id: JournalId; day: number; variant: number }
 
@@ -45,7 +45,8 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'winterFire', lines: ['Kept the fire alive through a whole winter night.'] },
     { id: 'winterCooking', lines: ['Cooked berries by the fire, with the snow coming down.', 'Cooked a fish by the fire, with the snow coming down.',
       'Cooked a warm supper by the fire, with the snow coming down.'] },
-    { id: 'pineTea', lines: ['Pine needle tea, hot in the snow.'] }
+    { id: 'pineTea', lines: ['Pine needle tea, hot in the snow.'] },
+    { id: 'winterBread', lines: ['Bread from my own field, warm by the fire.'] }
   ],
   spring: [
     { id: 'firstRain', lines: ['The first rain of spring.'], silent: true },
@@ -61,7 +62,8 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'goldEvening', lines: ['The evening went gold.'] },
     { id: 'warmSleep', lines: ['Slept out without a fire, and it was warm.'] },
     { id: 'lookoutEvening', lines: ['Watched the land from the lookout on a long evening.'] },
-    { id: 'wildHoney', lines: ['Wild honey from the hollow tree.'] }
+    { id: 'wildHoney', lines: ['Wild honey from the hollow tree.'] },
+    { id: 'grainIn', lines: ['Brought the grain in. The granary smells of summer.'] }
   ]
 };
 
@@ -121,7 +123,8 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   winterFire: m => onBefore(m, acted(m, 'sleep') && dawn(m) && isAtHome(m.before) && fuelLeft(m.after) > 0
     && (m.before.lastWolf?.day !== m.before.day || m.before.lastWolf.took === 'offered')),
   // A meal cooked in the snow, told by what it was. Tea has a line of its own, and is no meal.
-  winterCooking: m => (acted(m, 'cook') && !cooked(m, 'pineTea') ? { day: m.before.day, variant: winterMealLine(m) } : null),
+  // A loaf has a line of its own too.
+  winterCooking: m => (acted(m, 'cook') && !cooked(m, 'pineTea') && !cooked(m, 'loaf') ? { day: m.before.day, variant: winterMealLine(m) } : null),
   firstRain: m => onAfter(m, rainMessage(m.before, m.after) !== null),
   rabbits: m => onAfter(m, awake(m) && m.after.area === 'camp' && daylight(m.after) && RABBIT_HOMES.some(home => within(m.after, home, 4))),
   bushesFull: m => onBefore(m, m.action?.type === 'gather' && done(m) && berries(m.after) > berries(m.before)),
@@ -138,6 +141,8 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   pineTea: m => onBefore(m, cooked(m, 'pineTea')),
   salad: m => onBefore(m, cooked(m, 'salad')),
   wildHoney: m => onBefore(m, gathered(m, 'honey')),
+  grainIn: m => onBefore(m, acted(m, 'threshStrip')),
+  winterBread: m => onBefore(m, cooked(m, 'loaf')),
   // Slept through at home in the house, the fireplace still alight at dawn.
   fireside: m => onBefore(m, acted(m, 'sleep') && dawn(m) && livesInHouse(m.before) && isAtHome(m.before) && fuelLeft(m.after) > 0)
 };

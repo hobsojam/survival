@@ -133,3 +133,17 @@ export function grindGrainBlocker(state: GameState): string | null {
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   return null;
 }
+
+/** The morning line from the field, or null: time to sow at the first dawn of spring, or the grain turned gold on the dawn it ripens. */
+export function fieldNews(before: GameState, after: GameState): string | null {
+  if (after.day <= before.day || !after.structures.field) return null;
+  const { strips, seed } = after.field;
+  if (isSpring(after.day) && !isSpring(before.day) && seed > 0 && strips.some(strip => strip.sownDay === null)) {
+    return 'The ground is soft. Time to sow the field.';
+  }
+  const ripened = strips.some(strip => strip.sownDay !== null && !strip.cut && ripeDay(strip.sownDay) > before.day && ripeDay(strip.sownDay) <= after.day);
+  if (!ripened) return null;
+  return after.progress.workshop.harvestTools
+    ? 'The grain has turned gold. It\'s ready to cut.'
+    : 'The grain has turned gold. Make a sickle and flail at the workshop to bring it in.';
+}

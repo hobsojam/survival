@@ -12,6 +12,32 @@ const flame = { r: 'fire1', o: 'fire2', O: 'fire3', W: 'fire4' } as const;
 const cloud = (light: PaletteKey, dark: PaletteKey): Record<string, PaletteKey> => ({ c: dark, C: light });
 
 export const JOURNAL_ICONS: Record<JournalId, JournalIcon> = {
+  // A sheaf of grain, tied round its middle.
+  grainIn: { legend: { g: 'scarf2', G: 'scarf3', W: 'scarf4', t: 'wood1' }, rows: [
+    '..........',
+    '..W.W.W...',
+    '.WGWGWGW..',
+    '..GgGgG...',
+    '...ggg....',
+    '...ttt....',
+    '...ggg....',
+    '..g.g.g...',
+    '.g..g..g..',
+    '..........'
+  ] },
+  // A round loaf on a board, steam rising.
+  winterBread: { legend: { k: 'wood1', c: 'earth2', C: 'earth3', W: 'earth4', b: 'wood3', s: 'frost' }, rows: [
+    '...s..s...',
+    '..s..s....',
+    '..........',
+    '...kkkk...',
+    '..kCWWCk..',
+    '.kCWCCWCk.',
+    '.kcCCCCck.',
+    'bbbbbbbbbb',
+    '.b......b.',
+    '..........'
+  ] },
   leaves: { legend: { o: 'fire1', O: 'fire2', s: 'wood2' }, rows: [
     '..........',
     '.....oo...',

@@ -38,7 +38,7 @@ describe('the year journal pages', () => {
     expect(view.title).toBe('Winter, year one');
     expect(view.days).toBe('Days 11–20');
     expect(view.entries).toEqual([]);
-    expect(view.blanks).toBe(6);
+    expect(view.blanks).toBe(7);
     expect(view.hasPrevious && view.hasNext).toBe(true);
   });
 

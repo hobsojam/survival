@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { CLEARING_STEPS, STEP_IDS, inClearing, placeBranches } from '../src/game/clearing';
-import { FIELD_STRIPS, cutStripBlocker, emptyField, ripeDay, sowStripBlocker, stripStage, threshGrain, threshStripBlocker, wildGrainBlocker } from '../src/game/field';
+import { FIELD_STRIPS, cutStripBlocker, emptyField, fieldNews, ripeDay, sowStripBlocker, stripStage, threshGrain, threshStripBlocker, wildGrainBlocker } from '../src/game/field';
 import { TOO_TIRED_MESSAGE, workSeconds } from '../src/game/needs';
 import { advanceTime, applyAction } from '../src/game/rules';
 import { nodeShown } from '../src/game/forage';
+import { newsBetween } from '../src/game/news';
+import { journalEntry, recordJournal } from '../src/game/journalEntries';
+import { nightStart } from '../src/game/calendar';
+import { addFood, emptyFood } from '../src/game/food';
 import { upgradeBlocker } from '../src/game/workshop';
 import { loadGame, saveGame, SAVE_KEY } from '../src/game/save';
 import { fieldCamp, strip, withField } from './fieldCamp';
@@ -269,5 +273,59 @@ describe('wild grain', () => {
     const gathered = applyAction(atGrain(), { type: 'gather', nodeId: 'wildGrain-0' }).state;
     const dawned = advanceTime({ ...gathered, timeOfDay: BALANCE.daySeconds - 1 }, 1.5, 'resting');
     expect(dawned.nodes.find(node => node.id === 'wildGrain-0')!.amount).toBe(1);
+  });
+});
+
+describe('news from the field', () => {
+  const dawnInto = (state: GameState, day: number): [GameState, GameState] => [{ ...state, day: day - 1 }, { ...state, day }];
+  const sownOn = (state: GameState, day: number): GameState => withField(state, { strips: [strip({ sownDay: day }), strip(), strip(), strip()] });
+
+  it('says it is time to sow at the first dawn of spring, with a field, seed and a bare strip', () => {
+    const state = withField(fieldCamp(), { seed: 2 });
+    expect(fieldNews(...dawnInto(state, 21))).toBe('The ground is soft. Time to sow the field.');
+    expect(fieldNews(...dawnInto(state, 22))).toBeNull();
+    expect(fieldNews(...dawnInto(withField(state, { seed: 0 }), 21))).toBeNull();
+    expect(fieldNews(...dawnInto({ ...state, structures: { ...state.structures, field: false } }, 21))).toBeNull();
+    const allSown = withField(state, { strips: Array.from({ length: FIELD_STRIPS }, () => strip({ sownDay: 2 })) });
+    expect(fieldNews(...dawnInto(allSown, 21))).toBeNull();
+  });
+
+  it('says the grain has turned gold on the dawn it ripens, pointing to the workshop until the tools are made', () => {
+    const state = sownOn(fieldCamp(), 22);
+    expect(fieldNews(...dawnInto(state, 35))).toBe('The grain has turned gold. Make a sickle and flail at the workshop to bring it in.');
+    const tooled = { ...state, progress: { ...state.progress, workshop: { ...state.progress.workshop, harvestTools: true } } };
+    expect(fieldNews(...dawnInto(tooled, 35))).toBe('The grain has turned gold. It\'s ready to cut.');
+    expect(fieldNews(...dawnInto(state, 34))).toBeNull();
+    expect(fieldNews(...dawnInto(state, 36))).toBeNull();
+    expect(fieldNews(...dawnInto(withField(state, { strips: [strip({ sownDay: 22, cut: true }), strip(), strip(), strip()] }), 35))).toBeNull();
+    expect(fieldNews(state, { ...state, timeOfDay: 10 })).toBeNull();
+  });
+
+  it('is part of the news between two moments', () => {
+    const state = withField(fieldCamp(), { seed: 2 });
+    expect(newsBetween(...dawnInto(state, 21))).toContain('The ground is soft. Time to sow the field.');
+  });
+});
+
+describe('the harvest in the year journal', () => {
+  const tooled = (state: GameState): GameState => ({ ...state, progress: { ...state.progress, workshop: { ...state.progress.workshop, harvestTools: true } } });
+
+  it('writes down the grain brought in on a summer threshing', () => {
+    const state = withField(tooled(fieldCamp({ granary: true })), { strips: [strip({ sownDay: 22, cut: true }), strip(), strip(), strip()] });
+    const summer = { ...state, day: 36 };
+    const action = { type: 'threshStrip', index: 0 } as const;
+    const { state: written, messages } = recordJournal(summer, applyAction(summer, action).state, action);
+    expect(written.journal.map(entry => entry.id)).toContain('grainIn');
+    expect(messages).toContain('Written in your journal: Brought the grain in. The granary smells of summer.');
+  });
+
+  it('writes down the first winter loaf, and not as an ordinary winter supper', () => {
+    const base = fieldCamp();
+    const state = { ...base, day: 12, timeOfDay: nightStart(12) + 5, fireFuel: 60, inventory: { ...base.inventory, food: addFood(emptyFood(), 'flour', 1, 12) } };
+    const action = { type: 'cook', dish: 'loaf' } as const;
+    const ids = recordJournal(state, applyAction(state, action).state, action).state.journal.map(entry => entry.id);
+    expect(ids).toContain('winterBread');
+    expect(ids).not.toContain('winterCooking');
+    expect(journalEntry('winterBread')!.lines[0]).toBe('Bread from my own field, warm by the fire.');
   });
 });
