@@ -19,7 +19,7 @@ import { GAVE_OUT_MESSAGE } from '../game/sickness';
 import { ENDING_FADE_MS, endingMarkup, endingView, showEnding } from './ending';
 import { browserDownloadDoc, downloadText } from './download';
 import { showBuildList, showCampStores } from './showPanels';
-import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
+import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
 import type { UpgradeId } from '../game/workshop';
 import { Soundscape } from '../game/soundscape';
 
@@ -91,7 +91,7 @@ export class App {
               <section class="panel forecast-panel" id="forecast-panel" data-tab="camp"><p class="eyebrow">THE FORECAST</p><h2 id="forecast-title">A cold night is coming</h2><p id="forecast-copy" class="forecast-copy"></p><div class="forecast-checks"><span id="forecast-shelter"></span><span id="forecast-fire"></span><span id="forecast-food"></span></div></section>
               <section class="panel lookout-panel" id="lookout-panel" data-tab="build"><p class="eyebrow">A PLACE BEYOND CAMP</p><h2 id="lookout-title">The old lookout</h2><p id="lookout-copy" class="lookout-copy"></p><button type="button" id="lookout-button" data-action="repairLookout">Repair lookout</button><small id="lookout-cost">4 wood · 2 fiber · 2 stone</small></section>
               <section class="panel axe-panel" id="forest-tools-panel" data-tab="build"><p class="eyebrow">FOREST TOOLS</p><div class="tool-row" id="axe-row"><h2 id="axe-title">Stone axe</h2><p id="axe-copy" class="lookout-copy"></p><button type="button" id="axe-button" data-action="craftAxe">Craft stone axe</button><small id="axe-cost">1 wood · 1 fiber · 1 stone</small></div><div id="pickaxe-row" class="tool-row" hidden><h2 id="pickaxe-title">Pickaxe</h2><p id="pickaxe-copy" class="lookout-copy"></p><button type="button" id="pickaxe-button" data-action="craftPickaxe">Craft pickaxe</button><small id="pickaxe-cost">2 wood · 1 fiber · 2 stone</small></div><div id="pot-row" class="tool-row"><h2 id="pot-title">Cooking pot</h2><p id="pot-copy" class="lookout-copy"></p><button type="button" id="pot-button" data-action="craftPot">Make a cooking pot</button><small id="pot-cost">1 wood · 2 stone</small></div><div id="pack-row" class="tool-row"><h2 id="pack-title">Woven pack</h2><p id="pack-copy" class="lookout-copy"></p><button type="button" id="pack-button" data-action="craftPack">Weave a pack</button><small id="pack-cost">2 wood · 4 fiber</small></div><div id="line-row" class="tool-row"><h2 id="line-title">Fishing line</h2><p id="line-copy" class="lookout-copy"></p><button type="button" id="line-button" data-action="makeFishingLine">Make a fishing line</button><small id="line-cost">1 wood · 1 fiber</small></div><div id="pillow-row" class="tool-row" hidden><h2 id="pillow-title">Feather pillow</h2><p id="pillow-copy" class="lookout-copy"></p><button type="button" id="pillow-button" data-action="craftPillow">Stitch a pillow</button><small id="pillow-cost">6 feathers</small></div><div id="cloak-row" class="tool-row" hidden><h2 id="cloak-title">Fur cloak</h2><p id="cloak-copy" class="lookout-copy"></p><button type="button" id="cloak-button" data-action="craftCloak">Make a cloak</button><small id="cloak-cost">6 fur</small></div></section>
-              <section class="panel workshop-panel" id="workshop-panel" data-tab="build" hidden><p class="eyebrow">THE WORKSHOP</p><div id="saw-row" class="tool-row"><h2 id="saw-title"></h2><p id="saw-copy" class="lookout-copy"></p><button type="button" id="saw-button" data-upgrade="saw">Make a saw</button><small id="saw-cost"></small></div><div id="handcart-row" class="tool-row"><h2 id="handcart-title"></h2><p id="handcart-copy" class="lookout-copy"></p><button type="button" id="handcart-button" data-upgrade="handcart">Build a handcart</button><small id="handcart-cost"></small></div><div id="bedtools-row" class="tool-row"><h2 id="bedtools-title"></h2><p id="bedtools-copy" class="lookout-copy"></p><button type="button" id="bedtools-button" data-upgrade="bedTools">Make bed tools</button><small id="bedtools-cost"></small></div></section>
+              <section class="panel workshop-panel" id="workshop-panel" data-tab="build" hidden><p class="eyebrow">THE WORKSHOP</p><div id="saw-row" class="tool-row"><h2 id="saw-title"></h2><p id="saw-copy" class="lookout-copy"></p><button type="button" id="saw-button" data-upgrade="saw">Make a saw</button><small id="saw-cost"></small></div><div id="handcart-row" class="tool-row"><h2 id="handcart-title"></h2><p id="handcart-copy" class="lookout-copy"></p><button type="button" id="handcart-button" data-upgrade="handcart">Build a handcart</button><small id="handcart-cost"></small></div><div id="bedtools-row" class="tool-row"><h2 id="bedtools-title"></h2><p id="bedtools-copy" class="lookout-copy"></p><button type="button" id="bedtools-button" data-upgrade="bedTools">Make bed tools</button><small id="bedtools-cost"></small></div><div id="harvesttools-row" class="tool-row"><h2 id="harvesttools-title"></h2><p id="harvesttools-copy" class="lookout-copy"></p><button type="button" id="harvesttools-button" data-upgrade="harvestTools">Make a sickle and flail</button><small id="harvesttools-cost"></small></div><div id="quern-row" class="tool-row"><h2 id="quern-title"></h2><p id="quern-copy" class="lookout-copy"></p><button type="button" id="quern-button" data-upgrade="quern">Make a hand quern</button><small id="quern-cost"></small></div></section>
               <section class="panel ration-panel" data-tab="bag"><p class="eyebrow">TRAIL FOOD</p><h2>Drying rack</h2><p class="lookout-copy">Dry a berry at camp for a ration you can eat anywhere. Each restores 45 hunger.</p><button type="button" id="prepare-button" data-action="prepareTrailFood">Prepare trail ration</button><small id="prepare-hint">Build a drying rack first.</small></section>
               <section class="panel sites-panel" data-tab="camp"><p class="eyebrow">BEYOND CAMP</p><h2>Follow the paths</h2><p class="lookout-copy">An old basket, a quiet spring, and a stone cairn wait beyond the clearing.</p><button type="button" id="site-button">Explore nearby place</button><small>Stand beside a place and press V</small></section>
               <section class="panel journal-panel" data-tab="camp"><p class="eyebrow">YOUR FIELD JOURNAL</p><h2>Areas beyond camp</h2><p id="journal-hint" class="journal-hint"></p>
@@ -115,6 +115,8 @@ export class App {
               ${campStoresMarkup()}
               <section class="panel garden-panel" data-tab="camp"><p class="eyebrow">GROW WITH THE SEASONS</p><h2>Berry garden</h2><p class="garden-hint" id="garden-hint"></p><div id="garden-plots"></div></section>
               <section class="panel beds-panel" data-tab="camp" hidden><p class="eyebrow">THE WEST GROUND</p><h2>Vegetable beds</h2><p class="garden-hint" id="beds-hint"></p><div id="bed-list"></div><div class="tool-row" id="draw-water-row" hidden><button type="button" id="draw-water-button" data-action="drawWater">Draw water</button><small id="draw-water-hint"></small></div></section>
+              <section class="panel field-panel" data-tab="camp" hidden><p class="eyebrow">THE SOUTH GROUND</p><h2>Grain field</h2><p class="garden-hint" id="field-hint"></p><div id="strip-list"></div></section>
+              <section class="panel granary-panel" data-tab="camp" hidden><p class="eyebrow">THE SOUTH GROUND</p><h2>Granary</h2><p class="garden-hint"><span id="granary-stored"></span> · <span id="granary-seed"></span></p><div class="tool-row" id="grind-row" hidden><button type="button" id="grind-button" data-action="grindGrain">Grind flour</button><small id="grind-hint"></small></div></section>
               <section class="panel night-panel" data-tab="camp"><p class="eyebrow">CAMP MOMENTS</p><h2>Cook or unwind</h2><p class="night-hint" id="night-hint">Cook by the fire any time. Stargazing waits for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" data-dish="berries" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button>${nightDishMarkup()}</div></section>
               <section class="panel build-panel" data-tab="build"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand anywhere in the clearing to build.</p><div id="build-list">${buildListMarkup()}</div><div id="clearing-group" hidden><h3 class="build-group-heading">Clear the land</h3><p id="clearing-progress" class="build-hint" hidden></p><div id="clearing-sides">${clearingMarkup}</div><div class="tool-row" id="clear-row"><h3 id="clear-title">Clear the ground</h3><p id="clear-copy" class="lookout-copy"></p><button type="button" id="clear-button" data-action="clearGround">Clear the ground</button><small id="clear-cost"></small></div></div></section>
               <section class="panel phone-only" data-tab="camp"><p class="eyebrow">THIS CAMP</p><button type="button" id="phone-new-game" class="secondary-button">Start a new game</button></section>
@@ -130,7 +132,7 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'makeFishingLine' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeFood' | 'takeFood' | 'drawWater';
+        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'makeFishingLine' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeFood' | 'takeFood' | 'drawWater' | 'grindGrain';
         const item = button.dataset.item as FoodItem | undefined;
         const dish = button.dataset.dish as DishId | undefined;
         if (type === 'storeFood' || type === 'takeFood') {
@@ -150,6 +152,12 @@ export class App {
       if (!button) return;
       const type = button.dataset.action as 'sowBed' | 'harvestBed';
       this.scene?.perform({ type, index: Number(button.dataset.bedIndex) });
+    });
+    this.root.addEventListener('click', event => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-strip-index]');
+      if (!button) return;
+      const type = button.dataset.action as 'sowStrip' | 'cutStrip' | 'threshStrip';
+      this.scene?.perform({ type, index: Number(button.dataset.stripIndex) });
     });
     this.root.querySelectorAll<HTMLButtonElement>('[data-upgrade]').forEach(button => {
       button.addEventListener('click', () => this.scene?.perform({ type: 'makeUpgrade', upgrade: button.dataset.upgrade as UpgradeId }));
@@ -359,6 +367,7 @@ export class App {
     this.renderBuild();
     this.renderGarden();
     this.renderBeds();
+    this.renderField();
   }
 
   private renderClock(): void {
@@ -518,7 +527,7 @@ export class App {
     const view = workshopView(this.state);
     const panel = this.root.querySelector<HTMLElement>('#workshop-panel');
     if (panel) panel.hidden = !view.shown;
-    for (const [name, row] of [['saw', view.rows.saw], ['handcart', view.rows.handcart], ['bedtools', view.rows.bedTools]] as const) {
+    for (const [name, row] of [['saw', view.rows.saw], ['handcart', view.rows.handcart], ['bedtools', view.rows.bedTools], ['harvesttools', view.rows.harvestTools], ['quern', view.rows.quern]] as const) {
       this.renderActionPanel(name, row);
     }
   }
@@ -581,6 +590,28 @@ export class App {
       button.classList.toggle('ready', !view.water.disabled);
     }
     this.setText('draw-water-hint', view.water.hint);
+  }
+
+  private renderField(): void {
+    const field = fieldPanelView(this.state);
+    const fieldPanel = this.root.querySelector<HTMLElement>('.field-panel');
+    if (fieldPanel) fieldPanel.hidden = !field.shown;
+    this.setText('field-hint', field.hint);
+    const list = this.root.querySelector<HTMLElement>('#strip-list');
+    if (list) list.innerHTML = field.strips.map((strip, index) => stripMarkup(strip, index)).join('');
+    const granary = granaryPanelView(this.state);
+    const granaryPanel = this.root.querySelector<HTMLElement>('.granary-panel');
+    if (granaryPanel) granaryPanel.hidden = !granary.shown;
+    this.setText('granary-stored', granary.stored);
+    this.setText('granary-seed', granary.seed);
+    const row = this.root.querySelector<HTMLElement>('#grind-row');
+    if (row) row.hidden = !granary.grind.shown;
+    const button = this.root.querySelector<HTMLButtonElement>('#grind-button');
+    if (button) {
+      button.disabled = granary.grind.disabled;
+      button.classList.toggle('ready', !granary.grind.disabled);
+    }
+    this.setText('grind-hint', granary.grind.hint);
   }
 
   private renderBuild(): void {

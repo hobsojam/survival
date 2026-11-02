@@ -1,3 +1,4 @@
+import { cutStripBlocker, grindGrainBlocker, sowStripBlocker, stripStage, threshStripBlocker, type StripStage } from '../game/field';
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isWinter, nightStart, season } from '../game/calendar';
 import { FOOD_ITEMS, availableFood, foodCount, goingSoft, isFresh, storeTotal, type FoodItem, type KeptFood } from '../game/food';
 import { foodIconUrl } from '../art/foodIcons';
@@ -90,6 +91,58 @@ export function bedsPanelView(state: GameState): { shown: boolean; hint: string;
 export function bedMarkup(bed: BedPanelView, index: number): string {
   const disabled = bed.disabled ? ' disabled' : '';
   return `<div class="garden-plot"><span><small>${bed.label}</small></span><button type="button" data-action="${bed.action}" data-bed-index="${index}" title="${bed.title}"${disabled}>${bed.verb}</button></div>`;
+}
+
+const STRIP_WORDS: Record<StripStage, string> = {
+  bare: 'Bare, ready to sow', shoots: 'Green shoots', green: 'Growing tall', gold: 'Gold, ready to cut', stooks: 'Sheaves in stooks'
+};
+
+/** The job each stage is ready for: sowing a bare strip, cutting gold grain, threshing stooks; nothing while it grows. */
+const STRIP_JOBS: Record<StripStage, { action: StripPanelView['action']; verb: string; done: string; blocker: (state: GameState, index: number) => string | null } | null> = {
+  bare: { action: 'sowStrip', verb: 'Sow', done: 'Sow the strip.', blocker: sowStripBlocker },
+  shoots: null,
+  green: null,
+  gold: { action: 'cutStrip', verb: 'Cut', done: 'Cut the strip.', blocker: cutStripBlocker },
+  stooks: { action: 'threshStrip', verb: 'Thresh', done: 'Thresh the strip.', blocker: threshStripBlocker }
+};
+
+export interface StripPanelView { label: string; action: 'sowStrip' | 'cutStrip' | 'threshStrip' | null; verb: string; disabled: boolean; title: string }
+
+/** The Grain field panel, once built: a line per strip naming how it stands, with the job it is ready for. */
+export function fieldPanelView(state: GameState): { shown: boolean; hint: string; strips: StripPanelView[] } {
+  const strips = state.field.strips.map((strip, index): StripPanelView => {
+    const stage = stripStage(strip, state.day);
+    const words = stage === 'bare' && isWinter(state.day) ? 'Bare, resting for winter' : STRIP_WORDS[stage];
+    const label = `Strip ${index + 1} · ${words}`;
+    const job = STRIP_JOBS[stage];
+    if (!job) return { label, action: null, verb: '', disabled: true, title: '' };
+    const blocker = job.blocker(state, index);
+    return { label, action: job.action, verb: job.verb, disabled: Boolean(blocker), title: blocker ?? job.done };
+  });
+  const tools = state.progress.workshop.harvestTools ? '' : ' The workshop can make a sickle and flail.';
+  const seed = state.field.seed > 0 ? '' : ' Wild grain grows at the edge of the clearing.';
+  const hint = `Sow in spring, and the grain grows by itself through summer. Once it turns gold, cut it and thresh it. Ripe grain waits for you.${tools}${seed}`;
+  return { shown: state.structures.field, hint, strips };
+}
+
+export function stripMarkup(strip: StripPanelView, index: number): string {
+  const button = strip.action
+    ? `<button type="button" data-action="${strip.action}" data-strip-index="${index}" title="${strip.title}"${strip.disabled ? ' disabled' : ''}>${strip.verb}</button>`
+    : '';
+  return `<div class="garden-plot"><span><small>${strip.label}</small></span>${button}</div>`;
+}
+
+/** The Granary panel, once built: the grain stored against its room, the seed kept, and Grind once the quern is made. */
+export function granaryPanelView(state: GameState): { shown: boolean; stored: string; seed: string; grind: { shown: boolean; disabled: boolean; hint: string } } {
+  const { grain, seed } = state.field;
+  const seedLine = seed === 0 ? 'No seed yet' : `Seed for ${seed} ${seed === 1 ? 'strip' : 'strips'}`;
+  const blocker = grindGrainBlocker(state);
+  return {
+    shown: state.structures.granary,
+    stored: `${grain} of ${BALANCE.granaryCapacity} grain`,
+    seed: seedLine,
+    grind: { shown: state.progress.workshop.quern, disabled: Boolean(blocker), hint: blocker ?? '' }
+  };
 }
 
 /** What a panel with one action button shows: its heading, its copy, its price line and its button state. */
