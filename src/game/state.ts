@@ -257,6 +257,9 @@ export const BALANCE = {
   /** A fish eaten raw barely helps; cooked at the fire it is a proper meal. */
   fishHunger: 10,
   cookedFishHunger: 45,
+  /** A rabbit a wolf friend brings home, roasted at the fire; one comes every this many winter dawns. */
+  cookedRabbitHunger: 50,
+  rabbitEveryDays: 2,
   fireSecondsPerWood: 90,
   /** Kindling: the same with or without the hearth. */
   fiberFireSeconds: 30,

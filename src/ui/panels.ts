@@ -194,7 +194,7 @@ export interface DishView { dish: Exclude<DishId, 'berries'>; name: string; icon
 /** The camp panel's dishes beyond a toasted berry: a fish whenever there is one, and the pot dishes once the pot is made. Each says why it can't be cooked yet. */
 export function nightDishesView(state: GameState): DishView[] {
   const offered = (dish: DishId): dish is DishView['dish'] =>
-    dish === 'fish' ? availableFood(state, 'fish') > 0 : DISHES[dish].potOnly && state.progress.potCrafted;
+    dish === 'fish' || dish === 'rabbit' ? availableFood(state, dish) > 0 : DISHES[dish].potOnly && state.progress.potCrafted;
   return DISH_ORDER.filter(offered).map(dish => {
     const blocker = dishBlocker(state, dish);
     const name = capitalised(DISHES[dish].name);
@@ -272,7 +272,7 @@ const HUNGER_A_DAY = 30;
 /** The hunger each kept food fills, for the food laid by: a fish counts as the cooked meal it makes, and pine needles make tea, not meals. */
 const LAID_BY_HUNGER: Record<KeptFood, number> = {
   hazelnut: BALANCE.hazelnutHunger, honey: BALANCE.honeyHunger, pineNeedles: 0, roastedHazelnuts: BALANCE.roastedHazelnutHunger,
-  trailFood: BALANCE.trailFoodHungerGain, vegetables: BALANCE.vegetableHunger, fish: BALANCE.cookedFishHunger
+  trailFood: BALANCE.trailFoodHungerGain, vegetables: BALANCE.vegetableHunger, fish: BALANCE.cookedFishHunger, rabbit: BALANCE.cookedRabbitHunger
 };
 
 /** Whole days of winter hunger the kept food in the bag and the larder would fill, up to the season's ten. */
@@ -339,7 +339,10 @@ export const BAG_FOODS = [
   { item: 'pineNeedles', label: 'Pine needles', eat: null },
   { item: 'roastedHazelnuts', label: 'Roasted hazelnuts', eat: 'Eat the roasted hazelnuts' },
   { item: 'vegetables', label: 'Vegetables', eat: 'Eat some raw vegetables' },
-  { item: 'fish', label: 'Fish', eat: 'Eat a raw fish' }
+  { item: 'fish', label: 'Fish', eat: 'Eat a raw fish' },
+  // EASTER EGG: only ever brought by a wolf friend, and shown only while there is one. Left out of the
+  // README on purpose; see the wolf's gift in src/game/companion.ts and AGENTS.md.
+  { item: 'rabbit', label: 'Rabbit', eat: null }
 ] as const;
 export type BagFood = (typeof BAG_FOODS)[number]['item'];
 
@@ -403,7 +406,7 @@ function fireLine(state: GameState): string {
 }
 
 const LARDER_LABELS: Record<FoodItem, string> = {
-  berry: 'Berries', greens: 'Greens', hazelnut: 'Hazelnuts', honey: 'Honey', pineNeedles: 'Pine needles', roastedHazelnuts: 'Roasted hazelnuts', trailFood: 'Rations', vegetables: 'Vegetables', fish: 'Fish'
+  berry: 'Berries', greens: 'Greens', hazelnut: 'Hazelnuts', honey: 'Honey', pineNeedles: 'Pine needles', roastedHazelnuts: 'Roasted hazelnuts', trailFood: 'Rations', vegetables: 'Vegetables', fish: 'Fish', rabbit: 'Rabbit'
 };
 
 export interface LarderRowView { item: FoodItem; label: string; kept: number; storeDisabled: boolean; storeTitle: string; takeDisabled: boolean; takeTitle: string }

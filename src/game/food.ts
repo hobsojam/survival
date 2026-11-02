@@ -9,10 +9,10 @@ export type { FoodStore } from './foodStore';
 // kept food is just a count. Every eater goes through availableFood and spendFood, which reach into the larder at camp.
 
 export type FreshFood = 'berry' | 'greens';
-export type KeptFood = 'hazelnut' | 'honey' | 'pineNeedles' | 'roastedHazelnuts' | 'trailFood' | 'vegetables' | 'fish';
+export type KeptFood = 'hazelnut' | 'honey' | 'pineNeedles' | 'roastedHazelnuts' | 'trailFood' | 'vegetables' | 'fish' | 'rabbit';
 export type FoodItem = FreshFood | KeptFood;
 
-export const FOOD_ITEMS: readonly FoodItem[] = ['berry', 'greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood', 'vegetables', 'fish'];
+export const FOOD_ITEMS: readonly FoodItem[] = ['berry', 'greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood', 'vegetables', 'fish', 'rabbit'];
 
 export function isFresh(item: FoodItem): item is FreshFood {
   return item === 'berry' || item === 'greens';
@@ -22,7 +22,7 @@ export function foodCount(store: FoodStore, item: FoodItem): number {
   return isFresh(item) ? store[item].length : store[item];
 }
 
-const KEPT_FOODS: readonly KeptFood[] = ['hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood', 'vegetables', 'fish'];
+const KEPT_FOODS: readonly KeptFood[] = ['hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood', 'vegetables', 'fish', 'rabbit'];
 
 /** Kept food held, bag and larder together, wherever the survivor is: hazelnuts, honey, pine needles, roasted hazelnuts, rations, vegetables. */
 export function keptFoodTotal(state: GameState): number {
