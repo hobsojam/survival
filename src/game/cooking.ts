@@ -7,7 +7,7 @@ import { BALANCE, type GameState } from './state';
 // Cooking at the fire. Without the pot it is fish or one berry toasted on a stick; the pot, made at the toolshed,
 // adds tea, salad, roasted nuts, honey cake and, once the well stands, vegetable stew. Every dish needs a usable fire at home or camp.
 
-export type DishId = 'fish' | 'rabbit' | 'berries' | 'pineTea' | 'salad' | 'roastedHazelnuts' | 'honeyCake' | 'stew';
+export type DishId = 'fish' | 'rabbit' | 'berries' | 'pineTea' | 'salad' | 'roastedHazelnuts' | 'honeyCake' | 'stew' | 'loaf';
 
 export const DISHES: Record<DishId, { name: string; ingredients: Partial<Record<FoodItem, number>>; potOnly: boolean }> = {
   fish: { name: 'a fish', ingredients: { fish: 1 }, potOnly: false },
@@ -17,10 +17,12 @@ export const DISHES: Record<DishId, { name: string; ingredients: Partial<Record<
   salad: { name: 'greens and berry salad', ingredients: { greens: 1, berry: 1 }, potOnly: true },
   roastedHazelnuts: { name: 'roasted hazelnuts', ingredients: { hazelnut: 2 }, potOnly: true },
   honeyCake: { name: 'honey cake', ingredients: { honey: 1, hazelnut: 1, berry: 1 }, potOnly: true },
-  stew: { name: 'vegetable stew', ingredients: { vegetables: 2 }, potOnly: true }
+  stew: { name: 'vegetable stew', ingredients: { vegetables: 2 }, potOnly: true },
+  // Baked on the hot stones by the fire, so it needs no pot; the loaf is kept in the bag for later.
+  loaf: { name: 'a loaf of bread', ingredients: { flour: 1 }, potOnly: false }
 };
 
-export const DISH_ORDER: readonly DishId[] = ['fish', 'rabbit', 'berries', 'pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew'];
+export const DISH_ORDER: readonly DishId[] = ['fish', 'rabbit', 'berries', 'pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew', 'loaf'];
 
 export const POT_COST = { wood: 1, fiber: 0, stone: 2 } as const;
 
@@ -86,6 +88,7 @@ export function dishBlocker(state: GameState, dish: DishId): string | null {
   const paid = spendIngredients(state, dish);
   if (!paid) return `You need ${ingredientList(dish)} for ${DISHES[dish].name}.`;
   if (dish === 'roastedHazelnuts' && freeSpaces(paid) < 1) return 'Make room in your bag for the roasted hazelnuts.';
+  if (dish === 'loaf' && freeSpaces(paid) < 1) return 'Make room in your bag for the loaf.';
   return null;
 }
 
@@ -96,10 +99,14 @@ export function defaultDish(state: GameState): DishId | null {
 
 const up = (value: number, gain: number): number => Math.min(100, value + gain);
 
+/** The dishes kept in the bag for later rather than eaten at once, and what each leaves there. */
+const PACKED: Partial<Record<DishId, FoodItem>> = { roastedHazelnuts: 'roastedHazelnuts', loaf: 'bread' };
+
 /** The paid state with what a dish leaves in the bag, put there before the cooking time runs so a dawn's gift can't take its space. */
 export function packDish(paid: GameState, dish: DishId): GameState {
-  if (dish !== 'roastedHazelnuts') return paid;
-  return { ...paid, inventory: { ...paid.inventory, food: addFood(paid.inventory.food, 'roastedHazelnuts', 1, paid.day) } };
+  const kept = PACKED[dish];
+  if (!kept) return paid;
+  return { ...paid, inventory: { ...paid.inventory, food: addFood(paid.inventory.food, kept, 1, paid.day) } };
 }
 
 /** What a dish does once cooked: `cooked` has paid for it, been packed and spent the time; the rack is read from before. */
@@ -135,6 +142,10 @@ export function serveDish(cooked: GameState, dish: DishId, dryingRack: boolean):
     case 'honeyCake': return {
       state: { ...cooked, player: { ...player, hunger: up(player.hunger, BALANCE.honeyCakeHungerGain) }, cakeBonus: true },
       message: 'You bake a little honey cake. You will rest well tonight.'
+    };
+    case 'loaf': return {
+      state: cooked,
+      message: 'You bake a loaf on the hot stones by the fire and keep it for later.'
     };
     case 'stew': return {
       state: { ...cooked, player: { ...player, hunger: up(player.hunger, BALANCE.stewHungerGain), warmth: up(player.warmth, BALANCE.stewWarmthGain) } },

@@ -197,10 +197,13 @@ export function fishingLineView(state: GameState): ActionPanelView {
 
 export interface DishView { dish: Exclude<DishId, 'berries'>; name: string; icon: string; cost: string; disabled: boolean; title: string }
 
-/** The camp panel's dishes beyond a toasted berry: a fish whenever there is one, and the pot dishes once the pot is made. Each says why it can't be cooked yet. */
+/** Dishes offered only while their one ingredient is in reach: a fish, a rabbit, and a loaf from flour. */
+const OFFERED_WHEN_HELD: Partial<Record<DishId, FoodItem>> = { fish: 'fish', rabbit: 'rabbit', loaf: 'flour' };
+
+/** The camp panel's dishes beyond a toasted berry: a fish whenever there is one, a loaf whenever there is flour, and the pot dishes once the pot is made. Each says why it can't be cooked yet. */
 export function nightDishesView(state: GameState): DishView[] {
   const offered = (dish: DishId): dish is DishView['dish'] =>
-    dish === 'fish' || dish === 'rabbit' ? availableFood(state, dish) > 0 : DISHES[dish].potOnly && state.progress.potCrafted;
+    OFFERED_WHEN_HELD[dish] ? availableFood(state, OFFERED_WHEN_HELD[dish]) > 0 : DISHES[dish].potOnly && state.progress.potCrafted;
   return DISH_ORDER.filter(offered).map(dish => {
     const blocker = dishBlocker(state, dish);
     const name = capitalised(DISHES[dish].name);
@@ -282,10 +285,12 @@ const LAID_BY_HUNGER: Record<KeptFood, number> = {
   flour: BALANCE.breadHunger
 };
 
-/** Whole days of winter hunger the kept food in the bag and the larder would fill, up to the season's ten. */
+/** Whole days of winter hunger the kept food in the bag and the larder, and the granary's grain, would fill, up to the season's ten. */
 export function foodLaidByDays(state: GameState): number {
-  const hunger = (Object.keys(LAID_BY_HUNGER) as KeptFood[])
+  const kept = (Object.keys(LAID_BY_HUNGER) as KeptFood[])
     .reduce((total, item) => total + (state.inventory.food[item] + state.larder[item]) * LAID_BY_HUNGER[item], 0);
+  // The granary's grain counts as the loaves it would make, as flour does.
+  const hunger = kept + Math.floor(state.field.grain / BALANCE.grainPerFlour) * BALANCE.breadHunger;
   return Math.min(SEASON_LENGTH, Math.floor(hunger / HUNGER_A_DAY));
 }
 
@@ -338,7 +343,7 @@ export function startNote(save: LoadResult, storageAvailable: boolean): string {
   return 'A fresh camp is ready whenever you are.';
 }
 
-/** The Bag panel's forage cells, shown only while the bag holds some; all but pine needles can be eaten from here. */
+/** The Bag panel's forage cells, shown only while the bag holds some; all but pine needles, flour and the rabbit can be eaten from here. */
 export const BAG_FOODS = [
   { item: 'greens', label: 'Greens', eat: 'Eat a handful of greens' },
   { item: 'hazelnut', label: 'Hazelnuts', eat: 'Eat a hazelnut' },
@@ -347,6 +352,8 @@ export const BAG_FOODS = [
   { item: 'roastedHazelnuts', label: 'Roasted hazelnuts', eat: 'Eat the roasted hazelnuts' },
   { item: 'vegetables', label: 'Vegetables', eat: 'Eat some raw vegetables' },
   { item: 'fish', label: 'Fish', eat: 'Eat a raw fish' },
+  { item: 'bread', label: 'Bread', eat: 'Eat a loaf of bread' },
+  { item: 'flour', label: 'Flour', eat: null },
   // EASTER EGG: only ever brought by a wolf friend, and shown only while there is one. Left out of the
   // README on purpose; see the wolf's gift in src/game/companion.ts and AGENTS.md.
   { item: 'rabbit', label: 'Rabbit', eat: null }

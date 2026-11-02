@@ -63,8 +63,8 @@ describe('the cooking pot', () => {
 
 describe('the dishes', () => {
   it('lists every dish in order, and only a fish, a rabbit and berries cook without the pot', () => {
-    expect(DISH_ORDER).toEqual(['fish', 'rabbit', 'berries', 'pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew']);
-    expect(DISH_ORDER.filter(dish => !DISHES[dish].potOnly)).toEqual(['fish', 'rabbit', 'berries']);
+    expect(DISH_ORDER).toEqual(['fish', 'rabbit', 'berries', 'pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew', 'loaf']);
+    expect(DISH_ORDER.filter(dish => !DISHES[dish].potOnly)).toEqual(['fish', 'rabbit', 'berries', 'loaf']);
   });
 
   it('cooks berries without the pot exactly as before', () => {
@@ -132,7 +132,7 @@ describe('the dishes', () => {
     const ingredients: Record<keyof typeof DISHES, Partial<Record<FoodItem, number>>> = {
       fish: { fish: 1 }, rabbit: { rabbit: 1 }, berries: { berry: 1 }, pineTea: { pineNeedles: 1 },
       salad: { greens: 1, berry: 1 }, roastedHazelnuts: { hazelnut: 2 },
-      honeyCake: { honey: 1, hazelnut: 1, berry: 1 }, stew: { vegetables: 2 }
+      honeyCake: { honey: 1, hazelnut: 1, berry: 1 }, stew: { vegetables: 2 }, loaf: { flour: 1 }
     };
     for (const dish of DISH_ORDER) {
       const state = evening(ingredients[dish]);

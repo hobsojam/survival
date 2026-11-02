@@ -192,7 +192,7 @@ describe('sprite pipeline', () => {
 
 describe('food icons', () => {
   it('draws every food on the journal icon grid, each its own picture', () => {
-    expect(Object.keys(FOOD_ICONS).sort()).toEqual(['fish', 'greens', 'hazelnut', 'honey', 'honeyCake', 'pineNeedles', 'pineTea', 'rabbit', 'roastedHazelnuts', 'salad', 'stew', 'vegetables']);
+    expect(Object.keys(FOOD_ICONS).sort()).toEqual(['bread', 'fish', 'flour', 'greens', 'hazelnut', 'honey', 'honeyCake', 'loaf', 'pineNeedles', 'pineTea', 'rabbit', 'roastedHazelnuts', 'salad', 'stew', 'vegetables']);
     for (const [id, { legend, rows }] of Object.entries(FOOD_ICONS)) {
       expect(rows, id).toHaveLength(JOURNAL_ICON_SIZE);
       for (const row of rows) {
@@ -200,7 +200,9 @@ describe('food icons', () => {
         for (const pixel of row) if (pixel !== '.') expect(legend[pixel], `${id} '${pixel}'`).toBeDefined();
       }
     }
-    expect(new Set(Object.values(FOOD_ICONS).map(icon => icon.rows.join(''))).size).toBe(Object.keys(FOOD_ICONS).length);
+    // A loaf baked at the fire is the bread in the bag, so the two share one picture; every other food has its own.
+    expect(FOOD_ICONS.loaf).toBe(FOOD_ICONS.bread);
+    expect(new Set(Object.values(FOOD_ICONS).map(icon => icon.rows.join(''))).size).toBe(Object.keys(FOOD_ICONS).length - 1);
   });
 
   it('paints a food icon as a crisp SVG data URL', () => {

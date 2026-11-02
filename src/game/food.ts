@@ -14,6 +14,9 @@ export type FoodItem = FreshFood | KeptFood;
 
 export const FOOD_ITEMS: readonly FoodItem[] = ['berry', 'greens', 'bread', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood', 'vegetables', 'fish', 'rabbit', 'flour'];
 
+/** Fresh food in the order Q prefers it on a tie. */
+export const FRESH_FOODS: readonly FreshFood[] = ['berry', 'greens', 'bread'];
+
 export function isFresh(item: FoodItem): item is FreshFood {
   return item === 'berry' || item === 'greens' || item === 'bread';
 }
@@ -123,11 +126,14 @@ function oldestPick(state: GameState, item: FreshFood): number | null {
   return picks.length > 0 ? Math.min(...picks) : null;
 }
 
-/** What Q eats: the fresh item nearest to going soft (berry wins a tie), then hazelnut, honey, roasted hazelnuts, vegetables. Never pine needles or rations. */
+/** What Q eats: the fresh item nearest to going soft (berry, then greens, then bread on a tie), then hazelnut, honey, roasted hazelnuts, vegetables. Never pine needles or rations. */
 export function quickEatItem(state: GameState): FoodItem | null {
-  const berry = oldestPick(state, 'berry'), greens = oldestPick(state, 'greens');
-  if (berry !== null && (greens === null || berry <= greens)) return 'berry';
-  if (greens !== null) return 'greens';
+  let freshest: { item: FreshFood; picked: number } | null = null;
+  for (const item of FRESH_FOODS) {
+    const picked = oldestPick(state, item);
+    if (picked !== null && (freshest === null || picked < freshest.picked)) freshest = { item, picked };
+  }
+  if (freshest) return freshest.item;
   return (['hazelnut', 'honey', 'roastedHazelnuts', 'vegetables'] as const).find(item => availableFood(state, item) > 0) ?? null;
 }
 
@@ -138,7 +144,7 @@ const gone = (picked: number, day: number, keepDays: number): boolean => day - p
 export function spoil(store: FoodStore, day: number, keepDays: number): { store: FoodStore; lost: Record<FreshFood, number> } {
   const kept: FoodStore = { ...store };
   const lost: Record<FreshFood, number> = { berry: 0, greens: 0, bread: 0 };
-  for (const item of ['berry', 'greens'] as const) {
+  for (const item of FRESH_FOODS) {
     kept[item] = store[item].filter(picked => !gone(picked, day, keepDays));
     lost[item] = store[item].length - kept[item].length;
   }
@@ -161,8 +167,9 @@ export function spoilMessage(before: GameState, after: GameState): string | null
   if (!spoiled || spoiled.day === before.lastSpoiled?.day) return null;
   const text = [
     spoiled.berry ? quantity(spoiled.berry, 'a berry', 'berries') : '',
-    spoiled.greens ? quantity(spoiled.greens, 'a handful of greens', 'handfuls of greens') : ''
+    spoiled.greens ? quantity(spoiled.greens, 'a handful of greens', 'handfuls of greens') : '',
+    spoiled.bread ? quantity(spoiled.bread, 'a loaf', 'loaves') : ''
   ].filter(Boolean).join(' and ');
-  const them = spoiled.berry + spoiled.greens === 1 ? 'it' : 'them';
+  const them = spoiled.berry + spoiled.greens + spoiled.bread === 1 ? 'it' : 'them';
   return `${text[0].toUpperCase()}${text.slice(1)} had gone soft, so you threw ${them} out.`;
 }

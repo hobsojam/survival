@@ -10,7 +10,7 @@ import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, ma
 import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
 import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
-import { cutField, cutStripBlocker, seededField, sowStripBlocker, sownField, threshStripBlocker, threshedField, wildGrainBlocker } from './field';
+import { cutField, cutStripBlocker, grindGrainBlocker, seededField, sowStripBlocker, sownField, threshStripBlocker, threshedField, wildGrainBlocker } from './field';
 import { BED_CROPS, bedsDawn, drawWaterBlocker, emptyBed, harvestBedBlocker, needsWater, sowBedBlocker } from './beds';
 import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
 import { logsInStore } from './wood';
@@ -35,6 +35,7 @@ export type GameAction =
   | { type: 'sowStrip'; index: number }
   | { type: 'cutStrip'; index: number }
   | { type: 'threshStrip'; index: number }
+  | { type: 'grindGrain' }
   | { type: 'drawWater' }
   | { type: 'makeUpgrade'; upgrade: UpgradeId }
   | { type: 'eat'; item?: FoodItem }
@@ -881,6 +882,19 @@ const threshStrip: ActionHandler<'threshStrip'> = (state, action) => {
   return fieldWork(state, field, message);
 };
 
+/** The quern grinds a flour's grain from the granary into the bag, in the time and energy of a gather. */
+const grindGrain: ActionHandler<'grindGrain'> = state => {
+  const blocker = grindGrainBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  const ground = {
+    ...state,
+    field: { ...state.field, grain: state.field.grain - BALANCE.grainPerFlour },
+    inventory: { ...state.inventory, food: addFood(state.inventory.food, 'flour', 1, state.day) },
+    player: tire(state, BALANCE.gatherEnergyCost)
+  };
+  return { state: advanceTime(ground, workSeconds(state, BALANCE.gatherSeconds), 'working'), message: 'You grind a little grain into flour.' };
+};
+
 /** One bucket from the well waters every bed still growing, for today. It takes the time and energy of gathering. */
 const drawWater: ActionHandler<'drawWater'> = state => {
   const blocker = drawWaterBlocker(state);
@@ -1014,7 +1028,7 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak,
+  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak,
   makeFishingLine, fish
 };
 

@@ -1,15 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { CLEARING_STEPS, STEP_IDS, inClearing, placeBranches } from '../src/game/clearing';
-import { FIELD_STRIPS, cutStripBlocker, emptyField, ripeDay, sowStripBlocker, stripStage, threshGrain, threshStripBlocker, wildGrainBlocker, type FieldState, type FieldStrip } from '../src/game/field';
+import { FIELD_STRIPS, cutStripBlocker, emptyField, ripeDay, sowStripBlocker, stripStage, threshGrain, threshStripBlocker, wildGrainBlocker } from '../src/game/field';
 import { TOO_TIRED_MESSAGE, workSeconds } from '../src/game/needs';
 import { advanceTime, applyAction } from '../src/game/rules';
 import { nodeShown } from '../src/game/forage';
 import { upgradeBlocker } from '../src/game/workshop';
 import { loadGame, saveGame, SAVE_KEY } from '../src/game/save';
-
-const { campX, campY } = BALANCE;
-const SOUTH: GameState['clearing']['cleared'] = ['south-near', 'south-far'];
+import { fieldCamp, strip, withField } from './fieldCamp';
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();
@@ -20,25 +18,6 @@ class MemoryStorage implements Storage {
   setItem(key: string, value: string): void { this.data.set(key, value); }
   removeItem(key: string): void { this.data.delete(key); }
 }
-
-/** A camp past its cold night with the south ground cleared, standing at the fire; the field, granary and workshop as asked. */
-export function fieldCamp(structures: Partial<GameState['structures']> = {}, changes: Partial<GameState> = {}): GameState {
-  const base = createGame();
-  const placed = placeBranches(base.nodes, SOUTH);
-  return {
-    ...base,
-    day: 22,
-    nodes: base.nodes.map((node, i) => ({ ...node, x: placed[i].x, y: placed[i].y })),
-    clearing: { cleared: SOUTH, marked: null, felled: [] },
-    progress: { ...base.progress, nextStormDay: null, hearthUnlocked: true },
-    structures: { ...base.structures, field: true, ...structures },
-    player: { ...base.player, x: campX, y: campY },
-    ...changes
-  };
-}
-
-export const strip = (changes: Partial<FieldStrip> = {}): FieldStrip => ({ sownDay: null, cut: false, ...changes });
-export const withField = (state: GameState, field: Partial<FieldState>): GameState => ({ ...state, field: { ...state.field, ...field } });
 
 /** Saves a state and loads it back, as the game would. */
 function roundTrip(state: GameState) {

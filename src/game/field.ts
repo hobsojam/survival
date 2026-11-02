@@ -1,5 +1,5 @@
 import { YEAR_LENGTH, isSpring, isSummer, yearOf } from './calendar';
-import { isInClearing } from './camp';
+import { freeSpaces, isInClearing } from './camp';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { BALANCE, type GameState } from './state';
 
@@ -122,3 +122,14 @@ export function wildGrainBlocker(state: GameState): string | null {
 
 /** The field with one more strip's seed, from the wild grain. */
 export const seededField = (state: GameState): FieldState => ({ ...state.field, seed: state.field.seed + 1 });
+
+/** Why grain can't be ground into flour now, or null: at the granary, with the quern, a flour's grain, and room for it. */
+export function grindGrainBlocker(state: GameState): string | null {
+  if (!state.structures.granary) return 'Build the granary first.';
+  if (!state.progress.workshop.quern) return 'Make a hand quern at the workshop first.';
+  if (!isInClearing(state)) return 'Return to camp to grind grain.';
+  if (state.field.grain < BALANCE.grainPerFlour) return 'There isn\'t enough grain in the granary to grind.';
+  if (freeSpaces(state) < 1) return 'Make room in your bag for the flour.';
+  if (isExhausted(state)) return TOO_TIRED_MESSAGE;
+  return null;
+}
