@@ -33,6 +33,16 @@ describe('gathering and inventory', () => {
     expect(applyAction(prepared, { type: 'gather', nodeId: 'branch-0' }).state).toBe(prepared);
   });
 
+  it('prepares a trail ration anywhere in the clearing, not only beside the fire', () => {
+    const state = createGame();
+    state.inventory.food = stock(1);
+    state.structures.dryingRack = true;
+    state.clearing = { cleared: ['east-near'], marked: null, felled: [] };
+    state.player.x = BALANCE.campX + 5.5;
+    expect(isInClearing(state) && !isAtCamp(state)).toBe(true);
+    expect(applyAction(state, { type: 'prepareTrailFood' }).state.inventory.food.trailFood).toBe(1);
+  });
+
   it('eats a ration anywhere for 45 hunger and consumes exactly one', () => {
     const state = createGame();
     state.player.x = 0;

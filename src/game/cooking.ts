@@ -42,7 +42,7 @@ function cookingFireBlocker(state: GameState): string | null {
     if (!isAtHome(state)) return 'Go home to cook.';
     return fuelLeft(state) <= 0 ? 'The fireplace is out. Stock the wood store.' : null;
   }
-  if (!isAtCamp(state)) return 'Return to camp to cook.';
+  if (!isAtCamp(state)) return isInClearing(state) ? 'Move closer to the fire to cook.' : 'Return to camp to cook.';
   return state.fireFuel <= 0 ? 'Light the campfire before cooking.' : null;
 }
 
