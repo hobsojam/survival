@@ -39,7 +39,7 @@ This was the user's choice: bread from the first harvest, with the mill and bake
 ## Anti-goals (a failure even if it technically works)
 
 - **A food mountain.** This was the user's strongest concern: the field should make life easier, not bury the player in food. Three rules guard against it:
-  1. **One harvest is sized to one winter.** It gives about 15–20 loaves' worth of grain and no more.
+  1. **One harvest is sized to one winter.** It gives about 8 loaves' worth of grain and no more.
   2. **The granary holds exactly one harvest.** Grain left over from last year partly fills it, and a new harvest only tops it back up to full. Threshed grain that won't fit is simply not gathered. Grain can never pile up over the years.
   3. **Grain stays as grain until it is used.** The player grinds and bakes a little at a time. Bread is fresh food and goes soft like berries *(my call)*, so baking a stockpile of loaves doesn't pay.
 - **A daily chore.** The field needs no visit between sowing and harvest.
@@ -108,7 +108,7 @@ The year runs autumn, winter, spring, summer, with 10 days to a season (`src/gam
 - **Grinding:** at the granary, with the quern, one action turns a little grain into **flour** in the bag. *(Amounts are the builder's call, for example 2 grain to 1 flour.)* Flour takes one bag space, can go in the larder, and never spoils.
 - **Baking:** a **loaf** is a new dish baked from flour at the cooking fire (the campfire, or the house's fireplace once the survivor lives there). Baking doesn't need the pot, and it needs no water, so the well isn't required. *(My call.)*
 - **Eating:** a loaf is one of the most filling foods, on a par with stew and honey cake *(the exact hunger value is the builder's call)*. It is fresh food: it goes soft after a few dawns in the bag, or a few more in the larder, like berries.
-- **Sizing:** a full field's grain bakes about 15–20 loaves. With winter at 10 days, that's enough to eat bread through the whole season without foraging, and not much more. *(These numbers are a starting point. The builder tunes the yield, the grind ratio and the hunger value together so that one harvest is about one winter.)*
+- **Sizing:** the survivor loses about 30 hunger a day (`hungerLoss` in `src/game/rules.ts`), so winter's 10 days need about 300. A full field's grain bakes **8 loaves** at 50 hunger each, which is 400 hunger. That's enough to eat bread through the whole season without foraging, with a little to spare for loaves eaten before hunger is low. *(Corrected while planning: the brainstorm's rough figure of 15–20 loaves would have been about three winters' worth, the food mountain the user ruled out.)* *(These numbers are a starting point. The builder tunes the yield, the grind ratio and the hunger value together so that one harvest is about one winter.)*
 
 ## How the player learns this
 
