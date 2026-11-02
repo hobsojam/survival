@@ -179,7 +179,7 @@ describe('the beehive in camp', () => {
     sceneVisuals(state, timeMs).filter(visual => visual.id === 'beehive' || visual.id === 'beehiveSite').map(visual => visual.texture);
 
   it('stands east of the house on the north far ground', () => {
-    expect(CAMP_STRUCTURES).toContainEqual(['beehive', 1.75, -7.25]);
+    expect(CAMP_STRUCTURES).toContainEqual(['beehive', 2, -7]);
     expect(inClearing(spot().x, spot().y, ['north-near', 'north-far'])).toBe(true);
     expect(inClearing(spot().x, spot().y, ['north-near'])).toBe(false);
   });
