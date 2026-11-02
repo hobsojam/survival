@@ -10,6 +10,7 @@ import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, ma
 import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
 import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
+import { cutField, cutStripBlocker, sowStripBlocker, sownField, threshStripBlocker, threshedField } from './field';
 import { BED_CROPS, bedsDawn, drawWaterBlocker, emptyBed, harvestBedBlocker, needsWater, sowBedBlocker } from './beds';
 import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
 import { logsInStore } from './wood';
@@ -31,6 +32,9 @@ export type GameAction =
   | { type: 'harvestGarden'; plotIndex: number }
   | { type: 'sowBed'; index: number }
   | { type: 'harvestBed'; index: number }
+  | { type: 'sowStrip'; index: number }
+  | { type: 'cutStrip'; index: number }
+  | { type: 'threshStrip'; index: number }
   | { type: 'drawWater' }
   | { type: 'makeUpgrade'; upgrade: UpgradeId }
   | { type: 'eat'; item?: FoodItem }
@@ -834,6 +838,37 @@ const harvestBed: ActionHandler<'harvestBed'> = (state, action) => {
   return { state: advanceTime(harvested, workSeconds(state, BALANCE.gatherSeconds), 'working'), message: `Harvested the ${BED_CROPS[action.index]}.` };
 };
 
+/** Sowing a strip spends a strip's seed, in the time and energy of planting. */
+const sowStrip: ActionHandler<'sowStrip'> = (state, action) => {
+  const blocker = sowStripBlocker(state, action.index);
+  if (blocker) return refuse(state, blocker);
+  return {
+    state: advanceTime({ ...state, field: sownField(state, action.index), player: tire(state, BALANCE.gatherEnergyCost) }, workSeconds(state, BALANCE.gatherSeconds), 'working'),
+    message: 'Sowed a strip of grain.'
+  };
+};
+
+/** Cutting and threshing a strip are the heavy work of the harvest. */
+function fieldWork(state: GameState, field: GameState['field'], message: string): ActionResult {
+  return {
+    state: advanceTime({ ...state, field, player: tire(state, BALANCE.fieldWorkEnergy) }, workSeconds(state, BALANCE.fieldWorkSeconds), 'working'),
+    message
+  };
+}
+
+const cutStrip: ActionHandler<'cutStrip'> = (state, action) => {
+  const blocker = cutStripBlocker(state, action.index);
+  if (blocker) return refuse(state, blocker);
+  return fieldWork(state, cutField(state, action.index), 'Cut the strip and stood the sheaves in stooks.');
+};
+
+const threshStrip: ActionHandler<'threshStrip'> = (state, action) => {
+  const blocker = threshStripBlocker(state, action.index);
+  if (blocker) return refuse(state, blocker);
+  const { field, message } = threshedField(state, action.index);
+  return fieldWork(state, field, message);
+};
+
 /** One bucket from the well waters every bed still growing, for today. It takes the time and energy of gathering. */
 const drawWater: ActionHandler<'drawWater'> = state => {
   const blocker = drawWaterBlocker(state);
@@ -967,7 +1002,7 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak,
+  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak,
   makeFishingLine, fish
 };
 
