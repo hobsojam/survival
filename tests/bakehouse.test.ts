@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, BUILDINGS, createGame, type GameState } from '../src/game/state';
 import { loadGame, SAVE_KEY, SAVE_VERSION } from '../src/game/save';
-import { applyAction, groundBlocker } from '../src/game/rules';
-import { millGrainBlocker, milledFlour } from '../src/game/bakehouse';
+import { advanceTime, applyAction, groundBlocker } from '../src/game/rules';
+import { bakeryNews, millGrainBlocker, milledFlour, takeLoafBlocker } from '../src/game/bakehouse';
+import { newsBetween } from '../src/game/news';
 import { addFood, availableFood, emptyFood, reachableMillFlour, spendFood } from '../src/game/food';
 import { dishBlocker } from '../src/game/cooking';
 import { nightStart } from '../src/game/calendar';
@@ -145,5 +146,72 @@ describe('baking at the fire from the mill\'s flour', () => {
     expect(dishBlocker({ ...full, inventory: { ...full.inventory, wood: 8 } }, 'loaf')).toBe('Make room in your bag for the loaf.');
     const withBagFlour = evening({ millFlour: 3 }, 1);
     expect(dishBlocker({ ...withBagFlour, inventory: { ...withBagFlour.inventory, wood: 7 } }, 'loaf')).toBeNull();
+  });
+});
+
+/** The state just before dawn, rested through it into the next day. */
+const acrossDawn = (state: GameState): GameState => advanceTime({ ...state, timeOfDay: BALANCE.daySeconds - 1 }, 2, 'resting');
+const away = (state: GameState): GameState => ({ ...state, player: { ...state.player, x: 2, y: 2 } });
+
+describe('the morning loaf', () => {
+  it('bakes one loaf at dawn from the mill\'s flour, wherever the survivor is', () => {
+    const after = acrossDawn(away(bakehouseCamp({ millFlour: 3 })));
+    expect(after.day).toBe(23);
+    expect(after.millFlour).toBe(2);
+    expect(after.bakery).toEqual({ shelf: [23], lastBaked: 23 });
+  });
+
+  it('waits while the shelf is full or the bin is empty, using nothing', () => {
+    expect(acrossDawn(bakehouseCamp({ millFlour: 3, shelf: [21, 22], lastBaked: 22 }))).toMatchObject({ millFlour: 3, bakery: { shelf: [21, 22], lastBaked: 22 } });
+    expect(acrossDawn(bakehouseCamp({ millFlour: 0, lastBaked: 20 })).bakery).toEqual({ shelf: [], lastBaked: 20 });
+    expect(acrossDawn(bakehouseCamp({ millFlour: 3, bakery: false })).millFlour).toBe(3);
+  });
+
+  it('throws out a shelf loaf five dawns after baking, then bakes into the space', () => {
+    const after = acrossDawn(bakehouseCamp({ millFlour: 1, shelf: [18, 21], lastBaked: 21 }));
+    expect(after.bakery.shelf).toEqual([21, 23]);
+    expect(after.lastSpoiled).toEqual({ day: 23, berry: 0, greens: 0, bread: 1 });
+  });
+
+  it('keeps a shelf loaf through its fourth dawn', () => {
+    expect(acrossDawn(bakehouseCamp({ shelf: [19] })).bakery.shelf).toEqual([19]);
+  });
+
+  it('says so on the first bake and after a pause, never two mornings running', () => {
+    const pair = (lastBaked: number | null, millFlour: number) => {
+      const before = bakehouseCamp({ millFlour, lastBaked });
+      return [before, acrossDawn(before)] as const;
+    };
+    expect(bakeryNews(...pair(null, 1))).toBe('Fresh bread from the oven this morning.');
+    expect(bakeryNews(...pair(22, 1))).toBeNull();
+    expect(bakeryNews(...pair(20, 1))).toBe('Fresh bread from the oven this morning.');
+    expect(bakeryNews(...pair(20, 0))).toBeNull();
+    const before = bakehouseCamp({ millFlour: 1 });
+    expect(newsBetween(before, acrossDawn(before))).toContain('Fresh bread from the oven this morning.');
+  });
+});
+
+describe('taking a loaf', () => {
+  it('moves the oldest shelf loaf into the bag, keeping its bake day, in no time', () => {
+    const before = bakehouseCamp({ shelf: [20, 22], lastBaked: 22 });
+    const { state: after, message } = applyAction(before, { type: 'takeLoaf' });
+    expect(after.bakery.shelf).toEqual([22]);
+    expect(after.inventory.food.bread).toEqual([20]);
+    expect(after.timeOfDay).toBe(before.timeOfDay);
+    expect(message).toBe('You take a loaf from the bakery shelf.');
+  });
+
+  it('refuses with no bakery, away from camp, an empty shelf, or a full bag', () => {
+    expect(takeLoafBlocker(bakehouseCamp({ bakery: false }))).toBe('Build the bakery first.');
+    expect(takeLoafBlocker(away(bakehouseCamp({ shelf: [22], lastBaked: 22 })))).toBe('Return to camp to take a loaf.');
+    expect(takeLoafBlocker(bakehouseCamp())).toBe('There\'s no loaf on the shelf yet.');
+    const full = bakehouseCamp({ shelf: [22], lastBaked: 22 });
+    expect(takeLoafBlocker({ ...full, inventory: { ...full.inventory, wood: 8 } })).toBe('Make room in your bag for the loaf.');
+    expect(takeLoafBlocker(full)).toBeNull();
+  });
+
+  it('lets a four-day-old loaf taken into the bag go soft at the next dawn, by the bag\'s rule', () => {
+    const taken = applyAction(bakehouseCamp({ shelf: [19], lastBaked: 19 }), { type: 'takeLoaf' }).state;
+    expect(acrossDawn(taken).inventory.food.bread).toEqual([]);
   });
 });
