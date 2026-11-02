@@ -678,6 +678,7 @@ const eatTrailFood: ActionHandler<'eatTrailFood'> = eatRation;
 const eat: ActionHandler<'eat'> = (state, action) => {
   const item = action.item ?? quickEatItem(state);
   if (item === 'pineNeedles') return refuse(state, 'Pine needles are for tea.');
+  if (item === 'rabbit') return refuse(state, 'Roast the rabbit at the fire first.');
   if (item === 'trailFood') return eatRation(state);
   const fed = item && spendFood(state, item, 1);
   if (!item || !fed) return refuse(state, 'No food in your bag.');

@@ -270,14 +270,14 @@ describe('bag panel', () => {
     expect(foods.roastedHazelnuts.shown).toBe(false);
   });
 
-  it('draws each forage cell with its icon, and an Eat button for all but pine needles', () => {
-    expect(BAG_FOODS.map(cell => cell.item)).toEqual(['greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'vegetables', 'fish']);
+  it('draws each forage cell with its icon, and an Eat button for all but pine needles and the rabbit', () => {
+    expect(BAG_FOODS.map(cell => cell.item)).toEqual(['greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'vegetables', 'fish', 'rabbit']);
     const markup = bagFoodMarkup();
     for (const { item } of BAG_FOODS) {
       const cell = markup.split('</div>').find(part => part.includes(`data-food="${item}"`))!;
       expect(cell, item).toContain('src="data:image/svg+xml,');
       expect(cell, item).toContain(`id="${item}-count"`);
-      expect(cell.includes(`data-action="eat" data-item="${item}"`), item).toBe(item !== 'pineNeedles');
+      expect(cell.includes(`data-action="eat" data-item="${item}"`), item).toBe(item !== 'pineNeedles' && item !== 'rabbit');
     }
   });
 

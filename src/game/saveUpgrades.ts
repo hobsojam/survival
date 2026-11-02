@@ -4,7 +4,7 @@
 // anything the player had. Loading runs every step a save needs, in order, then validates the result as usual.
 
 /** The saved shape's version. Bump it by one with every change to the shape, and add its upgrade step below. */
-export const SAVE_VERSION = 24;
+export const SAVE_VERSION = 25;
 
 /** The oldest save that can still be brought up to date: earlier formats were never upgraded and don't load. */
 export const OLDEST_UPGRADABLE_VERSION = 23;
@@ -27,6 +27,13 @@ export const SAVE_UPGRADES: Readonly<Record<number, SaveUpgrade>> = {
       progress: { ...state.progress, fishingLine: false },
       inventory: { ...state.inventory, food: { ...state.inventory.food, fish: 0 } },
       larder: { ...state.larder, fish: 0 } };
+  },
+  // Version 25: a wolf friend can bring rabbits home in winter. An older camp has none.
+  24: old => {
+    const state = old as Upgradable & { inventory: Upgradable & { food: Upgradable }; larder: Upgradable };
+    return { ...state,
+      inventory: { ...state.inventory, food: { ...state.inventory.food, rabbit: 0 } },
+      larder: { ...state.larder, rabbit: 0 } };
   }
 };
 

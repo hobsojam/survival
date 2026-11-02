@@ -134,6 +134,13 @@ export function companionDawn(next: GameState): void {
     changes = { ...changes, lastGift: next.day };
     next.inventory = { ...next.inventory, food: addFood(next.inventory.food, 'berry', 1, next.day) };
   }
+  // A wolf friend hunts in winter, and now and then brings a rabbit home, like a dog with a stick.
+  // EASTER EGG: the rabbit is deliberately left out of the README and hidden on screen until the first
+  // one arrives, so finding it is a surprise. Don't document it for players. See AGENTS.md.
+  if (companion.friend === 'wolf' && home && isWinter(next.day) && next.day - companion.lastGift >= BALANCE.rabbitEveryDays && freeSpaces(next) >= 1) {
+    changes = { ...changes, lastGift: next.day };
+    next.inventory = { ...next.inventory, food: addFood(next.inventory.food, 'rabbit', 1, next.day) };
+  }
   next.companion = { ...companion, ...changes };
 }
 
@@ -151,6 +158,7 @@ export function companionNews(before: GameState, after: GameState): string[] {
   const piece = keepsakeKind(friend) === 'feather' ? 'a feather' : 'a tuft of fur';
   const news: string[] = [];
   if (after.companion.lastGift > before.companion.lastGift && friend === 'fox') news.push('The fox left a berry by your bedroll.');
+  if (after.companion.lastGift > before.companion.lastGift && friend === 'wolf') news.push('Your wolf left a rabbit by your bedroll.');
   if (after.companion.keepsakeLying && !before.companion.keepsakeLying) news.push(`${piece[0].toUpperCase()}${piece.slice(1)} lies by the fire.`);
   if (after.companion.keepsakes > before.companion.keepsakes) news.push(`You found ${piece} by the fire.`);
   return news;
