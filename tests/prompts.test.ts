@@ -3,7 +3,7 @@ import { nightStart } from '../src/game/calendar';
 import { BALANCE, LOOKOUT, SITES, createGame, type GameState } from '../src/game/state';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { markedTrees } from '../src/game/clearing';
-import { KEY_ACTIONS, actionPose, closestSite, closestTree, gatherKeyAction, gatherSpot, promptFor } from '../src/scene/prompts';
+import { KEY_ACTIONS, actionPose, closestSite, closestTree, gatherSpot, promptFor, useKeyAction } from '../src/scene/prompts';
 import { stock } from './stock';
 import { addFood, emptyFood } from '../src/game/food';
 
@@ -17,38 +17,38 @@ const at = (state: GameState, x: number, y: number): GameState => ({ ...state, p
 
 describe('camp prompts', () => {
   it('offers cooking, fire, rest and building by day at camp', () => {
-    expect(promptFor(bareCamp())).toBe('At camp · C Cook · F Fire · R Rest · Click an upgrade to build');
+    expect(promptFor(bareCamp())).toBe('At camp · Cook · Feed the fire · R Rest · Click an upgrade to build');
   });
 
   it('names a daytime meal when the fire is lit', () => {
     const camp = bareCamp();
     const ready = { ...camp, fireFuel: 30, companion: { ...camp.companion, lastOffer: { bird: 1, fox: 1, wolf: 1 } },
       inventory: { ...camp.inventory, food: stock(1) } };
-    expect(promptFor(ready)).toBe('C  Cook a berry · F Fire · R Rest · Click an upgrade to build');
+    expect(promptFor(ready)).toBe('Cook a berry · Feed the fire · R Rest · Click an upgrade to build');
   });
 
   it('offers only clearing comforts on grown ground away from the fire', () => {
     const state = { ...createGame(), nodes: [], trees: [], clearing: { cleared: ['east-near' as const], marked: null, felled: [] } };
-    expect(promptFor(at(state, BALANCE.campX + 6, BALANCE.campY))).toBe('In the clearing · G Stargaze · Click an upgrade to build');
+    expect(promptFor(at(state, BALANCE.campX + 6, BALANCE.campY))).toBe('In the clearing · Watch the stars · Click an upgrade to build');
   });
 
   it('offers night comforts at camp after dark', () => {
-    expect(promptFor({ ...bareCamp(), timeOfDay: nightStart(1) + 1 })).toBe('At camp · C Cook · G Stargaze · F Fire · R Rest');
+    expect(promptFor({ ...bareCamp(), timeOfDay: nightStart(1) + 1 })).toBe('At camp · Cook · Watch the stars · Feed the fire · R Rest');
   });
 
   it('offers sleep at camp once sleep is allowed', () => {
     const state = { ...bareCamp(), timeOfDay: nightStart(1) + 1, structures: { ...createGame().structures, shelter: true } };
-    expect(promptFor(state)).toBe('At camp · C Cook · G Stargaze · Z Sleep · F Fire');
+    expect(promptFor(state)).toBe('At camp · Cook · Watch the stars · Z Sleep · Feed the fire');
   });
 
   it('names the dish C would cook after dark', () => {
     // Every animal has had its offering today, so the berry is left for the pot.
     const camp = bareCamp();
     const night = { ...camp, timeOfDay: nightStart(1) + 1, fireFuel: 30, companion: { ...camp.companion, lastOffer: { bird: 1, fox: 1, wolf: 1 } } };
-    expect(promptFor({ ...night, inventory: { ...night.inventory, food: stock(1) } })).toBe('C  Cook a berry · G Stargaze · F Fire · R Rest');
+    expect(promptFor({ ...night, inventory: { ...night.inventory, food: stock(1) } })).toBe('Cook a berry · Watch the stars · Feed the fire · R Rest');
     const tea = { ...night, progress: { ...night.progress, potCrafted: true },
       inventory: { ...night.inventory, food: addFood(emptyFood(), 'pineNeedles', 1, 1) } };
-    expect(promptFor(tea)).toBe('C  Cook pine needle tea · G Stargaze · F Fire · R Rest');
+    expect(promptFor(tea)).toBe('Cook pine needle tea · Watch the stars · Feed the fire · R Rest');
   });
 
   it('shows movement help away from camp with nothing nearby', () => {
@@ -97,14 +97,14 @@ describe('camp prompts', () => {
     const damaged = bareCamp(LOOKOUT.x, LOOKOUT.y);
     expect(promptFor(damaged)).toBe('Lookout · weather the cold night first');
     const repairable = { ...damaged, progress: { ...damaged.progress, hearthUnlocked: true } };
-    expect(promptFor(repairable)).toBe('L  Repair lookout');
+    expect(promptFor(repairable)).toBe('E  Repair lookout');
     expect(promptFor({ ...repairable, progress: { ...repairable.progress, lookoutRepaired: true } })).toBe('The lookout stands again');
   });
 
   it('describes a nearby tree by axe and regrowth', () => {
     const state = { ...bareCamp(5, 25), trees: [{ id: 't', x: 5, y: 25, sprite: 'treePine' as const, readyDay: 1 }] };
     expect(promptFor(state)).toBe('Mature tree · craft an axe at camp');
-    expect(promptFor({ ...state, progress: { ...state.progress, axeCrafted: true } })).toBe('X  Chop mature tree');
+    expect(promptFor({ ...state, progress: { ...state.progress, axeCrafted: true } })).toBe('E  Chop mature tree');
     expect(promptFor({ ...state, trees: [{ ...state.trees[0], readyDay: 9 }] })).toBe('Stump · regrows day 9');
   });
 
@@ -113,7 +113,7 @@ describe('camp prompts', () => {
     const [, second] = markedTrees(marked);
     const beside = at(marked, second.x, second.y);
     expect(closestTree(beside)?.id).toBe('mark-north-near-1');
-    expect(promptFor(beside)).toBe('X  Chop mature tree');
+    expect(promptFor(beside)).toBe('E  Chop mature tree');
     expect(gatherSpot({ type: 'chopTree', treeId: 'mark-north-near-1' }, marked)).toEqual({ x: second.x, y: second.y, kind: 'branch' });
     const felled = { ...beside, clearing: { ...marked.clearing, felled: [1] } };
     expect(promptFor(felled)).toBe('Stump · this ground is being cleared');
@@ -125,9 +125,17 @@ describe('camp prompts', () => {
     expect(promptFor(state)).toBe('E  Gather fiber · Mature tree · craft an axe at camp');
   });
 
+  it('puts E on the first thing it would use, and names the rest plainly for a click', () => {
+    const tree = { id: 't', x: 5, y: 25, sprite: 'treePine' as const, readyDay: 1 };
+    const state = { ...bareCamp(5, 25), trees: [tree], progress: { ...createGame().progress, axeCrafted: true },
+      nodes: [{ id: 'f', kind: 'fiber' as const, x: 5, y: 25, amount: 1, readyDay: 1 }] };
+    expect(promptFor(state)).toBe('E  Gather fiber · Chop mature tree');
+    expect(promptFor({ ...state, nodes: [] })).toBe('E  Chop mature tree');
+  });
+
   it('offers to explore a site along the path', () => {
     const { x, y } = SITES.cairn;
-    expect(promptFor(bareCamp(x, y))).toBe('V  Explore nearby place');
+    expect(promptFor(bareCamp(x, y))).toBe('E  Explore nearby place');
   });
 });
 
@@ -188,16 +196,38 @@ describe('closest tree and site', () => {
 describe('the E key', () => {
   it('gathers the nearest node, pile, rubble or quarry face', () => {
     const state = bareCamp(5, 25);
-    expect(gatherKeyAction({ ...state, nodes: [{ id: 'n', kind: 'berry', x: 5, y: 25, amount: 1, readyDay: 1 }] })).toEqual({ type: 'gather', nodeId: 'n' });
-    expect(gatherKeyAction({ ...state, stonePiles: [{ id: 'p', x: 5, y: 25, count: 1, area: 'camp' }] })).toEqual({ type: 'pickUpStone', pileId: 'p' });
+    expect(useKeyAction({ ...state, nodes: [{ id: 'n', kind: 'berry', x: 5, y: 25, amount: 1, readyDay: 1 }] })).toEqual({ type: 'gather', nodeId: 'n' });
+    expect(useKeyAction({ ...state, stonePiles: [{ id: 'p', x: 5, y: 25, count: 1, area: 'camp' }] })).toEqual({ type: 'pickUpStone', pileId: 'p' });
     const quarry = { ...state, area: 'quarry' as const, progress: { ...state.progress, pickaxeCrafted: true } };
-    expect(gatherKeyAction(at(quarry, RUBBLE_SITE.x, RUBBLE_SITE.y))).toEqual({ type: 'gatherRubble' });
-    expect(gatherKeyAction(at(quarry, QUARRY_SITE.x, QUARRY_SITE.y))).toEqual({ type: 'digQuarry' });
+    expect(useKeyAction(at(quarry, RUBBLE_SITE.x, RUBBLE_SITE.y))).toEqual({ type: 'gatherRubble' });
+    expect(useKeyAction(at(quarry, QUARRY_SITE.x, QUARRY_SITE.y))).toEqual({ type: 'digQuarry' });
   });
 
-  it('rests at camp when there is nothing to gather, and does nothing elsewhere', () => {
-    expect(gatherKeyAction(bareCamp())).toEqual({ type: 'rest' });
-    expect(gatherKeyAction(bareCamp(5, 25))).toBeUndefined();
+  it('also repairs the lookout, explores a place, chops a tree and leaves an offering, as a tap would', () => {
+    const lookout = bareCamp(LOOKOUT.x, LOOKOUT.y);
+    expect(useKeyAction({ ...lookout, progress: { ...lookout.progress, hearthUnlocked: true } })).toEqual({ type: 'repairLookout' });
+    expect(useKeyAction(bareCamp(SITES.spring.x, SITES.spring.y))).toEqual({ type: 'visitSite', siteId: 'spring' });
+    const tree = { ...bareCamp(5, 25), trees: [{ id: 't', x: 5, y: 25, sprite: 'treePine' as const, readyDay: 1 }] };
+    expect(useKeyAction({ ...tree, progress: { ...tree.progress, axeCrafted: true } })).toEqual({ type: 'chopTree', treeId: 't' });
+    const dusk = { ...bareCamp(), timeOfDay: nightStart(1) - 5, inventory: { ...createGame().inventory, food: stock(1) } };
+    expect(useKeyAction(dusk)).toEqual({ type: 'befriend' });
+  });
+
+  it('gathers before anything else in reach', () => {
+    const state = { ...bareCamp(5, 25), progress: { ...createGame().progress, axeCrafted: true },
+      trees: [{ id: 't', x: 5, y: 25, sprite: 'treePine' as const, readyDay: 1 }], nodes: [{ id: 'f', kind: 'fiber' as const, x: 5, y: 25, amount: 1, readyDay: 1 }] };
+    expect(useKeyAction(state)).toEqual({ type: 'gather', nodeId: 'f' });
+  });
+
+  it("doesn't use a tree there is no axe for, or a lookout not yet ready", () => {
+    const tree = { ...bareCamp(5, 25), trees: [{ id: 't', x: 5, y: 25, sprite: 'treePine' as const, readyDay: 1 }] };
+    expect(useKeyAction(tree)).toBeUndefined();
+    expect(useKeyAction(bareCamp(LOOKOUT.x, LOOKOUT.y))).toBeUndefined();
+  });
+
+  it('rests at camp when there is nothing to use, and does nothing elsewhere', () => {
+    expect(useKeyAction(bareCamp())).toEqual({ type: 'rest' });
+    expect(useKeyAction(bareCamp(5, 25))).toBeUndefined();
   });
 });
 
@@ -240,7 +270,7 @@ describe('winter prompts', () => {
     const bush = createGame().nodes.find(node => node.id === 'berry-0')!;
     const winter = { ...bareCamp(bush.x, bush.y), day: 12, nodes: [bush] };
     expect(promptFor(winter)).toContain('E  Search the bare bush');
-    expect(gatherKeyAction(winter)).toEqual({ type: 'gather', nodeId: 'berry-0' });
+    expect(useKeyAction(winter)).toEqual({ type: 'gather', nodeId: 'berry-0' });
     expect(promptFor({ ...winter, day: 2 })).toContain('E  Pick berries');
   });
 });
@@ -248,13 +278,13 @@ describe('winter prompts', () => {
 describe('offering prompts', () => {
   it('offers the fox a berry with O while it sits at dusk', () => {
     const dusk = { ...bareCamp(), timeOfDay: nightStart(1) - 5, inventory: { ...createGame().inventory, food: stock(1) } };
-    expect(promptFor(dusk)).toBe('O  Leave a berry for the fox · At camp · C Cook · F Fire · R Rest · Click an upgrade to build');
+    expect(promptFor(dusk)).toBe('E  Leave a berry for the fox · At camp · Cook · Feed the fire · R Rest · Click an upgrade to build');
     expect(KEY_ACTIONS).toContainEqual(['O', { type: 'befriend' }]);
   });
 
   it('adds the offering beside a bush the birds visit', () => {
     const bush = createGame().nodes.find(node => node.id === 'berry-0')!;
     const spring = { ...bareCamp(19, 14), day: 22, timeOfDay: 60, nodes: [bush], inventory: { ...createGame().inventory, food: stock(1) } };
-    expect(promptFor(spring)).toBe('E  Pick berries · O  Scatter a berry for the birds');
+    expect(promptFor(spring)).toBe('E  Pick berries · Scatter a berry for the birds');
   });
 });

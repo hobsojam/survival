@@ -15,7 +15,7 @@ import { sceneVisuals } from '../src/scene/visuals';
 import { effectVisuals } from '../src/scene/effectVisuals';
 import { houseGlow } from '../src/scene/lighting';
 import { replayFrame } from '../src/scene/sleepReplay';
-import { gatherKeyAction, promptFor } from '../src/scene/prompts';
+import { useKeyAction, promptFor } from '../src/scene/prompts';
 import { stock } from './stock';
 
 const { campX, campY, daySeconds } = BALANCE;
@@ -194,7 +194,7 @@ describe('cooking at home', () => {
 
   it('offers and cooks a daytime meal over banked fireplace fuel', () => {
     const home = housed({ ...food, fireplaceFuel: 30 });
-    expect(promptFor({ ...home, nodes: [] })).toContain('C  Cook a berry');
+    expect(promptFor({ ...home, nodes: [] })).toContain('Cook a berry');
     expect(cookBlocker(home)).toBeNull();
     expect(act(home, { type: 'cook', dish: 'berries' }).message).toBe('You toast a berry by the fire. A warm little meal.');
   });
@@ -361,11 +361,11 @@ describe('the house by night', () => {
 
 describe('the prompts at home', () => {
   it('rests and sleeps at home, and feeds the campfire at camp', () => {
-    expect(gatherKeyAction({ ...housed(), nodes: [] })).toEqual({ type: 'rest' });
-    expect(gatherKeyAction({ ...atFire(housed()), nodes: [] })).toBeUndefined();
+    expect(useKeyAction({ ...housed(), nodes: [] })).toEqual({ type: 'rest' });
+    expect(useKeyAction({ ...atFire(housed()), nodes: [] })).toBeUndefined();
     expect(promptFor({ ...housed(night()), nodes: [] })).toContain('Z Sleep');
     const camp = promptFor({ ...atFire(housed(night())), nodes: [] });
-    expect(camp).toContain('F Fire');
+    expect(camp).toContain('Feed the fire');
     expect(camp).not.toContain('Z Sleep');
     expect(camp).not.toContain('R Rest');
   });

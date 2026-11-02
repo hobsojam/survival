@@ -19,33 +19,23 @@ Open the local address printed by Vite, usually <http://localhost:5173/>. For a 
 
 | Control | Action |
 | --- | --- |
-| WASD or arrow keys | Move the survivor |
-| E | Gather the nearest branches, berries, fiber plants, rocks, seasonal forage, loose stone, or quarry rubble within reach, or dig the quarry face with the pickaxe; at camp with nothing nearby, rest |
-| F | Add one wood to the campfire while at camp |
+| Tap or click | Walk there, or walk over and use the supply, loose stone, tree, place, lookout, campfire, rubble, quarry face, or path end you tapped |
+| WASD or arrow keys | Walk |
+| E | Use what's in reach, the way a tap on it would: gather branches, berries, fiber, rocks, forage, loose stone or rubble, dig the quarry face (with the pickaxe), chop a mature tree (with the stone axe), explore a place along the paths or fish at the frozen spring, repair the lookout, or leave an offering. If several are in reach, E does the one the prompt marks with E; the rest are named plainly, to click. At camp with nothing in reach, E rests |
 | R | Rest at camp for a short break |
 | Z | Sleep until morning (at night, at camp, once the shelter is built) |
-| Q | Eat: the fresh food nearest to going soft (berries first if it's a tie), then a hazelnut, honey, roasted hazelnuts, or vegetables. Never pine needles, rations, or raw fish |
-| C | Cook at a lit campfire after dark (once you live in the house, at home by the fireplace): a fish if you have one, otherwise one berry, or with the pot the first dish you have the food for |
-| G | Watch the stars at camp after dark |
-| P | Dry one berry into a trail ration at a built drying rack |
-| T | Eat one trail ration, anywhere |
-| X | Chop the nearest mature tree (once you have the stone axe) |
-| V | Explore the nearest place along the paths; in winter, with a fishing line, fish through the ice at the quiet spring |
-| L | Repair the old lookout when you stand beside it |
-| O | Leave a small offering for a wild animal, when one would take it |
 | Walk off the west edge | Follow the west path into the quarry area, once the shelter is built; walk off the quarry's east edge to come home |
-| Tap or click | Walk there, or walk over and use the supply, loose stone, tree, place, lookout, campfire, rubble, quarry face, or path end you tapped |
 | Build buttons | Spend wood, and sometimes fiber or stone, on camp upgrades and tools |
 | Bag buttons | Eat a berry, a ration, a fish, or one of your forage finds, burn wood or fiber at camp, or drop a stone where you stand |
 | Store 1 / Take 1 | Move food between your bag and a built larder, in the Camp stores panel, in the clearing |
 
-The buttons beside the game also let you eat, rest, feed the fire, and sleep. Your survivor's meters and those buttons stay at the top of the sidebar; below them, the **Bag**, **Build**, and **Camp** tabs each show one group of panels, and the sidebar remembers the tab you had open. A dot on Build means something there is ready. If the keyboard does not respond, click the game area once to focus it.
+Everything can be done by clicking: the buttons beside the game let you eat, eat a ration, rest, feed the fire, and sleep, and the panels hold the rest. The hint line under the game names only E, R and Z. Older shortcut keys still work for anyone used to them, though they're no longer shown: F feeds the fire, Q eats, T eats a ration, P prepares a ration, C cooks, G watches the stars, X chops, V explores or fishes, L repairs the lookout, and O leaves an offering. (Q never eats pine needles, rations, or raw fish, and C cooks a fish first if you have one.) Your survivor's meters and those buttons stay at the top of the sidebar; below them, the **Bag**, **Build**, and **Camp** tabs each show one group of panels, and the sidebar remembers the tab you had open. A dot on Build means something there is ready. If the keyboard does not respond, click the game area once to focus it.
 
 Press **Esc**, or the **Pause** button at the top, to pause. The clock, the fire, hunger, and the sounds all wait until you resume (Esc again, or **Resume** on the card over the game), and the game saves when you pause. The game also holds still while its browser tab is hidden.
 
 You can also tap or click to play. Tap the ground to walk there. Tap a supply, a loose stone, a mature tree, a place along the paths, the lookout, or the campfire, and the survivor walks over and uses it once: gathering, chopping, exploring, repairing, or adding a log. On a phone held upright, the game fills the screen. Eat, Rest, Fire, and Sleep sit in a row at the bottom (with Cook and Stars at night, and Offer, when they are ready), and the Bag, Build, and Camp tabs slide up the rest of the panels. Tap the game or the tab again to close them. A dot on Build means something is ready to build or craft.
 
-At night, the **After dark** panel offers two optional ways to spend a little time. Cook one berry at a lit campfire for a warmer, more filling meal; it takes eight seconds and restores 35 hunger and 10 warmth, in addition to the warmth you gain while near the fire. A drying rack raises the meal's hunger recovery to 50. Or watch the stars at camp for twelve seconds and regain 10 energy. The panel shows when each activity is ready. Neither activity is needed for survival, and you can still rest or sleep as before.
+The **Camp moments** panel offers two optional ways to spend a little time. Cook one berry at a lit campfire, by day or night, for a warmer, more filling meal; it takes eight seconds and restores 35 hunger and 10 warmth, in addition to the warmth you gain while near the fire. A drying rack raises the meal's hunger recovery to 50. Or, after dark, watch the stars at camp for twelve seconds and regain 10 energy. The panel shows when each activity is ready. Neither activity is needed for survival, and you can still rest or sleep as before.
 
 A day lasts about five and a half minutes of live play, but how much of it is night changes with the seasons. On the first day, night falls after about four minutes and lasts about eighty seconds. Midwinter nights start after about three minutes twenty-five seconds and last about two minutes, while midsummer nights start after about four minutes fifteen seconds and last about seventy-five seconds. The dial in the top bar shows where you are in the day, with that day's night shaded, and counts down in real time to nightfall or dawn. Gathering takes six game seconds and building takes twelve, so daylight matters.
 

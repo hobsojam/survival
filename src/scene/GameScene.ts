@@ -23,7 +23,7 @@ import { hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTa
 import { palette } from '../art/palette';
 import type { SoundCue } from '../game/soundscape';
 import { ALL_NEED_ALERTS, needAlerts, needsMessage, type NeedAlert } from '../game/needs';
-import { KEY_ACTIONS, actionPose, closestSite, closestTree, gatherKeyAction, gatherSpot, promptFor } from './prompts';
+import { KEY_ACTIONS, actionPose, closestSite, closestTree, gatherSpot, promptFor, useKeyAction } from './prompts';
 
 export class GameScene extends Phaser.Scene {
   private state: GameState;
@@ -122,18 +122,19 @@ export class GameScene extends Phaser.Scene {
 
   private handleActionKeys(): void {
     const pressed = (key: string): boolean => Phaser.Input.Keyboard.JustDown(this.keys![key]);
-    if (pressed('E')) this.pressGather();
+    if (pressed('E')) this.pressUse();
     for (const [key, action] of KEY_ACTIONS) if (pressed(key)) this.perform(action);
     if (pressed('X')) this.pressChop();
     if (pressed('V')) this.visitNearestSite();
   }
 
-  private pressGather(): void {
-    const action = gatherKeyAction(this.state);
+  /** E uses whatever is in reach, as a tap on it would. */
+  private pressUse(): void {
+    const action = useKeyAction(this.state);
     if (action) this.perform(action);
     else {
       this.cancelWalk();
-      this.onFeedback('Nothing to gather here.');
+      this.onFeedback('Nothing to use here.');
     }
   }
 
