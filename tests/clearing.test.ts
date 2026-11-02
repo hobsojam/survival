@@ -117,7 +117,7 @@ describe('clearing steps', () => {
   it('makes room for the buildings', () => {
     const room = Object.fromEntries(STEP_IDS.map(id => [id, CLEARING_STEPS[id].room]));
     expect(room).toEqual({
-      'north-near': ['larder'], 'north-far': ['house'], 'north-outer': ['bakery'],
+      'north-near': ['larder'], 'north-far': ['house', 'beehive'], 'north-outer': ['bakery'],
       'east-near': ['woodpile', 'fibreStack'], 'east-far': ['workshop'],
       'south-near': ['granary'], 'south-far': ['field'], 'south-outer': ['windmill'],
       'west-near': ['vegetableBeds'], 'west-far': ['well']

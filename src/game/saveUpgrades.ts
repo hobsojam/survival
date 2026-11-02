@@ -6,7 +6,7 @@ import { emptyField } from './field';
 // anything the player had. Loading runs every step a save needs, in order, then validates the result as usual.
 
 /** The saved shape's version. Bump it by one with every change to the shape, and add its upgrade step below. */
-export const SAVE_VERSION = 27;
+export const SAVE_VERSION = 28;
 
 /** The oldest save that can still be brought up to date: earlier formats were never upgraded and don't load. */
 export const OLDEST_UPGRADABLE_VERSION = 23;
@@ -61,6 +61,14 @@ export const SAVE_UPGRADES: Readonly<Record<number, SaveUpgrade>> = {
       structures: { windmill: false, bakery: false, ...state.structures },
       millFlour: state.millFlour ?? 0,
       bakery: { resumed: null, ...(state.bakery ?? { shelf: [], lastBaked: null }) } };
+  },
+  // Version 28: a beehive on the north far ground. An older camp has none, and an empty hive.
+  27: old => {
+    const state = old as Upgradable & { structures: Upgradable };
+    // Each part is added only where it is missing, so a step run on a camp that already has it leaves it as it was.
+    return { ...state,
+      structures: { beehive: false, ...state.structures },
+      beehive: state.beehive ?? { honey: 0, nextHoney: null } };
   }
 };
 

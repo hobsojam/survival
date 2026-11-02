@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createGame } from '../src/game/state';
 import { loadGame, saveGame, SAVE_KEY, SAVE_VERSION } from '../src/game/save';
 import { emptyField } from '../src/game/field';
+import { beehiveCamp } from './beehiveCamp';
 import { OLDEST_UPGRADABLE_VERSION, SAVE_UPGRADES, upgradeSave, type SaveUpgrade } from '../src/game/saveUpgrades';
 
 class MemoryStorage implements Storage {
@@ -144,5 +145,38 @@ describe('the version 27 upgrade: the windmill and bakery', () => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, JSON.stringify({ version: 26, state: version26() }));
     expect(loadGame(storage).kind).toBe('loaded');
+  });
+});
+
+describe('the version 28 upgrade: the beehive', () => {
+  /** A version 27 camp: today's game without anything the beehive brought. */
+  function version27(changes: Record<string, unknown> = {}) {
+    const game = createGame() as unknown as Record<string, any>;
+    const { beehive: _h, ...structures } = game.structures;
+    const { beehive: _b, ...state } = game;
+    return { ...state, structures, ...changes };
+  }
+
+  it('adds no beehive and an empty hive', () => {
+    const upgraded = SAVE_UPGRADES[27](structuredClone(version27())) as ReturnType<typeof createGame>;
+    expect(upgraded.structures.beehive).toBe(false);
+    expect(upgraded.beehive).toEqual({ honey: 0, nextHoney: null });
+  });
+
+  it('leaves a camp that already has a hive as it was', () => {
+    const game = createGame();
+    const current = { ...game, structures: { ...game.structures, beehive: true }, beehive: { honey: 2, nextHoney: 9 } };
+    expect(SAVE_UPGRADES[27](structuredClone(current))).toEqual(current);
+  });
+
+  it('loads a version 27 camp with the north far ground cleared', () => {
+    const camp = beehiveCamp({ built: false }) as unknown as Record<string, any>;
+    const { beehive: _h, ...structures } = camp.structures;
+    const { beehive: _b, ...state } = camp;
+    const storage = new MemoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 27, state: { ...state, structures } }));
+    const loaded = loadGame(storage);
+    expect(loaded.kind).toBe('loaded');
+    expect(loaded.kind === 'loaded' && [loaded.state.structures.beehive, loaded.state.beehive]).toEqual([false, { honey: 0, nextHoney: null }]);
   });
 });
