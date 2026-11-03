@@ -2,7 +2,7 @@ import type { SpriteDef } from './sprites';
 import type { PaletteKey } from './palette';
 import { BALANCE } from '../game/state';
 import { CLEARING_STEPS, STEP_IDS, clearingKey, clearingReach, type StepId } from '../game/clearing';
-import { CAMP_OPEN_PATHS, CAMP_PATHS, QUARRY_PATHS, mixHash, pathDistance, type PathRoute } from '../scene/mapGeometry';
+import { CAMP_OPEN_PATHS, CAMP_PATHS, mixHash, pathDistance, type PathRoute } from '../scene/mapGeometry';
 import { faceBottom, FACE_HEIGHT, quarryGroundAt, type QuarryGround } from '../scene/quarryGeometry';
 
 type Grid = string[][];
@@ -171,7 +171,7 @@ function pathSpriteFor(g: Grid): string {
   return name;
 }
 // Build every area's paths up front so their sprites are registered as textures with the rest.
-for (const routes of [CAMP_PATHS, CAMP_OPEN_PATHS, QUARRY_PATHS]) pathTiles(routes);
+for (const routes of [CAMP_PATHS, CAMP_OPEN_PATHS]) pathTiles(routes);
 
 export function pathTile(x: number, y: number, destinations: readonly PathRoute[]): string | undefined {
   return pathTiles(destinations).get(`${x},${y}`);
