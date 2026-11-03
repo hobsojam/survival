@@ -175,7 +175,8 @@ function builtTexture(state: GameState, id: (typeof CAMP_STRUCTURES)[number][0],
     return `house:${paint}-${boxes}-${light}`;
   }
   if (id === 'granary') return `granary:${stockFrame(state.field.grain)}`;
-  return id === 'larder' ? `larder:${stockFrame(storeTotal(state.larder))}` : `${id}:built`;
+  if (id === 'larder') return `${state.structures.storehouse ? 'storehouse' : 'larder'}:${stockFrame(storeTotal(state.larder))}`;
+  return `${id}:built`;
 }
 
 function shelterTexture(state: GameState): string {

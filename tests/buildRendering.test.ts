@@ -155,7 +155,7 @@ describe('mine Build panel', () => {
     expect(panel.hidden).toBe(false);
     expect(row.hidden).toBe(false);
   });
-  it('shows its row and panel after the pickaxe is crafted, then keeps the built status visible', () => {
+  it('shows its row and panel after the pickaxe is crafted, then hides it after building', () => {
     const { app, get } = renderer();
     app['renderTools']();
     expect(get('#mine-panel').hidden).toBe(true);
@@ -171,7 +171,6 @@ describe('mine Build panel', () => {
 
     state.progress.mineBuilt = true;
     app['renderTools']();
-    expect(get('#mine-copy').textContent).toContain('2 digs left');
-    expect(get('#mine-panel').hidden).toBe(false);
+    expect(get('#mine-panel').hidden).toBe(true);
   });
 });

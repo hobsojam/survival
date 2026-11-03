@@ -6,7 +6,7 @@ import { emptyField } from './field';
 // anything the player had. Loading runs every step a save needs, in order, then validates the result as usual.
 
 /** The saved shape's version. Bump it by one with every change to the shape, and add its upgrade step below. */
-export const SAVE_VERSION = 31;
+export const SAVE_VERSION = 32;
 
 /** The oldest save that can still be brought up to date: earlier formats were never upgraded and don't load. */
 export const OLDEST_UPGRADABLE_VERSION = 23;
@@ -85,6 +85,11 @@ export const SAVE_UPGRADES: Readonly<Record<number, SaveUpgrade>> = {
       structures: { timberYard: false, ...state.structures },
       progress: { ...state.progress, mineBuilt: false },
       mineReadyDay: 1 };
+  },
+  // Version 32: the existing larder can be expanded into a storehouse.
+  31: old => {
+    const state = old as Upgradable & { structures: Upgradable };
+    return { ...state, structures: { storehouse: false, ...state.structures } };
   }
 };
 

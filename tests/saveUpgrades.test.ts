@@ -96,6 +96,24 @@ describe('loading through the upgrades', () => {
   });
 });
 
+describe('the version 32 upgrade: storehouse', () => {
+  it('keeps an older larder and its food while starting the upgrade unbuilt', () => {
+    const old = createGame() as Record<string, any>;
+    old.structures.larder = true;
+    delete old.structures.storehouse;
+    const upgraded = SAVE_UPGRADES[31](old) as ReturnType<typeof createGame>;
+    expect(upgraded.structures).toMatchObject({ larder: true, storehouse: false });
+    expect(old.structures.storehouse).toBeUndefined();
+    const storage = new MemoryStorage();
+    const oldSave = createGame() as Record<string, any>;
+    delete oldSave.structures.storehouse;
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 31, state: oldSave }));
+    const loaded = loadGame(storage);
+    expect(loaded.kind).toBe('loaded');
+    if (loaded.kind === 'loaded') expect(loaded.state.structures.storehouse).toBe(false);
+  });
+});
+
 describe('the version 31 upgrade: timber yard', () => {
   it('starts older woodpiles without a yard and preserves their stored wood', () => {
     const base = createGame();

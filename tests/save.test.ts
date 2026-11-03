@@ -724,6 +724,12 @@ describe('the larder in the save', () => {
     expect(accepts(state => { delete (state as any).larder; })).toBe(false);
   });
 
+  it('accepts 30 food after the storehouse upgrade and rejects an orphaned storehouse', () => {
+    expect(accepts(state => { state.structures.larder = true; state.structures.storehouse = true; state.larder = stock(30); })).toBe(true);
+    expect(accepts(state => { state.structures.larder = true; state.structures.storehouse = true; state.larder = stock(31); })).toBe(false);
+    expect(accepts(state => { state.structures.storehouse = true; })).toBe(false);
+  });
+
   it('stands only on cleared north ground', () => {
     expect(accepts(state => { state.structures.larder = true; })).toBe(true);
     expect(accepts(state => {

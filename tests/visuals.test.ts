@@ -463,7 +463,9 @@ describe('the larder', () => {
     expect(larder(state)!.depth).toBe(larder(state)!.y);
     const kept = (berries: number) => larder({ ...state, larder: stock(berries) })!.texture;
     expect([kept(1), kept(6), kept(7), kept(10)]).toEqual(['larder:some', 'larder:some', 'larder:full', 'larder:full']);
-    for (const name of ['larder', 'larderSite']) expect(() => validateSprite(sprites[name])).not.toThrow();
+    state.structures.storehouse = true;
+    expect(larder(state)!.texture).toBe('storehouse:empty');
+    for (const name of ['larder', 'larderSite', 'storehouse']) expect(() => validateSprite(sprites[name])).not.toThrow();
     for (const frame of ['empty', 'some', 'full']) expect(sprites.larder.frames[frame], frame).toBeDefined();
   });
 });

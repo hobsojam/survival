@@ -92,6 +92,21 @@ describe('where the larder stands', () => {
   });
 });
 
+describe('upgrading the larder', () => {
+  it('uses wood and fiber and raises the food limit to 30', () => {
+    const base = camp();
+    const state = { ...base, inventory: { ...base.inventory, wood: 8, fiber: 3, food: food([['hazelnut', 21, 1]]) }, larder: food([['hazelnut', 9, 1]]) };
+    expect(buildStatus(state, 'storehouse')).toBe('ready');
+    const built = applyAction(state, { type: 'build', structureId: 'storehouse' }).state;
+    expect(built.structures.storehouse).toBe(true);
+    expect(built.inventory.wood).toBe(0);
+    expect(built.inventory.fiber).toBe(0);
+    expect(applyAction(built, { type: 'storeFood', item: 'hazelnut' }).state.larder.hazelnut).toBe(10);
+    const full = withStores(built, food([['hazelnut', 1, 1]]), food([['hazelnut', 30, 1]]));
+    expect(applyAction(full, { type: 'storeFood', item: 'hazelnut' }).message).toBe('The larder is full.');
+  });
+});
+
 describe('storing and taking food', () => {
   it('stores the bag\'s oldest piece and takes the larder\'s freshest', () => {
     const state = withStores(camp(), food([['berry', 1, 5], ['berry', 1, 3]]), food([['berry', 1, 2], ['berry', 1, 4]]));
