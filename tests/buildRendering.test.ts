@@ -137,6 +137,24 @@ describe('house decoration controls', () => {
 });
 
 describe('mine Build panel', () => {
+  it('reveals the inner row when the browser returns its outer panel for a selector list', () => {
+    const { app, get } = renderer();
+    const state = createGame();
+    state.progress.pickaxeCrafted = true;
+    Object.assign(app, { state });
+    const panel = get('#mine-panel');
+    const row = get('#mine-row');
+    panel.hidden = true;
+    row.hidden = true;
+    const root = app['root'];
+    const original = root.querySelector.bind(root);
+    root.querySelector = ((selector: string) => selector === '#mine-row, #mine-panel' ? panel : original(selector)) as typeof root.querySelector;
+
+    app['renderTools']();
+
+    expect(panel.hidden).toBe(false);
+    expect(row.hidden).toBe(false);
+  });
   it('shows its row and panel after the pickaxe is crafted, then keeps the built status visible', () => {
     const { app, get } = renderer();
     app['renderTools']();
