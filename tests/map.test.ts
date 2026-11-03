@@ -434,10 +434,6 @@ describe('the grown clearing', () => {
       expect(edges.get(`${x},${y}`)?.map(row => [...row].map(pixel => pixel !== '.')), `edge at ${x},${y}`).toEqual(old.map(row => [...row].map(pixel => pixel !== '.')));
     }
     expect(edges.size).toBe(expectedEdges);
-    const radius = BALANCE.campRadius;
-    const oldStones = Array.from({ length: 26 }, (_, i) => ({ x: CAMP_CENTER_X + Math.cos(i * Math.PI * 2 / 26) * radius, y: CAMP_CENTER_Y + Math.sin(i * Math.PI * 2 / 26) * radius, sprite: `rimStone${i % 2}` }));
-    expect(map.rimStones.every(stone => oldStones.some(old => old.x === stone.x && old.y === stone.y && old.sprite === stone.sprite))).toBe(true);
-    expect(map.rimStones).toHaveLength(20);
     expect(buildMap(nodes, 'camp')).toEqual(map);
   });
 
@@ -451,6 +447,19 @@ describe('the grown clearing', () => {
     expect(shades).toContain('earth2');
     expect(shades).toContain('earth3');
     expect(shades).not.toContain('earth0');
+  });
+
+  it('spaces boundary stones unevenly without clumping them', () => {
+    const stones = buildMap(nodes, 'camp').rimStones;
+    const angles = stones.map(stone => {
+      const dx = stone.x - CAMP_CENTER_X, dy = stone.y - CAMP_CENTER_Y;
+      expect(Math.hypot(dx, dy)).toBeCloseTo(BALANCE.campRadius);
+      return (Math.atan2(dy, dx) + Math.PI * 2) % (Math.PI * 2);
+    }).sort((a, b) => a - b);
+    const gaps = angles.map((angle, i) => (angles[(i + 1) % angles.length] - angle + Math.PI * 2) % (Math.PI * 2))
+      .filter(gap => gap < .35);
+    expect(Math.min(...gaps)).toBeGreaterThan(.15);
+    expect(Math.max(...gaps) - Math.min(...gaps)).toBeGreaterThan(.02);
   });
 
   it('makes the ground earth where the north near step reaches', () => {

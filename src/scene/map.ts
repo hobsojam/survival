@@ -269,9 +269,10 @@ function campRimStones(site: CampSite): MapItem[] {
   const count = Math.round(26 * meanReach / BALANCE.campRadius);
   const rimStones: MapItem[] = [];
   for (let i = 0; i < count; i++) {
-    const angle = i * Math.PI * 2 / count;
+    const offset = (mixHash(i, count, 91) % 1000 / 1000 - .5) * .32;
+    const angle = (i + offset) * Math.PI * 2 / count;
     const reach = reachAt(angle);
-    const item = { x: CAMP_CENTER_X + Math.cos(angle) * reach, y: CAMP_CENTER_Y + Math.sin(angle) * reach, sprite: `rimStone${i % 2}` };
+    const item = { x: CAMP_CENTER_X + Math.cos(angle) * reach, y: CAMP_CENTER_Y + Math.sin(angle) * reach, sprite: `rimStone${mixHash(i, count, 93) % 2}` };
     if (stoneClearsPaths(item, site.routes)) rimStones.push(item);
   }
   return rimStones;
