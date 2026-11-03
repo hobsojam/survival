@@ -5,7 +5,7 @@ import { buildMap, shownTerrainKey, terrainKey, type TerrainMap } from '../src/s
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { CLEARING_STEPS, STEP_IDS, clearingReach, inClearing, type ClearingState, type StepId } from '../src/game/clearing';
 import { CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_OPEN_PATHS, CAMP_SIGN, QUARRY_PATHS, QUARRY_SIGN, pathDistance as routeDistance } from '../src/scene/mapGeometry';
-import { FACE_HEIGHT, faceBottom, floorDepth, quarryGroundAt } from '../src/scene/quarryGeometry';
+import { FACE_HEIGHT, QUARRY_MEADOWS, faceBottom, floorDepth, quarryGroundAt } from '../src/scene/quarryGeometry';
 
 function visibleGround(map: TerrainMap, x: number, y: number, pixelX = 8, pixelY = 8): string | undefined {
   const base = terrainSprites[map.ground[y][x]];
@@ -229,6 +229,39 @@ describe('the quarry scenery', () => {
   const nodes = createGame().nodes;
   const quarry = buildMap([], 'quarry');
   const clearOf = (x: number, y: number, spot: { x: number; y: number }) => Math.hypot(x - spot.x, y - spot.y);
+  const PROPS = ['cutBlocks', 'barrow', 'tumbledBlock'];
+  const props = quarry.decorations.filter(item => PROPS.includes(item.sprite));
+
+  it('leaves signs of old work on the floor, clear of the workings and the track', () => {
+    expect(props.map(item => item.sprite).sort()).toEqual([...PROPS].sort());
+    for (const item of props) {
+      const where = `${item.sprite} at ${item.x},${item.y}`;
+      expect(floorDepth(item.x + .5, item.y + .5), where).toBeLessThan(.92);
+      for (const site of [QUARRY_SITE, RUBBLE_SITE]) expect(clearOf(item.x, item.y, site), where).toBeGreaterThanOrEqual(3);
+      expect(routeDistance(item.x + .5, item.y + .5, QUARRY_PATHS), where).toBeGreaterThanOrEqual(1.5);
+    }
+  });
+
+  it('grows patches of wildflowers and long grass in the open meadow', () => {
+    const near = (item: { x: number; y: number }) => QUARRY_MEADOWS.some(([x, y]) => Math.hypot(item.x - x, item.y - y) <= 2.5);
+    const flowers = quarry.decorations.filter(item => item.sprite.startsWith('flower'));
+    expect(flowers.length).toBeGreaterThanOrEqual(12);
+    expect(flowers.every(near)).toBe(true);
+    expect(quarry.decorations.filter(item => item.sprite.startsWith('longGrass')).length).toBeGreaterThanOrEqual(10);
+    for (const [x, y] of QUARRY_MEADOWS) expect(quarryGroundAt(x * 16 + 8, y * 16 + 8), `${x},${y}`).toBe('grass');
+  });
+
+  it('puts the flowers under the snow in winter and adds a few in spring', () => {
+    const count = (map: TerrainMap) => map.decorations.filter(item => item.sprite.startsWith('flower')).length;
+    expect(count(buildMap([], 'quarry', 'winter'))).toBe(0);
+    expect(count(buildMap([], 'quarry', 'spring'))).toBeGreaterThan(count(quarry));
+  });
+
+  it('grows ferns where the meadow meets the woods', () => {
+    const ferns = quarry.decorations.filter(item => item.sprite.startsWith('fern'));
+    expect(ferns.length).toBeGreaterThanOrEqual(8);
+    for (const fern of ferns) expect(Math.min(fern.x, fern.y, BALANCE.mapWidth - 1 - fern.x, BALANCE.mapHeight - 1 - fern.y)).toBeLessThanOrEqual(4);
+  });
 
   it('rings the quarry with a full band of trees on every side', () => {
     const edge = (test: (tree: { x: number; y: number }) => boolean) => quarry.trees.filter(test).length;
@@ -254,12 +287,12 @@ describe('the quarry scenery', () => {
   });
 
   it('keeps the face and the floor clear', () => {
-    for (const item of [...quarry.trees, ...quarry.decorations])
+    for (const item of [...quarry.trees, ...quarry.decorations.filter(item => !PROPS.includes(item.sprite))])
       expect(quarryGroundAt(item.x * 16 + 8, item.y * 16 + 8), `${item.sprite} at ${item.x},${item.y}`).not.toMatch(/^(face|seam|lip|foot|floor)$/);
   });
 
   it('puts small decorations only on plain grass', () => {
-    for (const item of quarry.decorations.filter(item => !item.sprite.startsWith('boulder')))
+    for (const item of quarry.decorations.filter(item => !item.sprite.startsWith('boulder') && !PROPS.includes(item.sprite)))
       expect(quarry.ground[item.y][item.x], `${item.sprite} at ${item.x},${item.y}`).toMatch(/^grass\d$/);
   });
 
@@ -310,7 +343,7 @@ describe('the quarry scenery', () => {
   });
 
   it('draws the signposts and boulders as real sprites', () => {
-    for (const name of ['signpostCamp', 'signpostQuarry', 'boulder0', 'boulder1']) expect(terrainSprites[name], name).toBeDefined();
+    for (const name of ['signpostCamp', 'signpostQuarry', 'boulder0', 'boulder1', 'cutBlocks', 'barrow', 'tumbledBlock', 'fern0', 'fern1', 'longGrass0', 'longGrass1', 'flowerClump0', 'flowerClump1']) expect(terrainSprites[name], name).toBeDefined();
   });
 });
 

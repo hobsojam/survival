@@ -6,7 +6,7 @@ import { HOUSE_SPOT, fireplaceBurning } from '../game/home';
 import { TILE, worldX, worldY } from './art';
 import { GROUND_DECAL_DEPTH, LIGHT_DEPTH, WEATHER_DEPTH } from './visuals';
 
-export type EffectKind = 'gather' | 'cook' | 'stargaze' | 'frost';
+export type EffectKind = 'gather' | 'cook' | 'stargaze' | 'frost' | 'dust';
 export interface EffectEvent {
   kind: EffectKind;
   startedAtMs: number;
@@ -134,9 +134,22 @@ function eventVisuals(state: GameState, event: EffectEvent, index: number, age: 
   if (event.kind === 'stargaze' && age < 1200) {
     return [visual(id, `shootingStar:star${frame}`, x - 60 + Math.floor(age / 16), y - 93, LIGHT_DEPTH + 0.1, 1 - age / 1200)];
   }
+  if (event.kind === 'dust' && age < 900) return dustVisuals(id, x, y, age);
   if (event.kind === 'frost' && state.area === 'camp' && age < 30000) {
     return [[-32, 16], [16, -32], [48, 32]].map(([dx, dy], i) => visual(`${id}:frost:${i}`, `morningFrost:frost${i}`, x + dx, y + dy,
       GROUND_DECAL_DEPTH + 1, 0.75 * (1 - age / 30000)));
   }
   return [];
+}
+
+/** Dust rolling off the quarry face where a stone broke free, and two chips bouncing out across the gravel. */
+function dustVisuals(id: string, x: number, y: number, age: number): EffectVisual[] {
+  const frame = Math.min(2, Math.floor(age / 300));
+  const puffs = [[-8, -14], [0, -18], [8, -14]].map(([dx, dy], i) => visual(`${id}:dust:${i}`, `smokePuff:puff${frame}`,
+    x + dx + Math.sign(dx) * Math.floor(age / 120), y + dy - Math.floor(age / 90), LIGHT_DEPTH + 0.1, 0.8 * (1 - age / 900)));
+  if (age >= 500) return puffs;
+  const progress = age / 500;
+  const chips = [-1, 1].map((side, i) => visual(`${id}:chip:${i}`, 'stoneChip:still',
+    x + side * (4 + Math.floor(progress * 14)), y - 6 - Math.round(Math.sin(progress * Math.PI) * 8) + Math.floor(progress * 6), y + 1));
+  return [...puffs, ...chips];
 }

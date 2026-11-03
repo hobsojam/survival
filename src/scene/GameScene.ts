@@ -23,7 +23,7 @@ import { hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTa
 import { palette } from '../art/palette';
 import type { SoundCue } from '../game/soundscape';
 import { ALL_NEED_ALERTS, needAlerts, needsMessage, type NeedAlert } from '../game/needs';
-import { KEY_ACTIONS, actionPose, closestSite, closestTree, gatherSpot, promptFor, useKeyAction } from './prompts';
+import { KEY_ACTIONS, actionEffect, actionPose, closestSite, closestTree, gatherSpot, promptFor, useKeyAction } from './prompts';
 
 export class GameScene extends Phaser.Scene {
   private state: GameState;
@@ -223,8 +223,8 @@ export class GameScene extends Phaser.Scene {
     if (spot) this.onSound('gather');
     if (action.type === 'build') this.onSound('build');
     if (spot) this.effects?.trigger('gather', this.time.now, spot.x, spot.y, spot.kind);
-    if (action.type === 'cook' || action.type === 'stargaze')
-      this.effects?.trigger(action.type, this.time.now, this.state.player.x, this.state.player.y);
+    const effect = actionEffect(action, this.state);
+    if (effect) this.effects?.trigger(effect.kind, this.time.now, effect.x, effect.y);
     const pose = actionPose(action.type);
     if (pose) this.visualAction = { kind: pose, startedAtMs: this.time.now };
   }

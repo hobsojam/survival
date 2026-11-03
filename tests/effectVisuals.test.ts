@@ -105,12 +105,23 @@ describe('phase 5 scene effects', () => {
     expect(state).toEqual(before);
   });
 
+  it('throws up dust and chips from the quarry face when it is dug, then settles', () => {
+    const dig: EffectEvent = { kind: 'dust', startedAtMs: 1000, x: 12, y: 12 };
+    const early = effectVisuals({ ...state, area: 'quarry' }, 1200, [dig]);
+    expect(early.filter(item => item.texture.startsWith('smokePuff:'))).toHaveLength(3);
+    expect(early.filter(item => item.texture.startsWith('stoneChip:'))).toHaveLength(2);
+    const later = effectVisuals({ ...state, area: 'quarry' }, 1700, [dig]);
+    const puffs = (list: typeof early) => list.filter(item => item.texture.startsWith('smokePuff:'));
+    expect(Math.min(...puffs(later).map(item => item.y))).toBeLessThan(Math.min(...puffs(early).map(item => item.y)));
+    expect(effectVisuals({ ...state, area: 'quarry' }, 2000, [dig])).toEqual([]);
+  });
+
   it('only emits registered textures for every resource and weather state', () => {
     const storm = { ...state, day: 3, timeOfDay: 190, fireFuel: 100,
       progress: { ...state.progress, nextStormDay: 3 } };
     const events: EffectEvent[] = [
       ...(['branch', 'berry', 'fiber', 'stone', 'hazel', 'pine', 'greens', 'honey'] as const).map(resource => ({ ...event('gather'), resource })),
-      event('cook'), event('stargaze'), event('frost')
+      event('cook'), event('stargaze'), event('frost'), event('dust')
     ];
     for (const timeMs of [1000, 1250, 1500, 2000]) for (const effect of effectVisuals(storm, timeMs, events)) {
       const [name, frame] = effect.texture.split(':');

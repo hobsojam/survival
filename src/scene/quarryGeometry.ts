@@ -13,6 +13,8 @@ const TRACK_EDGE = 0.2;
 export const FLOOR_EDGE_IN = .92;
 export const FLOOR_EDGE_OUT = 1.04;
 export const TRACK_EDGE_OUT = TRACK_HALF_WIDTH + TRACK_EDGE;
+/** Where the quarry's meadow flowers gather, out in the open grass clear of the floor, the track and the woods. */
+export const QUARRY_MEADOWS: readonly (readonly [number, number])[] = [[26, 9], [30, 20], [20, 23], [9, 21]];
 const FLOOR = { x: 13.5, y: 14, rx: 7, ry: 4 } as const;
 
 /** The y of the cliff's foot at this x: level to x 14, then stepping back a tile per tile to its east end at 18. */

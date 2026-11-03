@@ -263,6 +263,44 @@ addDecal('pebbles1', g => { rect(g, 2, 4, 3, 2, 'j'); dot(g, 2, 4, 'k'); rect(g,
 addDecal('stump', g => { ellipse(g, 8, 13, 5, 2, 't'); rect(g, 4, 6, 9, 7, 'm'); rect(g, 5, 5, 7, 5, 'n'); rect(g, 6, 5, 5, 2, 'o'); dot(g, 8, 6, 'p'); }, 16, 16);
 addDecal('mushrooms', g => { rect(g, 2, 4, 1, 3, 'l'); rect(g, 5, 5, 1, 2, 'l'); rect(g, 1, 3, 3, 2, 'q'); rect(g, 4, 4, 3, 2, 'q'); });
 addDecal('fallenLeaf', g => { rect(g, 2, 3, 4, 2, 'r'); rect(g, 3, 2, 2, 1, 's'); dot(g, 6, 5, 'r'); });
+// The quarry's leftovers on its floor, and the ferns and long grass of its meadow.
+addDecal('cutBlocks', g => {
+  ellipse(g, 16, 22, 15, 2, 't');
+  rect(g, 2, 12, 14, 10, 'u'); rect(g, 3, 12, 12, 3, 'k'); rect(g, 3, 15, 12, 6, 'j'); rect(g, 3, 12, 5, 1, 'l'); rect(g, 14, 15, 1, 6, 'i');
+  rect(g, 16, 13, 14, 9, 'u'); rect(g, 17, 13, 12, 3, 'k'); rect(g, 17, 16, 12, 5, 'j'); rect(g, 28, 16, 1, 5, 'i');
+  rect(g, 8, 3, 15, 10, 'u'); rect(g, 9, 3, 13, 3, 'k'); rect(g, 9, 6, 13, 6, 'j'); rect(g, 9, 3, 6, 1, 'l'); rect(g, 21, 6, 1, 6, 'i');
+  rect(g, 11, 8, 8, 1, 'i');
+}, 32, 24);
+addDecal('barrow', g => {
+  ellipse(g, 12, 14, 11, 1.5, 't');
+  for (const [x, y, c] of [[7, 4, 'k'], [8, 4, 'j'], [10, 3, 'k'], [11, 3, 'l'], [11, 4, 'j'], [13, 4, 'k'], [14, 4, 'i']] as const) dot(g, x, y, c);
+  rect(g, 4, 5, 14, 1, 'm'); rect(g, 4, 6, 14, 4, 'n'); rect(g, 5, 6, 12, 1, 'o'); rect(g, 5, 10, 12, 1, 'm');
+  for (const [x, y] of [[18, 9], [19, 10], [20, 10], [21, 11], [22, 11]]) dot(g, x, y, 'm');
+  rect(g, 15, 11, 1, 3, 'm');
+  ellipse(g, 5, 11.5, 2.5, 2.5, 'u'); dot(g, 5, 11, 'i'); dot(g, 5, 12, 'i');
+}, 24, 16);
+addDecal('tumbledBlock', g => {
+  ellipse(g, 12, 13, 10, 2, 't');
+  rect(g, 4, 3, 15, 10, 'u'); rect(g, 5, 3, 13, 3, 'k'); rect(g, 5, 6, 13, 6, 'j'); rect(g, 5, 3, 5, 1, 'l'); rect(g, 17, 6, 1, 6, 'i');
+  for (const [x, y] of [[9, 7], [10, 8], [11, 9], [11, 10]]) dot(g, x, y, 'i');
+  for (const [x, y, c] of [[1, 12, 'j'], [2, 12, 'i'], [21, 12, 'k'], [22, 13, 'i'], [20, 14, 'j']] as const) dot(g, x, y, c);
+}, 24, 16);
+// A clump of meadow flowers, for the hearts of the quarry's flower patches.
+for (let i = 0; i < 2; i++) addDecal(`flowerClump${i}`, g => {
+  for (const [x, y, c] of [[2, 4, 'd'], [5, 2, 'f'], [8, 5, 'h'], [11, 3, 'e'], [13, 5, 'f'], [6, 6, 'e'], [10, 7, 'g']] as const) {
+    rect(g, x, y + 1, 1, 7 - y, 'a'); dot(g, x, y, i ? ({ d: 'g', f: 'e', h: 'f', e: 'd', g: 'h' } as const)[c] : c); dot(g, x + 1, y, 'e');
+  }
+  rect(g, 1, 7, 14, 1, 'a');
+}, 16, 8);
+for (let i = 0; i < 2; i++) addDecal(`fern${i}`, g => {
+  for (const [x, y] of [[1, 3], [2, 4], [3, 5], [6, 3], [5, 4], [4, 5], [3, 2], [5, 1], [4, 6], [4, 7]]) dot(g, x + i, y, 'r');
+  for (const [x, y] of [[1, 2], [7, 2], [4, 0], [2, 3]]) dot(g, x, y + i, 's');
+});
+for (let i = 0; i < 2; i++) addDecal(`longGrass${i}`, g => {
+  rect(g, 1, 7, 6, 1, 'a');
+  for (const [x, top] of [[1, 4], [2, 2], [3, 3], [4, 1], [5, 3], [6, 2 + i]]) rect(g, x, top + i, 1, 7 - top - i, x % 2 ? 'a' : 'b');
+  dot(g, 4, 1 + i, 'c'); dot(g, 2, 2 + i, 'c');
+});
 for (let i = 0; i < 2; i++) addDecal(`rimStone${i}`, g => {
   rect(g, 1, 6, 12, 4, 'u');
   rect(g, 2, i ? 4 : 5, 10, 5, 'u');

@@ -11,6 +11,7 @@ import { CHORUS_SECONDS, chorusNight, companionPose, type CompanionPose } from '
 import type { SoundCue } from '../game/soundscape';
 import {
   BIRD_HOMES, EYE_SPOTS, FIREFLY_HOMES, FOX, birdForageTarget, birdMayReturn, birdShouldLeave, birdGroundFrame, birdFlightFrame,
+  BUTTERFLY_COUNT, QUARRY_BIRD_HOMES, SWALLOW_COUNT, butterfliesOut, butterflyAt, swallowAt, swallowsOut,
   LEAF_HOMES, RABBIT_FLEE_RADIUS, RABBIT_HOMES, WOLF_SPOTS, darkness, eyesAt, fireflyFrame, fireflyGlow, fireflyOffset, foxAt, foxFrame, leafAt, rabbitAt, rabbitCount, wolfCount, wolfWatch, type Point
 } from './ambient';
 
@@ -21,6 +22,8 @@ interface Bird {
   home: Point; ground: Point; away: Point | null; flight: Flight | null; restSeconds: number;
   nextForageAtMs: number; forageUntilMs: number; forageNodeId: string | null;
   index: number; image: Phaser.GameObjects.Image;
+  /** Camp birds fly to the berry bushes and may come to trust the survivor; the quarry's birds only hop about the gravel. */
+  atCamp: boolean;
 }
 
 /** A rabbit that has run off hides for a while, and only comes home once the survivor has moved away. */
@@ -68,6 +71,10 @@ function landBird(bird: Bird, flight: Flight, timeMs: number): void {
 
 export class AmbientLife {
   private readonly birds: Bird[];
+  private readonly quarryBirds: Bird[];
+  private readonly swallows: Phaser.GameObjects.Image[];
+  private readonly butterflies: Phaser.GameObjects.Image[];
+  private quarryStarted = false;
   private readonly fox: Phaser.GameObjects.Image;
   private readonly fireflies: Phaser.GameObjects.Image[];
   private readonly leaves: Phaser.GameObjects.Image[];
@@ -93,11 +100,15 @@ export class AmbientLife {
   private started = false;
 
   constructor(scene: Phaser.Scene, private readonly onCue: (cue: SoundCue) => void = () => undefined) {
-    this.birds = BIRD_HOMES.map((home, index) => ({
+    const bird = (home: Point, index: number, atCamp: boolean): Bird => ({
       home, ground: home, away: null, flight: null, restSeconds: 0,
-      nextForageAtMs: 0, forageUntilMs: 0, forageNodeId: null, index,
+      nextForageAtMs: 0, forageUntilMs: 0, forageNodeId: null, index, atCamp,
       image: sprite(scene, 'bird', 'idle')
-    }));
+    });
+    this.birds = BIRD_HOMES.map((home, index) => bird(home, index, true));
+    this.quarryBirds = QUARRY_BIRD_HOMES.map((home, index) => bird(home, index, false));
+    this.swallows = Array.from({ length: SWALLOW_COUNT }, () => sprite(scene, 'swallow', 'fly0'));
+    this.butterflies = Array.from({ length: BUTTERFLY_COUNT }, () => sprite(scene, 'butterfly', 'flap0'));
     this.fox = sprite(scene, 'fox', 'trot0');
     this.fireflies = FIREFLY_HOMES.map(() => sprite(scene, 'firefly', 'glow0', LIGHT_DEPTH));
     this.leaves = LEAF_HOMES.map(() => sprite(scene, 'leaf', 'fall0'));
@@ -111,9 +122,13 @@ export class AmbientLife {
 
   update(state: GameState, seconds: number, timeMs: number): void {
     const dark = darkness(state.day, state.timeOfDay);
-    // The birds, the fox and the fireflies live at camp; the eyes watch the quarry.
-    if (state.area === 'quarry') this.updateEyes(dark, state, timeMs);
-    else for (const image of this.eyes) image.setVisible(false);
+    // The birds, the fox and the fireflies live at camp; the eyes watch the quarry by night, and its own birds fly by day.
+    if (state.area === 'quarry') {
+      this.updateEyes(dark, state, timeMs);
+      this.updateQuarryLife(state, dark, seconds, timeMs);
+    } else {
+      for (const image of [...this.eyes, ...this.quarryBirds.map(bird => bird.image), ...this.swallows, ...this.butterflies]) image.setVisible(false);
+    }
     this.updateWolves(state, dark, seconds, timeMs);
     this.updateFriend(state, seconds, timeMs);
     if (state.area !== 'camp') {
@@ -136,6 +151,29 @@ export class AmbientLife {
     // Fireflies are a summer-night sight, and leaves fall on autumn days.
     this.updateFireflies(firefliesOut(state.day) ? dark : 0, timeMs);
     this.updateLeaves(state, dark, timeMs);
+  }
+
+  /** The quarry's daytime life: birds on the gravel, swallows along the face and butterflies over the meadow. */
+  private updateQuarryLife(state: GameState, dark: number, seconds: number, timeMs: number): void {
+    // Arriving after dark, the gravel birds are already away to roost.
+    if (!this.quarryStarted) {
+      this.quarryStarted = true;
+      if (dark > 0.3) for (const bird of this.quarryBirds) bird.away = { x: bird.home.x, y: bird.home.y - 9 };
+    }
+    if (isWinter(state.day)) for (const bird of this.quarryBirds) bird.image.setVisible(false);
+    else for (const bird of this.quarryBirds) this.updateBird(bird, state, dark, seconds, timeMs);
+    const swallows = swallowsOut(state.day, dark);
+    this.swallows.forEach((image, index) => {
+      if (!swallows) { image.setVisible(false); return; }
+      const pose = swallowAt(index, timeMs);
+      this.show(image, pose.x, pose.y, pose.frame, pose.facing);
+    });
+    const butterflies = butterfliesOut(state.day, dark);
+    this.butterflies.forEach((image, index) => {
+      if (!butterflies) { image.setVisible(false); return; }
+      const pose = butterflyAt(index, timeMs);
+      this.show(image, pose.x, pose.y, pose.frame, pose.facing);
+    });
   }
 
   /** Staggers the birds' first forage, and sends them away if camp opens after dark. */
@@ -223,7 +261,7 @@ export class AmbientLife {
 
   /** One bird lingers once the birds have begun to trust the survivor. */
   private fleeRadius(bird: Bird, state: GameState): number | undefined {
-    const trusting = bird.index === 0 && !state.companion.friend && state.companion.trust.bird > 0;
+    const trusting = bird.atCamp && bird.index === 0 && !state.companion.friend && state.companion.trust.bird > 0;
     return trusting ? TRUSTING_FLEE_RADIUS : undefined;
   }
 
@@ -259,7 +297,7 @@ export class AmbientLife {
       this.show(bird.image, bird.ground.x, bird.ground.y, `bird:peck${Math.floor(timeMs / 170) % 2}`);
       return;
     }
-    if (timeMs >= bird.nextForageAtMs) {
+    if (bird.atCamp && timeMs >= bird.nextForageAtMs) {
       const target = birdForageTarget(bird.home, state.nodes, Math.random());
       bird.nextForageAtMs = timeMs + 12000 + bird.index * 1700;
       if (target) {
