@@ -134,7 +134,7 @@ describe('mine panel', () => {
     state.player.y = QUARRY_SITE.y;
     expect(mineView(state)).toMatchObject({ shown: true, disabled: false, ready: true });
     state.progress.mineBuilt = true;
-    expect(mineView(state)).toMatchObject({ shown: true, disabled: true, cost: 'Built', copy: expect.stringContaining('2 digs left') });
+    expect(mineView(state).shown).toBe(false);
   });
 });
 
@@ -593,6 +593,9 @@ describe('larder controls', () => {
   it('is hidden until the larder is built', () => {
     expect(larderView(stocked(false)).shown).toBe(false);
     expect(larderView(stocked(true))).toMatchObject({ shown: true, stored: 'Stored food 0/10', rows: [] });
+    const upgraded = stocked(true);
+    upgraded.structures.storehouse = true;
+    expect(larderView(upgraded).stored).toBe('Stored food 0/30');
   });
 
   it('shows a row for each item in the bag or the larder, with what each button would do', () => {

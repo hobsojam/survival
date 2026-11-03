@@ -420,6 +420,24 @@ function larder(g: Grid, stock: StockLevel): void {
   box(g, 12, 8, 1, 2, 'k'); dot(g, 14, 5, 'k'); dot(g, 15, 6, 'l');
   box(g, 14, 8, 2, 2, 'B');
 }
+/** A broader raised store with a deeper roof and shuttered bays, replacing the larder in place. */
+function storehouse(g: Grid, stock: StockLevel): void {
+  oval(g, 16, 30, 14, 2, 's');
+  for (const x of [4, 26]) { box(g, x, 17, 2, 12, 'b'); line(g, x, 17, x, 28, 'd'); }
+  box(g, 3, 14, 26, 4, 'a'); line(g, 3, 15, 28, 15, 'e');
+  box(g, 4, 7, 24, 7, 'c');
+  for (const x of [10, 21]) line(g, x, 7, x, 13, 'b');
+  box(g, 12, 8, 8, 5, 'a');
+  box(g, 2, 3, 28, 4, 'd'); box(g, 3, 3, 12, 1, 'e'); line(g, 2, 6, 29, 6, 'b');
+  line(g, 14, 18, 12, 29, 'd'); line(g, 18, 18, 16, 29, 'c');
+  for (const y of [21, 24, 27]) line(g, 14 - Math.round((y - 18) / 6), y, 17 - Math.round((y - 18) / 6), y, 'e');
+  if (stock === 'empty') return;
+  box(g, 13, 10, 2, 3, 'k'); dot(g, 13, 10, 'l');
+  box(g, 17, 9, 2, 4, 'h'); dot(g, 17, 9, 'j');
+  if (stock === 'some') return;
+  box(g, 14, 8, 2, 2, 'h'); dot(g, 14, 8, 'j');
+  box(g, 19, 11, 1, 2, 'k'); dot(g, 19, 11, 'l');
+}
 function woodpileSite(g: Grid): void {
   for (const [x, y] of [[2, 7], [21, 7], [2, 11], [21, 11]]) stake(g, x, y);
   line(g, 4, 8, 20, 8, 'h'); line(g, 4, 12, 20, 12, 'h');
@@ -1039,6 +1057,7 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   woodshed: define(48, 40, campLegend, { empty: g => woodshed(g, 'empty'), some: g => woodshed(g, 'some'), full: g => woodshed(g, 'full') }),
   larderSite: define(24, 16, campLegend, { still: larderSite }),
   larder: define(24, 28, campLegend, { empty: g => larder(g, 'empty'), some: g => larder(g, 'some'), full: g => larder(g, 'full') }),
+  storehouse: define(32, 32, campLegend, { empty: g => storehouse(g, 'empty'), some: g => storehouse(g, 'some'), full: g => storehouse(g, 'full') }),
   vegetableBedsSite: define(48, 16, campLegend, { still: vegetableBedsSite }),
   vegBed: define(14, 12, bedLegend, BED_FRAMES),
   wellSite: define(20, 12, campLegend, { still: wellSite }),

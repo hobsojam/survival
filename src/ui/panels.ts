@@ -4,7 +4,7 @@ import { millGrainBlocker, takeLoafBlocker } from '../game/bakehouse';
 import { takeHoneyBlocker } from '../game/beehive';
 import { FOOD_ITEMS, availableFood, emptyFood, foodCount, goingSoft, isFresh, storeTotal, type FoodItem, type KeptFood } from '../game/food';
 import { foodIconUrl } from '../art/foodIcons';
-import { BALANCE, BUILDINGS, type GameState, type StructureId } from '../game/state';
+import { BALANCE, BUILDINGS, foodStoreCapacity, type GameState, type StructureId } from '../game/state';
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { BED_CROPS, bedSoil, bedStage, drawWaterBlocker, harvestBedBlocker, sowBedBlocker, type BedSoil, type BedStage } from '../game/beds';
 import { workSeconds } from '../game/needs';
@@ -261,7 +261,7 @@ export function pickaxeView(state: GameState): ActionPanelView & { shown: boolea
 }
 
 export function mineView(state: GameState): ActionPanelView {
-  const shown = state.progress.pickaxeCrafted;
+  const shown = state.progress.pickaxeCrafted && !state.progress.mineBuilt;
   if (state.progress.mineBuilt) {
     const digs = Number(state.quarryReadyDay <= state.day) + Number(state.mineReadyDay <= state.day);
     return { shown, title: 'Timber-supported mine', copy: `${digs} ${digs === 1 ? 'dig' : 'digs'} left today. Each dig gives one stone; both return at dawn.`, cost: 'Built', disabled: true, ready: false };
@@ -464,7 +464,8 @@ export type BagFood = (typeof BAG_FOODS)[number]['item'];
 /** Every forage cell, hidden until the bag panel shows it; fresh food has a line for what is going soft. */
 export function bagFoodMarkup(): string {
   return BAG_FOODS.map(({ item, label, eat }) => {
-    const button = eat ? `<button type="button" class="supply-action" data-action="eat" data-item="${item}" data-supply="${item}" aria-label="${eat}">Eat</button>` : '';
+    let button = eat ? `<button type="button" class="supply-action" data-action="eat" data-item="${item}" data-supply="${item}" aria-label="${eat}">Eat</button>` : '';
+    if (item === 'pineNeedles') button = '<button type="button" class="supply-action" data-action="burnPineNeedles" data-supply="pineNeedles" aria-label="Burn one bunch of pine needles">Burn</button><button type="button" class="supply-action" data-action="dropPineNeedles" data-supply="pineNeedles" aria-label="Drop one bunch of pine needles">Drop</button>';
     const note = isFresh(item) ? `<small id="${item}-note" class="supply-note"></small>` : '';
     return `<div data-food="${item}" hidden><img class="food-icon" src="${foodIconUrl(item)}" alt=""><strong id="${item}-count">0</strong><small>${label}</small>${note}${button}</div>`;
   }).join('');
@@ -536,7 +537,7 @@ export function larderView(state: GameState): { shown: boolean; stored: string; 
       takeDisabled: Boolean(takeBlocker), takeTitle: takeBlocker ?? `Take 1 ${foodWord(item, 1)}.`
     };
   });
-  return { shown: state.structures.larder, stored: `Stored food ${storeTotal(state.larder)}/${BALANCE.larderCapacity}`, rows };
+  return { shown: state.structures.larder, stored: `Stored food ${storeTotal(state.larder)}/${foodStoreCapacity(state)}`, rows };
 }
 
 /** The larder's controls, hidden until built, with a hidden row for every food. */

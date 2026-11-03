@@ -22,13 +22,15 @@ import { showBuildList, showCampStores } from './showPanels';
 import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, decorationMarkup, decorationButtonView, DECORATION_CHOICES, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
 import type { UpgradeId } from '../game/workshop';
 import { Soundscape } from '../game/soundscape';
+import { isAtHome } from '../game/home';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
 /** What each Burn or Drop button spends, as a count in the bag; Eat buttons follow the bag view instead. */
 const SUPPLY_COUNTS: Record<string, (inventory: GameState['inventory']) => number> = {
   wood: inventory => inventory.wood,
   fiber: inventory => inventory.fiber,
-  stone: inventory => inventory.stone
+  stone: inventory => inventory.stone,
+  pineNeedles: inventory => inventory.food.pineNeedles
 };
 /** Burn reaches the woodpile and the fibre stack at camp; everything else follows the bag. */
 const AT_CAMP_COUNTS: Record<string, (state: GameState) => number> = { wood: availableWood, fiber: availableFiber };
@@ -135,7 +137,7 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'buildMine' | 'craftPot' | 'craftPack' | 'makeFishingLine' | 'clearGround' | 'burnFiber' | 'dropStone' | 'storeFood' | 'takeFood' | 'drawWater' | 'grindGrain' | 'millGrain' | 'takeLoaf' | 'takeHoney';
+        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'buildMine' | 'craftPot' | 'craftPack' | 'makeFishingLine' | 'clearGround' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'storeFood' | 'takeFood' | 'drawWater' | 'grindGrain' | 'millGrain' | 'takeLoaf' | 'takeHoney';
         const item = button.dataset.item as FoodItem | undefined;
         const dish = button.dataset.dish as DishId | undefined;
         if (type === 'storeFood' || type === 'takeFood') {
@@ -426,6 +428,7 @@ export class App {
       // Eat buttons follow the food within reach, the larder included in the clearing; the rest follow the bag.
       const { action } = button.dataset;
       if (action === 'eat' || action === 'eatTrailFood') button.disabled = !bag.eatable[(button.dataset.item ?? 'trailFood') as EatableFood];
+      else if (action === 'burnPineNeedles') button.disabled = !isAtHome(this.state) || inventory.food.pineNeedles <= 0;
       else button.disabled = supplyCount(this.state, button.dataset.supply ?? '') <= 0;
     });
     this.setText('stone-stored', bag.storedAtCamp);

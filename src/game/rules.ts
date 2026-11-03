@@ -20,7 +20,7 @@ import { settleStores } from './stores';
 import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, cartSpace, countWord, fellingWood, upgradeBlocker, type UpgradeId } from './workshop';
 import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishingSecondsFor, validRoll } from './fishing';
 import { ENDED_MESSAGE, GAVE_OUT_MESSAGE, judgeSickDay, markWarmMeal, markWarmRest, sicknessTick } from './sickness';
-import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, type GameState, type ResourceNode, type SiteId, type StructureId } from './state';
+import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, foodStoreCapacity, type GameState, type ResourceNode, type SiteId, type StructureId } from './state';
 
 export type GameAction =
   | { type: 'gather'; nodeId: string }
@@ -48,7 +48,7 @@ export type GameAction =
   | { type: 'storeFood'; item: FoodItem }
   | { type: 'takeFood'; item: FoodItem }
   | { type: 'cook'; dish?: DishId }
-  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'buildMine' | 'burnFiber' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' }
+  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'buildMine' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' }
   | { type: 'pickUpStone'; pileId: string }
   | { type: 'makeFishingLine' }
   | { type: 'fish'; roll: number };
@@ -649,7 +649,7 @@ export function storeFoodBlocker(state: GameState, item: FoodItem): string | nul
   const blocker = larderBlocker(state);
   if (blocker) return blocker;
   if (foodCount(state.inventory.food, item) < 1) return `You have no ${foodWord(item, 2)} to store.`;
-  if (storeTotal(state.larder) >= BALANCE.larderCapacity) return 'The larder is full.';
+  if (storeTotal(state.larder) >= foodStoreCapacity(state)) return 'The larder is full.';
   return null;
 }
 
@@ -699,6 +699,24 @@ const pickUpStone: ActionHandler<'pickUpStone'> = (state, action) => {
   return {
     state: advanceTime({ ...state, inventory: { ...state.inventory, stone: state.inventory.stone + 1 }, stonePiles }, BALANCE.pickUpSeconds, 'resting'),
     message: 'Picked up a stone.'
+  };
+};
+
+const dropPineNeedles: ActionHandler<'dropPineNeedles'> = state => {
+  const needles = state.inventory.food.pineNeedles;
+  if (needles < 1) return refuse(state, 'You have no pine needles to drop.');
+  return { state: { ...state, inventory: { ...state.inventory, food: { ...state.inventory.food, pineNeedles: needles - 1 } } }, message: 'Dropped a bunch of pine needles.' };
+};
+
+const burnPineNeedles: ActionHandler<'burnPineNeedles'> = state => {
+  if (!isAtHome(state)) return refuse(state, 'Move closer to the fire to tend it.');
+  const needles = state.inventory.food.pineNeedles;
+  if (needles < 1) return refuse(state, 'You have no pine needles to burn.');
+  const fuel = BALANCE.fiberFireSeconds;
+  const fire = livesInHouse(state) ? { fireplaceFuel: state.fireplaceFuel + fuel } : { fireFuel: state.fireFuel + fuel };
+  return {
+    state: { ...state, ...fire, inventory: { ...state.inventory, food: { ...state.inventory.food, pineNeedles: needles - 1 } } },
+    message: 'The pine needles flare up as kindling.'
   };
 };
 
@@ -1130,7 +1148,7 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
 
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, buildMine, chopTree, markClearing, clearGround, visitSite,
-  storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
+  storeFood, takeFood, dropStone, dropPineNeedles, pickUpStone, burnFiber, burnPineNeedles, eat, eatTrailFood, prepareTrailFood,
   cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak,
   makeFishingLine, fish
 };

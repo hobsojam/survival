@@ -1,4 +1,4 @@
-import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type StructureId } from './state';
+import { BALANCE, BUILDINGS, SITES, createGame, foodStoreCapacity, type GameState, type StructureId } from './state';
 import { bagCapacity, carriedCount } from './rules';
 import { season, yearOf } from './calendar';
 import { journalEntry, journalSeason, type JournalId } from './journalEntries';
@@ -224,7 +224,7 @@ function validLarder({ larder, structures, day, clearing }: SaveShape): boolean 
   });
   if (!grounded || !validFood(larder, day)) return false;
   const stored = storeTotal(larder as FoodStore);
-  return stored <= BALANCE.larderCapacity && (structures.larder === true || stored === 0);
+  return stored <= foodStoreCapacity({ structures: { storehouse: structures.storehouse === true } }) && (structures.larder === true || stored === 0);
 }
 
 function validWorld({ nodes, trees, stonePiles, day, clearing }: SaveShape): boolean {
