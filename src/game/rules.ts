@@ -989,13 +989,20 @@ export const DECORATION_COSTS = {
   fence: { wood: 6, fiber: 1, berry: 0, greens: 0 }
 } as const;
 
+function completedDecoration(state: GameState, choice: DecorationChoice): string | null {
+  switch (choice) {
+    case 'flowerBoxes': return state.decorations.flowerBoxes ? 'Flower boxes are already built.' : null;
+    case 'fence': return state.decorations.fence >= 3 ? 'The fence is complete.' : null;
+    case 'berryPaint': return state.decorations.paint === 'berry' ? 'The walls are already berry red.' : null;
+    case 'leafPaint': return state.decorations.paint === 'leaf' ? 'The walls are already leaf green.' : null;
+  }
+}
+
 export function decorationBlocker(state: GameState, choice: DecorationChoice): string | null {
   if (!isInClearing(state)) return 'Return to the marked camp area to decorate.';
   if (!state.structures.house) return 'Build the house first.';
-  if (choice === 'flowerBoxes' && state.decorations.flowerBoxes) return 'Flower boxes are already built.';
-  if (choice === 'fence' && state.decorations.fence >= 3) return 'The fence is complete.';
-  if (choice === 'berryPaint' && state.decorations.paint === 'berry') return 'The walls are already berry red.';
-  if (choice === 'leafPaint' && state.decorations.paint === 'leaf') return 'The walls are already leaf green.';
+  const completed = completedDecoration(state, choice);
+  if (completed) return completed;
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   const cost = DECORATION_COSTS[choice];
   const missing = [availableWood(state) < cost.wood ? `${cost.wood} wood` : null,

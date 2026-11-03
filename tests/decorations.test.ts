@@ -5,6 +5,7 @@ import { sceneVisuals } from '../src/scene/visuals';
 import { phase3Sprites } from '../src/art/phase3Sprites';
 import { upgradeSave } from '../src/game/saveUpgrades';
 import { loadGame, saveGame, SAVE_KEY, SAVE_VERSION } from '../src/game/save';
+import { DECORATION_CHOICES, decorationButtonView, decorationMarkup } from '../src/ui/panels';
 
 function house(changes: Partial<GameState> = {}): GameState {
   const base = createGame();
@@ -25,6 +26,29 @@ class MemoryStorage implements Storage {
   setItem(key: string, value: string): void { this.values.set(key, value); }
   removeItem(key: string): void { this.values.delete(key); }
 }
+
+describe('decoration choices in the Build tab', () => {
+  it('lists all four fixed choices with their material prices after the house stands', () => {
+    const markup = decorationMarkup();
+    for (const choice of DECORATION_CHOICES) expect(markup).toContain(`data-decorate="${choice}"`);
+    const state = house();
+    expect(decorationButtonView(state, 'berryPaint')).toMatchObject({ shown: true, disabled: false, price: '2 fiber · 2 berries' });
+    expect(decorationButtonView(state, 'leafPaint')).toMatchObject({ shown: true, disabled: false, price: '2 fiber · 2 greens' });
+    expect(decorationButtonView(state, 'flowerBoxes')).toMatchObject({ shown: true, disabled: false, price: '3 wood · 2 fiber' });
+    expect(decorationButtonView(state, 'fence')).toMatchObject({ shown: true, disabled: false, price: '6 wood · 1 fiber', description: 'Section 1 of 3 · fixed around the yard' });
+  });
+
+  it('shows unavailable and completed choices distinctly', () => {
+    expect(decorationButtonView(createGame(), 'fence')).toMatchObject({ shown: false, disabled: true, locked: true });
+    const base = house();
+    const empty = { ...base, inventory: createGame().inventory };
+    expect(decorationButtonView(empty, 'fence')).toMatchObject({ shown: true, disabled: true, locked: true });
+    const completed = { ...base, decorations: { paint: 'berry' as const, flowerBoxes: true, fence: 3 } };
+    expect(decorationButtonView(completed, 'berryPaint')).toMatchObject({ built: true, disabled: true, verb: 'Done' });
+    expect(decorationButtonView(completed, 'flowerBoxes')).toMatchObject({ built: true, disabled: true, verb: 'Done' });
+    expect(decorationButtonView(completed, 'fence')).toMatchObject({ built: true, disabled: true, description: 'Section 3 of 3 · fixed around the yard' });
+  });
+});
 
 describe('homestead decoration', () => {
   it('needs a house, the clearing and the stated materials', () => {
