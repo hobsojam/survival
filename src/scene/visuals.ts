@@ -244,7 +244,7 @@ function addCamp(state: GameState, add: AddVisual, timeMs: number): void {
   const { structures, progress } = state;
   add('shelter', shelterTexture(state), x - 3, y - 2, structures.shelter ? undefined : GROUND_DECAL_DEPTH);
   addBuildableStructures(state, add, x, y, timeMs);
-  const fenceSpots = [{ dx: -2.5, dy: -5.4, frame: 'side' }, { dx: 1.4, dy: -5.4, frame: 'side' }, { dx: -0.5, dy: -9.1, frame: 'rail' }];
+  const fenceSpots = [{ dx: -3, dy: -5.625, frame: 'left' }, { dx: 2, dy: -5.625, frame: 'right' }, { dx: -0.5, dy: -6.625, frame: 'rail' }];
   fenceSpots.slice(0, state.decorations.fence).forEach((spot, index) => add(`house-fence-${index}`, `fence:${spot.frame}`, x + spot.dx, y + spot.dy));
   addGardenPlants(state, add, x, y);
   add('logSeat', 'logSeat:still', x - 1, y + 1);
