@@ -505,7 +505,10 @@ export class App {
   private renderActionPanel(name: string, view: ActionPanelView): void {
     const container = this.root.querySelector<HTMLElement>(`#${name}-row, #${name}-panel`);
     if (container) container.hidden = view.shown === false;
-    if (name === 'mine') this.root.querySelector<HTMLElement>('#mine-panel')!.hidden = view.shown === false;
+    if (name === 'mine') {
+      this.root.querySelector<HTMLElement>('#mine-panel')!.hidden = view.shown === false;
+      this.root.querySelector<HTMLElement>('#mine-row')!.hidden = view.shown === false;
+    }
     const button = this.root.querySelector<HTMLButtonElement>(`#${name}-button`);
     if (button) {
       button.disabled = view.disabled;
