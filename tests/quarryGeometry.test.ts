@@ -91,7 +91,7 @@ describe('the quarry\'s ground tiles', () => {
 
   it('paints the floor pale, with no hard outline at its edge', () => {
     const floor = colours(quarryGroundTile(13, 14));
-    expect(floor.every(colour => /^(stone[34]|earth[34])$/.test(colour))).toBe(true);
+    expect(floor.every(colour => /^stone[234]$/.test(colour))).toBe(true);
     expect(colours(quarryGroundTile(13, 18)).includes('earth0')).toBe(false);
   });
 });

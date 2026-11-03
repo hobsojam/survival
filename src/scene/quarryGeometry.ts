@@ -9,6 +9,10 @@ export const FACE_HEIGHT = 2.5;
 /** Half the track's width, in tiles; its soft edge runs a fifth of a tile further. */
 export const TRACK_HALF_WIDTH = 0.8;
 const TRACK_EDGE = 0.2;
+/** Where the floor's soft edge starts and ends, and where the track's ends, as floor depth and track distance. */
+export const FLOOR_EDGE_IN = .92;
+export const FLOOR_EDGE_OUT = 1.04;
+export const TRACK_EDGE_OUT = TRACK_HALF_WIDTH + TRACK_EDGE;
 const FLOOR = { x: 13.5, y: 14, rx: 7, ry: 4 } as const;
 
 /** The y of the cliff's foot at this x: level to x 14, then stepping back a tile per tile to its east end at 18. */
@@ -47,8 +51,8 @@ export function quarryGroundAt(px: number, py: number): QuarryGround {
     if (y < top) return y >= top - 3 / 16 ? 'lip' : 'plateau';
   }
   const depth = floorDepth(x, y), track = trackDistance(x, y);
-  if (depth < .92) return 'floor';
+  if (depth < FLOOR_EDGE_IN) return 'floor';
   if (track < TRACK_HALF_WIDTH) return 'track';
-  if (depth < 1.04) return 'floorEdge';
-  return track < TRACK_HALF_WIDTH + TRACK_EDGE ? 'trackEdge' : 'grass';
+  if (depth < FLOOR_EDGE_OUT) return 'floorEdge';
+  return track < TRACK_EDGE_OUT ? 'trackEdge' : 'grass';
 }

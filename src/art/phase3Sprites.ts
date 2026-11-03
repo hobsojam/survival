@@ -338,25 +338,22 @@ function stonePile(g: Grid): void {
   box(g, 1, 10, 14, 4, 'a'); box(g, 2, 10, 12, 1, 'e'); line(g, 2, 12, 13, 12, 'c');
   stoneLump(g, 2, 6, 6, 5); stoneLump(g, 8, 6, 6, 5); stoneLump(g, 5, 2, 6, 5);
 }
-/** One cut terrace of the quarry: a flat top lit from the top-left over a seamed front face. */
-function quarryTier(g: Grid, x: number, y: number, w: number, face: number, seam: number): void {
-  box(g, x, y, w, 3, 'p'); box(g, x + 1, y, Math.floor(w / 2), 1, 'q'); dot(g, x, y, 'q');
-  box(g, x, y + 3, w, face, 'o'); line(g, x, y + 3, x + w - 1, y + 3, 'n');
-  for (let sx = x + seam; sx < x + w - 2; sx += 9) line(g, sx, y + 4, sx, y + 2 + face, 'n');
-  line(g, x + w - 1, y, x + w - 1, y + 2 + face, 'm'); line(g, x, y + 2 + face, x + w - 1, y + 2 + face, 'm');
-}
-/** The quarry: three cut terraces of grey stone, with a loose block ready to break free, or a fresh notch where one was. */
+/** The worked spot at the foot of the quarry face: a big cut block standing proud, ready to break free, or the pale
+ * stump where one came out, with chips on the gravel. */
 function quarry(g: Grid, ready: boolean): void {
-  oval(g, 21, 29, 18, 2, 's');
-  quarryTier(g, 8, 2, 25, 5, 6);
-  quarryTier(g, 3, 10, 34, 5, 4);
-  quarryTier(g, 0, 18, 40, 7, 7);
+  oval(g, 16, 22, 14, 1, 's');
   if (ready) {
-    box(g, 24, 21, 10, 8, 'm'); box(g, 24, 21, 9, 3, 'p'); box(g, 24, 21, 4, 1, 'q');
-    box(g, 24, 24, 9, 4, 'o'); line(g, 26, 26, 30, 26, 'p');
+    box(g, 7, 0, 18, 22, 'm');
+    box(g, 7, 0, 17, 5, 'p'); box(g, 7, 0, 9, 1, 'q'); dot(g, 7, 0, 'q');
+    box(g, 7, 5, 17, 16, 'o'); line(g, 7, 5, 23, 5, 'n');
+    line(g, 9, 12, 21, 12, 'n'); line(g, 9, 13, 21, 13, 'p');
+    for (const x of [10, 14, 18]) line(g, x, 6, x, 9, 'n');
+    box(g, 25, 14, 5, 8, 'm'); box(g, 25, 14, 4, 2, 'p'); box(g, 25, 16, 4, 5, 'o');
   } else {
-    box(g, 24, 20, 9, 6, 'm'); box(g, 25, 20, 7, 1, 'n'); dot(g, 24, 20, 'n');
-    for (const [x, y] of [[19, 27], [23, 28], [29, 28], [34, 27], [37, 28]]) { dot(g, x, y, 'p'); dot(g, x + 1, y, 'n'); }
+    box(g, 7, 13, 18, 9, 'm');
+    box(g, 7, 13, 17, 3, 'q'); box(g, 8, 14, 15, 1, 'p');
+    box(g, 7, 16, 17, 5, 'o'); line(g, 7, 16, 23, 16, 'n');
+    for (const [x, y] of [[3, 20], [5, 21], [26, 19], [28, 21], [30, 20], [11, 11], [20, 12]]) { dot(g, x, y, 'q'); dot(g, x + 1, y, 'n'); }
   }
 }
 /** Loose rubble at the quarry's foot: a heap of small broken stones, or just grit once it's picked over. */
@@ -980,7 +977,7 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   looseStones: define(16, 16, campLegend, { one: g => looseStones(g, 1), two: g => looseStones(g, 2), many: g => looseStones(g, 3) }),
   stonePileSite: define(16, 16, campLegend, { still: stonePileSite }),
   stonePile: define(16, 16, campLegend, { built: stonePile }),
-  quarry: define(40, 32, campLegend, { ready: g => quarry(g, true), spent: g => quarry(g, false) }, [20, 29]),
+  quarry: define(32, 24, campLegend, { ready: g => quarry(g, true), spent: g => quarry(g, false) }, [16, 22]),
   rubble: define(24, 16, campLegend, { ready: g => rubble(g, true), gathered: g => rubble(g, false) }),
   toolshedSite: define(24, 16, campLegend, { still: toolshedSite }),
   toolshed: define(24, 28, campLegend, { built: toolshed }),

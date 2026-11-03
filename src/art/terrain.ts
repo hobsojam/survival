@@ -3,7 +3,7 @@ import type { PaletteKey } from './palette';
 import { BALANCE } from '../game/state';
 import { CLEARING_STEPS, STEP_IDS, clearingKey, clearingReach, type StepId } from '../game/clearing';
 import { CAMP_OPEN_PATHS, CAMP_PATHS, mixHash, pathDistance, type PathRoute } from '../scene/mapGeometry';
-import { faceBottom, FACE_HEIGHT, quarryGroundAt, type QuarryGround } from '../scene/quarryGeometry';
+import { FACE_HEIGHT, FLOOR_EDGE_IN, FLOOR_EDGE_OUT, TRACK_EDGE_OUT, TRACK_HALF_WIDTH, faceBottom, floorDepth, quarryGroundAt, trackDistance, type QuarryGround } from '../scene/quarryGeometry';
 
 type Grid = string[][];
 const blank = (w: number, h: number, fill = '.'): Grid => Array.from({ length: h }, () => Array.from({ length: w }, () => fill));
@@ -178,10 +178,10 @@ export function pathTile(x: number, y: number, destinations: readonly PathRoute[
 }
 
 /** The quarry's ground: grass, the cut face and its lip, the gravel floor and the worn track. The track is drawn in
- * path colours so it snows over like the camp's paths; stone and earth are left alone by the seasons. */
+ * path colours so it snows over like the camp's paths; the stone is left alone by the seasons. */
 const quarryLegend = {
   a: 'grass1', b: 'grass2', c: 'grass3', d: 'grass4', l: 'leaf3', m: 'leaf2',
-  k: 'stone1', s: 'stone2', t: 'stone3', u: 'stone4', x: 'shadow', h: 'earth3', i: 'earth4',
+  k: 'stone1', s: 'stone2', t: 'stone3', u: 'stone4', x: 'shadow',
   p: 'path3', q: 'path2', r: 'path4'
 } as const;
 const quarrySprites = new Map<string, string>();
@@ -193,12 +193,15 @@ function grassPixel(px: number, py: number): string {
 }
 function floorPixel(px: number, py: number): string {
   const n = roll(px, py, 53);
-  return n < 45 ? 't' : n < 75 ? 'i' : n < 90 ? 'u' : 'h';
+  return n < 7 ? 'u' : n < 13 ? 's' : 't';
 }
 function trackPixel(px: number, py: number): string {
   const n = roll(px, py, 55);
-  return n < 8 ? 'q' : n < 16 ? 'r' : 'p';
+  return n < 6 ? 'q' : n < 12 ? 'r' : 'p';
 }
+/** An edge pixel shades from one side to the other: the nearer the inside, the likelier it takes the inside's colour. */
+const fade = (px: number, py: number, salt: number, inside: number): boolean => roll(px, py, salt) < inside * 100;
+const centre = (p: number): number => (p + .5) / 16;
 function facePixel(px: number, py: number): string {
   if (roll(px, py, 57) < 2) return 'u';
   const foot = faceBottom((px + .5) / 16) ?? 0;
@@ -214,9 +217,13 @@ const quarryPixel: Record<QuarryGround, (px: number, py: number) => string> = {
   seam: () => 'k',
   foot: () => 'x',
   floor: floorPixel,
-  floorEdge: (px, py) => roll(px, py, 65) < 50 ? floorPixel(px, py) : grassPixel(px, py),
-  track: trackPixel,
-  trackEdge: (px, py) => roll(px, py, 67) < 50 ? trackPixel(px, py) : grassPixel(px, py)
+  floorEdge: (px, py) => fade(px, py, 65, (FLOOR_EDGE_OUT - floorDepth(centre(px), centre(py))) / (FLOOR_EDGE_OUT - FLOOR_EDGE_IN))
+    ? floorPixel(px, py) : grassPixel(px, py),
+  // Where the track runs into the floor's soft edge, it shades into gravel rather than ending in a hard line.
+  track: (px, py) => fade(px, py, 71, (FLOOR_EDGE_OUT - floorDepth(centre(px), centre(py))) / (FLOOR_EDGE_OUT - FLOOR_EDGE_IN))
+    ? floorPixel(px, py) : trackPixel(px, py),
+  trackEdge: (px, py) => fade(px, py, 67, (TRACK_EDGE_OUT - trackDistance(centre(px), centre(py))) / (TRACK_EDGE_OUT - TRACK_HALF_WIDTH))
+    ? trackPixel(px, py) : grassPixel(px, py)
 };
 
 /** The quarry's ground tile at (x, y): a plain grass tile where nothing is worked, else a sprite cut from the shapes. */

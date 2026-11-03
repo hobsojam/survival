@@ -196,6 +196,13 @@ describe('the quarry area', () => {
     expect(pickTapTarget(state, RUBBLE_SITE.x, RUBBLE_SITE.y + 0.4)).toEqual({ kind: 'rubble', x: RUBBLE_SITE.x, y: RUBBLE_SITE.y });
   });
 
+  it('still finds the quarry when you tap it, ready or worked out', () => {
+    const state = quarryState();
+    expect(pickTapTarget(state, QUARRY_SITE.x, QUARRY_SITE.y - .5)).toMatchObject({ kind: 'quarry' });
+    state.quarryReadyDay = state.day + 1;
+    expect(pickTapTarget(state, QUARRY_SITE.x, QUARRY_SITE.y - .5)).toMatchObject({ kind: 'quarry' });
+  });
+
   it('gives every tap close to the rubble to the rubble, never the quarry art beside it', () => {
     const state = quarryState();
     for (let dx = -0.9; dx <= 0.9; dx += 0.3) for (let dy = -0.9; dy <= 0.9; dy += 0.3) {
