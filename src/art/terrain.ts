@@ -96,16 +96,21 @@ function clearingTiles(cleared: readonly StepId[]): Map<string, string> {
   return tiles;
 }
 
-/** The earth pixels on one tile, a 2-pixel rim of lighter earth inside the clearing's edge; null when none, 'full' when solid. */
+/** The earth pixels on one tile, with varied earth shades just inside the exact clearing edge. */
 function clearingTileGrid(dx: number, dy: number, cleared: readonly StepId[]): Grid | 'full' | null {
   const g = blank(16, 16);
   let filled = 0;
   for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
     const offsetX = dx * 16 + x - 8, offsetY = dy * 16 + y - 8;
     const reach = clearingReach(BALANCE.campX + offsetX / 16, BALANCE.campY + offsetY / 16, cleared) * 16;
-    const distanceSquared = offsetX ** 2 + offsetY ** 2;
-    if (distanceSquared > reach ** 2) continue;
-    g[y][x] = distanceSquared >= (reach - 2) ** 2 ? 'e' : 'g';
+    const distance = Math.hypot(offsetX, offsetY);
+    if (distance > reach) continue;
+    const worldX = (BALANCE.campX + dx) * 16 + x, worldY = (BALANCE.campY + dy) * 16 + y;
+    const rimWidth = 1 + mixHash(Math.floor(worldX / 4), Math.floor(worldY / 4), 87) % 3;
+    const grain = mixHash(worldX, worldY, 89) % 100;
+    if (reach - distance <= rimWidth && grain < 18) g[y][x] = 'e';
+    else if (reach - distance <= rimWidth && grain < 42) g[y][x] = 'h';
+    else g[y][x] = 'g';
     filled++;
   }
   if (filled === 256) return 'full';
@@ -117,7 +122,7 @@ function clearingSpriteFor(g: Grid): string {
   let name = clearingSprites.get(shape);
   if (!name) {
     name = `clearingEdge${clearingSprites.size}`;
-    addTerrainSprite(name, sprite(g, { e: 'earth0', g: 'earth2' }));
+    addTerrainSprite(name, sprite(g, { e: 'earth1', g: 'earth2', h: 'earth3' }));
     clearingSprites.set(shape, name);
   }
   return name;

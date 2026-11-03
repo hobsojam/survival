@@ -422,7 +422,7 @@ describe('the grown clearing', () => {
     return filled === 256 ? 'full' : rows.map(row => row.join(''));
   }
 
-  it('looks just as it did when nothing is cleared', () => {
+  it('keeps the exact visible gameplay footprint when nothing is cleared', () => {
     const map = buildMap(nodes, 'camp', 'summer', none);
     const edges = new Map(map.campEdges.map(edge => [`${edge.x},${edge.y}`, terrainSprites[edge.sprite].frames.still]));
     let expectedEdges = 0;
@@ -431,7 +431,7 @@ describe('the grown clearing', () => {
       expect(map.ground[y][x].startsWith('earth'), `ground at ${x},${y}`).toBe(old === 'full');
       if (old === null || old === 'full') { expect(edges.has(`${x},${y}`), `edge at ${x},${y}`).toBe(false); continue; }
       expectedEdges++;
-      expect(edges.get(`${x},${y}`), `edge at ${x},${y}`).toEqual(old);
+      expect(edges.get(`${x},${y}`)?.map(row => [...row].map(pixel => pixel !== '.')), `edge at ${x},${y}`).toEqual(old.map(row => [...row].map(pixel => pixel !== '.')));
     }
     expect(edges.size).toBe(expectedEdges);
     const radius = BALANCE.campRadius;
@@ -439,6 +439,18 @@ describe('the grown clearing', () => {
     expect(map.rimStones.every(stone => oldStones.some(old => old.x === stone.x && old.y === stone.y && old.sprite === stone.sprite))).toBe(true);
     expect(map.rimStones).toHaveLength(20);
     expect(buildMap(nodes, 'camp')).toEqual(map);
+  });
+
+  it('uses varied earth shades rather than a dark continuous outline', () => {
+    const map = buildMap(nodes, 'camp');
+    const shades = new Set(map.campEdges.flatMap(item => {
+      const edge = terrainSprites[item.sprite];
+      return edge.frames.still.flatMap(row => [...row].filter(pixel => pixel !== '.').map(pixel => edge.legend[pixel]));
+    }));
+    expect(shades).toContain('earth1');
+    expect(shades).toContain('earth2');
+    expect(shades).toContain('earth3');
+    expect(shades).not.toContain('earth0');
   });
 
   it('makes the ground earth where the north near step reaches', () => {
@@ -450,11 +462,13 @@ describe('the grown clearing', () => {
     expect(map.campEdges.length).toBeGreaterThan(0);
   });
 
-  it('shares one sprite between identical edge tiles', () => {
-    // With the north and south near ground cleared, a few edge tiles come out pixel for pixel alike.
-    const map = buildMap(nodes, 'camp', 'summer', grown(['north-near', 'south-near']));
-    const names = new Set(map.campEdges.map(edge => edge.sprite));
-    expect(names.size).toBeLessThan(map.campEdges.length);
+  it('reuses edge sprites when the same clearing is redrawn', () => {
+    const clearing = grown(['north-near', 'south-near']);
+    const first = buildMap(nodes, 'camp', 'summer', clearing);
+    const spriteCount = Object.keys(terrainSprites).filter(name => name.startsWith('clearingEdge')).length;
+    const second = buildMap(nodes, 'camp', 'summer', clearing);
+    expect(second.campEdges).toEqual(first.campEdges);
+    expect(Object.keys(terrainSprites).filter(name => name.startsWith('clearingEdge'))).toHaveLength(spriteCount);
     for (const edge of buildMap(nodes, 'camp', 'summer', grown(farCleared)).campEdges) expect(terrainSprites[edge.sprite]).toBeDefined();
   });
 
