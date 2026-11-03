@@ -3,7 +3,7 @@ import { nightStart } from '../src/game/calendar';
 import { BALANCE, LOOKOUT, SITES, createGame, type GameState } from '../src/game/state';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { markedTrees } from '../src/game/clearing';
-import { KEY_ACTIONS, actionPose, closestSite, closestTree, gatherSpot, promptFor, useKeyAction } from '../src/scene/prompts';
+import { KEY_ACTIONS, actionEffect, actionPose, closestSite, closestTree, gatherSpot, promptFor, useKeyAction } from '../src/scene/prompts';
 import { stock } from './stock';
 import { addFood, emptyFood } from '../src/game/food';
 
@@ -239,6 +239,14 @@ describe('single-press keys', () => {
 });
 
 describe('action feedback', () => {
+  it('raises dust at the quarry face when it is dug, and steam or a star where the survivor stands', () => {
+    const state = { ...createGame(), player: { ...createGame().player, x: 5, y: 6 } };
+    expect(actionEffect({ type: 'digQuarry' }, state)).toEqual({ kind: 'dust', x: QUARRY_SITE.x, y: QUARRY_SITE.y });
+    expect(actionEffect({ type: 'cook' }, state)).toEqual({ kind: 'cook', x: 5, y: 6 });
+    expect(actionEffect({ type: 'stargaze' }, state)).toEqual({ kind: 'stargaze', x: 5, y: 6 });
+    expect(actionEffect({ type: 'rest' }, state)).toBeUndefined();
+  });
+
   it('poses the survivor for gathering, resting, cooking and stargazing', () => {
     expect(actionPose('gather')).toBe('gather');
     expect(actionPose('chopTree')).toBe('gather');

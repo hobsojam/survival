@@ -187,6 +187,20 @@ const smokePuff = define(8, 8, { a: 'stone3', b: 'stone4' }, {
   puff1: g => { box(g, 2, 3, 4, 3, 'a'); box(g, 3, 2, 2, 2, 'b'); dot(g, 6, 3, 'b'); },
   puff2: g => { box(g, 1, 2, 5, 3, 'a'); box(g, 2, 1, 3, 2, 'b'); dot(g, 6, 2, 'b'); }
 }, [4, 7], { puff: { frames: ['puff0', 'puff1', 'puff2'], frameRate: 5, repeat: 0 } });
+/** Paints a frame from rows of legend keys, '.' for clear. */
+const paint = (rows: string[]) => (g: Grid): void => rows.forEach((row, y) => [...row].forEach((c, x) => { if (c !== '.') dot(g, x, y, c); }));
+/** A swallow seen from below, facing right: dark wings beating, a forked tail and a pale throat. */
+const swallowSprite = define(7, 4, { a: 'night', b: 'paper' }, {
+  fly0: paint(['..a....', 'a.aa...', '.aaaaba', 'a......']),
+  fly1: paint(['a......', '.aaaaba', 'a.aa...', '..a....'])
+}, [3, 2]);
+/** A butterfly with yellow wings tipped pink, open and then closed. */
+const butterflySprite = define(7, 4, { a: 'flower1', b: 'flower3', k: 'ink' }, {
+  flap0: paint(['bb...bb', 'baakaab', '.aakaa.', '...k...']),
+  flap1: paint(['...b...', '..bab..', '..aka..', '...k...'])
+}, [3, 3]);
+/** A chip of stone knocked off the quarry face. */
+const stoneChip = define(2, 2, { a: 'stone2', b: 'stone1' }, { still: g => { dot(g, 0, 0, 'a'); dot(g, 1, 0, 'a'); dot(g, 1, 1, 'b'); } }, [1, 1]);
 const spark = define(1, 1, { a: 'fire4' }, { still: g => dot(g, 0, 0, 'a') }, [0, 0]);
 const windStreak = define(12, 3, { a: 'frost' }, {
   streak0: g => { line(g, 0, 2, 7, 1, 'a'); box(g, 7, 1, 3, 1, 'a'); },
@@ -254,6 +268,6 @@ for (let variant = 0; variant < 3; variant++) frostPainters[`frost${variant}`] =
 const morningFrost = define(16, 16, frostLegend, frostPainters, [8, 15]);
 
 export const wildlifeSprites: Record<string, SpriteDef> = {
-  bird: birdSprite, fox: foxSprite, wolf: wolfSprite, keepsake: keepsakeSprite, firefly: fireflySprite, leaf: leafSprite, eyes: eyesSprite, rabbit: rabbitSprite, wolfTracks: wolfTracksSprite, gatherPop, smokePuff, spark,
+  bird: birdSprite, fox: foxSprite, wolf: wolfSprite, keepsake: keepsakeSprite, firefly: fireflySprite, leaf: leafSprite, eyes: eyesSprite, rabbit: rabbitSprite, wolfTracks: wolfTracksSprite, swallow: swallowSprite, butterfly: butterflySprite, gatherPop, smokePuff, stoneChip, spark,
   windStreak, snowFlake, rainStreak, puddle, cookSteam, shootingStar, morningFrost
 };

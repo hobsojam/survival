@@ -1,5 +1,6 @@
 import { BALANCE, type ResourceNode } from '../game/state';
-import { nightStart } from '../game/calendar';
+import { isSpring, isSummer, isWinter, nightStart } from '../game/calendar';
+import { QUARRY_MEADOWS } from './quarryGeometry';
 import { WOLF_LOW_FUEL } from '../game/wolves';
 import { RABBIT_HOMES, dayHash as hash, type Point } from '../game/wildlife';
 
@@ -177,3 +178,41 @@ export function foxFrame(pose: 'trot' | 'run' | 'sit', elapsedSeconds: number): 
 export function fireflyFrame(index: number, timeMs: number): string {
   return `firefly:glow${Math.floor(timeMs / 500 + index) % 2}`;
 }
+
+/** Small birds that hop about the quarry floor, clear of the dig spot. They fly off like the camp's birds, but never forage. */
+export const QUARRY_BIRD_HOMES: Point[] = [{ x: 9.6, y: 15.4 }, { x: 10.5, y: 16 }, { x: 15.2, y: 13.4 }];
+
+export interface FlyingPose { x: number; y: number; frame: string; facing: 1 | -1 }
+
+/** Swallows wheel along the top of the quarry face, each on its own loop at its own speed. */
+export const SWALLOW_COUNT = 3;
+export function swallowAt(index: number, timeMs: number): FlyingPose {
+  const seconds = timeMs / 1000;
+  const angle = seconds * (.55 + index * .12) + index * 2.1;
+  const reach = 5.5 - index * .8;
+  return {
+    x: 8 + Math.cos(angle) * reach,
+    y: 7 - index * .3 + Math.sin(angle) * 1.2 + Math.sin(angle * 3) * .3,
+    // Moving along the loop's top they head left, along its bottom right.
+    frame: Math.floor(seconds * 8 + index) % 2 ? 'swallow:fly1' : 'swallow:fly0',
+    facing: Math.sin(angle) > 0 ? -1 : 1
+  };
+}
+/** Swallows come with the spring and leave for the winter, and roost at night. */
+export const swallowsOut = (day: number, dark: number): boolean => !isWinter(day) && dark < 0.3;
+
+/** One butterfly to each meadow patch, wandering about over its flowers. */
+export const BUTTERFLY_COUNT = QUARRY_MEADOWS.length;
+export function butterflyAt(index: number, timeMs: number): FlyingPose {
+  const seconds = timeMs / 1000 + index * 3.7;
+  const [mx, my] = QUARRY_MEADOWS[index];
+  const dx = Math.sin(seconds * .7) * 1.3 + Math.sin(seconds * 1.9) * .3;
+  return {
+    x: mx + .5 + dx,
+    y: my + .5 + Math.cos(seconds * .5 + index) * .8 - .4 - Math.abs(Math.sin(seconds * 3)) * .2,
+    frame: Math.floor(seconds * 6) % 2 ? 'butterfly:flap1' : 'butterfly:flap0',
+    facing: Math.cos(seconds * .7) >= 0 ? 1 : -1
+  };
+}
+/** Butterflies are out on spring and summer days. */
+export const butterfliesOut = (day: number, dark: number): boolean => (isSpring(day) || isSummer(day)) && dark < 0.3;

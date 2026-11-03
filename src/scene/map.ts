@@ -4,7 +4,7 @@ import { QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 import { clearingTile, pathTile, quarryGroundTile, terrainSprites } from '../art/terrain';
 import { CLEARING_STEPS, STEP_IDS, clearingKey, clearingReach, type ClearingState, type StepId } from '../game/clearing';
 import { CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_OPEN_PATHS, CAMP_PATHS, CAMP_SIGN, QUARRY_PATHS, QUARRY_SIGN, mixHash, pathDistance, type PathRoute } from './mapGeometry';
-import { FACE_HEIGHT, faceBottom, floorDepth } from './quarryGeometry';
+import { FACE_HEIGHT, QUARRY_MEADOWS, faceBottom, floorDepth } from './quarryGeometry';
 
 export interface MapItem { x: number; y: number; sprite: string }
 export interface TerrainMap { ground: string[][]; pathTiles: MapItem[]; campEdges: MapItem[]; decorations: MapItem[]; rimStones: MapItem[]; trees: MapItem[]; groves: MapItem[][];
@@ -71,6 +71,8 @@ const emptyMap = (): TerrainMap => ({ ground: [], pathTiles: [], campEdges: [], 
 /** Boulders sit about the quarry's open ground; clumps of trees stand between them. */
 const QUARRY_BOULDERS = [[20, 9], [27, 11], [33, 19], [24, 20], [9, 17], [18, 25], [35, 7], [6, 8], [29, 26], [14, 5]];
 const QUARRY_CLUMPS = [[30, 8], [33, 23], [22, 5], [7, 24], [24, 22]];
+/** What the quarrymen left on the floor: a stack of cut blocks, an old barrow and a block that tumbled from the face. */
+const QUARRY_PROPS: readonly MapItem[] = [{ x: 8, y: 13, sprite: 'cutBlocks' }, { x: 17, y: 12, sprite: 'barrow' }, { x: 11, y: 16, sprite: 'tumbledBlock' }];
 const CLUMP_OFFSETS = [[0, 0], [1, 0], [0, 1], [-1, 1], [1, 1], [-1, 0], [0, -1]];
 
 /**
@@ -100,7 +102,7 @@ function quarryWoods(x: number, y: number): boolean {
 }
 
 /** The quarry: a cut face in the west above a gravel floor, a worn track home, boulders and stones, and woods all round. */
-function buildQuarryMap(): TerrainMap {
+function buildQuarryMap(time: Season): TerrainMap {
   const map = emptyMap();
   const boulders = QUARRY_BOULDERS.filter(([x, y]) => quarryClear(x, y, BOULDER_TRACK_CLEARANCE))
     .map(([x, y]) => ({ x, y, sprite: `boulder${hash(x, y, 11) % 2}` }));
@@ -113,8 +115,9 @@ function buildQuarryMap(): TerrainMap {
       row.push(ground);
       if (quarryWoods(x, y)) {
         if (quarryClear(x, y, TREE_TRACK_CLEARANCE) && !boulders.some(item => Math.hypot(item.x - x, item.y - y) < 1.2)) map.trees.push(treeAt(x, y));
-      } else if (/^grass\d$/.test(ground) && quarryOpen(x, y, boulders) && hash(x, y, 4) % 4 === 0) {
-        map.decorations.push({ x, y, sprite: quarryDetail(x, y) });
+      } else if (/^grass\d$/.test(ground) && quarryOpen(x, y, boulders)) {
+        const sprite = quarryDecoration(x, y, time);
+        if (sprite) map.decorations.push({ x, y, sprite });
       }
     }
     map.ground.push(row);
@@ -126,7 +129,9 @@ function buildQuarryMap(): TerrainMap {
     map.trees.push(...clump.map(({ x, y }) => treeAt(x, y)));
   }
   // Nothing lies flat under a clump's trunks; the boulders go in last, among the stones.
-  map.decorations = [...map.decorations.filter(item => !taken(item.x, item.y)), ...boulders];
+  map.decorations = [...map.decorations.filter(item => !taken(item.x, item.y)), ...boulders, ...QUARRY_PROPS];
+  // The flowers are under the snow in winter.
+  if (time === 'winter') map.decorations = map.decorations.filter(item => !item.sprite.startsWith('flower'));
   map.signs = [{ ...QUARRY_SIGN, sprite: 'signpostCamp' }];
   return map;
 }
@@ -135,6 +140,21 @@ function buildQuarryMap(): TerrainMap {
 function quarryOpen(x: number, y: number, boulders: readonly MapItem[]): boolean {
   return !nearSign(x, y, QUARRY_SIGN) && boulders.every(item => Math.hypot(item.x - x, item.y - y) >= 1.2)
     && [QUARRY_SITE, RUBBLE_SITE].every(site => Math.hypot(x - site.x, y - site.y) >= 1.5);
+}
+
+/**
+ * What lies on an open grass tile, if anything: flowers and long grass in the meadow patches, ferns where the grass meets
+ * the woods, a few more flowers anywhere in spring, and otherwise now and then a stone, a tuft, mushrooms or a stump.
+ */
+function quarryDecoration(x: number, y: number, time: Season): string | undefined {
+  if (QUARRY_MEADOWS.some(([px, py]) => Math.hypot(x - px, y - py) <= 2.5)) {
+    const pick = hash(x, y, 4) % 3;
+    if (pick === 0) return hash(x, y, 5) % 2 ? `flowerClump${hash(x, y, 6) % 2}` : `flower${hash(x, y, 5) % 3}`;
+    if (pick === 1) return `longGrass${hash(x, y, 5) % 2}`;
+  }
+  if (edgeDistance(x, y) <= 4 && hash(x, y, 10) % 3 === 0) return `fern${hash(x, y, 5) % 2}`;
+  if (time === 'spring' && hash(x, y, 9) % 10 === 0) return `flower${hash(x, y, 5) % 3}`;
+  return hash(x, y, 4) % 3 === 0 ? quarryDetail(x, y) : undefined;
 }
 
 /** Mostly loose stones, with a tuft of grass, an old stump or a ring of mushrooms here and there. */
@@ -152,7 +172,7 @@ function quarryDetail(x: number, y: number): string {
  * except the marked step's, which the scene draws itself as choppable trees.
  */
 export function buildMap(nodes: ResourceNode[], key: TerrainKey, time: Season = 'summer', clearing: ClearingState = { cleared: [], marked: null, felled: [] }): TerrainMap {
-  if (key === 'quarry') return buildQuarryMap();
+  if (key === 'quarry') return buildQuarryMap(time);
   const standing = STEP_IDS.filter(id => !clearing.cleared.includes(id));
   const site: CampSite = { nodes, routes: ROUTES[key], cleared: clearing.cleared, reserved: standing.flatMap(id => CLEARING_STEPS[id].trees) };
   const map = emptyMap();

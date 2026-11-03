@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
 import { QUARRY_SITE } from '../src/game/areas';
 import { BALANCE, createGame } from '../src/game/state';
+import { QUARRY_MEADOWS, faceBottom, floorDepth } from '../src/scene/quarryGeometry';
 import {
   RABBIT_HOMES, rabbitAt, rabbitCount,
   WOLF_SPOTS, wolfCount, wolfWatch,
+  BUTTERFLY_COUNT, QUARRY_BIRD_HOMES, SWALLOW_COUNT, butterfliesOut, butterflyAt, swallowAt, swallowsOut,
   BIRD_FLEE_RADIUS, BIRD_FORAGE_RADIUS, BIRD_HOMES, FIREFLY_HOMES, FOX, birdForageTarget, birdMayReturn, birdShouldLeave, EYE_SPOTS, LEAF_HOMES, darkness, eyesAt, fireflyGlow, foxAt, foxVisits, foxWindow, leafAt
 } from '../src/scene/ambient';
 
@@ -248,5 +250,54 @@ describe('spring rabbits', () => {
       }
     });
     expect(frames).toEqual(new Set(['rabbit:sit', 'rabbit:nibble0', 'rabbit:nibble1', 'rabbit:hop0', 'rabbit:hop1']));
+  });
+});
+
+describe('quarry life', () => {
+  const times = Array.from({ length: 200 }, (_, i) => i * 137);
+
+  it('wheels the swallows along the top of the face, never out over the floor', () => {
+    for (let index = 0; index < SWALLOW_COUNT; index++) {
+      const spots = times.map(t => swallowAt(index, t));
+      for (const { x, y } of spots) {
+        expect(x).toBeGreaterThanOrEqual(1);
+        expect(x).toBeLessThanOrEqual(16);
+        expect(y).toBeLessThan((faceBottom(x) ?? 11) + .5);
+        expect(y).toBeGreaterThan(4);
+      }
+      // They really fly: the loop covers several tiles and they turn both ways.
+      expect(Math.max(...spots.map(spot => spot.x)) - Math.min(...spots.map(spot => spot.x))).toBeGreaterThan(5);
+      expect(new Set(spots.map(spot => spot.facing))).toEqual(new Set([1, -1]));
+      expect(new Set(spots.map(spot => spot.frame))).toEqual(new Set(['swallow:fly0', 'swallow:fly1']));
+    }
+  });
+
+  it('flutters each butterfly about its own meadow patch', () => {
+    expect(BUTTERFLY_COUNT).toBe(QUARRY_MEADOWS.length);
+    for (let index = 0; index < BUTTERFLY_COUNT; index++) {
+      const [mx, my] = QUARRY_MEADOWS[index];
+      for (const t of times) {
+        const { x, y } = butterflyAt(index, t);
+        expect(Math.hypot(x - mx - .5, y - my - .5)).toBeLessThanOrEqual(2.5);
+      }
+      expect(new Set(times.map(t => butterflyAt(index, t).frame))).toEqual(new Set(['butterfly:flap0', 'butterfly:flap1']));
+    }
+  });
+
+  it('brings the swallows from spring to autumn and the butterflies in spring and summer, by day only', () => {
+    expect(swallowsOut(5, 0)).toBe(true);
+    expect(swallowsOut(15, 0)).toBe(false);
+    expect(swallowsOut(25, .5)).toBe(false);
+    expect(butterfliesOut(25, 0)).toBe(true);
+    expect(butterfliesOut(35, 0)).toBe(true);
+    expect(butterfliesOut(5, 0)).toBe(false);
+    expect(butterfliesOut(35, .5)).toBe(false);
+  });
+
+  it('keeps the gravel birds on the floor, clear of the dig spot', () => {
+    for (const home of QUARRY_BIRD_HOMES) {
+      expect(floorDepth(home.x, home.y)).toBeLessThan(.92);
+      expect(Math.hypot(home.x - QUARRY_SITE.x, home.y - QUARRY_SITE.y)).toBeGreaterThanOrEqual(2.5);
+    }
   });
 });

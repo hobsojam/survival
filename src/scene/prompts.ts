@@ -73,6 +73,13 @@ export function useKeyAction(state: GameState): GameAction | undefined {
   return choices.find(choice => choice.action)?.action ?? (isAtHome(state) ? { type: 'rest' } : undefined);
 }
 
+/** The scene effect an action that changed the game plays, and where: dust off the quarry face, or steam or a star by the survivor. */
+export function actionEffect(action: GameAction, after: GameState): { kind: 'dust' | 'cook' | 'stargaze'; x: number; y: number } | undefined {
+  if (action.type === 'digQuarry') return { kind: 'dust', ...QUARRY_SITE };
+  if (action.type === 'cook' || action.type === 'stargaze') return { kind: action.type, x: after.player.x, y: after.player.y };
+  return undefined;
+}
+
 /** Where a gathering action happened, read from the state before it, for the pick-up sparkle. */
 export function gatherSpot(action: GameAction, before: GameState): { x: number; y: number; kind: ResourceKind } | undefined {
   switch (action.type) {

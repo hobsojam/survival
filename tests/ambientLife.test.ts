@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createGame } from '../src/game/state';
+import { createGame, type GameState } from '../src/game/state';
 import { worldX } from '../src/scene/art';
-import { BIRD_HOMES, EYE_SPOTS, RABBIT_HOMES, WOLF_SPOTS, rabbitCount, wolfCount } from '../src/scene/ambient';
+import { BIRD_HOMES, EYE_SPOTS, QUARRY_BIRD_HOMES, RABBIT_HOMES, WOLF_SPOTS, rabbitCount, wolfCount } from '../src/scene/ambient';
 import { nightStart } from '../src/game/calendar';
 import { AmbientLife } from '../src/scene/ambientLife';
 
@@ -317,5 +317,47 @@ describe('the friend in motion', () => {
     expect(bird.texture).toMatch(/^bird:fly/);
     for (let t = 400; t <= 1500; t += 100) life.update({ ...day, player: { ...day.player, x: 18 } }, 0.1, t);
     expect(bird.texture).toBe('bird:idle');
+  });
+});
+
+describe('daytime life in the quarry', () => {
+  const base = createGame();
+  const summerDay = { ...base, area: 'quarry' as const, day: 35, timeOfDay: 60, player: { ...base.player, x: 36, y: 15 } };
+  const run = (life: AmbientLife, state: GameState, from = 100, to = 600) => {
+    for (let t = from; t <= to; t += 100) life.update(state, 0.1, t);
+  };
+
+  it('sends swallows over the face and butterflies over the meadow on a summer day', () => {
+    const { scene, of } = sceneWithImages();
+    const life = new AmbientLife(scene as never);
+    run(life, summerDay);
+    expect(of('swallow').filter(image => image.visible).length).toBeGreaterThan(0);
+    expect(of('butterfly').filter(image => image.visible).length).toBeGreaterThan(0);
+    // Back at camp, they stay behind.
+    run(life, { ...summerDay, area: 'camp' }, 700, 900);
+    expect(of('swallow').some(image => image.visible)).toBe(false);
+    expect(of('butterfly').some(image => image.visible)).toBe(false);
+  });
+
+  it('keeps the quarry quiet in winter and at night', () => {
+    for (const state of [{ ...summerDay, day: 15 }, { ...summerDay, timeOfDay: nightStart(35) + 40 }]) {
+      const { scene, of } = sceneWithImages();
+      const life = new AmbientLife(scene as never);
+      run(life, state);
+      expect(of('swallow').some(image => image.visible)).toBe(false);
+      expect(of('butterfly').some(image => image.visible)).toBe(false);
+      expect(of('bird').some(image => image.visible)).toBe(false);
+    }
+  });
+
+  it('lets small birds hop on the gravel, and fly off when the survivor comes close', () => {
+    const { scene, of } = sceneWithImages();
+    const life = new AmbientLife(scene as never);
+    run(life, summerDay);
+    const onGravel = of('bird').filter(image => image.visible);
+    expect(onGravel.map(image => image.x).sort()).toEqual(QUARRY_BIRD_HOMES.map(home => Math.round(worldX(home.x))).sort());
+    const [home] = QUARRY_BIRD_HOMES;
+    run(life, { ...summerDay, player: { ...summerDay.player, x: home.x + .5, y: home.y } }, 700, 900);
+    expect(of('bird').some(image => image.texture.startsWith('bird:fly'))).toBe(true);
   });
 });
