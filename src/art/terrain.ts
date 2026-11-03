@@ -3,7 +3,7 @@ import type { PaletteKey } from './palette';
 import { BALANCE } from '../game/state';
 import { CLEARING_STEPS, STEP_IDS, clearingKey, clearingReach, type StepId } from '../game/clearing';
 import { CAMP_OPEN_PATHS, CAMP_PATHS, mixHash, pathDistance, type PathRoute } from '../scene/mapGeometry';
-import { FACE_HEIGHT, FLOOR_EDGE_IN, FLOOR_EDGE_OUT, TRACK_EDGE_OUT, TRACK_HALF_WIDTH, faceBottom, floorDepth, quarryGroundAt, trackDistance, type QuarryGround } from '../scene/quarryGeometry';
+import { FACE_HEIGHT, FLOOR_EDGE_IN, FLOOR_EDGE_OUT, faceBottom, floorDepth, quarryGroundAt, trackDistance, trackEdgeOut, trackHalfWidth, type QuarryGround } from '../scene/quarryGeometry';
 
 type Grid = string[][];
 const blank = (w: number, h: number, fill = '.'): Grid => Array.from({ length: h }, () => Array.from({ length: w }, () => fill));
@@ -21,7 +21,7 @@ const sprite = (g: Grid, legend: Record<string, PaletteKey>, anchor?: [number, n
 });
 const groundLegend = { a: 'grass1', b: 'grass2', c: 'grass3', d: 'grass4', e: 'earth0', f: 'earth1', g: 'earth2', h: 'earth3', i: 'earth4', s: 'stone2', t: 'stone3' } as const;
 
-const pathLegend = { ...groundLegend, e: 'path1', f: 'path2', g: 'path3' } as const;
+const pathLegend = { ...groundLegend, e: 'path2', f: 'path3', g: 'path4' } as const;
 
 export const terrainSprites: Record<string, SpriteDef> = {};
 for (let variant = 0; variant < 4; variant++) {
@@ -158,7 +158,9 @@ function pathTileGrid(x: number, y: number, destinations: readonly PathRoute[]):
     if (distance > .53) continue;
     if (distance > .39 && mixHash(worldX, worldY, 75) % 100 >= (.53 - distance) / .14 * 100) continue;
     const grain = mixHash(worldX, worldY, 77) % 100;
-    g[py][px] = grain < 7 ? 'e' : grain < 20 ? 'g' : 'f';
+    if (grain < 6) g[py][px] = 'e';
+    else if (grain < 12) g[py][px] = 'g';
+    else g[py][px] = 'f';
     filled++;
   }
   return filled ? g : null;
@@ -226,7 +228,7 @@ const quarryPixel: Record<QuarryGround, (px: number, py: number) => string> = {
   // Where the track runs into the floor's soft edge, it shades into gravel rather than ending in a hard line.
   track: (px, py) => fade(px, py, 71, (FLOOR_EDGE_OUT - floorDepth(centre(px), centre(py))) / (FLOOR_EDGE_OUT - FLOOR_EDGE_IN))
     ? floorPixel(px, py) : trackPixel(px, py),
-  trackEdge: (px, py) => fade(px, py, 67, (TRACK_EDGE_OUT - trackDistance(centre(px), centre(py))) / (TRACK_EDGE_OUT - TRACK_HALF_WIDTH))
+  trackEdge: (px, py) => fade(px, py, 67, (trackEdgeOut(centre(px)) - trackDistance(centre(px), centre(py))) / (trackEdgeOut(centre(px)) - trackHalfWidth(centre(px))))
     ? trackPixel(px, py) : grassPixel(px, py)
 };
 

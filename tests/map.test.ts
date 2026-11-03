@@ -140,16 +140,17 @@ describe('terrain composition', () => {
     }
   });
 
-  it('renders camp paths as varied worn earth without a dark outline', () => {
+  it('renders camp paths with the quarry track earth tones and no dark outline', () => {
     const map = buildMap(nodes, 'camp-open');
     const colors = new Set(map.pathTiles.flatMap(item => {
       const sprite = terrainSprites[item.sprite];
       return sprite.frames.still.flatMap(row => [...row].filter(pixel => pixel !== '.').map(pixel => sprite.legend[pixel]));
     }));
-    expect(colors).toContain('path1');
     expect(colors).toContain('path2');
     expect(colors).toContain('path3');
+    expect(colors).toContain('path4');
     expect(colors).not.toContain('path0');
+    expect(colors).not.toContain('path1');
   });
 
   it('marks the camp circle with sixteen to twenty outlined high-contrast stones', () => {
@@ -225,6 +226,13 @@ describe('terrain composition', () => {
       const t = Math.max(0, Math.min(1, ((x - centerX) * dx + (y - centerY) * dy) / (dx * dx + dy * dy)));
       expect(Math.hypot(x - centerX - t * dx, y - centerY - t * dy), `tree at ${tree.x},${tree.y}`).toBeGreaterThanOrEqual(1.35);
     }
+  });
+
+  it('narrows the quarry track as it reaches the camp crossing', () => {
+    const offsetY = 16 * 16 + 2;
+    expect(quarryGroundAt(30 * 16 + 8, 15 * 16 + 11)).toBe('track');
+    expect(quarryGroundAt(QUARRY_EXIT.x * 16 + 8, 15 * 16 + 8)).toBe('track');
+    expect(quarryGroundAt(QUARRY_EXIT.x * 16 + 8, offsetY)).not.toBe('track');
   });
 
   it('the quarry map is rocky and wooded, not a second meadow', () => {
