@@ -1,3 +1,4 @@
+import { BALANCE } from '../game/state';
 import { QUARRY_PATHS, mixHash, pathDistance } from './mapGeometry';
 
 // The quarry's shapes, in tile units (a tile's centre is x + .5): a cut rock face along the west with a grassy plateau
@@ -9,10 +10,13 @@ export const FACE_HEIGHT = 2.5;
 /** Half the track's width, in tiles; its soft edge runs a fifth of a tile further. */
 export const TRACK_HALF_WIDTH = 0.8;
 const TRACK_EDGE = 0.2;
-/** Where the floor's soft edge starts and ends, and where the track's ends, as floor depth and track distance. */
+/** Where the floor's soft edge starts and ends, as floor depth. */
 export const FLOOR_EDGE_IN = .92;
 export const FLOOR_EDGE_OUT = 1.04;
-export const TRACK_EDGE_OUT = TRACK_HALF_WIDTH + TRACK_EDGE;
+/** The broad quarry track narrows over its last four tiles to meet the camp footpath. */
+const trackTaper = (x: number): number => Math.max(0, Math.min(1, (x - (BALANCE.mapWidth - 5)) / 4));
+export function trackHalfWidth(x: number): number { return TRACK_HALF_WIDTH - .41 * trackTaper(x); }
+export function trackEdgeOut(x: number): number { return trackHalfWidth(x) + TRACK_EDGE - .06 * trackTaper(x); }
 /** Where the quarry's meadow flowers gather, out in the open grass clear of the floor, the track and the woods. */
 export const QUARRY_MEADOWS: readonly (readonly [number, number])[] = [[26, 9], [30, 20], [20, 23], [9, 21]];
 const FLOOR = { x: 13.5, y: 14, rx: 7, ry: 4 } as const;
@@ -54,7 +58,7 @@ export function quarryGroundAt(px: number, py: number): QuarryGround {
   }
   const depth = floorDepth(x, y), track = trackDistance(x, y);
   if (depth < FLOOR_EDGE_IN) return 'floor';
-  if (track < TRACK_HALF_WIDTH) return 'track';
+  if (track < trackHalfWidth(x)) return 'track';
   if (depth < FLOOR_EDGE_OUT) return 'floorEdge';
-  return track < TRACK_EDGE_OUT ? 'trackEdge' : 'grass';
+  return track < trackEdgeOut(x) ? 'trackEdge' : 'grass';
 }

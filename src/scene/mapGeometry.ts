@@ -10,11 +10,11 @@ export const CAMP_CENTER_Y = BALANCE.campY + .5;
 
 const fromCamp = ([x, y]: readonly [number, number]): PathRoute => [BALANCE.campX, BALANCE.campY, x, y];
 export const CAMP_PATHS: readonly PathRoute[] = PATH_DESTINATIONS.map(fromCamp);
-/** Once the shelter stands, a fifth path leads west to the crossing. */
-export const CAMP_OPEN_PATHS: readonly PathRoute[] = [...CAMP_PATHS, fromCamp([CAMP_EXIT.x, CAMP_EXIT.y])];
+/** Once the shelter stands, a fifth path leads west and continues through the map edge. */
+export const CAMP_OPEN_PATHS: readonly PathRoute[] = [...CAMP_PATHS, fromCamp([CAMP_EXIT.x, CAMP_EXIT.y]), [CAMP_EXIT.x, CAMP_EXIT.y, CAMP_EXIT.x - 1, CAMP_EXIT.y]];
 
-/** In the quarry, a worn track runs from the east edge of the quarry floor to the way home. */
-export const QUARRY_PATHS: readonly PathRoute[] = [[19, 14, QUARRY_EXIT.x, QUARRY_EXIT.y]];
+/** In the quarry, a worn track runs from the floor through the east edge to the way home. */
+export const QUARRY_PATHS: readonly PathRoute[] = [[19, 14, QUARRY_EXIT.x, QUARRY_EXIT.y], [QUARRY_EXIT.x, QUARRY_EXIT.y, QUARRY_EXIT.x + 1, QUARRY_EXIT.y]];
 
 /** Signposts beside each end of the west path: one at the quarry pointing home, one at camp pointing to the quarry. */
 export const QUARRY_SIGN = { x: QUARRY_EXIT.x - 2, y: QUARRY_EXIT.y - 2 } as const;
