@@ -14,11 +14,9 @@ const TRACK_EDGE = 0.2;
 export const FLOOR_EDGE_IN = .92;
 export const FLOOR_EDGE_OUT = 1.04;
 /** The broad quarry track narrows over its last four tiles to meet the camp footpath. */
-export function trackHalfWidth(x: number): number {
-  const taper = Math.max(0, Math.min(1, (x - (BALANCE.mapWidth - 5)) / 4));
-  return TRACK_HALF_WIDTH - .32 * taper;
-}
-export function trackEdgeOut(x: number): number { return trackHalfWidth(x) + TRACK_EDGE; }
+const trackTaper = (x: number): number => Math.max(0, Math.min(1, (x - (BALANCE.mapWidth - 5)) / 4));
+export function trackHalfWidth(x: number): number { return TRACK_HALF_WIDTH - .41 * trackTaper(x); }
+export function trackEdgeOut(x: number): number { return trackHalfWidth(x) + TRACK_EDGE - .06 * trackTaper(x); }
 /** Where the quarry's meadow flowers gather, out in the open grass clear of the floor, the track and the woods. */
 export const QUARRY_MEADOWS: readonly (readonly [number, number])[] = [[26, 9], [30, 20], [20, 23], [9, 21]];
 const FLOOR = { x: 13.5, y: 14, rx: 7, ry: 4 } as const;

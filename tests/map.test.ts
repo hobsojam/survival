@@ -235,6 +235,21 @@ describe('terrain composition', () => {
     expect(quarryGroundAt(QUARRY_EXIT.x * 16 + 8, offsetY)).not.toBe('track');
   });
 
+  it('keeps the visible crossing open at both map edges', () => {
+    const camp = buildMap(nodes, 'camp-open');
+    const quarry = buildMap([], 'quarry');
+    const paintedRows = (map: TerrainMap, tileX: number, pixelX: number) =>
+      Array.from({ length: 48 }, (_, i) => i + 14 * 16).filter(worldY =>
+        visibleGround(map, tileX, Math.floor(worldY / 16), pixelX, worldY % 16)?.startsWith('path'));
+    const campRows = paintedRows(camp, 0, 0);
+    const quarryRows = paintedRows(quarry, QUARRY_EXIT.x, 15);
+    for (let y = 244; y <= 251; y++) {
+      expect(campRows, `camp crossing gap at row ${y}`).toContain(y);
+      expect(quarryRows, `quarry crossing gap at row ${y}`).toContain(y);
+    }
+    expect(Math.abs(campRows.length - quarryRows.length)).toBeLessThanOrEqual(3);
+  });
+
   it('the quarry map is rocky and wooded, not a second meadow', () => {
     const camp = buildMap(nodes, 'camp');
     const quarry = buildMap([], 'quarry');
