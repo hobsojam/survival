@@ -503,8 +503,9 @@ export class App {
 
   /** Writes a one-button panel's view into the elements named after it, such as #axe-title and #axe-button. */
   private renderActionPanel(name: string, view: ActionPanelView): void {
-    const container = this.root.querySelector<HTMLElement>(name === 'mine' ? '#mine-panel' : `#${name}-row, #${name}-panel`);
+    const container = this.root.querySelector<HTMLElement>(`#${name}-row, #${name}-panel`);
     if (container) container.hidden = view.shown === false;
+    if (name === 'mine') this.root.querySelector<HTMLElement>('#mine-panel')!.hidden = view.shown === false;
     const button = this.root.querySelector<HTMLButtonElement>(`#${name}-button`);
     if (button) {
       button.disabled = view.disabled;
