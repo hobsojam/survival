@@ -4,7 +4,7 @@ import { applyAction, decorationBlocker, availableWood, availableFiber } from '.
 import { sceneVisuals } from '../src/scene/visuals';
 import { phase3Sprites } from '../src/art/phase3Sprites';
 import { upgradeSave } from '../src/game/saveUpgrades';
-import { loadGame, saveGame, SAVE_KEY, SAVE_VERSION } from '../src/game/save';
+import { loadGame, saveGame, SAVE_KEY } from '../src/game/save';
 import { DECORATION_CHOICES, decorationButtonView, decorationMarkup } from '../src/ui/panels';
 
 function house(changes: Partial<GameState> = {}): GameState {
@@ -94,7 +94,7 @@ describe('homestead decoration', () => {
   it('upgrades old saves and rejects decoration data without a house', () => {
     const old = structuredClone(createGame()) as unknown as Record<string, unknown>;
     delete old.decorations;
-    const upgraded = upgradeSave(SAVE_VERSION - 1, old);
+    const upgraded = upgradeSave(29, old);
     expect(upgraded.ok).toBe(true);
     if (upgraded.ok) expect((upgraded.state as GameState).decorations).toEqual({ paint: 'natural', flowerBoxes: false, fence: 0 });
     const storage = new MemoryStorage();

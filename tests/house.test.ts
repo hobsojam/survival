@@ -148,16 +148,17 @@ describe('where the house stands', () => {
 describe('the wood store', () => {
   it('holds the woodpile and the woodshed together', () => {
     expect(woodStoreCapacity(camp())).toBe(0);
-    expect(woodStoreCapacity(camp(undefined, { ...FINISHED_SHELTER, woodpile: true }))).toBe(12);
+    expect(woodStoreCapacity(camp(undefined, { ...FINISHED_SHELTER, woodpile: true }))).toBe(24);
     expect(woodStoreCapacity(housed())).toBe(24);
-    expect(woodStoreCapacity(housed({ woodpile: true }))).toBe(36);
+    expect(woodStoreCapacity(housed({ woodpile: true }))).toBe(48);
+    expect(woodStoreCapacity(housed({ woodpile: true, timberYard: true }))).toBe(72);
   });
 
   it('takes wood by itself up to the whole store, with only the house or beside the woodpile', () => {
     expect(settleStores(withBag(housed(), { wood: 2 }))).toMatchObject({ storedWood: 2, inventory: { wood: 0 } });
     expect(settleStores(withBag(housed({}, { storedWood: 23 }), { wood: 3 }))).toMatchObject({ storedWood: 24, inventory: { wood: 2 } });
     expect(settleStores(withBag(housed({ woodpile: true }, { storedWood: 12 }), { wood: 3 }))).toMatchObject({ storedWood: 15, inventory: { wood: 0 } });
-    const full = withBag(housed({ woodpile: true }, { storedWood: 36 }), { wood: 1 });
+    const full = withBag(housed({ woodpile: true }, { storedWood: 48 }), { wood: 1 });
     expect(settleStores(full)).toBe(full);
   });
 
@@ -187,8 +188,8 @@ describe('the woodshed', () => {
   });
 
   it('fills the woodshed by its share of the whole store, woodpile included', () => {
-    expect(shelterTexture(housed({ woodpile: true }, { storedWood: 17 }))).toBe('woodshed:some');
-    expect(shelterTexture(housed({ woodpile: true }, { storedWood: 18 }))).toBe('woodshed:full');
+    expect(shelterTexture(housed({ woodpile: true }, { storedWood: 23 }))).toBe('woodshed:some');
+    expect(shelterTexture(housed({ woodpile: true }, { storedWood: 24 }))).toBe('woodshed:full');
     expect(sceneVisuals(housed({ woodpile: true }, { storedWood: 7 }), 0).find(visual => visual.id === 'woodpile')?.texture).toBe(`woodpile:${stockFrame(7)}`);
   });
 
@@ -214,12 +215,15 @@ describe('the house in the save', () => {
   });
 
   it('holds up to the whole wood store', () => {
-    expect(save(housed({ woodpile: true }, { storedWood: 36 }))).toBe('loaded');
-    expect(save(housed({ woodpile: true }, { storedWood: 37 }))).toBe('invalid');
+    expect(save(housed({ woodpile: true }, { storedWood: 48 }))).toBe('loaded');
+    expect(save(housed({ woodpile: true }, { storedWood: 49 }))).toBe('invalid');
     expect(save(housed({}, { storedWood: 24 }))).toBe('loaded');
     expect(save(housed({}, { storedWood: 25 }))).toBe('invalid');
-    expect(save(camp(undefined, { ...FINISHED_SHELTER, woodpile: true }, { storedWood: 12 }))).toBe('loaded');
-    expect(save(camp(undefined, { ...FINISHED_SHELTER, woodpile: true }, { storedWood: 13 }))).toBe('invalid');
+    expect(save(camp(undefined, { ...FINISHED_SHELTER, woodpile: true }, { storedWood: 24 }))).toBe('loaded');
+    expect(save(camp(undefined, { ...FINISHED_SHELTER, woodpile: true }, { storedWood: 25 }))).toBe('invalid');
+    expect(save(camp(undefined, { ...FINISHED_SHELTER, woodpile: true, timberYard: true }, { storedWood: 48 }))).toBe('loaded');
+    expect(save(camp(undefined, { ...FINISHED_SHELTER, woodpile: true, timberYard: true }, { storedWood: 49 }))).toBe('invalid');
+    expect(save(camp(undefined, { ...FINISHED_SHELTER, timberYard: true }))).toBe('invalid');
   });
 
   it('keeps fireplace fuel to a lived-in house', () => {

@@ -221,7 +221,7 @@ export class GameScene extends Phaser.Scene {
   private showActionDone(action: GameAction, before: GameState): void {
     const spot = gatherSpot(action, before);
     if (spot) this.onSound('gather');
-    if (action.type === 'build' || action.type === 'decorate') this.onSound('build');
+    if (action.type === 'build' || action.type === 'decorate' || action.type === 'buildMine') this.onSound('build');
     if (spot) this.effects?.trigger('gather', this.time.now, spot.x, spot.y, spot.kind);
     const effect = actionEffect(action, this.state);
     if (effect) this.effects?.trigger(effect.kind, this.time.now, effect.x, effect.y);

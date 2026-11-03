@@ -135,3 +135,25 @@ describe('house decoration controls', () => {
     expect(fence.title).toContain('complete');
   });
 });
+
+describe('mine Build panel', () => {
+  it('shows its row and panel after the pickaxe is crafted, then keeps the built status visible', () => {
+    const { app, get } = renderer();
+    app['renderTools']();
+    expect(get('#mine-panel').hidden).toBe(true);
+    expect(get('#mine-row, #mine-panel').hidden).toBe(true);
+
+    const state = createGame();
+    state.progress.pickaxeCrafted = true;
+    Object.assign(app, { state });
+    app['renderTools']();
+    expect(get('#mine-panel').hidden).toBe(false);
+    expect(get('#mine-row, #mine-panel').hidden).toBe(false);
+    expect(get('#mine-button').disabled).toBe(true);
+
+    state.progress.mineBuilt = true;
+    app['renderTools']();
+    expect(get('#mine-copy').textContent).toContain('2 digs left');
+    expect(get('#mine-panel').hidden).toBe(false);
+  });
+});

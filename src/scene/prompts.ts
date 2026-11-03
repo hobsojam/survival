@@ -1,6 +1,6 @@
 import { isWinter, nightStart } from '../game/calendar';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceKind, type SiteId, type TreeNode } from '../game/state';
-import { isAtCamp, isInClearing, sleepBlocker, type GameAction } from '../game/rules';
+import { isAtCamp, isInClearing, mineBlocker, sleepBlocker, type GameAction } from '../game/rules';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 import { choppableTrees, isClearingStump } from '../game/clearing';
 import { sitePrompt } from '../game/sitePrompt';
@@ -178,6 +178,7 @@ function housePrompt(state: GameState): string {
 /** Everything in reach in the quarry area: a loose pile first, then the rubble or the quarry face. */
 function quarryChoices(state: GameState): Choice[] {
   const found = closestGatherable(state);
+  if (!found && within(state, QUARRY_SITE) && !mineBlocker(state)) return [{ label: 'Build timber mine', action: { type: 'buildMine' } }];
   return found ? [gatherChoice(state, found)] : [];
 }
 
@@ -185,15 +186,28 @@ function quarryPrompt(state: GameState): string {
   const found = closestGatherable(state);
   if (found) {
     const [label] = choiceLabels([gatherChoice(state, found)]);
-    return found.kind === 'pile' && within(state, QUARRY_SITE) ? `${label} · ${quarryFaceNote(state)}` : label;
+    if (!within(state, QUARRY_SITE)) return label;
+    if (found.kind === 'pile') return `${label} · ${quarryFaceNote(state)}`;
+    if (found.kind === 'quarry') return `${label}${mineStatus(state)}`;
+    return label;
   }
-  if (within(state, QUARRY_SITE) && state.quarryReadyDay > state.day) return 'Quarry · worked out until morning';
+  if (within(state, QUARRY_SITE)) {
+    if (!mineBlocker(state)) return 'E  Build timber mine · 16 wood · 4 fiber';
+    return `Quarry · worked out until morning${mineStatus(state)}`;
+  }
   if (within(state, QUARRY_EXIT)) return 'Walk east to return to camp';
   return 'WASD / arrows  Move';
 }
 
 /** What the quarry face is doing, for when E is busy with a loose pile beside it. */
 function quarryFaceNote(state: GameState): string {
-  if (state.quarryReadyDay > state.day) return 'Quarry · worked out until morning';
-  return state.progress.pickaxeCrafted ? 'Quarry · tap the face to dig' : 'Quarry · craft a pickaxe at the toolshed';
+  if (state.quarryReadyDay > state.day && (!state.progress.mineBuilt || state.mineReadyDay > state.day)) return `Quarry · worked out until morning${mineStatus(state)}`;
+  return state.progress.pickaxeCrafted ? `Quarry · tap the face to dig${mineStatus(state)}` : 'Quarry · craft a pickaxe at the toolshed';
+}
+
+function mineStatus(state: GameState): string {
+  if (!state.progress.pickaxeCrafted) return '';
+  if (!state.progress.mineBuilt) return ' · Build tab: timber mine (16 wood · 4 fiber)';
+  const digs = Number(state.quarryReadyDay <= state.day) + Number(state.mineReadyDay <= state.day);
+  return ` · Mine: ${digs} ${digs === 1 ? 'dig' : 'digs'} left`;
 }

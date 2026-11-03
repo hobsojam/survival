@@ -9,7 +9,7 @@ import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { BED_CROPS, bedSoil, bedStage, drawWaterBlocker, harvestBedBlocker, sowBedBlocker, type BedSoil, type BedStage } from '../game/beds';
 import { workSeconds } from '../game/needs';
 import { hasWoodStore, livesInHouse, woodStoreCapacity } from '../game/home';
-import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
+import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, mineBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
 import { WORKSHOP_UPGRADES, upgradeBlocker, type UpgradeId } from '../game/workshop';
 import { logsInStore } from '../game/wood';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
@@ -258,6 +258,16 @@ export function pickaxeView(state: GameState): ActionPanelView & { shown: boolea
     return { ...button, title: 'Pickaxe ready', copy: 'Tap the quarry face, or stand at it and press E, to dig a stone. It is ready again each dawn.', cost: 'Crafted' };
   }
   return { ...button, title: 'Craft a pickaxe', copy: blocker ?? 'Your toolshed is ready. Craft a pickaxe to work the quarry face.', cost: '2 wood · 1 fiber · 2 stone' };
+}
+
+export function mineView(state: GameState): ActionPanelView {
+  const shown = state.progress.pickaxeCrafted;
+  if (state.progress.mineBuilt) {
+    const digs = Number(state.quarryReadyDay <= state.day) + Number(state.mineReadyDay <= state.day);
+    return { shown, title: 'Timber-supported mine', copy: `${digs} ${digs === 1 ? 'dig' : 'digs'} left today. Each dig gives one stone; both return at dawn.`, cost: 'Built', disabled: true, ready: false };
+  }
+  const blocker = mineBlocker(state);
+  return { shown, title: 'Build a mine', copy: blocker ?? 'Brace the quarry face with timber for two digs each day.', cost: '16 wood · 4 fiber', disabled: Boolean(blocker), ready: !blocker };
 }
 
 export function potView(state: GameState): ActionPanelView {

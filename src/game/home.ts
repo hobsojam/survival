@@ -21,7 +21,9 @@ export function hasWoodStore(state: GameState): boolean {
 
 /** The single wood store: the woodpile's share if it is built, and the woodshed's once the house stands. */
 export function woodStoreCapacity(state: GameState): number {
-  return (state.structures.woodpile ? BALANCE.woodpileCapacity : 0) + (state.structures.house ? BALANCE.woodshedCapacity : 0);
+  return (state.structures.woodpile ? BALANCE.woodpileCapacity : 0)
+    + (state.structures.timberYard ? BALANCE.timberYardCapacity : 0)
+    + (state.structures.house ? BALANCE.woodshedCapacity : 0);
 }
 
 /** Where the survivor sleeps, rests and cooks: by the house once they live there, otherwise by the campfire. */

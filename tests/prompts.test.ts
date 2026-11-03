@@ -146,10 +146,22 @@ describe('quarry prompts', () => {
     expect(promptFor(quarry(RUBBLE_SITE.x, RUBBLE_SITE.y))).toBe('E  Gather rubble');
   });
 
+  it('shows mine construction and remaining digs at the quarry face', () => {
+    const state = quarry(QUARRY_SITE.x, QUARRY_SITE.y);
+    state.progress.pickaxeCrafted = true;
+    expect(promptFor(state)).toContain('Build tab');
+    state.progress.mineBuilt = true;
+    expect(promptFor(state)).toContain('2 digs left');
+    state.quarryReadyDay = state.day + 1;
+    expect(promptFor(state)).toContain('1 dig left');
+    state.mineReadyDay = state.day + 1;
+    expect(promptFor(state)).toContain('worked out until morning');
+  });
+
   it('asks for a pickaxe at the quarry face, then offers to dig', () => {
     const state = quarry(QUARRY_SITE.x, QUARRY_SITE.y);
     expect(promptFor(state)).toBe('Quarry · craft a pickaxe at the toolshed');
-    expect(promptFor({ ...state, progress: { ...state.progress, pickaxeCrafted: true } })).toBe('E  Dig the quarry');
+    expect(promptFor({ ...state, progress: { ...state.progress, pickaxeCrafted: true } })).toBe('E  Dig the quarry · Build tab: timber mine (16 wood · 4 fiber)');
   });
 
   it('still mentions the quarry face when a loose pile beside it is nearer', () => {
@@ -157,8 +169,8 @@ describe('quarry prompts', () => {
     const state = { ...quarry(QUARRY_SITE.x + 1, QUARRY_SITE.y), stonePiles: [pile] };
     expect(promptFor(state)).toBe('E  Pick up stone (×2) · Quarry · craft a pickaxe at the toolshed');
     const withPickaxe = { ...state, progress: { ...state.progress, pickaxeCrafted: true } };
-    expect(promptFor(withPickaxe)).toBe('E  Pick up stone (×2) · Quarry · tap the face to dig');
-    expect(promptFor({ ...withPickaxe, quarryReadyDay: 2 })).toBe('E  Pick up stone (×2) · Quarry · worked out until morning');
+    expect(promptFor(withPickaxe)).toBe('E  Pick up stone (×2) · Quarry · tap the face to dig · Build tab: timber mine (16 wood · 4 fiber)');
+    expect(promptFor({ ...withPickaxe, quarryReadyDay: 2 })).toBe('E  Pick up stone (×2) · Quarry · worked out until morning · Build tab: timber mine (16 wood · 4 fiber)');
     expect(promptFor({ ...state, player: { ...state.player, x: 30, y: 3 }, stonePiles: [{ ...pile, x: 30, y: 3 }] })).toBe('E  Pick up stone (×2)');
   });
 

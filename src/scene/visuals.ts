@@ -43,7 +43,15 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     visuals.push({ id, texture, x, y, depth: depth ?? y });
   };
   if (state.area === 'quarry') {
-    add('quarry', state.quarryReadyDay <= state.day ? 'quarry:ready' : 'quarry:spent', QUARRY_SITE.x, QUARRY_SITE.y);
+    let quarryTexture = state.quarryReadyDay <= state.day ? 'quarry:ready' : 'quarry:spent';
+    if (state.progress.mineBuilt) {
+      const digs = Number(state.quarryReadyDay <= state.day) + Number(state.mineReadyDay <= state.day);
+      let frame = 'spent';
+      if (digs === 2) frame = 'full';
+      else if (digs === 1) frame = 'one';
+      quarryTexture = `mine:${frame}`;
+    }
+    add('quarry', quarryTexture, QUARRY_SITE.x, QUARRY_SITE.y);
     add('rubble', state.rubbleReadyDay <= state.day ? 'rubble:ready' : 'rubble:gathered', RUBBLE_SITE.x, RUBBLE_SITE.y);
     addPiles(state, visuals, add);
     return visuals;
@@ -154,7 +162,10 @@ function builtTexture(state: GameState, id: (typeof CAMP_STRUCTURES)[number][0],
   if (id === 'windmill') return `windmill:turn${Math.floor(timeMs / SAIL_FRAME_MS) % 4}`;
   if (id === 'bakery') return bakeryTexture(state);
   if (id === 'beehive') return beehiveTexture(state, timeMs);
-  if (id === 'woodpile') return `woodpile:${stockFrame(state.storedWood)}`;
+  if (id === 'woodpile') {
+    const sprite = state.structures.timberYard ? 'timberYard' : 'woodpile';
+    return `${sprite}:${stockFrame(state.storedWood)}`;
+  }
   if (id === 'fibreStack') return `fibreStack:${stockFrame(state.storedFiber)}`;
   if (id === 'house') {
     const { paint, flowerBoxes } = state.decorations;

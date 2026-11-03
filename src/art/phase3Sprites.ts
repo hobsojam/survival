@@ -356,6 +356,15 @@ function quarry(g: Grid, ready: boolean): void {
     for (const [x, y] of [[3, 20], [5, 21], [26, 19], [28, 21], [30, 20], [11, 11], [20, 12]]) { dot(g, x, y, 'q'); dot(g, x + 1, y, 'n'); }
   }
 }
+/** Heavy timber posts and a braced lintel hold the worked rock face open. */
+function mine(g: Grid, ready: boolean, full: boolean): void {
+  quarry(g, ready);
+  box(g, 2, 2, 4, 21, 'b'); box(g, 26, 2, 4, 21, 'b');
+  line(g, 2, 2, 29, 2, 'a'); line(g, 2, 3, 29, 3, 'c');
+  line(g, 5, 7, 13, 2, 'd'); line(g, 26, 7, 18, 2, 'd');
+  for (const x of [3, 27]) { dot(g, x, 5, 'e'); dot(g, x, 18, 'e'); }
+  if (full) { box(g, 20, 10, 4, 3, 'p'); line(g, 20, 10, 23, 10, 'q'); }
+}
 /** Loose rubble at the quarry's foot: a heap of small broken stones, or just grit once it's picked over. */
 function rubble(g: Grid, ready: boolean): void {
   oval(g, 12, 13, ready ? 9 : 7, 2, 's');
@@ -435,6 +444,19 @@ function woodpile(g: Grid, stock: StockLevel): void {
     log(12, 7);
   }
   box(g, 0, 2, 24, 3, 'd'); box(g, 1, 2, 12, 1, 'e'); line(g, 0, 4, 23, 4, 'b');
+}
+/** The timber yard adds a second rack of split logs and a broader roof beside the original pile. */
+function timberYard(g: Grid, stock: StockLevel): void {
+  woodpile(g, stock);
+  for (const x of [25, 33]) { box(g, x, 5, 2, 13, 'b'); line(g, x, 5, x, 17, 'd'); }
+  box(g, 25, 16, 10, 2, 'a');
+  if (stock !== 'empty') {
+    for (const x of [25, 29, 33]) { box(g, x, 12, 4, 3, 'c'); line(g, x, 12, x + 3, 12, 'e'); }
+  }
+  if (stock === 'full') {
+    for (const x of [27, 31]) { box(g, x, 9, 4, 3, 'c'); line(g, x, 9, x + 3, 9, 'e'); }
+  }
+  box(g, 23, 2, 16, 3, 'd'); line(g, 23, 4, 38, 4, 'b');
 }
 function fibreStackSite(g: Grid): void {
   for (const [x, y] of [[3, 7], [20, 7], [3, 11], [20, 11]]) stake(g, x, y);
@@ -1000,11 +1022,13 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   stonePileSite: define(16, 16, campLegend, { still: stonePileSite }),
   stonePile: define(16, 16, campLegend, { built: stonePile }),
   quarry: define(32, 24, campLegend, { ready: g => quarry(g, true), spent: g => quarry(g, false) }, [16, 22]),
+  mine: define(32, 24, campLegend, { full: g => mine(g, true, true), one: g => mine(g, true, false), spent: g => mine(g, false, false) }, [16, 22]),
   rubble: define(24, 16, campLegend, { ready: g => rubble(g, true), gathered: g => rubble(g, false) }),
   toolshedSite: define(24, 16, campLegend, { still: toolshedSite }),
   toolshed: define(24, 28, campLegend, { built: toolshed }),
   woodpileSite: define(24, 16, campLegend, { still: woodpileSite }),
   woodpile: define(24, 20, campLegend, { empty: g => woodpile(g, 'empty'), some: g => woodpile(g, 'some'), full: g => woodpile(g, 'full') }),
+  timberYard: define(40, 20, campLegend, { empty: g => timberYard(g, 'empty'), some: g => timberYard(g, 'some'), full: g => timberYard(g, 'full') }),
   fibreStackSite: define(24, 16, campLegend, { still: fibreStackSite }),
   fibreStack: define(24, 20, campLegend, { empty: g => fibreStack(g, 'empty'), some: g => fibreStack(g, 'some'), full: g => fibreStack(g, 'full') }),
   houseSite: define(40, 32, campLegend, { still: houseSite }),

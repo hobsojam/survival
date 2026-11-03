@@ -5,7 +5,9 @@ import { potBlocker } from '../src/game/cooking';
 import { stormReadiness } from '../src/game/forecast';
 import { applyAction, availableWood, buildStatus, groundBlocker, lookoutRepairBlocker, spendWood } from '../src/game/rules';
 import { bagView, buildButtonView } from '../src/ui/panels';
-import { CAMP_STRUCTURES, stockFrame } from '../src/scene/visuals';
+import { CAMP_STRUCTURES, sceneVisuals, stockFrame } from '../src/scene/visuals';
+import { woodStoreCapacity } from '../src/game/home';
+import { settleStores } from '../src/game/stores';
 import { PATH_DESTINATIONS, segmentDistance } from './placement';
 
 const { campX, campY } = BALANCE;
@@ -34,9 +36,9 @@ const stocked = (bag: number, pile: number, changes: Partial<GameState> = {}): G
 
 describe('building the woodpile', () => {
   it('is defined as asked', () => {
-    expect(BUILDINGS.woodpile).toEqual({ name: 'Woodpile', description: 'Keep up to 12 wood split and dry', symbol: '▤',
+    expect(BUILDINGS.woodpile).toEqual({ name: 'Woodpile', description: 'Keep up to 24 wood split and dry', symbol: '▤',
       cost: { wood: 3, fiber: 1 }, prerequisite: null, ground: 'east-near' });
-    expect(BALANCE.woodpileCapacity).toBe(12);
+    expect(BALANCE.woodpileCapacity).toBe(24);
     expect(createGame().storedWood).toBe(0);
   });
 
@@ -57,6 +59,34 @@ describe('building the woodpile', () => {
     expect(built.message).toBe('Built the woodpile.');
     expect(built.state.structures.woodpile).toBe(true);
     expect(built.state.inventory).toMatchObject({ wood: 0, fiber: 0 });
+  });
+});
+
+describe('Timber yard', () => {
+  it('appears after the woodpile and costs eight wood and two fiber', () => {
+    const base = camp(false);
+    expect(buildButtonView(base, 'timberYard').shown).toBe(false);
+    const state = stocked(0, 8, { inventory: { ...base.inventory, fiber: 2 } });
+    expect(buildButtonView(state, 'timberYard')).toMatchObject({ shown: true, ready: true, price: '8 wood · 2 fiber' });
+    const result = applyAction(state, { type: 'build', structureId: 'timberYard' });
+    expect(result.state).toMatchObject({ structures: { timberYard: true }, storedWood: 0, inventory: { fiber: 0 } });
+    expect(woodStoreCapacity(result.state)).toBe(48);
+    expect(buildButtonView(result.state, 'timberYard').shown).toBe(false);
+  });
+
+  it('stores more than a woven pack can carry', () => {
+    const base = camp();
+    expect(woodStoreCapacity(base)).toBe(24);
+    const state = { ...base, storedWood: 23, inventory: { ...base.inventory, wood: 2 } };
+    expect(settleStores(state)).toMatchObject({ storedWood: 24, inventory: { wood: 1 } });
+    expect(woodStoreCapacity({ ...base, structures: { ...base.structures, timberYard: true, house: true } })).toBe(72);
+  });
+
+  it('shows a larger yard at the existing woodpile spot', () => {
+    const base = camp();
+    expect(sceneVisuals(base, 0).find(visual => visual.id === 'woodpile')?.texture).toBe('woodpile:empty');
+    const yard = { ...base, structures: { ...base.structures, timberYard: true } };
+    expect(sceneVisuals(yard, 0).find(visual => visual.id === 'woodpile')?.texture).toBe('timberYard:empty');
   });
 });
 

@@ -275,6 +275,26 @@ describe('local save', () => {
     expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
   });
 
+  it('round-trips the mine and rejects impossible second-dig timers', () => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    state.day = 2;
+    state.structures.shelter = true;
+    state.structures.toolshed = true;
+    state.progress.quarryFound = true;
+    state.progress.pickaxeCrafted = true;
+    state.progress.mineBuilt = true;
+    state.mineReadyDay = 3;
+    expect(saveGame(storage, state)).toEqual({ ok: true });
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
+    state.mineReadyDay = 4;
+    expect(saveGame(storage, state).ok).toBe(false);
+    state.mineReadyDay = 1;
+    state.progress.mineBuilt = false;
+    state.mineReadyDay = 3;
+    expect(saveGame(storage, state).ok).toBe(false);
+  });
+
   it('rejects impossible quarry progress', () => {
     const variants: ((state: any) => void)[] = [
       state => { state.area = 'mine'; },
@@ -660,8 +680,8 @@ describe('the larder in the save', () => {
       state.clearing = { cleared: ['east-near'], marked: null, felled: [] };
       change(state);
     });
-    expect(east(state => { state.structures.woodpile = true; state.storedWood = 12; })).toBe(true);
-    expect(east(state => { state.structures.woodpile = true; state.storedWood = 13; })).toBe(false);
+    expect(east(state => { state.structures.woodpile = true; state.storedWood = 24; })).toBe(true);
+    expect(east(state => { state.structures.woodpile = true; state.storedWood = 25; })).toBe(false);
     expect(east(state => { state.structures.woodpile = true; state.storedWood = 0.5; })).toBe(false);
     expect(east(state => { state.storedWood = 1; })).toBe(false);
     expect(east(state => { delete (state as any).storedWood; })).toBe(false);

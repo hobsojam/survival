@@ -5,10 +5,11 @@ import { fieldCamp, strip, withField } from './fieldCamp';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from '../src/game/state';
 import { CLEARING_STEPS } from '../src/game/clearing';
-import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, campStoresView, cloakView, foodLaidByDays, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
+import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, campStoresView, cloakView, foodLaidByDays, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
 import { dishBlocker } from '../src/game/cooking';
 import { addFood, emptyFood } from '../src/game/food';
 import { stock } from './stock';
+import { QUARRY_SITE } from '../src/game/areas';
 
 type Changes = { structures?: Partial<GameState['structures']>; progress?: Partial<GameState['progress']>; inventory?: Partial<GameState['inventory']> };
 
@@ -121,6 +122,19 @@ describe('pickaxe panel', () => {
     expect(pickaxeView(game({ progress: { quarryFound: true, pickaxeCrafted: true }, structures: { shelter: true, toolshed: true } })))
       .toMatchObject({ shown: false, title: 'Pickaxe ready', cost: 'Crafted', disabled: true, ready: false,
         copy: 'Tap the quarry face, or stand at it and press E, to dig a stone. It is ready again each dawn.' });
+  });
+});
+
+describe('mine panel', () => {
+  it('offers construction at the quarry and reports remaining digs after building', () => {
+    const state = game({ progress: { pickaxeCrafted: true }, inventory: { wood: 4 } },
+      { area: 'quarry', player: { ...createGame().player, x: QUARRY_SITE.x + 5, y: QUARRY_SITE.y }, storedWood: 12, storedFiber: 4 });
+    expect(mineView(state)).toMatchObject({ shown: true, disabled: true, cost: '16 wood · 4 fiber' });
+    state.player.x = QUARRY_SITE.x;
+    state.player.y = QUARRY_SITE.y;
+    expect(mineView(state)).toMatchObject({ shown: true, disabled: false, ready: true });
+    state.progress.mineBuilt = true;
+    expect(mineView(state)).toMatchObject({ shown: true, disabled: true, cost: 'Built', copy: expect.stringContaining('2 digs left') });
   });
 });
 
@@ -384,7 +398,7 @@ describe('the camp stores panel', () => {
   it('counts the whole wood store, the fibre stack and the cart', () => {
     const base = game({ structures: { ...FINISHED_SHELTER, woodpile: true, house: true, fibreStack: true }, progress: { workshop: { saw: false, handcart: true, bedTools: false, harvestTools: false, quern: false } } },
       { storedWood: 20, storedFiber: 5, cartWood: 3 });
-    expect(shownLines(base)).toEqual([{ id: 'wood', text: 'Wood 20/36' }, { id: 'fiber', text: 'Fiber 5/12' }, { id: 'cart', text: 'Cart 3/12' }]);
+    expect(shownLines(base)).toEqual([{ id: 'wood', text: 'Wood 20/48' }, { id: 'fiber', text: 'Fiber 5/12' }, { id: 'cart', text: 'Cart 3/12' }]);
   });
 
   it('shows for the larder alone, with no store lines', () => {
