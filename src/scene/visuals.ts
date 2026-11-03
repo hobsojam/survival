@@ -156,7 +156,13 @@ function builtTexture(state: GameState, id: (typeof CAMP_STRUCTURES)[number][0],
   if (id === 'beehive') return beehiveTexture(state, timeMs);
   if (id === 'woodpile') return `woodpile:${stockFrame(state.storedWood)}`;
   if (id === 'fibreStack') return `fibreStack:${stockFrame(state.storedFiber)}`;
-  if (id === 'house') return fireplaceBurning(state) ? 'house:lit' : 'house:dark';
+  if (id === 'house') {
+    const { paint, flowerBoxes } = state.decorations;
+    const light = fireplaceBurning(state) ? 'lit' : 'dark';
+    if (paint === 'natural' && !flowerBoxes) return `house:${light}`;
+    const boxes = flowerBoxes ? 'boxes' : 'bare';
+    return `house:${paint}-${boxes}-${light}`;
+  }
   if (id === 'granary') return `granary:${stockFrame(state.field.grain)}`;
   return id === 'larder' ? `larder:${stockFrame(storeTotal(state.larder))}` : `${id}:built`;
 }
@@ -226,6 +232,8 @@ function addCamp(state: GameState, add: AddVisual, timeMs: number): void {
   const { structures, progress } = state;
   add('shelter', shelterTexture(state), x - 3, y - 2, structures.shelter ? undefined : GROUND_DECAL_DEPTH);
   addBuildableStructures(state, add, x, y, timeMs);
+  const fenceSpots = [{ dx: -2.5, dy: -5.4, frame: 'side' }, { dx: 1.4, dy: -5.4, frame: 'side' }, { dx: -0.5, dy: -9.1, frame: 'rail' }];
+  fenceSpots.slice(0, state.decorations.fence).forEach((spot, index) => add(`house-fence-${index}`, `fence:${spot.frame}`, x + spot.dx, y + spot.dy));
   addGardenPlants(state, add, x, y);
   add('logSeat', 'logSeat:still', x - 1, y + 1);
   add('lookout', progress.lookoutRepaired ? 'lookout:restored' : 'lookout:damaged', LOOKOUT.x, LOOKOUT.y);

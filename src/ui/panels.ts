@@ -18,6 +18,7 @@ import { CLEARING_STEPS, STEP_IDS, clearGroundBlocker, markBlocker, nextStep, ro
 import { KEEPSAKES_NEEDED, cloakBlocker, keepsakeKind, pillowBlocker } from '../game/companion';
 import { DISHES, DISH_ORDER, dishBlocker, foodWord, ingredientList, potBlocker, type DishId } from '../game/cooking';
 import { fishingLineBlocker } from '../game/fishing';
+import { DECORATION_COSTS, decorationBlocker, type DecorationChoice } from '../game/rules';
 
 export interface GardenPlotPanelView {
   label: string;
@@ -675,4 +676,28 @@ export function clearingView(state: GameState): { shown: boolean; sides: Clearin
     copy = `Fell the ${left} marked ${treeWord} left on the ${side} side.`;
   }
   return { shown, sides, progress, clear: { ...clear, copy, cost: `${cost.wood} wood · ${cost.fiber} fiber${cost.stone > 0 ? ` · ${cost.stone} stone` : ''}` } };
+}
+
+export const DECORATION_CHOICES: readonly DecorationChoice[] = ['berryPaint', 'leafPaint', 'flowerBoxes', 'fence'];
+const DECORATION_NAMES: Record<DecorationChoice, string> = {
+  berryPaint: 'Berry red walls', leafPaint: 'Leaf green walls', flowerBoxes: 'Flower boxes', fence: 'Wooden fence'
+};
+
+export function decorationMarkup(): string {
+  return DECORATION_CHOICES.map(choice => `<button type="button" class="build-item" data-decorate="${choice}"><span class="build-symbol">✿</span><span class="build-copy"><strong>${DECORATION_NAMES[choice]}</strong><small class="decor-description"></small></span><span class="build-cost"><b class="build-verb"></b><small class="build-price"></small></span></button>`).join('');
+}
+
+export function decorationButtonView(state: GameState, choice: DecorationChoice): BuildButtonView {
+  const blocker = decorationBlocker(state, choice);
+  const cost = DECORATION_COSTS[choice];
+  const price = [cost.wood && `${cost.wood} wood`, cost.fiber && `${cost.fiber} fiber`, cost.berry && `${cost.berry} berries`, cost.greens && `${cost.greens} greens`].filter(Boolean).join(' · ');
+  let built = choice === 'flowerBoxes' && state.decorations.flowerBoxes;
+  if (choice === 'fence') built = state.decorations.fence >= 3;
+  if (choice === 'berryPaint') built = state.decorations.paint === 'berry';
+  if (choice === 'leafPaint') built = state.decorations.paint === 'leaf';
+  let description = 'Color the house with gathered pigment';
+  if (choice === 'flowerBoxes') description = 'A pair beneath the window';
+  if (choice === 'fence') description = `Section ${Math.min(3, state.decorations.fence + 1)} of 3 · fixed around the yard`;
+  return { shown: state.structures.house, disabled: Boolean(blocker), built, locked: Boolean(blocker) && !built,
+    ready: !blocker, description, verb: built ? 'Done' : 'Make', price };
 }

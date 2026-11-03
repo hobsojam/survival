@@ -11,9 +11,13 @@ function element() {
     hidden: false,
     disabled: false,
     textContent: '',
+    title: '',
     style: { width: '' },
     classList: { toggle: () => undefined },
-    querySelector: () => element()
+    querySelector: (() => { const children = new Map<string, ReturnType<typeof element>>(); return (selector: string) => {
+      if (!children.has(selector)) children.set(selector, element());
+      return children.get(selector)!;
+    }; })()
   };
 }
 
@@ -103,5 +107,31 @@ describe('completed Camp discoveries', () => {
     state.progress.discoveries.cairn = true;
     app['renderSurvivor']();
     expect(get('.sites-panel').hidden).toBe(true);
+  });
+});
+
+describe('house decoration controls', () => {
+  it('appears only after the house and reflects material and completion state', () => {
+    const { app, get } = renderer();
+    app['renderDecorations']();
+    expect(get('#decoration-group').hidden).toBe(true);
+
+    const state = createGame();
+    state.structures.house = true;
+    state.inventory.wood = 6;
+    state.inventory.fiber = 1;
+    Object.assign(app, { state });
+    app['renderDecorations']();
+    expect(get('#decoration-group').hidden).toBe(false);
+    const fence = get('[data-decorate="fence"]');
+    expect(fence.disabled).toBe(false);
+    expect(fence.querySelector('.build-price').textContent).toBe('6 wood · 1 fiber');
+    expect(fence.querySelector('.decor-description').textContent).toContain('Section 1 of 3');
+
+    state.decorations.fence = 3;
+    app['renderDecorations']();
+    expect(fence.disabled).toBe(true);
+    expect(fence.querySelector('.build-verb').textContent).toBe('Done');
+    expect(fence.title).toContain('complete');
   });
 });

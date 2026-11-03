@@ -93,6 +93,14 @@ function validProgress({ structures, progress, area }: SaveShape): boolean {
   return flags.every(key => bool(progress[key])) && validWorkshop(structures, progress) && validProgressDependencies(structures, progress, area);
 }
 
+function validDecorations({ decorations, structures }: SaveShape): boolean {
+  if (!object(decorations) || Object.keys(decorations).length !== 3) return false;
+  const { paint, flowerBoxes, fence } = decorations;
+  if (paint !== 'natural' && paint !== 'berry' && paint !== 'leaf') return false;
+  if (!bool(flowerBoxes) || !whole(fence) || fence < 0 || fence > 3) return false;
+  return structures.house === true || (paint === 'natural' && !flowerBoxes && fence === 0);
+}
+
 function validStorm({ progress, day }: SaveShape): boolean {
   if (progress.hearthUnlocked) return progress.nextStormDay === null;
   return whole(progress.nextStormDay) && whole(day) && progress.nextStormDay >= BALANCE.coldNightStartDay && progress.nextStormDay >= day;
@@ -329,7 +337,7 @@ function validSickness({ sickness, ending, day, fishingMisses }: SaveShape): boo
 /** Checks a version 24 save, with the survivor's sickness and whether their story has ended, and: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, the workshop and its handcart, shelter upgrades, garden plots, vegetable beds, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validBeehive, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validSickness];
+  const checks = [validClock, validSurvivor, validProgress, validDecorations, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validBeehive, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validSickness];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

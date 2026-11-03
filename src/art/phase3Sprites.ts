@@ -140,7 +140,7 @@ function hollowTree(g: Grid, frame: HollowFrame): void {
   for (const [x, y] of spots) { dot(g, x, y, 'v'); dot(g, x + 1, y, 'x'); }
 }
 
-const campLegend = { s: 'shadow', a: 'wood0', b: 'wood1', c: 'wood2', d: 'wood3', e: 'wood4', f: 'canvas0', g: 'canvas1', h: 'canvas2', i: 'canvas3', j: 'canvas4', k: 'berry2', l: 'berry4', m: 'stone0', n: 'stone1', o: 'stone2', p: 'stone3', q: 'stone4', r: 'fire0', t: 'fire1', u: 'fire2', v: 'fire3', w: 'fire4', z: 'earth3', A: 'earth2', B: 'earth4', C: 'scarf3' } as const;
+const campLegend = { s: 'shadow', a: 'wood0', b: 'wood1', c: 'wood2', d: 'wood3', e: 'wood4', f: 'canvas0', g: 'canvas1', h: 'canvas2', i: 'canvas3', j: 'canvas4', k: 'berry2', l: 'berry4', m: 'stone0', n: 'stone1', o: 'stone2', p: 'stone3', q: 'stone4', r: 'fire0', t: 'fire1', u: 'fire2', v: 'fire3', w: 'fire4', z: 'earth3', A: 'earth2', B: 'earth4', C: 'scarf3', D: 'berry1', E: 'berry2', F: 'berry3', G: 'leaf1', H: 'leaf2', I: 'leaf3', J: 'flower1', K: 'flower3', L: 'leaf4' } as const;
 function stake(g: Grid, x: number, y: number): void {
   box(g, x, y, 2, 4, 'a'); box(g, x, y, 1, 2, 'd'); dot(g, x, y, 'e');
 }
@@ -471,12 +471,19 @@ function houseSite(g: Grid): void {
   for (const x of [8, 14, 20]) { box(g, x, 24, 4, 2, 'n'); line(g, x, 24, x + 2, 24, 'p'); }
   box(g, 28, 19, 4, 3, 'n'); line(g, 28, 19, 30, 19, 'p');
 }
+function houseWallColors(paint: 'natural' | 'berry' | 'leaf'): [string, string, string] {
+  if (paint === 'berry') return ['D', 'E', 'F'];
+  if (paint === 'leaf') return ['G', 'H', 'I'];
+  return ['a', 'c', 'e'];
+}
+
 /** A small log house on a stone footing: a shingled roof edged in dark wood, a stone chimney, a door and one window, dark or lit from within. */
-function house(g: Grid, lit: boolean): void {
+function house(g: Grid, lit: boolean, paint: 'natural' | 'berry' | 'leaf' = 'natural', flowerBoxes = false): void {
   oval(g, 20, 30, 19, 2, 's');
   // Log walls: dark ends, each course a lit top over a shaded underside.
-  box(g, 3, 14, 34, 14, 'a');
-  for (let y = 15; y < 27; y += 3) { box(g, 4, y, 32, 2, 'c'); line(g, 4, y, 35, y, 'e'); line(g, 4, y + 2, 35, y + 2, 'b'); }
+  const [wallBase, wallMain, wallLight] = houseWallColors(paint);
+  box(g, 3, 14, 34, 14, wallBase);
+  for (let y = 15; y < 27; y += 3) { box(g, 4, y, 32, 2, wallMain); line(g, 4, y, 35, y, wallLight); line(g, 4, y + 2, 35, y + 2, wallBase); }
   for (const x of [3, 36]) for (let y = 15; y < 27; y += 3) dot(g, x, y, 'd');
   box(g, 2, 27, 36, 3, 'n'); line(g, 2, 27, 37, 27, 'p');
   for (const x of [7, 13, 19, 25, 31]) dot(g, x, 28, 'm');
@@ -489,6 +496,12 @@ function house(g: Grid, lit: boolean): void {
   else { dot(g, 24, 20, 'n'); dot(g, 23, 19, 'o'); }
   line(g, 26, 19, 26, 23, 'b'); line(g, 23, 21, 28, 21, 'b');
   box(g, 21, 25, 10, 1, 'd');
+  if (flowerBoxes) {
+    for (const x of [21, 27]) {
+      box(g, x, 26, 5, 3, 'b'); line(g, x, 26, x + 4, 26, 'e');
+      dot(g, x + 2, 25, 'L'); dot(g, x + 1, 24, 'K'); dot(g, x + 3, 24, 'J');
+    }
+  }
   // The roof: shingle courses under a pale ridge, its rim drawn in the darkest wood so it reads against the camp's earth.
   for (let y = 2; y <= 13; y++) {
     const half = Math.min(20, 3 + Math.floor((y - 2) * 1.6));
@@ -504,6 +517,15 @@ function house(g: Grid, lit: boolean): void {
   box(g, 27, 0, 8, 2, 'o'); line(g, 27, 0, 34, 0, 'p');
   if (lit) { dot(g, 30, 2, 'u'); dot(g, 31, 2, 'v'); }
 }
+function fenceSide(g: Grid): void {
+  for (const y of [5, 11]) { box(g, 9, y, 4, 3, 'c'); line(g, 9, y, 12, y, 'e'); }
+  for (const y of [2, 13]) { box(g, 8, y, 6, 4, 'b'); line(g, 8, y, 13, y, 'e'); }
+}
+function fenceRail(g: Grid): void {
+  for (const x of [2, 11, 20]) { box(g, x, 3, 4, 12, 'b'); line(g, x, 3, x + 3, 3, 'e'); }
+  for (const y of [6, 11]) { box(g, 2, y, 22, 3, 'c'); line(g, 2, y, 23, y, 'e'); }
+}
+
 /** The finished shelter once the bed has gone into the house: its door taken off, the front left open and logs stacked inside. */
 function woodshed(g: Grid, stock: StockLevel): void {
   shelter(g, false, 'finished');
@@ -986,7 +1008,10 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   fibreStackSite: define(24, 16, campLegend, { still: fibreStackSite }),
   fibreStack: define(24, 20, campLegend, { empty: g => fibreStack(g, 'empty'), some: g => fibreStack(g, 'some'), full: g => fibreStack(g, 'full') }),
   houseSite: define(40, 32, campLegend, { still: houseSite }),
-  house: define(40, 32, campLegend, { dark: g => house(g, false), lit: g => house(g, true) }),
+  house: define(40, 32, campLegend, { dark: g => house(g, false), lit: g => house(g, true), ...Object.fromEntries((['natural', 'berry', 'leaf'] as const).flatMap(paint => [false, true].flatMap(boxes => [false, true].map(lit => [
+    `${paint}-${boxes ? 'boxes' : 'bare'}-${lit ? 'lit' : 'dark'}`, (g: Grid) => house(g, lit, paint, boxes)
+  ])))) }),
+  fence: define(26, 17, campLegend, { rail: fenceRail, side: fenceSide }),
   woodshed: define(48, 40, campLegend, { empty: g => woodshed(g, 'empty'), some: g => woodshed(g, 'some'), full: g => woodshed(g, 'full') }),
   larderSite: define(24, 16, campLegend, { still: larderSite }),
   larder: define(24, 28, campLegend, { empty: g => larder(g, 'empty'), some: g => larder(g, 'some'), full: g => larder(g, 'full') }),
