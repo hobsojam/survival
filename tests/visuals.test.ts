@@ -345,6 +345,18 @@ describe('native-size scene art', () => {
 describe('the quarry area', () => {
   const quarryState = () => ({ ...createGame(), area: 'quarry' as const });
 
+  it('shows timber supports and the remaining daily dig stage', () => {
+    const state = quarryState();
+    state.progress.mineBuilt = true;
+    const texture = () => sceneVisuals(state, 0).find(item => item.id === 'quarry')?.texture;
+    expect(texture()).toBe('mine:full');
+    state.quarryReadyDay = state.day + 1;
+    expect(texture()).toBe('mine:one');
+    state.mineReadyDay = state.day + 1;
+    expect(texture()).toBe('mine:spent');
+    expect(() => validateSprite(sprites.mine)).not.toThrow();
+  });
+
   it('the quarry area shows only its own things', () => {
     const state = quarryState();
     state.stonePiles = [{ id: 'here', x: 14, y: 14, count: 1, area: 'quarry' }, { id: 'there', x: 5, y: 5, count: 1, area: 'camp' }];

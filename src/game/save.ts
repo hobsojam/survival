@@ -67,6 +67,7 @@ function validStructureDependencies(structures: ObjectValue): boolean {
 function validProgressDependencies(structures: ObjectValue, progress: ObjectValue, area: unknown): boolean {
   if ((area === 'quarry' || progress.quarryFound) && !structures.shelter) return false;
   if (progress.pickaxeCrafted && !(progress.quarryFound && structures.toolshed)) return false;
+  if (progress.mineBuilt && !progress.pickaxeCrafted) return false;
   if ((progress.axeCrafted || progress.potCrafted || progress.packWoven) && !structures.toolshed) return false;
   const needsColdNight = [structures.hearth, progress.lookoutRepaired, progress.axeCrafted].includes(true);
   return progress.hearthUnlocked === true || !needsColdNight;
@@ -89,7 +90,7 @@ function validProgress({ structures, progress, area }: SaveShape): boolean {
   // Exactly the buildings there are, and no others.
   if (Object.keys(structures).length !== buildingIds.length || !buildingIds.every(id => bool(structures[id]))) return false;
   if (!validStructureDependencies(structures)) return false;
-  const flags = ['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'pickaxeCrafted', 'potCrafted', 'packWoven', 'fishingLine'] as const;
+  const flags = ['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'pickaxeCrafted', 'mineBuilt', 'potCrafted', 'packWoven', 'fishingLine'] as const;
   return flags.every(key => bool(progress[key])) && validWorkshop(structures, progress) && validProgressDependencies(structures, progress, area);
 }
 
@@ -129,10 +130,12 @@ function validFibreStack({ structures, storedFiber }: SaveShape): boolean {
   return count(storedFiber) && storedFiber <= BALANCE.fibreStackCapacity && (structures.fibreStack === true || storedFiber === 0);
 }
 
-function validStone({ structures, storedStone, quarryReadyDay, rubbleReadyDay, day }: SaveShape): boolean {
+function validStone({ structures, storedStone, quarryReadyDay, mineReadyDay, rubbleReadyDay, day, progress }: SaveShape): boolean {
   const today = day as number;
   return count(storedStone) && storedStone <= BALANCE.stonePileCapacity && (structures.stonePile === true || storedStone === 0)
-    && readyBy(quarryReadyDay, today + 1) && readyBy(rubbleReadyDay, today + BALANCE.rubbleRegrowDays);
+    && readyBy(quarryReadyDay, today + 1) && readyBy(mineReadyDay, today + 1)
+    && (progress.mineBuilt === true || mineReadyDay === 1)
+    && readyBy(rubbleReadyDay, today + BALANCE.rubbleRegrowDays);
 }
 
 function validGarden({ gardenPlots, structures, day }: SaveShape): boolean {

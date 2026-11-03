@@ -1221,6 +1221,41 @@ describe('quarry and tools', () => {
     expect(again.message).toBe('The quarry face is worked out until morning.');
   });
 
+  it('builds a timber mine at the quarry and digs twice each day', () => {
+    const state = inQuarry(QUARRY_SITE.x, QUARRY_SITE.y);
+    state.progress.quarryFound = true;
+    state.progress.pickaxeCrafted = true;
+    state.structures.shelter = true;
+    state.structures.toolshed = true;
+    state.structures.woodpile = true;
+    state.structures.fibreStack = true;
+    state.inventory.wood = 4;
+    state.storedWood = 12;
+    state.storedFiber = 4;
+    const built = applyAction(state, { type: 'buildMine' }).state;
+    expect(built.progress.mineBuilt).toBe(true);
+    expect(built.inventory.wood + built.storedWood).toBe(0);
+    expect(built.storedFiber).toBe(0);
+    expect(built.inventory.stone).toBe(0);
+    const first = applyAction(built, { type: 'digQuarry' }).state;
+    const second = applyAction(first, { type: 'digQuarry' }).state;
+    expect(second.inventory.stone).toBe(2);
+    expect(second.player.energy).toBe(built.player.energy - 16);
+    expect(second.timeOfDay).toBe(built.timeOfDay + 20);
+    expect(applyAction(second, { type: 'digQuarry' }).state).toBe(second);
+    expect(applyAction({ ...second, day: second.day + 1 }, { type: 'digQuarry' }).state.inventory.stone).toBe(3);
+  });
+
+  it('requires a pickaxe, quarry location, and materials to build a mine', () => {
+    const state = inQuarry(QUARRY_SITE.x, QUARRY_SITE.y);
+    expect(applyAction(state, { type: 'buildMine' }).state).toBe(state);
+    state.progress.pickaxeCrafted = true;
+    expect(applyAction(state, { type: 'buildMine' }).state).toBe(state);
+    state.inventory.wood = 16;
+    state.inventory.fiber = 4;
+    expect(applyAction({ ...state, area: 'camp' }, { type: 'buildMine' }).state.progress.mineBuilt).toBe(false);
+  });
+
   it('dropped stone stays in its area', () => {
     const state = inQuarry(10, 10);
     state.inventory.stone = 2;

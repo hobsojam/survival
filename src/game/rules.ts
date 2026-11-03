@@ -48,7 +48,7 @@ export type GameAction =
   | { type: 'storeFood'; item: FoodItem }
   | { type: 'takeFood'; item: FoodItem }
   | { type: 'cook'; dish?: DishId }
-  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'burnFiber' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' }
+  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'buildMine' | 'burnFiber' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' }
   | { type: 'pickUpStone'; pileId: string }
   | { type: 'makeFishingLine' }
   | { type: 'fish'; roll: number };
@@ -142,6 +142,18 @@ export function pickaxeBlocker(state: GameState): string | null {
   const { wood, fiber, stone } = PICKAXE.cost;
   if (availableWood(state) < wood || availableFiber(state) < fiber || availableStone(state) < stone)
     return `Need ${wood} wood, ${fiber} fiber, and ${stone} stone for the pickaxe.`;
+  return null;
+}
+
+export const MINE_COST = { wood: 16, fiber: 4, stone: 0 } as const;
+
+/** A mine is built where the quarry face is worked, using timber from the bag and camp stores. */
+export function mineBlocker(state: GameState): string | null {
+  if (state.progress.mineBuilt) return 'The mine is already built.';
+  if (!state.progress.pickaxeCrafted) return 'Craft a pickaxe first.';
+  if (state.area !== 'quarry' || !near(state.player.x, state.player.y, QUARRY_SITE.x, QUARRY_SITE.y)) return 'Stand at the quarry face to build the mine.';
+  if (isExhausted(state)) return TOO_TIRED_MESSAGE;
+  if (availableWood(state) < MINE_COST.wood || availableFiber(state) < MINE_COST.fiber) return 'Need 16 wood and 4 fiber for the mine.';
   return null;
 }
 
@@ -437,6 +449,12 @@ const craftPickaxe: ActionHandler<'craftPickaxe'> = state => {
   };
 };
 
+const buildMine: ActionHandler<'buildMine'> = state => {
+  const blocker = mineBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  return { state: payAndBuild(state, MINE_COST, { progress: { ...state.progress, mineBuilt: true } }), message: 'Built timber supports for the mine. You can dig two stones each day.' };
+};
+
 const craftPot: ActionHandler<'craftPot'> = state => {
   const blocker = potBlocker(state);
   if (blocker) return refuse(state, blocker);
@@ -495,7 +513,9 @@ const gatherRubble: ActionHandler<'gatherRubble'> = state => {
 const digQuarry: ActionHandler<'digQuarry'> = state => {
   if (!state.progress.pickaxeCrafted) return refuse(state, 'You need a pickaxe to work the quarry.');
   if (state.area !== 'quarry' || !near(state.player.x, state.player.y, QUARRY_SITE.x, QUARRY_SITE.y)) return refuse(state, 'Move closer to the quarry face.');
-  if (state.quarryReadyDay > state.day) return refuse(state, 'The quarry face is worked out until morning.');
+  const firstReady = state.quarryReadyDay <= state.day;
+  const secondReady = state.progress.mineBuilt && state.mineReadyDay <= state.day;
+  if (!firstReady && !secondReady) return refuse(state, 'The quarry face is worked out until morning.');
   if (isExhausted(state)) return refuse(state, TOO_TIRED_MESSAGE);
   if (freeSpaces(state) < spaceFor('stone')) return refuse(state, FULL_BAG_MESSAGE);
   return {
@@ -503,7 +523,8 @@ const digQuarry: ActionHandler<'digQuarry'> = state => {
       ...state,
       player: tire(state, BALANCE.digEnergyCost),
       inventory: { ...state.inventory, stone: state.inventory.stone + 1 },
-      quarryReadyDay: state.day + 1
+      quarryReadyDay: firstReady ? state.day + 1 : state.quarryReadyDay,
+      mineReadyDay: !firstReady && secondReady ? state.day + 1 : state.mineReadyDay
     }, workSeconds(state, BALANCE.digSeconds), 'working'),
     message: 'Broke a good stone from the quarry face.'
   };
@@ -1108,7 +1129,7 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
 };
 
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
-  move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
+  move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, buildMine, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
   cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak,
   makeFishingLine, fish

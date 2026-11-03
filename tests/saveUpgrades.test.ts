@@ -69,6 +69,20 @@ describe('loading through the upgrades', () => {
     return loadGame(storage);
   };
 
+  it('upgrades version 30 quarry saves without changing prior digging progress', () => {
+    const old = createGame();
+    old.day = 2;
+    old.quarryReadyDay = 3;
+    const { mineReadyDay: _mineReadyDay, ...withoutMineTimer } = old;
+    const { mineBuilt: _mineBuilt, ...oldProgress } = old.progress;
+    const loaded = stored(30, { ...withoutMineTimer, progress: oldProgress });
+    expect(loaded.kind).toBe('loaded');
+    if (loaded.kind !== 'loaded') return;
+    expect(loaded.state.quarryReadyDay).toBe(3);
+    expect(loaded.state.progress.mineBuilt).toBe(false);
+    expect(loaded.state.mineReadyDay).toBe(1);
+  });
+
   it('refuses an older save and a newer one with their own reasons', () => {
     expect(stored(22)).toEqual({ kind: 'invalid', reason: 'This save is from an older version of the game.' });
     expect(stored(SAVE_VERSION + 1)).toEqual({ kind: 'invalid', reason: 'This save is from a newer version of the game.' });

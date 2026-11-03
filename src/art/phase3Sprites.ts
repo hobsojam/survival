@@ -356,6 +356,15 @@ function quarry(g: Grid, ready: boolean): void {
     for (const [x, y] of [[3, 20], [5, 21], [26, 19], [28, 21], [30, 20], [11, 11], [20, 12]]) { dot(g, x, y, 'q'); dot(g, x + 1, y, 'n'); }
   }
 }
+/** Heavy timber posts and a braced lintel hold the worked rock face open. */
+function mine(g: Grid, ready: boolean, full: boolean): void {
+  quarry(g, ready);
+  box(g, 2, 2, 4, 21, 'b'); box(g, 26, 2, 4, 21, 'b');
+  line(g, 2, 2, 29, 2, 'a'); line(g, 2, 3, 29, 3, 'c');
+  line(g, 5, 7, 13, 2, 'd'); line(g, 26, 7, 18, 2, 'd');
+  for (const x of [3, 27]) { dot(g, x, 5, 'e'); dot(g, x, 18, 'e'); }
+  if (full) { box(g, 20, 10, 4, 3, 'p'); line(g, 20, 10, 23, 10, 'q'); }
+}
 /** Loose rubble at the quarry's foot: a heap of small broken stones, or just grit once it's picked over. */
 function rubble(g: Grid, ready: boolean): void {
   oval(g, 12, 13, ready ? 9 : 7, 2, 's');
@@ -1013,6 +1022,7 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   stonePileSite: define(16, 16, campLegend, { still: stonePileSite }),
   stonePile: define(16, 16, campLegend, { built: stonePile }),
   quarry: define(32, 24, campLegend, { ready: g => quarry(g, true), spent: g => quarry(g, false) }, [16, 22]),
+  mine: define(32, 24, campLegend, { full: g => mine(g, true, true), one: g => mine(g, true, false), spent: g => mine(g, false, false) }, [16, 22]),
   rubble: define(24, 16, campLegend, { ready: g => rubble(g, true), gathered: g => rubble(g, false) }),
   toolshedSite: define(24, 16, campLegend, { still: toolshedSite }),
   toolshed: define(24, 28, campLegend, { built: toolshed }),

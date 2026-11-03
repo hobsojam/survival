@@ -78,10 +78,13 @@ export const SAVE_UPGRADES: Readonly<Record<number, SaveUpgrade>> = {
   },
   // Version 30: a built house can have paint, flower boxes and three short fence sections.
   29: old => ({ ...(old as Upgradable), decorations: { paint: 'natural', flowerBoxes: false, fence: 0 } }),
-  // Version 31: the existing woodpile holds more, and can gain a timber yard.
+  // Version 31: a larger woodpile can become a timber yard, and timber supports allow a second daily quarry dig.
   30: old => {
-    const state = old as Upgradable & { structures: Upgradable };
-    return { ...state, structures: { timberYard: false, ...state.structures } };
+    const state = old as Upgradable & { structures: Upgradable; progress: Upgradable };
+    return { ...state,
+      structures: { timberYard: false, ...state.structures },
+      progress: { ...state.progress, mineBuilt: false },
+      mineReadyDay: 1 };
   }
 };
 

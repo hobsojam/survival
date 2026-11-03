@@ -132,7 +132,7 @@ export interface GameState {
   structures: Record<StructureId, boolean>;
   decorations: HomesteadDecorations;
   progress: { nextStormDay: number | null; hearthUnlocked: boolean; lookoutRepaired: boolean; axeCrafted: boolean;
-    quarryFound: boolean; pickaxeCrafted: boolean; potCrafted: boolean; packWoven: boolean;
+    quarryFound: boolean; pickaxeCrafted: boolean; mineBuilt: boolean; potCrafted: boolean; packWoven: boolean;
     /** A fishing line, for the frozen spring in winter. */
     fishingLine: boolean;
     /** The workshop's upgrades, each made once. */
@@ -164,6 +164,8 @@ export interface GameState {
   larder: FoodStore;
   /** First day the quarry face can be dug again. */
   quarryReadyDay: number;
+  /** First day the mine's second daily dig can be used again. */
+  mineReadyDay: number;
   /** First day the rubble pile gives stone again. */
   rubbleReadyDay: number;
   /** The last winter night a wolf came into the dark camp, and what it took. */
@@ -402,7 +404,7 @@ export function createGame(): GameState {
     decorations: emptyDecorations(),
     structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, timberYard: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false, field: false, granary: false, windmill: false, bakery: false, beehive: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
-      quarryFound: false, pickaxeCrafted: false, potCrafted: false, packWoven: false, fishingLine: false,
+      quarryFound: false, pickaxeCrafted: false, mineBuilt: false, potCrafted: false, packWoven: false, fishingLine: false,
       workshop: { saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false },
       discoveries: { basket: false, spring: false, cairn: false } },
     nodes,
@@ -419,6 +421,7 @@ export function createGame(): GameState {
     storedFiber: 0,
     larder: emptyFood(),
     quarryReadyDay: 1,
+    mineReadyDay: 1,
     rubbleReadyDay: 1,
     lastWolf: null,
     lastSpoiled: null,

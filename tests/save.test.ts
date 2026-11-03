@@ -275,6 +275,26 @@ describe('local save', () => {
     expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
   });
 
+  it('round-trips the mine and rejects impossible second-dig timers', () => {
+    const storage = new MemoryStorage();
+    const state = createGame();
+    state.day = 2;
+    state.structures.shelter = true;
+    state.structures.toolshed = true;
+    state.progress.quarryFound = true;
+    state.progress.pickaxeCrafted = true;
+    state.progress.mineBuilt = true;
+    state.mineReadyDay = 3;
+    expect(saveGame(storage, state)).toEqual({ ok: true });
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
+    state.mineReadyDay = 4;
+    expect(saveGame(storage, state).ok).toBe(false);
+    state.mineReadyDay = 1;
+    state.progress.mineBuilt = false;
+    state.mineReadyDay = 3;
+    expect(saveGame(storage, state).ok).toBe(false);
+  });
+
   it('rejects impossible quarry progress', () => {
     const variants: ((state: any) => void)[] = [
       state => { state.area = 'mine'; },

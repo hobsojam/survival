@@ -88,7 +88,7 @@ export function closestGatherable(state: GameState): Gatherable | undefined {
     state.stonePiles.filter(pile => pile.area === state.area).map(pile => ({ found: { kind: 'pile' as const, pile }, away: distance(pile.x, pile.y, x, y) }));
   if (state.area === 'quarry') {
     if (state.rubbleReadyDay <= state.day) options.push({ found: { kind: 'rubble' }, away: distance(RUBBLE_SITE.x, RUBBLE_SITE.y, x, y) });
-    if (state.quarryReadyDay <= state.day) options.push({ found: { kind: 'quarry' }, away: distance(QUARRY_SITE.x, QUARRY_SITE.y, x, y) });
+    if (state.quarryReadyDay <= state.day || (state.progress.mineBuilt && state.mineReadyDay <= state.day)) options.push({ found: { kind: 'quarry' }, away: distance(QUARRY_SITE.x, QUARRY_SITE.y, x, y) });
   } else {
     options.push(...state.nodes.filter(node => node.amount > 0 && nodeShown(state, node)).map(node => ({ found: { kind: 'node' as const, node }, away: distance(node.x, node.y, x, y) })));
   }
