@@ -660,8 +660,8 @@ describe('the larder in the save', () => {
       state.clearing = { cleared: ['east-near'], marked: null, felled: [] };
       change(state);
     });
-    expect(east(state => { state.structures.woodpile = true; state.storedWood = 12; })).toBe(true);
-    expect(east(state => { state.structures.woodpile = true; state.storedWood = 13; })).toBe(false);
+    expect(east(state => { state.structures.woodpile = true; state.storedWood = 24; })).toBe(true);
+    expect(east(state => { state.structures.woodpile = true; state.storedWood = 25; })).toBe(false);
     expect(east(state => { state.structures.woodpile = true; state.storedWood = 0.5; })).toBe(false);
     expect(east(state => { state.storedWood = 1; })).toBe(false);
     expect(east(state => { delete (state as any).storedWood; })).toBe(false);

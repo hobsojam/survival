@@ -82,6 +82,23 @@ describe('loading through the upgrades', () => {
   });
 });
 
+describe('the version 31 upgrade: timber yard', () => {
+  it('starts older woodpiles without a yard and preserves their stored wood', () => {
+    const base = createGame();
+    const old = { ...base, storedWood: 12, structures: { ...base.structures, woodpile: true } } as Record<string, any>;
+    delete old.structures.timberYard;
+    const upgraded = SAVE_UPGRADES[30](old) as ReturnType<typeof createGame>;
+    expect(upgraded.structures).toMatchObject({ woodpile: true, timberYard: false });
+    expect(upgraded.storedWood).toBe(12);
+    expect(old.structures.timberYard).toBeUndefined();
+    const storage = new MemoryStorage();
+    const freshOld = createGame() as Record<string, any>;
+    delete freshOld.structures.timberYard;
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 30, state: freshOld }));
+    expect(loadGame(storage)).toMatchObject({ kind: 'loaded', state: { structures: { timberYard: false } } });
+  });
+});
+
 describe('the version 26 upgrade: the grain field', () => {
   /** A version 25 camp: today's game without anything the field brought. */
   function version25(changes: Record<string, unknown> = {}) {

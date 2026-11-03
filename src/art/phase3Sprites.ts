@@ -436,6 +436,19 @@ function woodpile(g: Grid, stock: StockLevel): void {
   }
   box(g, 0, 2, 24, 3, 'd'); box(g, 1, 2, 12, 1, 'e'); line(g, 0, 4, 23, 4, 'b');
 }
+/** The timber yard adds a second rack of split logs and a broader roof beside the original pile. */
+function timberYard(g: Grid, stock: StockLevel): void {
+  woodpile(g, stock);
+  for (const x of [25, 33]) { box(g, x, 5, 2, 13, 'b'); line(g, x, 5, x, 17, 'd'); }
+  box(g, 25, 16, 10, 2, 'a');
+  if (stock !== 'empty') {
+    for (const x of [25, 29, 33]) { box(g, x, 12, 4, 3, 'c'); line(g, x, 12, x + 3, 12, 'e'); }
+  }
+  if (stock === 'full') {
+    for (const x of [27, 31]) { box(g, x, 9, 4, 3, 'c'); line(g, x, 9, x + 3, 9, 'e'); }
+  }
+  box(g, 23, 2, 16, 3, 'd'); line(g, 23, 4, 38, 4, 'b');
+}
 function fibreStackSite(g: Grid): void {
   for (const [x, y] of [[3, 7], [20, 7], [3, 11], [20, 11]]) stake(g, x, y);
   line(g, 5, 8, 19, 8, 'h'); line(g, 5, 12, 19, 12, 'h');
@@ -1005,6 +1018,7 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   toolshed: define(24, 28, campLegend, { built: toolshed }),
   woodpileSite: define(24, 16, campLegend, { still: woodpileSite }),
   woodpile: define(24, 20, campLegend, { empty: g => woodpile(g, 'empty'), some: g => woodpile(g, 'some'), full: g => woodpile(g, 'full') }),
+  timberYard: define(40, 20, campLegend, { empty: g => timberYard(g, 'empty'), some: g => timberYard(g, 'some'), full: g => timberYard(g, 'full') }),
   fibreStackSite: define(24, 16, campLegend, { still: fibreStackSite }),
   fibreStack: define(24, 20, campLegend, { empty: g => fibreStack(g, 'empty'), some: g => fibreStack(g, 'some'), full: g => fibreStack(g, 'full') }),
   houseSite: define(40, 32, campLegend, { still: houseSite }),

@@ -6,7 +6,7 @@ import { emptyField } from './field';
 // anything the player had. Loading runs every step a save needs, in order, then validates the result as usual.
 
 /** The saved shape's version. Bump it by one with every change to the shape, and add its upgrade step below. */
-export const SAVE_VERSION = 30;
+export const SAVE_VERSION = 31;
 
 /** The oldest save that can still be brought up to date: earlier formats were never upgraded and don't load. */
 export const OLDEST_UPGRADABLE_VERSION = 23;
@@ -77,7 +77,12 @@ export const SAVE_UPGRADES: Readonly<Record<number, SaveUpgrade>> = {
     return { ...state, trees: state.trees.map(tree => tree.id === 'tree-1' && tree.x === 17 && tree.y === 9 ? { ...tree, x: 16, y: 4 } : tree) };
   },
   // Version 30: a built house can have paint, flower boxes and three short fence sections.
-  29: old => ({ ...(old as Upgradable), decorations: { paint: 'natural', flowerBoxes: false, fence: 0 } })
+  29: old => ({ ...(old as Upgradable), decorations: { paint: 'natural', flowerBoxes: false, fence: 0 } }),
+  // Version 31: the existing woodpile holds more, and can gain a timber yard.
+  30: old => {
+    const state = old as Upgradable & { structures: Upgradable };
+    return { ...state, structures: { timberYard: false, ...state.structures } };
+  }
 };
 
 export type UpgradeResult = { ok: true; state: unknown } | { ok: false; reason: string };

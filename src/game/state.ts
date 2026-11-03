@@ -21,7 +21,8 @@ export const BUILDINGS = {
   windbreak: { name: 'Windbreak', description: 'Stay warmer when the fire fades', symbol: '▥', cost: { wood: 5, fiber: 0 }, prerequisite: null },
   /** Stands on cleared ground: the step named by `ground` must be cleared first. */
   larder: { name: 'Larder', description: 'Keep up to 10 food raised off the ground', symbol: '▥', cost: { wood: 5, fiber: 2, stone: 2 }, prerequisite: null, ground: 'north-near' },
-  woodpile: { name: 'Woodpile', description: 'Keep up to 12 wood split and dry', symbol: '▤', cost: { wood: 3, fiber: 1 }, prerequisite: null, ground: 'east-near' },
+  woodpile: { name: 'Woodpile', description: 'Keep up to 24 wood split and dry', symbol: '▤', cost: { wood: 3, fiber: 1 }, prerequisite: null, ground: 'east-near' },
+  timberYard: { name: 'Timber yard', description: 'Expand the woodpile by 24 wood', symbol: '▤', cost: { wood: 8, fiber: 2 }, prerequisite: 'woodpile' },
   fibreStack: { name: 'Fibre stack', description: 'Keep up to 12 fiber dry under thatch', symbol: '≋', cost: { wood: 2, fiber: 3 }, prerequisite: null, ground: 'east-near' },
   vegetableBeds: { name: 'Vegetable beds', description: 'Three raised beds for potatoes, beans and carrots', symbol: '▦', cost: { wood: 6, fiber: 2 }, prerequisite: null, ground: 'west-near' },
   well: { name: 'Well', description: 'Draw water for the beds and the pot', symbol: '◉', cost: { wood: 2, fiber: 0, stone: 6 }, prerequisite: 'vegetableBeds', ground: 'west-far' },
@@ -290,7 +291,8 @@ export const BALANCE = {
   pickUpSeconds: 2,
   stonePileCapacity: 12,
   larderCapacity: 10,
-  woodpileCapacity: 12,
+  woodpileCapacity: 24,
+  timberYardCapacity: 24,
   /** The shelter, once the house stands, holds this much more wood as a woodshed. */
   woodshedCapacity: 24,
   /** Each log the fireplace takes from the wood store burns this long. */
@@ -398,7 +400,7 @@ export function createGame(): GameState {
     fireFuel: 0,
     fireplaceFuel: 0,
     decorations: emptyDecorations(),
-    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false, field: false, granary: false, windmill: false, bakery: false, beehive: false },
+    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, timberYard: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false, field: false, granary: false, windmill: false, bakery: false, beehive: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
       quarryFound: false, pickaxeCrafted: false, potCrafted: false, packWoven: false, fishingLine: false,
       workshop: { saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false },

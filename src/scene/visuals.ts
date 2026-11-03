@@ -154,7 +154,10 @@ function builtTexture(state: GameState, id: (typeof CAMP_STRUCTURES)[number][0],
   if (id === 'windmill') return `windmill:turn${Math.floor(timeMs / SAIL_FRAME_MS) % 4}`;
   if (id === 'bakery') return bakeryTexture(state);
   if (id === 'beehive') return beehiveTexture(state, timeMs);
-  if (id === 'woodpile') return `woodpile:${stockFrame(state.storedWood)}`;
+  if (id === 'woodpile') {
+    const sprite = state.structures.timberYard ? 'timberYard' : 'woodpile';
+    return `${sprite}:${stockFrame(state.storedWood)}`;
+  }
   if (id === 'fibreStack') return `fibreStack:${stockFrame(state.storedFiber)}`;
   if (id === 'house') {
     const { paint, flowerBoxes } = state.decorations;
