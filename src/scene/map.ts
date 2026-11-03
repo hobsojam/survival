@@ -1,9 +1,10 @@
 import { BALANCE, type GameState, type ResourceKind, type ResourceNode } from '../game/state';
 import { season, type Season } from '../game/calendar';
 import { QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
-import { clearingTile, pathTile, terrainSprites } from '../art/terrain';
+import { clearingTile, pathTile, quarryGroundTile, terrainSprites } from '../art/terrain';
 import { CLEARING_STEPS, STEP_IDS, clearingKey, clearingReach, type ClearingState, type StepId } from '../game/clearing';
-import { CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_OPEN_PATHS, CAMP_PATHS, CAMP_SIGN, QUARRY_PATHS, QUARRY_SIGN, pathDistance, type PathRoute } from './mapGeometry';
+import { CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_OPEN_PATHS, CAMP_PATHS, CAMP_SIGN, QUARRY_PATHS, QUARRY_SIGN, mixHash, pathDistance, type PathRoute } from './mapGeometry';
+import { FACE_HEIGHT, faceBottom, floorDepth } from './quarryGeometry';
 
 export interface MapItem { x: number; y: number; sprite: string }
 export interface TerrainMap { ground: string[][]; pathTiles: MapItem[]; campEdges: MapItem[]; decorations: MapItem[]; rimStones: MapItem[]; trees: MapItem[]; groves: MapItem[][];
@@ -25,11 +26,7 @@ export function shownTerrainKey(state: GameState): string {
 
 const ROUTES: Record<Exclude<TerrainKey, 'quarry'>, readonly PathRoute[]> = { camp: CAMP_PATHS, 'camp-open': CAMP_OPEN_PATHS };
 
-function hash(x: number, y: number, salt = 0): number {
-  let n = Math.imul(x + salt * 31, 374761393) + Math.imul(y - salt * 17, 668265263);
-  n = Math.imul(n ^ (n >>> 13), 1274126177);
-  return (n ^ (n >>> 16)) >>> 0;
-}
+const hash = mixHash;
 
 const flowerPatches = [[11, 8], [30, 7], [7, 23], [28, 23]];
 /** What the camp's trees and decorations must keep clear of, beyond the nodes and the paths. */
@@ -67,48 +64,66 @@ function stoneClearsPaths(item: MapItem, routes: readonly PathRoute[]): boolean 
   return true;
 }
 
-/** Smooth hash noise in [0, 1) over four-tile cells, so earth gathers in patches rather than speckles. */
-function patchNoise(x: number, y: number): number {
-  const cellX = Math.floor(x / 4), cellY = Math.floor(y / 4), u = (x % 4) / 4, v = (y % 4) / 4;
-  const corner = (cx: number, cy: number) => (hash(cx, cy, 8) % 1000) / 1000;
-  const top = corner(cellX, cellY) * (1 - u) + corner(cellX + 1, cellY) * u;
-  const bottom = corner(cellX, cellY + 1) * (1 - u) + corner(cellX + 1, cellY + 1) * u;
-  return top * (1 - v) + bottom * v;
-}
-
 const TREE_SPRITES = ['treeBroadleaf', 'treePine', 'treeYoung'];
 const edgeDistance = (x: number, y: number): number => Math.min(x, y, BALANCE.mapWidth - 1 - x, BALANCE.mapHeight - 1 - y);
 const emptyMap = (): TerrainMap => ({ ground: [], pathTiles: [], campEdges: [], decorations: [], rimStones: [], trees: [], groves: [], signs: [] });
 
 /** Boulders sit about the quarry's open ground; clumps of trees stand between them. */
 const QUARRY_BOULDERS = [[20, 9], [27, 11], [33, 19], [24, 20], [9, 17], [18, 25], [35, 7], [6, 8], [29, 26], [14, 5]];
-const QUARRY_CLUMPS = [[30, 8], [33, 23], [22, 5], [7, 24], [22, 22], [27, 17]];
+const QUARRY_CLUMPS = [[30, 8], [33, 23], [22, 5], [7, 24], [24, 22]];
 const CLUMP_OFFSETS = [[0, 0], [1, 0], [0, 1], [-1, 1], [1, 1], [-1, 0], [0, -1]];
 
-/** Whether a quarry spot is free for something standing: off the path, out of the way home and clear of the workings and the sign. */
-function quarryClear(x: number, y: number): boolean {
+/**
+ * Whether a quarry spot is free for something standing: off the floor, the face and its lip, clear of the track by
+ * `track` tiles, out of the way home and clear of the workings and the sign.
+ */
+function quarryClear(x: number, y: number, track: number): boolean {
+  const cx = x + .5, cy = y + .5;
   const workings = [QUARRY_SITE, RUBBLE_SITE].every(site => Math.hypot(x - site.x, y - site.y) >= 2.5);
   const exit = Math.abs(y - QUARRY_EXIT.y) > 2 || x < QUARRY_EXIT.x - 3;
-  return workings && exit && !nearSign(x, y, QUARRY_SIGN) && pathDistance(x + .5, y + .5, QUARRY_PATHS) >= 1.35;
+  const foot = faceBottom(cx);
+  const cliff = foot !== null && cy >= foot - FACE_HEIGHT - .5 && cy < foot + 1;
+  return workings && exit && !cliff && !nearSign(x, y, QUARRY_SIGN) && floorDepth(cx, cy) >= 1.15
+    && pathDistance(cx, cy, QUARRY_PATHS) >= track;
+}
+const TREE_TRACK_CLEARANCE = 2.5;
+const BOULDER_TRACK_CLEARANCE = 1.35;
+
+/** Whether the woods stand on a tile: all round the edge, thinning inward, and thick on the plateau above the face. */
+function quarryWoods(x: number, y: number): boolean {
+  const edge = edgeDistance(x, y);
+  if (edge === 0) return true;
+  if (edge === 1) return hash(x, y, 2) % 4 !== 0;
+  if (edge === 2 && hash(x, y, 2) % 3 === 0) return true;
+  const foot = faceBottom(x + .5);
+  return foot !== null && y + .5 < foot - FACE_HEIGHT - 1.5 && hash(x, y, 6) % 5 !== 0;
 }
 
-/** The quarry: mixed earth and grass, boulders and scattered stones, a worn path home and woods all round. */
+/** The quarry: a cut face in the west above a gravel floor, a worn track home, boulders and stones, and woods all round. */
 function buildQuarryMap(): TerrainMap {
   const map = emptyMap();
-  const boulders = QUARRY_BOULDERS.filter(([x, y]) => quarryClear(x, y))
+  const boulders = QUARRY_BOULDERS.filter(([x, y]) => quarryClear(x, y, BOULDER_TRACK_CLEARANCE))
     .map(([x, y]) => ({ x, y, sprite: `boulder${hash(x, y, 11) % 2}` }));
   const taken = (x: number, y: number) => [...boulders, ...map.trees].some(item => Math.hypot(item.x - x, item.y - y) < 1.2);
+  const treeAt = (x: number, y: number) => ({ x, y, sprite: TREE_SPRITES[hash(x, y, 3) % 3] });
   for (let y = 0; y < BALANCE.mapHeight; y++) {
     const row: string[] = [];
-    for (let x = 0; x < BALANCE.mapWidth; x++) row.push(layQuarryTile(x, y, map, boulders));
+    for (let x = 0; x < BALANCE.mapWidth; x++) {
+      const ground = quarryGroundTile(x, y);
+      row.push(ground);
+      if (quarryWoods(x, y)) {
+        if (quarryClear(x, y, TREE_TRACK_CLEARANCE) && !boulders.some(item => Math.hypot(item.x - x, item.y - y) < 1.2)) map.trees.push(treeAt(x, y));
+      } else if (/^grass\d$/.test(ground) && quarryOpen(x, y, boulders) && hash(x, y, 4) % 4 === 0) {
+        map.decorations.push({ x, y, sprite: quarryDetail(x, y) });
+      }
+    }
     map.ground.push(row);
   }
-  map.trees = map.trees.filter(tree => quarryClear(tree.x, tree.y) && !boulders.some(item => Math.hypot(item.x - tree.x, item.y - tree.y) < 1.2));
   for (const [cx, cy] of QUARRY_CLUMPS) {
     const clump = CLUMP_OFFSETS.filter((_, index) => index < 3 || hash(cx, cy, 12 + index) % 2 === 0)
       .map(([dx, dy]) => ({ x: cx + dx, y: cy + dy }))
-      .filter(({ x, y }) => quarryClear(x, y) && !taken(x, y));
-    map.trees.push(...clump.map(({ x, y }) => ({ x, y, sprite: TREE_SPRITES[hash(x, y, 3) % 3] })));
+      .filter(({ x, y }) => quarryClear(x, y, TREE_TRACK_CLEARANCE) && !taken(x, y));
+    map.trees.push(...clump.map(({ x, y }) => treeAt(x, y)));
   }
   // Nothing lies flat under a clump's trunks; the boulders go in last, among the stones.
   map.decorations = [...map.decorations.filter(item => !taken(item.x, item.y)), ...boulders];
@@ -116,22 +131,10 @@ function buildQuarryMap(): TerrainMap {
   return map;
 }
 
-/** Adds one quarry tile's path, border tree or decoration to the map and returns its ground sprite. */
-function layQuarryTile(x: number, y: number, map: TerrainMap, boulders: readonly MapItem[]): string {
-  const path = pathTile(x, y, QUARRY_PATHS);
-  if (path) map.pathTiles.push({ x, y, sprite: path });
-  const edge = edgeDistance(x, y);
-  const open = !path && !nearSign(x, y, QUARRY_SIGN) && boulders.every(item => Math.hypot(item.x - x, item.y - y) >= 1.2)
+/** Whether a grass tile is open for a small decoration: clear of the sign, the boulders and the workings. */
+function quarryOpen(x: number, y: number, boulders: readonly MapItem[]): boolean {
+  return !nearSign(x, y, QUARRY_SIGN) && boulders.every(item => Math.hypot(item.x - x, item.y - y) >= 1.2)
     && [QUARRY_SITE, RUBBLE_SITE].every(site => Math.hypot(x - site.x, y - site.y) >= 1.5);
-  // The woods close in two deep on every side, thinning on the inner row.
-  if (edge <= 1 && hash(x, y, 2) % (edge === 0 ? 4 : 2) !== 0) {
-    map.trees.push({ x, y, sprite: TREE_SPRITES[hash(x, y, 3) % 3] });
-  } else if (edge > 0 && open && hash(x, y, 4) % 4 === 0) {
-    map.decorations.push({ x, y, sprite: quarryDetail(x, y) });
-  }
-  // Bare earth lies in patches that grow commoner toward the quarry in the west; the path keeps to grass so it shows.
-  const bare = !path && patchNoise(x, y) + (hash(x, y, 7) % 5) / 25 > .55 + x / BALANCE.mapWidth * .2;
-  return bare ? `earth${hash(x, y, 1) % 3}` : `grass${hash(x, y) % 4}`;
 }
 
 /** Mostly loose stones, with a tuft of grass, an old stump or a ring of mushrooms here and there. */

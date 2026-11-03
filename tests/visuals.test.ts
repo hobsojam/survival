@@ -367,6 +367,12 @@ describe('the quarry area', () => {
     for (const item of visuals) expect(item.depth).toBe(item.y);
   });
 
+  it('draws the worked spot small enough to sit at the face\'s foot', () => {
+    expect(sprites.quarry.size).toEqual([32, 24]);
+    expect(sprites.quarry.anchor).toEqual([16, 22]);
+    expect(Object.keys(sprites.quarry.frames).sort()).toEqual(['ready', 'spent']);
+  });
+
   it('spent quarry and gathered rubble', () => {
     const state = quarryState();
     state.quarryReadyDay = state.day + 1;

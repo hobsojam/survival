@@ -5,6 +5,7 @@ import { buildMap, shownTerrainKey, terrainKey, type TerrainMap } from '../src/s
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { CLEARING_STEPS, STEP_IDS, clearingReach, inClearing, type ClearingState, type StepId } from '../src/game/clearing';
 import { CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_OPEN_PATHS, CAMP_SIGN, QUARRY_PATHS, QUARRY_SIGN, pathDistance as routeDistance } from '../src/scene/mapGeometry';
+import { FACE_HEIGHT, faceBottom, floorDepth, quarryGroundAt } from '../src/scene/quarryGeometry';
 
 function visibleGround(map: TerrainMap, x: number, y: number, pixelX = 8, pixelY = 8): string | undefined {
   const base = terrainSprites[map.ground[y][x]];
@@ -218,7 +219,6 @@ describe('terrain composition', () => {
     const camp = buildMap(nodes, 'camp');
     const quarry = buildMap([], 'quarry');
     expect(quarry.campEdges).toEqual([]);
-    expect(quarry.trees.length).toBeLessThan(camp.trees.length);
     const stones = (map: TerrainMap) => map.decorations.filter(item => item.sprite.startsWith('pebbles')).length;
     expect(stones(quarry)).toBeGreaterThanOrEqual(2 * stones(camp));
     expect(quarry.decorations.filter(item => item.sprite.startsWith('boulder')).length).toBeGreaterThanOrEqual(6);
@@ -230,12 +230,37 @@ describe('the quarry scenery', () => {
   const quarry = buildMap([], 'quarry');
   const clearOf = (x: number, y: number, spot: { x: number; y: number }) => Math.hypot(x - spot.x, y - spot.y);
 
-  it('rings the quarry with trees on every side', () => {
+  it('rings the quarry with a full band of trees on every side', () => {
     const edge = (test: (tree: { x: number; y: number }) => boolean) => quarry.trees.filter(test).length;
-    expect(edge(tree => tree.x <= 1)).toBeGreaterThanOrEqual(10);
-    expect(edge(tree => tree.x >= BALANCE.mapWidth - 2)).toBeGreaterThanOrEqual(10);
-    expect(edge(tree => tree.y <= 1)).toBeGreaterThanOrEqual(15);
-    expect(edge(tree => tree.y >= BALANCE.mapHeight - 2)).toBeGreaterThanOrEqual(15);
+    expect(edge(tree => tree.x <= 1)).toBeGreaterThanOrEqual(25);
+    expect(edge(tree => tree.x >= BALANCE.mapWidth - 2)).toBeGreaterThanOrEqual(30);
+    expect(edge(tree => tree.y <= 1)).toBeGreaterThanOrEqual(40);
+    expect(edge(tree => tree.y >= BALANCE.mapHeight - 2)).toBeGreaterThanOrEqual(40);
+  });
+
+  it('plants the plateau above the face', () => {
+    expect(quarry.trees.filter(tree => {
+      const foot = faceBottom(tree.x + .5);
+      return foot !== null && tree.y + .5 < foot - FACE_HEIGHT - 1;
+    }).length).toBeGreaterThanOrEqual(15);
+  });
+
+  it('keeps tree crowns off the track and out of the floor', () => {
+    for (const tree of quarry.trees) {
+      const where = `${tree.sprite} at ${tree.x},${tree.y}`;
+      expect(routeDistance(tree.x + .5, tree.y + .5, QUARRY_PATHS), where).toBeGreaterThanOrEqual(2.5);
+      expect(floorDepth(tree.x + .5, tree.y + .5), where).toBeGreaterThanOrEqual(1.15);
+    }
+  });
+
+  it('keeps the face and the floor clear', () => {
+    for (const item of [...quarry.trees, ...quarry.decorations])
+      expect(quarryGroundAt(item.x * 16 + 8, item.y * 16 + 8), `${item.sprite} at ${item.x},${item.y}`).not.toMatch(/^(face|seam|lip|foot|floor)$/);
+  });
+
+  it('puts small decorations only on plain grass', () => {
+    for (const item of quarry.decorations.filter(item => !item.sprite.startsWith('boulder')))
+      expect(quarry.ground[item.y][item.x], `${item.sprite} at ${item.x},${item.y}`).toMatch(/^grass\d$/);
   });
 
   it('plants small clumps of trees out in the open ground', () => {
@@ -245,16 +270,11 @@ describe('the quarry scenery', () => {
     expect(inland.some(tree => tree.x >= 26)).toBe(true);
   });
 
-  it('wears a path from the quarry face to the way home', () => {
-    expect(quarry.pathTiles.some(item => item.x === QUARRY_EXIT.x && Math.abs(item.y - QUARRY_EXIT.y) <= 1)).toBe(true);
-    expect(quarry.pathTiles.some(item => clearOf(item.x, item.y, QUARRY_SITE) <= 3)).toBe(true);
-    // The path is unbroken: every tile has a neighbour on it.
-    const on = new Set(quarry.pathTiles.map(item => `${item.x},${item.y}`));
-    expect(quarry.pathTiles.every(item => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => on.has(`${item.x + dx},${item.y + dy}`)))).toBe(true);
-  });
-
-  it('lays the path over grass, so it stands out from the bare earth', () => {
-    for (const item of quarry.pathTiles) expect(quarry.ground[item.y][item.x], `${item.x},${item.y}`).toMatch(/^grass/);
+  it('draws the track and floor in the ground, with no separate path tiles', () => {
+    expect(quarry.pathTiles).toEqual([]);
+    expect(quarry.ground[QUARRY_EXIT.y][QUARRY_EXIT.x]).not.toMatch(/^grass/);
+    expect(quarry.ground[QUARRY_SITE.y][QUARRY_SITE.x]).not.toMatch(/^grass/);
+    expect(quarry.ground.flat().filter(name => name.startsWith('earth'))).toEqual([]);
   });
 
   it('keeps old stumps few, so the quarry does not look logged', () => {
@@ -265,7 +285,7 @@ describe('the quarry scenery', () => {
     const boulders = quarry.decorations.filter(item => item.sprite.startsWith('boulder'));
     for (const item of [...quarry.trees, ...boulders]) {
       const where = `${item.sprite} at ${item.x},${item.y}`;
-      expect(routeDistance(item.x + .5, item.y + .5, QUARRY_PATHS), where).toBeGreaterThanOrEqual(1.35);
+      expect(routeDistance(item.x + .5, item.y + .5, QUARRY_PATHS), where).toBeGreaterThanOrEqual(item.sprite.startsWith('boulder') ? 1.35 : 2.5);
       expect(Math.abs(item.y - QUARRY_EXIT.y) > 2 || item.x < QUARRY_EXIT.x - 3, where).toBe(true);
       for (const site of [QUARRY_SITE, RUBBLE_SITE]) expect(clearOf(item.x, item.y, site), where).toBeGreaterThanOrEqual(2.5);
     }

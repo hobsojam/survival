@@ -2,7 +2,8 @@ import type { SpriteDef } from './sprites';
 import type { PaletteKey } from './palette';
 import { BALANCE } from '../game/state';
 import { CLEARING_STEPS, STEP_IDS, clearingKey, clearingReach, type StepId } from '../game/clearing';
-import { CAMP_OPEN_PATHS, CAMP_PATHS, QUARRY_PATHS, pathDistance, type PathRoute } from '../scene/mapGeometry';
+import { CAMP_OPEN_PATHS, CAMP_PATHS, mixHash, pathDistance, type PathRoute } from '../scene/mapGeometry';
+import { FACE_HEIGHT, FLOOR_EDGE_IN, FLOOR_EDGE_OUT, TRACK_EDGE_OUT, TRACK_HALF_WIDTH, faceBottom, floorDepth, quarryGroundAt, trackDistance, type QuarryGround } from '../scene/quarryGeometry';
 
 type Grid = string[][];
 const blank = (w: number, h: number, fill = '.'): Grid => Array.from({ length: h }, () => Array.from({ length: w }, () => fill));
@@ -170,11 +171,82 @@ function pathSpriteFor(g: Grid): string {
   return name;
 }
 // Build every area's paths up front so their sprites are registered as textures with the rest.
-for (const routes of [CAMP_PATHS, CAMP_OPEN_PATHS, QUARRY_PATHS]) pathTiles(routes);
+for (const routes of [CAMP_PATHS, CAMP_OPEN_PATHS]) pathTiles(routes);
 
 export function pathTile(x: number, y: number, destinations: readonly PathRoute[]): string | undefined {
   return pathTiles(destinations).get(`${x},${y}`);
 }
+
+/** The quarry's ground: grass, the cut face and its lip, the gravel floor and the worn track. The track is drawn in
+ * path colours so it snows over like the camp's paths; the stone is left alone by the seasons. */
+const quarryLegend = {
+  a: 'grass1', b: 'grass2', c: 'grass3', d: 'grass4', l: 'leaf3', m: 'leaf2',
+  k: 'stone1', s: 'stone2', t: 'stone3', u: 'stone4', x: 'shadow',
+  p: 'path3', q: 'path2', r: 'path4'
+} as const;
+const quarrySprites = new Map<string, string>();
+const roll = (px: number, py: number, salt: number): number => mixHash(px, py, salt) % 100;
+
+function grassPixel(px: number, py: number): string {
+  const n = roll(px, py, 51);
+  return n < 4 ? 'c' : n < 7 ? 'a' : 'b';
+}
+function floorPixel(px: number, py: number): string {
+  const n = roll(px, py, 53);
+  return n < 7 ? 'u' : n < 13 ? 's' : 't';
+}
+function trackPixel(px: number, py: number): string {
+  const n = roll(px, py, 55);
+  return n < 6 ? 'q' : n < 12 ? 'r' : 'p';
+}
+/** An edge pixel shades from one side to the other: the nearer the inside, the likelier it takes the inside's colour. */
+const fade = (px: number, py: number, salt: number, inside: number): boolean => roll(px, py, salt) < inside * 100;
+const centre = (p: number): number => (p + .5) / 16;
+function facePixel(px: number, py: number): string {
+  if (roll(px, py, 57) < 2) return 'u';
+  const foot = faceBottom((px + .5) / 16) ?? 0;
+  const band = Math.floor((py - Math.floor((foot - FACE_HEIGHT) * 16)) / 13);
+  const block = Math.floor((px + band * 9) / 22);
+  return mixHash(block, band, 59) % 2 ? 's' : 't';
+}
+const quarryPixel: Record<QuarryGround, (px: number, py: number) => string> = {
+  grass: grassPixel,
+  plateau: (px, py) => roll(px, py, 61) < 6 ? 'd' : grassPixel(px, py),
+  lip: (px, py) => roll(px, py, 63) < 30 ? 'm' : 'l',
+  face: facePixel,
+  seam: () => 'k',
+  foot: () => 'x',
+  floor: floorPixel,
+  floorEdge: (px, py) => fade(px, py, 65, (FLOOR_EDGE_OUT - floorDepth(centre(px), centre(py))) / (FLOOR_EDGE_OUT - FLOOR_EDGE_IN))
+    ? floorPixel(px, py) : grassPixel(px, py),
+  // Where the track runs into the floor's soft edge, it shades into gravel rather than ending in a hard line.
+  track: (px, py) => fade(px, py, 71, (FLOOR_EDGE_OUT - floorDepth(centre(px), centre(py))) / (FLOOR_EDGE_OUT - FLOOR_EDGE_IN))
+    ? floorPixel(px, py) : trackPixel(px, py),
+  trackEdge: (px, py) => fade(px, py, 67, (TRACK_EDGE_OUT - trackDistance(centre(px), centre(py))) / (TRACK_EDGE_OUT - TRACK_HALF_WIDTH))
+    ? trackPixel(px, py) : grassPixel(px, py)
+};
+
+/** The quarry's ground tile at (x, y): a plain grass tile where nothing is worked, else a sprite cut from the shapes. */
+export function quarryGroundTile(x: number, y: number): string {
+  const g = blank(16, 16);
+  let worked = false;
+  for (let py = 0; py < 16; py++) for (let px = 0; px < 16; px++) {
+    const kind = quarryGroundAt(x * 16 + px, y * 16 + py);
+    if (kind !== 'grass') worked = true;
+    g[py][px] = quarryPixel[kind](x * 16 + px, y * 16 + py);
+  }
+  if (!worked) return `grass${mixHash(x, y, 69) % 4}`;
+  const shape = g.map(row => row.join('')).join('/');
+  let name = quarrySprites.get(shape);
+  if (!name) {
+    name = `quarryTile${quarrySprites.size}`;
+    addTerrainSprite(name, sprite(g, quarryLegend));
+    quarrySprites.set(shape, name);
+  }
+  return name;
+}
+// Every quarry tile is made up front so they are registered as textures with the rest.
+for (let y = 0; y < BALANCE.mapHeight; y++) for (let x = 0; x < BALANCE.mapWidth; x++) quarryGroundTile(x, y);
 
 const decalLegend = { a: 'grass1', b: 'grass3', c: 'grass4', d: 'flower0', e: 'flower1', f: 'flower2', g: 'flower3', h: 'flower4', i: 'stone1', j: 'stone2', k: 'stone3', l: 'stone4', m: 'wood0', n: 'wood2', o: 'wood3', p: 'earth1', q: 'earth3', r: 'leaf2', s: 'leaf4', t: 'shadow', u: 'stone0' } as const;
 function addDecal(name: string, draw: (g: Grid) => void, w = 8, h = 8): void {
