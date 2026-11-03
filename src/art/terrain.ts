@@ -21,7 +21,7 @@ const sprite = (g: Grid, legend: Record<string, PaletteKey>, anchor?: [number, n
 });
 const groundLegend = { a: 'grass1', b: 'grass2', c: 'grass3', d: 'grass4', e: 'earth0', f: 'earth1', g: 'earth2', h: 'earth3', i: 'earth4', s: 'stone2', t: 'stone3' } as const;
 
-const pathLegend = { ...groundLegend, e: 'path0', f: 'path1', g: 'path2', h: 'path3', i: 'path4' } as const;
+const pathLegend = { ...groundLegend, e: 'path1', f: 'path2', g: 'path3' } as const;
 
 export const terrainSprites: Record<string, SpriteDef> = {};
 for (let variant = 0; variant < 4; variant++) {
@@ -152,9 +152,13 @@ function pathTileGrid(x: number, y: number, destinations: readonly PathRoute[]):
   const g = blank(16, 16);
   let filled = 0;
   for (let py = 0; py < 16; py++) for (let px = 0; px < 16; px++) {
-    const distance = pathDistance(x + (px + .5) / 16, y + (py + .5) / 16, destinations);
-    if (distance > .5) continue;
-    g[py][px] = distance >= .44 ? 'e' : 'g';
+    const worldX = x * 16 + px, worldY = y * 16 + py;
+    const wobble = (mixHash(Math.floor(worldX / 4), Math.floor(worldY / 4), 73) % 100 / 100 - .5) * .06;
+    const distance = pathDistance(x + (px + .5) / 16, y + (py + .5) / 16, destinations) + wobble;
+    if (distance > .53) continue;
+    if (distance > .39 && mixHash(worldX, worldY, 75) % 100 >= (.53 - distance) / .14 * 100) continue;
+    const grain = mixHash(worldX, worldY, 77) % 100;
+    g[py][px] = grain < 7 ? 'e' : grain < 20 ? 'g' : 'f';
     filled++;
   }
   return filled ? g : null;

@@ -140,6 +140,18 @@ describe('terrain composition', () => {
     }
   });
 
+  it('renders camp paths as varied worn earth without a dark outline', () => {
+    const map = buildMap(nodes, 'camp-open');
+    const colors = new Set(map.pathTiles.flatMap(item => {
+      const sprite = terrainSprites[item.sprite];
+      return sprite.frames.still.flatMap(row => [...row].filter(pixel => pixel !== '.').map(pixel => sprite.legend[pixel]));
+    }));
+    expect(colors).toContain('path1');
+    expect(colors).toContain('path2');
+    expect(colors).toContain('path3');
+    expect(colors).not.toContain('path0');
+  });
+
   it('marks the camp circle with sixteen to twenty outlined high-contrast stones', () => {
     const stones = buildMap(nodes, 'camp').rimStones;
     expect(stones.length).toBeGreaterThanOrEqual(16);
