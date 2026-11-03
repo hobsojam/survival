@@ -557,13 +557,30 @@ function house(g: Grid, lit: boolean, paint: 'natural' | 'berry' | 'leaf' = 'nat
   box(g, 27, 0, 8, 2, 'o'); line(g, 27, 0, 34, 0, 'p');
   if (lit) { dot(g, 30, 2, 'u'); dot(g, 31, 2, 'v'); }
 }
-function fenceSide(g: Grid): void {
-  for (const y of [5, 11]) { box(g, 9, y, 4, 3, 'c'); line(g, 9, y, 12, y, 'e'); }
-  for (const y of [2, 13]) { box(g, 8, y, 6, 4, 'b'); line(g, 8, y, 13, y, 'e'); }
+/** The side rails recede toward the two ends of the back fence. */
+function fenceSide(g: Grid, right: boolean): void {
+  const far = right ? 20 : 44;
+  oval(g, 32, 34, 5, 1, 's');
+  for (const [frontY, backY] of [[22, 9], [29, 16]]) {
+    line(g, far, backY + 2, 32, frontY + 2, 'b');
+    line(g, far, backY + 1, 32, frontY + 1, 'c');
+    line(g, far, backY, 32, frontY, 'd');
+  }
+  for (const [x, top, height] of [[far, 3, 18], [32, 17, 18]]) {
+    box(g, x - 2, top, 4, height, 'b');
+    line(g, x - 2, top + 1, x - 2, top + height - 1, 'a');
+    line(g, x - 2, top, x + 1, top, 'e');
+    line(g, x + 1, top + 1, x + 1, top + height - 2, 'c');
+  }
 }
 function fenceRail(g: Grid): void {
-  for (const x of [2, 11, 20]) { box(g, x, 3, 4, 12, 'b'); line(g, x, 3, x + 3, 3, 'e'); }
-  for (const y of [6, 11]) { box(g, 2, y, 22, 3, 'c'); line(g, 2, y, 23, y, 'e'); }
+  for (const y of [22, 29]) { box(g, 3, y, 58, 3, 'c'); line(g, 3, y, 60, y, 'd'); }
+  for (const x of [4, 60]) {
+    box(g, x - 2, 19, 4, 16, 'b');
+    line(g, x - 2, 19, x + 1, 19, 'e');
+    line(g, x - 2, 20, x - 2, 34, 'a');
+    line(g, x + 1, 20, x + 1, 33, 'c');
+  }
 }
 
 /** The finished shelter once the bed has gone into the house: its door taken off, the front left open and logs stacked inside. */
@@ -1053,7 +1070,7 @@ export const phase3Sprites: Record<string, SpriteDef> = {
   house: define(40, 32, campLegend, { dark: g => house(g, false), lit: g => house(g, true), ...Object.fromEntries((['natural', 'berry', 'leaf'] as const).flatMap(paint => [false, true].flatMap(boxes => [false, true].map(lit => [
     `${paint}-${boxes ? 'boxes' : 'bare'}-${lit ? 'lit' : 'dark'}`, (g: Grid) => house(g, lit, paint, boxes)
   ])))) }),
-  fence: define(26, 17, campLegend, { rail: fenceRail, side: fenceSide }),
+  fence: define(64, 36, campLegend, { rail: fenceRail, left: g => fenceSide(g, false), right: g => fenceSide(g, true) }, [32, 34]),
   woodshed: define(48, 40, campLegend, { empty: g => woodshed(g, 'empty'), some: g => woodshed(g, 'some'), full: g => woodshed(g, 'full') }),
   larderSite: define(24, 16, campLegend, { still: larderSite }),
   larder: define(24, 28, campLegend, { empty: g => larder(g, 'empty'), some: g => larder(g, 'some'), full: g => larder(g, 'full') }),
