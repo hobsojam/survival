@@ -3,7 +3,7 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type SiteId, typ
 import { GameScene } from '../scene/GameScene';
 import { canvasLayout, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
-import { availableFiber, availableWood, cookBlocker, isAtCamp, sleepBlocker, stargazeBlocker } from '../game/rules';
+import { availableFiber, availableWood, cookBlocker, decorationBlocker, type DecorationChoice, isAtCamp, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { nextStep, type Side } from '../game/clearing';
 import { offerBlocker } from '../game/companion';
 import { defaultDish, type DishId } from '../game/cooking';
@@ -19,7 +19,7 @@ import { GAVE_OUT_MESSAGE } from '../game/sickness';
 import { ENDING_FADE_MS, endingMarkup, endingView, showEnding } from './ending';
 import { browserDownloadDoc, downloadText } from './download';
 import { showBuildList, showCampStores } from './showPanels';
-import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
+import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, decorationMarkup, decorationButtonView, DECORATION_CHOICES, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
 import type { UpgradeId } from '../game/workshop';
 import { Soundscape } from '../game/soundscape';
 
@@ -121,7 +121,7 @@ export class App {
               <section class="panel bakery-panel" data-tab="camp" hidden><p class="eyebrow">THE NORTH GROUND</p><h2>Bakery</h2><p class="garden-hint"><span id="bakery-shelf"></span> <span id="bakery-note"></span></p><div class="tool-row"><button type="button" id="take-loaf-button" data-action="takeLoaf">Take a loaf</button><small id="take-loaf-hint"></small></div></section>
               <section class="panel beehive-panel" data-tab="camp" hidden><p class="eyebrow">THE NORTH GROUND</p><h2>Beehive</h2><p class="garden-hint"><span id="hive-honey"></span></p><div class="tool-row"><button type="button" id="take-honey-button" data-action="takeHoney">Take the honey</button><small id="take-honey-hint"></small></div></section>
               <section class="panel night-panel" data-tab="camp"><p class="eyebrow">CAMP MOMENTS</p><h2>Cook or unwind</h2><p class="night-hint" id="night-hint">Cook by the fire any time. Stargazing waits for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" data-dish="berries" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button>${nightDishMarkup()}</div></section>
-              <section class="panel build-panel" data-tab="build"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand anywhere in the clearing to build.</p><div id="build-list">${buildListMarkup()}</div><div id="clearing-group" hidden><h3 class="build-group-heading">Clear the land</h3><p id="clearing-progress" class="build-hint" hidden></p><div id="clearing-sides">${clearingMarkup}</div><div class="tool-row" id="clear-row"><h3 id="clear-title">Clear the ground</h3><p id="clear-copy" class="lookout-copy"></p><button type="button" id="clear-button" data-action="clearGround">Clear the ground</button><small id="clear-cost"></small></div></div></section>
+              <section class="panel build-panel" data-tab="build"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand anywhere in the clearing to build.</p><div id="build-list">${buildListMarkup()}</div><div id="decoration-group" hidden><h3 class="build-group-heading">Make it yours</h3><div id="decoration-list">${decorationMarkup()}</div></div><div id="clearing-group" hidden><h3 class="build-group-heading">Clear the land</h3><p id="clearing-progress" class="build-hint" hidden></p><div id="clearing-sides">${clearingMarkup}</div><div class="tool-row" id="clear-row"><h3 id="clear-title">Clear the ground</h3><p id="clear-copy" class="lookout-copy"></p><button type="button" id="clear-button" data-action="clearGround">Clear the ground</button><small id="clear-cost"></small></div></div></section>
               <section class="panel phone-only" data-tab="camp"><p class="eyebrow">THIS CAMP</p><button type="button" id="phone-new-game" class="secondary-button">Start a new game</button></section>
             </div>
           </aside>
@@ -168,6 +168,10 @@ export class App {
     this.root.querySelector('#build-list')!.addEventListener('click', event => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-build]');
       if (button) this.scene?.perform({ type: 'build', structureId: button.dataset.build as StructureId });
+    });
+    this.root.querySelector('#decoration-list')!.addEventListener('click', event => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-decorate]');
+      if (button) this.scene?.perform({ type: 'decorate', choice: button.dataset.decorate as DecorationChoice });
     });
     this.root.querySelector('#clearing-sides')!.addEventListener('click', event => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-clear-side]');
@@ -651,9 +655,26 @@ export class App {
     this.setText('prompt', this.scene?.getPrompt() ?? 'WASD / arrows  Move');
     showBuildList(this.find, buildListView(this.state));
     for (const id of buildOptions) this.renderBuildButton(id);
+    this.renderDecorations();
     this.renderClearing();
     const buildReady = Boolean(this.root.querySelector('[data-tab="build"] .ready'));
     this.root.querySelectorAll('[data-tab-button="build"], [data-sidebar-button="build"]').forEach(tab => tab.classList.toggle('has-dot', buildReady));
+  }
+
+  private renderDecorations(): void {
+    this.root.querySelector<HTMLElement>('#decoration-group')!.hidden = !this.state.structures.house;
+    for (const choice of DECORATION_CHOICES) {
+      const view = decorationButtonView(this.state, choice);
+      const button = this.root.querySelector<HTMLButtonElement>(`[data-decorate="${choice}"]`)!;
+      button.disabled = view.disabled;
+      button.classList.toggle('built', view.built);
+      button.classList.toggle('locked', view.locked);
+      button.classList.toggle('ready', view.ready);
+      button.querySelector<HTMLElement>('.decor-description')!.textContent = view.description;
+      button.querySelector<HTMLElement>('.build-verb')!.textContent = view.verb;
+      button.querySelector<HTMLElement>('.build-price')!.textContent = view.price;
+      button.title = decorationBlocker(this.state, choice) ?? '';
+    }
   }
 
   private renderClearing(): void {

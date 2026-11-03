@@ -88,6 +88,10 @@ export interface StonePile {
 
 export type AreaId = 'camp' | 'quarry';
 
+export type HousePaint = 'natural' | 'berry' | 'leaf';
+export interface HomesteadDecorations { paint: HousePaint; flowerBoxes: boolean; fence: number }
+export const emptyDecorations = (): HomesteadDecorations => ({ paint: 'natural', flowerBoxes: false, fence: 0 });
+
 /** What a wolf took on its last visit: a ration left out for it counts as its visit, and a friendly wolf sees the others off. */
 export type WolfTake = 'ration' | 'berry' | 'nothing' | 'offered' | 'chased';
 
@@ -125,6 +129,7 @@ export interface GameState {
   /** Seconds the house's fireplace has left to burn; it stays 0 until the house is built. */
   fireplaceFuel: number;
   structures: Record<StructureId, boolean>;
+  decorations: HomesteadDecorations;
   progress: { nextStormDay: number | null; hearthUnlocked: boolean; lookoutRepaired: boolean; axeCrafted: boolean;
     quarryFound: boolean; pickaxeCrafted: boolean; potCrafted: boolean; packWoven: boolean;
     /** A fishing line, for the frozen spring in winter. */
@@ -392,6 +397,7 @@ export function createGame(): GameState {
     inventory: { wood: 0, fiber: 0, stone: 0, food: emptyFood() },
     fireFuel: 0,
     fireplaceFuel: 0,
+    decorations: emptyDecorations(),
     structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, woodpile: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false, field: false, granary: false, windmill: false, bakery: false, beehive: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
       quarryFound: false, pickaxeCrafted: false, potCrafted: false, packWoven: false, fishingLine: false,

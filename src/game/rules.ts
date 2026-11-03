@@ -29,6 +29,7 @@ export type GameAction =
   | { type: 'clearGround' }
   | { type: 'visitSite'; siteId: SiteId }
   | { type: 'build'; structureId: StructureId }
+  | { type: 'decorate'; choice: DecorationChoice }
   | { type: 'move'; dx: number; dy: number }
   | { type: 'plantGarden'; plotIndex: number }
   | { type: 'harvestGarden'; plotIndex: number }
@@ -980,6 +981,47 @@ const build: ActionHandler<'build'> = (state, action) => {
   };
 };
 
+export type DecorationChoice = 'berryPaint' | 'leafPaint' | 'flowerBoxes' | 'fence';
+export const DECORATION_COSTS = {
+  berryPaint: { wood: 0, fiber: 2, berry: 2, greens: 0 },
+  leafPaint: { wood: 0, fiber: 2, berry: 0, greens: 2 },
+  flowerBoxes: { wood: 3, fiber: 2, berry: 0, greens: 0 },
+  fence: { wood: 6, fiber: 1, berry: 0, greens: 0 }
+} as const;
+
+export function decorationBlocker(state: GameState, choice: DecorationChoice): string | null {
+  if (!isInClearing(state)) return 'Return to the marked camp area to decorate.';
+  if (!state.structures.house) return 'Build the house first.';
+  if (choice === 'flowerBoxes' && state.decorations.flowerBoxes) return 'Flower boxes are already built.';
+  if (choice === 'fence' && state.decorations.fence >= 3) return 'The fence is complete.';
+  if (choice === 'berryPaint' && state.decorations.paint === 'berry') return 'The walls are already berry red.';
+  if (choice === 'leafPaint' && state.decorations.paint === 'leaf') return 'The walls are already leaf green.';
+  if (isExhausted(state)) return TOO_TIRED_MESSAGE;
+  const cost = DECORATION_COSTS[choice];
+  const missing = [availableWood(state) < cost.wood ? `${cost.wood} wood` : null,
+    availableFiber(state) < cost.fiber ? `${cost.fiber} fiber` : null,
+    availableFood(state, 'berry') < cost.berry ? `${cost.berry} berries` : null,
+    availableFood(state, 'greens') < cost.greens ? `${cost.greens} greens` : null].filter(Boolean);
+  return missing.length ? `Need ${missing.join(' and ')} to decorate the house.` : null;
+}
+
+const decorate: ActionHandler<'decorate'> = (state, action) => {
+  if (!(action.choice in DECORATION_COSTS)) return refuse(state, 'That decoration is unavailable.');
+  const blocker = decorationBlocker(state, action.choice);
+  if (blocker) return refuse(state, blocker);
+  const cost = DECORATION_COSTS[action.choice];
+  const paid = spendFood(spendFood(state, 'berry', cost.berry)!, 'greens', cost.greens)!;
+  const decorations = { ...state.decorations };
+  if (action.choice === 'berryPaint') decorations.paint = 'berry';
+  if (action.choice === 'leafPaint') decorations.paint = 'leaf';
+  if (action.choice === 'flowerBoxes') decorations.flowerBoxes = true;
+  if (action.choice === 'fence') decorations.fence += 1;
+  let message = 'You paint the house walls.';
+  if (action.choice === 'fence') message = 'You build a short fence section around the house.';
+  if (action.choice === 'flowerBoxes') message = 'You set flower boxes beneath the house window.';
+  return { state: payAndBuild(paid, { wood: cost.wood, fiber: cost.fiber, stone: 0 }, { decorations }), message };
+};
+
 const rest: ActionHandler<'rest'> = state => {
   if (!isAtHome(state)) return refuse(state, livesInHouse(state) ? 'Go home to rest.' : 'Move closer to the fire to rest.');
   const rested = advanceTime(markWarmRest(state), BALANCE.restSeconds, 'resting');
@@ -1061,7 +1103,7 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, pickUpStone, burnFiber, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak,
+  cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak,
   makeFishingLine, fish
 };
 
