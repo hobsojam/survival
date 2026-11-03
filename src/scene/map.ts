@@ -3,7 +3,7 @@ import { season, type Season } from '../game/calendar';
 import { QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 import { clearingTile, pathTile, terrainSprites } from '../art/terrain';
 import { CLEARING_STEPS, STEP_IDS, clearingKey, clearingReach, type ClearingState, type StepId } from '../game/clearing';
-import { CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_OPEN_PATHS, CAMP_PATHS, CAMP_SIGN, QUARRY_PATHS, QUARRY_SIGN, pathDistance, type PathRoute } from './mapGeometry';
+import { CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_OPEN_PATHS, CAMP_PATHS, CAMP_SIGN, QUARRY_PATHS, QUARRY_SIGN, mixHash, pathDistance, type PathRoute } from './mapGeometry';
 
 export interface MapItem { x: number; y: number; sprite: string }
 export interface TerrainMap { ground: string[][]; pathTiles: MapItem[]; campEdges: MapItem[]; decorations: MapItem[]; rimStones: MapItem[]; trees: MapItem[]; groves: MapItem[][];
@@ -25,11 +25,7 @@ export function shownTerrainKey(state: GameState): string {
 
 const ROUTES: Record<Exclude<TerrainKey, 'quarry'>, readonly PathRoute[]> = { camp: CAMP_PATHS, 'camp-open': CAMP_OPEN_PATHS };
 
-function hash(x: number, y: number, salt = 0): number {
-  let n = Math.imul(x + salt * 31, 374761393) + Math.imul(y - salt * 17, 668265263);
-  n = Math.imul(n ^ (n >>> 13), 1274126177);
-  return (n ^ (n >>> 16)) >>> 0;
-}
+const hash = mixHash;
 
 const flowerPatches = [[11, 8], [30, 7], [7, 23], [28, 23]];
 /** What the camp's trees and decorations must keep clear of, beyond the nodes and the paths. */
