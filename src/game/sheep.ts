@@ -60,6 +60,32 @@ export function shornSheep(state: GameState): { state: GameState; message: strin
   return { state: { ...state, sheep }, message };
 }
 
+export type WovenId = 'blanket' | 'jumper' | 'rug';
+
+export const WOVEN: Record<WovenId, { name: string; wool: number; made: string }> = {
+  blanket: { name: 'blanket', wool: 3, made: 'You wove a wool blanket and spread it on the bed.' },
+  jumper: { name: 'jumper', wool: 4, made: 'You wove a warm jumper. It itches a little.' },
+  rug: { name: 'rug', wool: 3, made: 'You wove a rug and laid it by the door.' }
+};
+
+/** Why an item can't be woven now, or null. */
+export function weaveBlocker(state: GameState, item: WovenId): string | null {
+  const { name, wool } = WOVEN[item];
+  if (state.sheep.woven[item]) return `You have already made the ${name}.`;
+  if (!state.structures.loom) return 'Build the loom first.';
+  if (item === 'blanket' && !state.structures.bed) return 'Build a bed first.';
+  if (item === 'rug' && !state.structures.house) return 'Build the house first.';
+  if (!isInClearing(state)) return 'Return to camp to use the loom.';
+  if (isExhausted(state)) return TOO_TIRED_MESSAGE;
+  return state.sheep.wool < wool ? `You need ${wool} wool for the ${name}.` : null;
+}
+
+/** The state with the item made and its wool taken from the basket. */
+export function wovenState(state: GameState, item: WovenId): { state: GameState; message: string } {
+  const { wool, made } = WOVEN[item];
+  return { state: { ...state, sheep: { ...state.sheep, wool: state.sheep.wool - wool, woven: { ...state.sheep.woven, [item]: true } } }, message: made };
+}
+
 /** What the survivor notices of the flock between two states. */
 export function sheepNews(before: GameState, after: GameState): string[] {
   return !before.sheep.arrived && after.sheep.arrived ? ['Three sheep were in the pen this morning. They seem to have decided something.'] : [];

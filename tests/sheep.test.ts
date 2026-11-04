@@ -6,7 +6,7 @@ import { newsBetween } from '../src/game/news';
 import { advanceTime, applyAction, buildStatus } from '../src/game/rules';
 import { threshedField } from '../src/game/field';
 import { wellSickness } from '../src/game/sickness';
-import { feedBlocker, shearBlocker, sheepStage } from '../src/game/sheep';
+import { WOVEN, feedBlocker, shearBlocker, sheepStage, weaveBlocker, type WovenId } from '../src/game/sheep';
 
 const ARRIVAL_NOTE = 'Three sheep were in the pen this morning. They seem to have decided something.';
 
@@ -192,5 +192,95 @@ describe('shearing', () => {
     const state = ready();
     expect(buildStatus(state, 'loom')).toBe('locked');
     expect(buildStatus(shear(state).state, 'loom')).not.toBe('locked');
+  });
+});
+
+describe('the loom', () => {
+  const loomCamp = (wool = 8, woven: Partial<GameState['sheep']['woven']> = {}, structures: Partial<GameState['structures']> = {}): GameState => {
+    const state = penCamp({ arrived: true, fluff: 0, fedUntil: 1, lastShornYear: 1, wool, woven: { blanket: false, jumper: false, rug: false, ...woven } });
+    return { ...state, structures: { ...state.structures, loom: true, bed: true, house: true, ...structures } };
+  };
+  const weave = (state: GameState, item: WovenId) => applyAction(state, { type: 'weave', item });
+
+  it('costs what the table says', () => {
+    expect(Object.fromEntries(Object.entries(WOVEN).map(([id, { wool }]) => [id, wool]))).toEqual({ blanket: 3, jumper: 4, rug: 3 });
+  });
+
+  it('gives each reason an item can\'t be woven', () => {
+    expect(weaveBlocker(loomCamp(8, { rug: true }), 'rug')).toBe('You have already made the rug.');
+    expect(weaveBlocker(loomCamp(8, {}, { loom: false }), 'rug')).toBe('Build the loom first.');
+    expect(weaveBlocker(loomCamp(8, {}, { bed: false }), 'blanket')).toBe('Build a bed first.');
+    expect(weaveBlocker(loomCamp(8, {}, { house: false }), 'rug')).toBe('Build the house first.');
+    const state = loomCamp();
+    expect(weaveBlocker({ ...state, player: { ...state.player, x: 1, y: 28 } }, 'rug')).toBe('Return to camp to use the loom.');
+    expect(weaveBlocker({ ...state, player: { ...state.player, energy: 0 } }, 'rug')).toBe(TOO_TIRED_MESSAGE);
+    expect(weaveBlocker(loomCamp(2), 'rug')).toBe('You need 3 wool for the rug.');
+    expect(weaveBlocker(loomCamp(3), 'jumper')).toBe('You need 4 wool for the jumper.');
+    expect(weaveBlocker(state, 'rug')).toBeNull();
+  });
+
+  it('needs neither bed nor house for the jumper', () => {
+    expect(weaveBlocker(loomCamp(4, {}, { bed: false, house: false }), 'jumper')).toBeNull();
+  });
+
+  it('spends the wool and takes a workshop job\'s time and energy', () => {
+    const state = loomCamp();
+    const { state: after, message } = weave(state, 'jumper');
+    expect(after.sheep.wool).toBe(4);
+    expect(after.sheep.woven).toEqual({ blanket: false, jumper: true, rug: false });
+    expect(after.timeOfDay).toBeCloseTo(state.timeOfDay + BALANCE.buildSeconds);
+    expect(state.player.energy - after.player.energy).toBeCloseTo(BALANCE.buildEnergyCost, 0);
+    expect(message).toContain('jumper');
+  });
+
+  it('refuses without spending', () => {
+    const state = loomCamp(2);
+    const { state: after } = weave(state, 'rug');
+    expect(after.sheep).toEqual(state.sheep);
+  });
+
+  describe('the blanket', () => {
+    const rested = (blanket: boolean, pillow: boolean, bed = true): number => {
+      const state = loomCamp(8, { blanket }, { bed });
+      return applyAction({ ...state, companion: { ...state.companion, pillow }, player: { ...state.player, energy: 10 }, structures: { ...state.structures, house: false } }, { type: 'rest' }).state.player.energy;
+    };
+
+    it('rests ten deeper in the bed', () => {
+      expect(rested(true, false) - rested(false, false)).toBeCloseTo(BALANCE.blanketEnergyGain);
+    });
+
+    it('adds to the pillow', () => {
+      expect(rested(true, true) - rested(false, true)).toBeCloseTo(BALANCE.blanketEnergyGain);
+    });
+  });
+
+  describe('the jumper', () => {
+    const lostOver = (timeOfDay: (day: number) => number, jumper: boolean, cloak = false): number => {
+      const state = loomCamp(8, { jumper });
+      const out = { ...state, day: 3, timeOfDay: timeOfDay(3), companion: { ...state.companion, cloak }, player: { ...state.player, x: 1, y: 28, warmth: 80 } };
+      return out.player.warmth - advanceTime(out, 5, 'working').player.warmth;
+    };
+    const night = (day: number) => nightStart(day) + 5;
+
+    it('keeps a tenth of the night\'s chill off', () => {
+      expect(lostOver(night, true) / lostOver(night, false)).toBeCloseTo(0.9);
+    });
+
+    it('adds to the cloak', () => {
+      expect(lostOver(night, true, true) / lostOver(night, false, true)).toBeCloseTo(0.9);
+      expect(lostOver(night, false, true) / lostOver(night, false)).toBeCloseTo(BALANCE.cloakWarmthLoss);
+    });
+
+    it('does nothing by day', () => {
+      expect(lostOver(() => 30, true)).toBeCloseTo(lostOver(() => 30, false));
+    });
+  });
+
+  it('makes a rug that changes nothing else', () => {
+    const state = loomCamp();
+    const { state: after } = weave(state, 'rug');
+    expect(after.sheep.woven).toEqual({ blanket: false, jumper: false, rug: true });
+    expect(after.structures).toEqual(state.structures);
+    expect(after.progress).toEqual(state.progress);
   });
 });
