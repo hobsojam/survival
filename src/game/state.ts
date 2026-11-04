@@ -298,6 +298,11 @@ export const BALANCE = {
   /** A rabbit a wolf friend brings home, roasted at the fire; one comes every this many winter dawns. */
   cookedRabbitHunger: 50,
   omeletteHunger: 35,
+  /** More variety from the orchard and the coop, all eaten at the fire. */
+  bakedAppleHunger: 30,
+  eggOnBreadHunger: 55,
+  applePieHunger: 60,
+  applePieWarmth: 15,
   rabbitEveryDays: 2,
   fireSecondsPerWood: 90,
   /** Kindling: the same with or without the hearth. */

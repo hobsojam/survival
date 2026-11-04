@@ -2,7 +2,7 @@ import { iconUrl, type JournalIcon } from './journalIcons';
 
 // The Bag panel's little pictures of foraged food and what the camp makes from it, on the journal icons' 10×10 grid.
 
-type FoodIconId = 'greens' | 'hazelnut' | 'honey' | 'pineNeedles' | 'roastedHazelnuts' | 'vegetables' | 'fish' | 'rabbit' | 'pineTea' | 'salad' | 'honeyCake' | 'stew' | 'bread' | 'flour' | 'loaf' | 'apple' | 'egg' | 'omelette';
+type FoodIconId = 'greens' | 'hazelnut' | 'honey' | 'pineNeedles' | 'roastedHazelnuts' | 'vegetables' | 'fish' | 'rabbit' | 'pineTea' | 'salad' | 'honeyCake' | 'stew' | 'bread' | 'flour' | 'loaf' | 'apple' | 'egg' | 'omelette' | 'bakedApple' | 'eggOnBread' | 'applePie';
 
 /** A round loaf, its crust scored and dusted with flour. */
 const LOAF: JournalIcon = { legend: { k: 'wood1', c: 'earth2', C: 'earth3', W: 'earth4', s: 'canvas4' }, rows: [
@@ -53,6 +53,45 @@ export const FOOD_ICONS: Record<FoodIconId, JournalIcon> = {
     '.pPYYYYPp.',
     '..pPPPPp..',
     '...pppp...',
+    '..........'
+  ] },
+  // An apple split open on a stone, its middle gone soft and golden.
+  bakedApple: { legend: { d: 'wood1', r: 'berry1', R: 'berry2', o: 'fire2', O: 'fire3', p: 'stone2' }, rows: [
+    '..........',
+    '....d.....',
+    '..rrdrr...',
+    '.rRRRRRr..',
+    '.rRoooRr..',
+    '.rRoOoRr..',
+    '.rRRRRRr..',
+    '..rrrrr...',
+    '.ppppppp..',
+    '..........'
+  ] },
+  // A fried egg on a thick slice.
+  eggOnBread: { legend: { k: 'wood1', C: 'earth3', e: 'canvas4', y: 'scarf3' }, rows: [
+    '..........',
+    '..........',
+    '..kkkkkk..',
+    '.kCCCCCCk.',
+    '.kCeeeeCk.',
+    '.keeyyeek.',
+    '.kCeeeeCk.',
+    '.kCCCCCCk.',
+    '..kkkkkk..',
+    '..........'
+  ] },
+  // A lattice-topped pie, with apple showing through, in its dish.
+  applePie: { legend: { c: 'earth2', W: 'earth4', r: 'berry2', d: 'stone2' }, rows: [
+    '..........',
+    '..........',
+    '...cccc...',
+    '..cWrWrc..',
+    '.cWWWWWWc.',
+    '.crWrWrWc.',
+    '.cWWWWWWc.',
+    '.dddddddd.',
+    '..dddddd..',
     '..........'
   ] },
   bread: LOAF,

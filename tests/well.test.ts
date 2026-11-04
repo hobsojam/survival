@@ -204,9 +204,9 @@ describe('vegetable stew', () => {
     };
   };
 
-  it('is a pot dish of two vegetables, cooked last of the pot dishes', () => {
+  it('is a pot dish of two vegetables, cooked after the other savoury pot dishes', () => {
     expect(DISHES.stew).toEqual({ name: 'vegetable stew', ingredients: { vegetables: 2 }, potOnly: true });
-    expect(DISH_ORDER.filter(dish => DISHES[dish].potOnly).at(-1)).toBe('stew');
+    expect(DISH_ORDER.filter(dish => DISHES[dish].potOnly).slice(-2)).toEqual(['stew', 'applePie']);
   });
 
   it('needs the well', () => {
@@ -255,10 +255,11 @@ describe('vegetable stew', () => {
 
   it('has a button with the other pot dishes', () => {
     const dishes = nightDishesView(evening(2));
-    expect(dishes.map(entry => entry.dish)).toEqual(['pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew']);
-    expect(dishes.at(-1)).toMatchObject({ name: 'Vegetable stew', cost: `2 vegetables · ${BALANCE.cookSeconds} seconds`, disabled: false, title: 'Cook vegetable stew.' });
-    expect(dishes.at(-1)!.icon).toMatch(/^data:image\//);
-    expect(nightDishesView(evening(2, false)).at(-1)).toMatchObject({ disabled: true, title: 'Build the well to cook stew.' });
+    expect(dishes.map(entry => entry.dish)).toEqual(['pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew', 'applePie']);
+    const stew = dishes.find(entry => entry.dish === 'stew');
+    expect(stew).toMatchObject({ name: 'Vegetable stew', cost: `2 vegetables · ${BALANCE.cookSeconds} seconds`, disabled: false, title: 'Cook vegetable stew.' });
+    expect(stew!.icon).toMatch(/^data:image\//);
+    expect(nightDishesView(evening(2, false)).find(entry => entry.dish === 'stew')).toMatchObject({ disabled: true, title: 'Build the well to cook stew.' });
     expect(nightDishMarkup()).toContain('id="dish-stew"');
   });
 });
