@@ -6,7 +6,7 @@ import { wolfVisit } from './wolves';
 import { availableFiber, availableStone, availableWood, spendFiber, spendWood, bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
 import { POT_COST, cookBlocker, defaultDish, dishBlocker, foodWord, isPackedDish, packDish, potBlocker, serveDish, spendIngredients, type DishId } from './cooking';
 import { alarmAfter, cloakBlocker, companionDawn, hasFriend, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
-import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, stepDepth, type StepId } from './clearing';
+import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, stepDepth, stepGround, stepWhere, type StepId } from './clearing';
 import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
 import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
@@ -600,11 +600,11 @@ const chopTree: ActionHandler<'chopTree'> = (state, action) => {
 const markClearing: ActionHandler<'markClearing'> = (state, action) => {
   const blocker = markBlocker(state, action.step);
   if (blocker) return refuse(state, blocker);
-  const { side, trees } = CLEARING_STEPS[action.step];
+  const { trees } = CLEARING_STEPS[action.step];
   const felled = state.clearing.marked === action.step ? state.clearing.felled : [];
   return {
     state: { ...state, clearing: { ...state.clearing, marked: action.step, felled } },
-    message: `Tied pale fibre round ${trees.length} trees on the ${side} side.`
+    message: `Tied pale fibre round ${trees.length} trees ${stepWhere(action.step)}.`
   };
 };
 
@@ -617,7 +617,7 @@ const clearGround: ActionHandler<'clearGround'> = state => {
   const nodes = state.nodes.map((node, index) => ({ ...node, x: placed[index].x, y: placed[index].y }));
   return {
     state: payAndBuild(state, CLEARING_STEPS[step].cost, { nodes, clearing: { cleared, marked: null, felled: [] } }),
-    message: `The ${CLEARING_STEPS[step].side} side is open now.${roomLine(step, state.structures, id => Object.hasOwn(BUILDINGS, id))}`
+    message: `${capitalised(stepGround(step))} is open now.${roomLine(step, state.structures, id => Object.hasOwn(BUILDINGS, id))}`
   };
 };
 

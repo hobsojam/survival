@@ -100,7 +100,9 @@ function addChickens(state: GameState, add: AddVisual, timeMs: number): void {
 export const SHEEP_RACK = { x: 33.5, y: 2.9 };
 
 const SHEEP_HOMES = [{ x: 32.25, y: 5.5 }, { x: 34.75, y: 5.2 }, { x: 33.5, y: 4.2 }];
-const SHEEP_AT_RACK = [{ x: 32.7, y: 4.2 }, { x: 34.3, y: 4.2 }, { x: 33.5, y: 4.8 }];
+const SHEEP_AT_RACK = [{ x: 32.5, y: 4.3 }, { x: 34.5, y: 4.3 }, { x: 33.5, y: 5.6 }];
+/** Clouds fill the pen, so they keep their own spots, fed or not, where every small face still shows. */
+const CLOUD_SPOTS = [{ x: 32.15, y: 5.8 }, { x: 34.85, y: 5.75 }, { x: 33.5, y: 3.85 }];
 /** How far above its feet each look's snow cap sits, in tiles. */
 const SNOW_LIFT: Record<SheepStage, number> = { shorn: 11 / TILE, woolly: 15 / TILE, round: 22 / TILE, cloud: 36 / TILE };
 const WANDER_MS: Record<SheepStage, number> = { shorn: 2600, woolly: 3200, round: 4200, cloud: 6400 };
@@ -111,11 +113,12 @@ function addSheep(state: GameState, add: AddVisual, timeMs: number): void {
   if (!sheep.arrived || !state.structures.sheepPen) return;
   const stage = sheepStage(sheep.fluff);
   const fed = sheep.fedUntil !== null && state.day < sheep.fedUntil;
-  const homes = fed ? SHEEP_AT_RACK : SHEEP_HOMES;
+  const cloud = stage === 'cloud';
+  const homes = cloud ? CLOUD_SPOTS : fed ? SHEEP_AT_RACK : SHEEP_HOMES;
   homes.forEach((home, index) => {
     const phase = timeMs / WANDER_MS[stage] + index * 2.1;
-    const x = home.x + Math.sin(phase) * 0.2;
-    const y = home.y + Math.sin(phase * 0.7 + index) * 0.12;
+    const x = home.x + Math.sin(phase) * (cloud ? 0.1 : 0.2);
+    const y = home.y + Math.sin(phase * 0.7 + index) * (cloud ? 0.05 : 0.12);
     const walking = Math.abs(Math.cos(phase)) > 0.4 && Math.floor(timeMs / 320) % 2 === 1;
     const depth = worldY(4.5) + worldY(y) / 1000;
     add(`sheep-${index}`, `sheep:${stage}${walking ? 'Walk' : 'Idle'}`, x, y, depth);
@@ -272,6 +275,8 @@ function addBuildableStructures(state: GameState, add: AddVisual, x: number, y: 
   const { structures } = state;
   for (const [id, dx, dy] of CAMP_STRUCTURES) {
     if (groundBlocker(state, id)) continue;
+    // The loom stays a surprise until the first shearing brings it into the build list.
+    if (id === 'loom' && state.sheep.lastShornYear === null) continue;
     if (id === 'vegetableBeds' && structures.vegetableBeds) {
       addVegetableBeds(state, add, x + dx, y + dy);
       continue;

@@ -16,7 +16,7 @@ import { WORKSHOP_UPGRADES, upgradeBlocker, type UpgradeId } from '../game/works
 import { logsInStore } from '../game/wood';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
-import { CLEARING_STEPS, STEP_IDS, clearGroundBlocker, markBlocker, nextStep, roomLine, stepDepth, type Side } from '../game/clearing';
+import { CLEARING_STEPS, STEP_IDS, clearGroundBlocker, markBlocker, nextStep, roomLine, stepDepth, stepGround, stepWhere, type Side } from '../game/clearing';
 import { KEEPSAKES_NEEDED, cloakBlocker, keepsakeStock, pillowBlocker } from '../game/companion';
 import { DISHES, DISH_ORDER, dishBlocker, foodWord, ingredientList, potBlocker, type DishId } from '../game/cooking';
 import { fishingLineBlocker } from '../game/fishing';
@@ -746,12 +746,12 @@ export function clearingView(state: GameState): { shown: boolean; sides: Clearin
   else if (state.clearing.cleared.length > 0) progress = `Cleared ground: ${state.clearing.cleared.map(step => step.replace('-', ' ')).join(', ')}.`;
   const shown = state.progress.axeCrafted;
   if (!marked) return { shown, sides, progress, clear: { ...clear, copy: 'Choose a side to mark its trees for felling.', cost: 'Choose a side first' } };
-  const { side, trees, cost } = CLEARING_STEPS[marked];
+  const { trees, cost } = CLEARING_STEPS[marked];
   const left = trees.length - felled.length;
-  let copy = `Ready to clear the ${side} side.`;
+  let copy = `Ready to clear ${stepGround(marked)}.`;
   if (left > 0) {
     const treeWord = left === 1 ? 'tree' : 'trees';
-    copy = `Fell the ${left} marked ${treeWord} left on the ${side} side.`;
+    copy = `Fell the ${left} marked ${treeWord} left ${stepWhere(marked)}.`;
   }
   return { shown, sides, progress, clear: { ...clear, copy, cost: `${cost.wood} wood · ${cost.fiber} fiber${cost.stone > 0 ? ` · ${cost.stone} stone` : ''}` } };
 }

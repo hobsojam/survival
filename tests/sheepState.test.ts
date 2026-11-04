@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE, createGame, type GameState } from '../src/game/state';
-import { CLEARING_STEPS, STEP_IDS, clearingReach, inClearing, previousStep } from '../src/game/clearing';
-import { groundBlocker } from '../src/game/rules';
+import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from '../src/game/state';
+import { CLEARING_STEPS, STEP_IDS, clearingReach, inClearing, placeBranches, previousStep, stepGround } from '../src/game/clearing';
+import { applyAction, groundBlocker } from '../src/game/rules';
+import { clearingView } from '../src/ui/panels';
 import { saveGame } from '../src/game/save';
 import { SAVE_VERSION, upgradeSave } from '../src/game/saveUpgrades';
 import { buildMap } from '../src/scene/map';
+import { CAMP_STRUCTURES } from '../src/scene/visuals';
 
 const fakeStorage = (): Storage => {
   const items = new Map<string, string>();
@@ -81,9 +83,56 @@ describe('upgrading a save', () => {
   });
 });
 
+/** A real camp in year two's spring, with the pen and its ground, that saves unless its flock is impossible. */
+function flockCamp(flock: Partial<GameState['sheep']>, extra: StructureId[] = [], without: StructureId[] = []): GameState {
+  const structures = { ...game.structures };
+  const want: string[] = ['sheepPen', 'workshop', 'granary', ...extra];
+  while (want.length) {
+    const id = want.pop() as StructureId;
+    const building = BUILDINGS[id];
+    if (!building) continue;
+    if (!without.includes(id)) structures[id] = true;
+    if (building.prerequisite) want.push(building.prerequisite);
+    if ('alsoRequires' in building && building.alsoRequires) want.push(building.alsoRequires);
+  }
+  const placed = placeBranches(game.nodes, [...STEP_IDS]);
+  return {
+    ...game,
+    day: 62,
+    nodes: game.nodes.map((node, i) => ({ ...node, x: placed[i].x, y: placed[i].y })),
+    clearing: { cleared: [...STEP_IDS], marked: null, felled: [] },
+    structures,
+    progress: { ...game.progress, nextStormDay: null, hearthUnlocked: true, workshop: { ...game.progress.workshop, shears: true } },
+    sheep: { ...game.sheep, ...flock }
+  };
+}
+
+describe('saves a flock can really reach', () => {
+  const shorn = { arrived: true, fluff: 0, fedUntil: 60, lastShornYear: 2 };
+  it.each<[string, GameState]>([
+    ['a pen with nothing in it', flockCamp({})],
+    ['feed out before they come', flockCamp({ fedUntil: 65 })],
+    ['a flock that has just come', flockCamp({ arrived: true, fluff: 40, fedUntil: 65 })],
+    ['a cloud', flockCamp({ arrived: true, fluff: 200, fedUntil: 60 })],
+    ['a full basket', flockCamp({ ...shorn, wool: 8 })],
+    ['a shorn flock with the loom', flockCamp({ ...shorn, wool: 4 }, ['loom'])],
+    ['everything woven', flockCamp({ ...shorn, woven: { blanket: true, jumper: true, rug: true } }, ['loom', 'bed', 'house'])]
+  ])('saves %s', (_name, state) => {
+    expect(saves(state)).toBe(true);
+  });
+});
+
+describe('where the loom stands', () => {
+  it('is on cleared ground by the time it can be built, since the flock needs the field on the south ground', () => {
+    const [, dx, dy] = CAMP_STRUCTURES.find(([id]) => id === 'loom')!;
+    expect(BUILDINGS.sheepPen.prerequisite).toBe('field');
+    expect(BUILDINGS.field.ground).toBe('south-far');
+    expect(inClearing(BALANCE.campX + dx, BALANCE.campY + dy, ['east-near', 'east-far', 'south-near', 'south-far'])).toBe(true);
+  });
+});
+
 describe('saves that cannot happen', () => {
   const sheep = (changes: Partial<GameState['sheep']>, more: Partial<GameState> = {}): GameState => ({ ...game, ...more, sheep: { ...game.sheep, ...changes } });
-  const built = (...ids: (keyof GameState['structures'])[]): Partial<GameState> => ({ structures: { ...game.structures, ...Object.fromEntries(ids.map(id => [id, true])) } });
 
   it.each([
     ['sheep without a pen', sheep({ arrived: true, fluff: 40 })],
@@ -91,11 +140,37 @@ describe('saves that cannot happen', () => {
     ['fluff past the cap', sheep({ arrived: true, fluff: 201 })],
     ['wool past the basket', sheep({ wool: 9 })],
     ['straw past the cap', { ...game, field: { ...game.field, straw: 13 } }],
-    ['a loom before any shearing', sheep({}, built('loom'))],
+    ['a loom before any shearing', { ...flockCamp({ arrived: true, fluff: 40, fedUntil: 60 }, ['loom']) }],
+    ['a shearing with no shears', { ...flockCamp({ arrived: true, fluff: 0, fedUntil: 60, lastShornYear: 2 }), progress: { ...flockCamp({}).progress, workshop: { ...flockCamp({}).progress.workshop, shears: false } } }],
+    ['a blanket with no bed', flockCamp({ arrived: true, fluff: 0, fedUntil: 60, lastShornYear: 2, woven: { blanket: true, jumper: false, rug: false } }, ['loom'], ['bed', 'house'])],
+    ['a rug with no house', flockCamp({ arrived: true, fluff: 0, fedUntil: 60, lastShornYear: 2, woven: { blanket: false, jumper: false, rug: true } }, ['loom'], ['house'])],
     ['a shearing with no sheep', sheep({ lastShornYear: 1 })],
     ['a woven item with no loom', sheep({ woven: { blanket: false, jumper: true, rug: false } })],
     ['a feed day that is not a number', sheep({ fedUntil: 'soon' as unknown as number })]
   ])('rejects %s', (_name, state) => {
     expect(saves(state)).toBe(false);
+  });
+});
+
+describe('finding the meadow', () => {
+  const marking = (): GameState => ({ ...flockCamp({}), clearing: { cleared: STEP_IDS.filter(id => id !== 'east-outer'), marked: null, felled: [] }, structures: { ...game.structures }, progress: { ...game.progress, axeCrafted: true } });
+
+  it('says where its marked trees are, not just which side', () => {
+    const { message } = applyAction(marking(), { type: 'markClearing', step: 'east-outer' });
+    expect(message).toBe('Tied pale fibre round 3 trees up past the lookout.');
+  });
+
+  it('keeps pointing there while they are felled and cleared', () => {
+    const marked = applyAction(marking(), { type: 'markClearing', step: 'east-outer' }).state;
+    expect(clearingView(marked).clear.copy).toBe('Fell the 3 marked trees left up past the lookout.');
+    const felled = { ...marked, clearing: { ...marked.clearing, felled: [0, 1, 2] } };
+    expect(clearingView(felled).clear.copy).toBe('Ready to clear the meadow up past the lookout.');
+    expect(stepGround('east-outer')).toBe('the meadow up past the lookout');
+    expect(stepGround('east-near')).toBe('the east side');
+  });
+
+  it('still names the side for ordinary ground', () => {
+    const state = { ...marking(), clearing: { cleared: [], marked: null, felled: [] } };
+    expect(applyAction(state, { type: 'markClearing', step: 'east-near' }).message).toBe('Tied pale fibre round 4 trees on the east side.');
   });
 });

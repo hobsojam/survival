@@ -58,8 +58,9 @@ describe('the flock in the scene', () => {
           for (const sheep of sheepVisuals(flock(fluff, { fedUntil: fed }), timeMs)) {
             expect(sheep.x).toBeGreaterThanOrEqual(worldX(31) - 8 + 23);
             expect(sheep.x).toBeLessThanOrEqual(worldX(37) - 8 - 23);
-            expect(sheep.y).toBeGreaterThanOrEqual(worldY(2) + 32);
-            expect(sheep.y).toBeLessThanOrEqual(worldY(7) - 8);
+            expect(sheep.y).toBeGreaterThanOrEqual(worldY(2) + 28);
+            // Their feet stay behind the front rail, which starts 69 pixels down the pen's 80.
+            expect(sheep.y).toBeLessThanOrEqual(worldY(2) - 8 + 71);
           }
         }
       }
@@ -99,5 +100,44 @@ describe('the flock in the scene', () => {
     expect(rug({ ...state, structures: house })).toBe(false);
     expect(rug({ ...state, structures: { ...house, loom: true }, sheep: { ...state.sheep, woven: { blanket: false, jumper: false, rug: true } } })).toBe(true);
     expect(rug({ ...state, sheep: { ...state.sheep, woven: { blanket: false, jumper: false, rug: true } } })).toBe(false);
+  });
+
+  describe('seeing the whole flock', () => {
+    const pixels = (texture: string, x: number, y: number): Map<string, string> => {
+      const [name, frame] = texture.split(':');
+      const def = sheepSprites[name];
+      const cells = new Map<string, string>();
+      def.frames[frame].forEach((row, py) => [...row].forEach((cell, px) => {
+        if (cell !== '.' && cell !== 's') cells.set(`${x + px - def.anchor[0]},${y + py - def.anchor[1]}`, cell);
+      }));
+      return cells;
+    };
+    /** How much of each sheep shows, and whether its face does, once the ones in front are drawn over it. */
+    const seen = (state: GameState, timeMs: number) => {
+      const flockInOrder = sheepVisuals(state, timeMs).sort((a, b) => a.depth - b.depth);
+      return flockInOrder.map((sheep, index) => {
+        const own = pixels(sheep.texture, sheep.x, sheep.y);
+        const front = flockInOrder.slice(index + 1).map(other => pixels(other.texture, other.x, other.y));
+        const shows = [...own].filter(([cell]) => !front.some(other => other.has(cell)));
+        return { share: shows.length / own.size, face: shows.some(([, cell]) => cell === 'k') };
+      });
+    };
+
+    it.each([[0], [40], [120], [200]])('shows every face at %i fluff, fed or not', fluff => {
+      for (const fedUntil of [1, 40]) {
+        for (const timeMs of [0, 3000, 9000, 40000, 123456]) {
+          for (const sheep of seen(flock(fluff, { fedUntil }), timeMs)) {
+            expect(sheep.face).toBe(true);
+            expect(sheep.share).toBeGreaterThan(0.6);
+          }
+        }
+      }
+    });
+  });
+
+  it('keeps the loom\'s spot unmarked until a shearing unlocks it', () => {
+    const site = (state: GameState) => sceneVisuals(state, 0).some(visual => visual.texture === 'loomSite:still');
+    expect(site(flock(40))).toBe(false);
+    expect(site(flock(0, { lastShornYear: 1 }))).toBe(true);
   });
 });

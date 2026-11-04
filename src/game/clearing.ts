@@ -319,3 +319,9 @@ export function roomLine(step: StepId, structures: Partial<Record<string, boolea
   if (open.length === 0) return '';
   return ` There's room for ${open.map(id => withArticle(buildingName(id))).join(' and ')} now.`;
 }
+
+/** Where a step's trees stand, for a sentence: its side, or the meadow's own place, which isn't reached by walking that way from the fire. */
+export const stepWhere = (id: StepId): string => (CLEARING_STEPS[id].patch ? 'up past the lookout' : `on the ${CLEARING_STEPS[id].side} side`);
+
+/** The ground a step opens, for a sentence. */
+export const stepGround = (id: StepId): string => (CLEARING_STEPS[id].patch ? 'the meadow up past the lookout' : `the ${CLEARING_STEPS[id].side} side`);
