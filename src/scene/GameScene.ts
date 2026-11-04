@@ -251,9 +251,8 @@ export class GameScene extends Phaser.Scene {
 
   getState(): GameState { return this.state; }
 
-  /** Swallows taps while the gate says no, such as when a phone sheet is open. */
   private unnamedAnimalUnder(pixelX: number, pixelY: number): NameTarget | null {
-    return unnamedAnimalAt(this.state, this.time.now, pixelX / TILE - 0.5, pixelY / TILE - 0.5, this.ambient.friendsDrawn);
+    return unnamedAnimalAt(this.state, this.time.now, pixelX / TILE - 0.5, pixelY / TILE - 0.5, { friends: this.ambient.friendsDrawn, stillSeconds: this.ambient.stillSeconds, replaying: this.nightWatch.running });
   }
 
   setNameAsker(ask: (target: NameTarget) => void): void {
@@ -267,6 +266,7 @@ export class GameScene extends Phaser.Scene {
     keyboard.enabled = !typing;
   }
 
+  /** Swallows taps while the gate says no, such as when a phone sheet is open. */
   setTapGate(gate: () => boolean): void {
     this.tapGate = gate;
   }

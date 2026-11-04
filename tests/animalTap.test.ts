@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { COOP_SITE } from '../src/game/chickens';
 import { STEP_IDS, placeBranches } from '../src/game/clearing';
 import { newlyStayed } from '../src/game/names';
-import { createGame, type GameState } from '../src/game/state';
+import { sprites } from '../src/art/sprites';
+import { createGame, type Friend, type GameState } from '../src/game/state';
 import { unnamedAnimalAt, type DrawnFriend } from '../src/scene/animalTap';
+import { companionPoseFor } from '../src/scene/companionPose';
 import { pickTapTarget } from '../src/scene/tapTarget';
 import { sceneVisuals } from '../src/scene/visuals';
 
@@ -80,6 +82,30 @@ describe('tapping the hens', () => {
     expect(coopTaps.every(target => target === null)).toBe(true);
   });
 
+  it('stands each hen in plain sight, with room to tap it once the camp has filled up', () => {
+    const built = camp({ structures: { ...game.structures, ...Object.fromEntries(Object.keys(game.structures).map(id => [id, true])) } as GameState['structures'] });
+    const paintedAt = (texture: string, x: number, y: number): [number, number][] => {
+      const [name, frame] = texture.split(':');
+      const def = sprites[name];
+      const rows = def.frames[frame] ?? [];
+      return rows.flatMap((row, r) => [...row].flatMap((cell, c): [number, number][] => (cell === '.' || def.legend[cell] === 'shadow' ? [] : [[x + c - def.anchor[0], y + r - def.anchor[1]]])));
+    };
+    for (const timeMs of [0, 1500, 9000]) {
+      const visuals = sceneVisuals(built, timeMs);
+      for (const index of [0, 1, 2]) {
+        const hen = visuals.find(visual => visual.id === `chicken-${index}`)!;
+        const others = visuals.filter(visual => visual.id !== hen.id && visual.depth >= hen.depth).flatMap(visual => paintedAt(visual.texture, visual.x, visual.y).map(([x, y]) => `${x},${y}`));
+        const hidden = new Set(others);
+        const inSight = paintedAt(hen.texture, hen.x, hen.y).filter(([x, y]) => !hidden.has(`${x},${y}`));
+        const asks = inSight.filter(([x, y]) => {
+          const target = unnamedAnimalAt(built, timeMs, tile(x + 0.5), tile(y + 0.5));
+          return target?.kind === 'chicken' && target.index === index;
+        });
+        expect(asks.length, `hen ${index} at ${timeMs}ms`).toBeGreaterThanOrEqual(60);
+      }
+    }
+  });
+
   it('leaves hens alone until they are home', () => {
     const { found } = scan(camp({ chickens: { ...game.chickens, discovered: true, following: true }, player: { ...game.player, x: COOP_SITE.x, y: COOP_SITE.y } }));
     expect(found.size).toBe(0);
@@ -87,18 +113,49 @@ describe('tapping the hens', () => {
 });
 
 describe('tapping a friend', () => {
-  const fox: DrawnFriend = { animal: 'fox', x: 15, y: 20, height: 0, frame: 'sit0', facing: 1 };
-  const withFox = camp({ companion: { ...game.companion, friend: 'fox', since: 1, friends: { ...game.companion.friends, fox: 1 } } });
+  const STILL = 30;
+  /** A friend by day, close by the survivor, who is at camp a step from the fire. */
+  const befriended = (animal: Friend, changes: Partial<GameState> = {}): GameState => camp({
+    companion: { ...game.companion, friend: animal, since: 1, friends: { ...game.companion.friends, [animal]: 1 } },
+    player: { ...game.player, x: game.player.x, y: game.player.y + 1 },
+    ...changes
+  });
+  const pose = (state: GameState, animal: Friend, timeMs: number, stillSeconds: number): DrawnFriend => ({ ...companionPoseFor(state, animal, timeMs, stillSeconds, 1)!, animal });
+  /** How many pixels around a pose ask about the friend. */
+  const tappable = (state: GameState, friend: DrawnFriend, stillSeconds: number): number => {
+    const middleX = (friend.x + 0.5) * 16;
+    const middleY = (friend.y - friend.height + 0.5) * 16;
+    let hits = 0;
+    for (let pixelX = middleX - 32; pixelX < middleX + 32; pixelX++) {
+      for (let pixelY = middleY - 48; pixelY < middleY + 32; pixelY++) {
+        const target = unnamedAnimalAt(state, 0, tile(pixelX + 0.5), tile(pixelY + 0.5), { friends: [friend], stillSeconds, replaying: false });
+        if (target?.kind === 'friend' && target.animal === friend.animal) hits++;
+      }
+    }
+    return hits;
+  };
 
-  it('asks about a friend from an old save when tapped', () => {
-    const answers = [];
-    for (let dx = -1; dx <= 1; dx += 0.05) for (let dy = -1; dy <= 0.2; dy += 0.05) answers.push(unnamedAnimalAt(withFox, 0, fox.x + dx, fox.y + dy, [fox]));
-    expect(answers).toContainEqual({ kind: 'friend', animal: 'fox' });
+  it.each(['bird', 'fox', 'wolf'] as const)('asks about a %s from an old save, when the survivor stands still', animal => {
+    const state = befriended(animal);
+    for (const timeMs of [0, 2500, 6100]) expect(tappable(state, pose(state, animal, timeMs, STILL), STILL)).toBeGreaterThanOrEqual(12);
+  });
+
+  it.each(['bird', 'fox', 'wolf'] as const)('leaves a %s trailing the survivor alone, so tapping to walk still walks', animal => {
+    const state = befriended(animal);
+    expect(tappable(state, pose(state, animal, 0, 0), 0)).toBe(0);
   });
 
   it('leaves a named friend alone', () => {
-    const named = { ...withFox, names: { ...withFox.names, fox: 'Rusty' } };
-    for (let dx = -1; dx <= 1; dx += 0.1) for (let dy = -1; dy <= 0.2; dy += 0.1) expect(unnamedAnimalAt(named, 0, fox.x + dx, fox.y + dy, [fox])).toBeNull();
+    const state = befriended('fox');
+    expect(tappable({ ...state, names: { ...state.names, fox: 'Rusty' } }, pose(state, 'fox', 0, STILL), STILL)).toBe(0);
+  });
+});
+
+describe('during the cold-night replay', () => {
+  it('asks about nothing, because the game is ignoring input', () => {
+    const state = camp();
+    const sheep = spot(state, 'sheep-1');
+    expect(unnamedAnimalAt(state, 0, tile(sheep.x), tile(sheep.y - 9), { friends: [], stillSeconds: 30, replaying: true })).toBeNull();
   });
 });
 

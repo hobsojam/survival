@@ -11,6 +11,12 @@ import { sceneVisuals } from './visuals';
 
 export type DrawnFriend = CompanionPose & { animal: Friend };
 
+/** What only the running scene knows: its friends as last drawn, how long the survivor has stood still, and whether a replay is ignoring input. */
+export interface TapScene { friends: readonly DrawnFriend[]; stillSeconds: number; replaying: boolean }
+const NO_SCENE: TapScene = { friends: [], stillSeconds: 0, replaying: false };
+/** Friends trail a walking survivor, so one only counts as tapped once the survivor has stopped and it has settled. */
+const SETTLED_SECONDS = 0.5;
+
 interface Painted { target: NameTarget; sprite: string; frame: string; x: number; y: number; depth: number; facing: 1 | -1 }
 
 /** Whether the world pixel falls on a painted part of the picture, leaving out its shadow. */
@@ -36,19 +42,20 @@ function drawnFlock(state: GameState, timeMs: number): Painted[] {
 }
 
 function drawnFriends(friends: readonly DrawnFriend[]): Painted[] {
-  return friends.map(({ animal, x, y, height, frame, facing }) => {
+  return friends.map(({ animal, x, y, height, frame: texture, facing }) => {
     const groundY = worldY(y);
-    return { target: { kind: 'friend', animal }, sprite: animal, frame, x: Math.round(worldX(x)), y: Math.round(worldY(y - height)), depth: groundY, facing };
+    const [sprite, frame] = texture.split(':');
+    return { target: { kind: 'friend', animal }, sprite, frame, x: Math.round(worldX(x)), y: Math.round(worldY(y - height)), depth: groundY, facing };
   });
 }
 
 /** The unnamed animal drawn under a tap, in tile units, or null. Anything else that can be tapped at that spot wins. */
-export function unnamedAnimalAt(state: GameState, timeMs: number, x: number, y: number, friends: readonly DrawnFriend[] = []): NameTarget | null {
-  if (state.area !== 'camp' || pickTapTarget(state, x, y).kind !== 'ground') return null;
+export function unnamedAnimalAt(state: GameState, timeMs: number, x: number, y: number, scene: TapScene = NO_SCENE): NameTarget | null {
+  if (scene.replaying || state.area !== 'camp' || pickTapTarget(state, x, y).kind !== 'ground') return null;
   const flock = drawnFlock(state, timeMs).filter(animal => animal.target.kind === 'sheep' || state.chickens.rescued);
   const pixelX = worldX(x);
   const pixelY = worldY(y);
-  const under = [...flock, ...drawnFriends(friends)]
+  const under = [...flock, ...(scene.stillSeconds > SETTLED_SECONDS ? drawnFriends(scene.friends) : [])]
     .filter(animal => nameOf(state, animal.target) === null && onPicture(animal, pixelX, pixelY))
     .sort((a, b) => b.depth - a.depth);
   return under[0]?.target ?? null;

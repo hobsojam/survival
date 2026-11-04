@@ -89,7 +89,7 @@ export class AmbientLife {
   /** The one smaller pair of eyes that comes to the firelight once the wolves begin to trust the survivor. */
   private readonly trustingEyes: Phaser.GameObjects.Image;
   /** How long the survivor has stood still, and which way they last walked, for the friend's pose. */
-  private stillSeconds = 0;
+  stillSeconds = 0;
   /** Every friend as last drawn, so a tap can find it. */
   friendsDrawn: DrawnFriend[] = [];
   private facing: 1 | -1 = 1;
