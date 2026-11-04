@@ -22,7 +22,7 @@ import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishing
 import { ENDED_MESSAGE, GAVE_OUT_MESSAGE, judgeSickDay, markWarmMeal, markWarmRest, sicknessTick } from './sickness';
 import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, foodStoreCapacity, type GameState, type ResourceNode, type SiteId, type StructureId } from './state';
 import { CHICKEN_SITE, chickensDawn, settleChickens, takeEggBlocker, takenEgg } from './chickens';
-import { cleanName, nameBlocker, named, type NameTarget } from './names';
+import { cleanName, friendCalled, nameBlocker, named, type NameTarget } from './names';
 import { fedSheep, feedBlocker, shearBlocker, sheepDawn, shornSheep, weaveBlocker, wovenState, type WovenId } from './sheep';
 import { appleBlocker, shedBlocker } from './homestead';
 
@@ -1145,7 +1145,7 @@ function sleptEnergy(state: GameState): number {
 }
 
 /** The bird's alarm names the fire that keeps the survivor warm: the fireplace once they live in the house. */
-const alarmMessage = (state: GameState): string => `Your bird woke you. The ${livesInHouse(state) ? 'fireplace' : 'fire'} is nearly out.`;
+export const alarmMessage = (state: GameState): string => `${friendCalled(state, 'bird', 'Your bird')} woke you. The ${livesInHouse(state) ? 'fireplace' : 'fire'} is nearly out.`;
 
 /** What the night did to the fire that keeps the survivor warm: in the house, the fireplace, which went out only if it burned and the store ran dry. */
 function fireDiedNote(before: GameState, after: GameState): string {

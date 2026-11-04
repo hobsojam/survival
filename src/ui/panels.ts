@@ -3,6 +3,7 @@ import { SEASON_LENGTH, daysLeftInSeason, isSpring, isWinter, nightStart, season
 import { millGrainBlocker, takeLoafBlocker } from '../game/bakehouse';
 import { takeHoneyBlocker } from '../game/beehive';
 import { takeEggBlocker } from '../game/chickens';
+import { friendCalled } from '../game/names';
 import { WOVEN, feedBlocker, shearBlocker, sheepStage, weaveBlocker, type SheepStage, type WovenId } from '../game/sheep';
 import { FOOD_ITEMS, availableFood, emptyFood, foodCount, goingSoft, isFresh, storeTotal, type FoodItem, type KeptFood } from '../game/food';
 import { foodIconUrl } from '../art/foodIcons';
@@ -398,7 +399,7 @@ function keepsakeItemView(made: boolean, shown: boolean, blocker: string | null,
 
 export function pillowView(state: GameState): ActionPanelView & { shown: boolean } {
   return keepsakeItemView(state.companion.pillow, state.companion.friends.bird !== null, pillowBlocker(state), {
-    title: 'Feather pillow', ready: 'Your bird\'s feathers would make the bed softer.', done: 'Resting in the bed goes a little deeper.',
+    title: 'Feather pillow', ready: `${friendCalled(state, 'bird', 'Your bird')}'s feathers would make the bed softer.`, done: 'Resting in the bed goes a little deeper.',
     cost: `${KEEPSAKES_NEEDED} feathers`
   });
 }

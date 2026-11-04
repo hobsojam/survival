@@ -1,4 +1,5 @@
 import { BALANCE, type Friend, type GameState } from './state';
+import { dayHash } from './wildlife';
 
 // The names the player gives the animals that share the camp. Names are for reading: nothing here changes how the game plays.
 
@@ -48,3 +49,28 @@ export const friendCalled = (state: GameState, animal: Friend, fallback: string)
 
 export const anyNamed = ({ names }: GameState): boolean =>
   [names.bird, names.fox, names.wolf, ...names.sheep, ...names.chickens].some(name => name !== null);
+
+const NOTE_CHANCE = 0.1;
+
+const NOTES = {
+  sheep: ['{name} was in the feed again.', '{name} has stopped pretending not to know you.', '{name} stood looking at the fence for a long time this morning.'],
+  chicken: ['{name} had opinions about the coop this morning.', '{name} followed you about for a bit, in case you were food.', '{name} got out, looked around, and got back in.'],
+  bird: ['{name} was singing before it was properly light.', '{name} was waiting on the woodpile this morning.', '{name} has found a new favourite branch.'],
+  fox: ['{name} watched you work for a while, then pretended not to.', '{name} slept on your boots.', '{name} came home with a leaf stuck to one ear.'],
+  wolf: ['{name} was up before you, watching the trees.', '{name} leaned on your leg this morning, and neither of you mentioned it.', '{name} yawned at the sunrise.']
+} as const;
+
+const fellows = ({ names }: GameState): { name: string; kind: keyof typeof NOTES }[] => [
+  ...(['bird', 'fox', 'wolf'] as const).flatMap(animal => { const name = names[animal]; return name ? [{ name, kind: animal }] : []; }),
+  ...names.sheep.flatMap(name => (name ? [{ name, kind: 'sheep' as const }] : [])),
+  ...names.chickens.flatMap(name => (name ? [{ name, kind: 'chicken' as const }] : []))
+];
+
+/** A line for this morning about a named animal, about one day in ten. It's worked out from the day alone, so nothing more is saved. */
+export function namedNote(state: GameState, day: number): string | null {
+  const animals = fellows(state);
+  if (animals.length === 0 || dayHash(day * 7 + 311) >= NOTE_CHANCE) return null;
+  const { name, kind } = animals[Math.floor(dayHash(day + 911) * animals.length)];
+  const lines = NOTES[kind];
+  return lines[Math.floor(dayHash(day + 1777) * lines.length)].replace('{name}', () => name);
+}

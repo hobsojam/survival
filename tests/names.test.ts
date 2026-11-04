@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { createGame, type GameState } from '../src/game/state';
-import { applyAction } from '../src/game/rules';
+import { alarmMessage, applyAction } from '../src/game/rules';
+import { companionNews } from '../src/game/companion';
+import { newsBetween } from '../src/game/news';
+import { wolfMessage } from '../src/game/wolves';
+import { endingView } from '../src/ui/ending';
+import { pillowView } from '../src/ui/panels';
 import { saveGame } from '../src/game/save';
 import { SAVE_VERSION, upgradeSave } from '../src/game/saveUpgrades';
-import { anyNamed, cleanName, friendCalled, nameBlocker, nameOf, type NameTarget } from '../src/game/names';
+import { anyNamed, cleanName, friendCalled, nameBlocker, nameOf, namedNote, type NameTarget } from '../src/game/names';
 
 const fakeStorage = (): Storage => {
   const items = new Map<string, string>();
@@ -122,5 +127,97 @@ describe('saving names', () => {
     expect(upgraded.ok).toBe(true);
     expect(upgraded.state.names).toEqual(game.names);
     expect(upgraded.state.companion.friends.fox).toBe(1);
+  });
+});
+
+describe('lines about a named friend', () => {
+  const friends = (...animals: ('bird' | 'fox' | 'wolf')[]): GameState['companion'] => ({
+    ...game.companion,
+    friend: animals[0],
+    since: 1,
+    friends: { ...game.companion.friends, ...Object.fromEntries(animals.map(animal => [animal, 1])) }
+  });
+  const dayOnly = (changes: Partial<GameState>): GameState => ({ ...game, ...changes });
+
+  it.each([
+    ['fox', 'The fox left a berry by your bedroll.', 'Rusty left a berry by your bedroll.'],
+    ['wolf', 'Your wolf left a rabbit by your bedroll.', 'Rusty left a rabbit by your bedroll.']
+  ] as const)('tells of the %s\'s gift by name', (animal, plain, withName) => {
+    const before = dayOnly({ companion: friends(animal) });
+    const after: GameState = { ...before, companion: { ...before.companion, lastGiftByFriend: { ...before.companion.lastGiftByFriend, [animal]: 5 } } };
+    expect(companionNews(before, after)).toContain(plain);
+    const called = { ...game.names, [animal]: 'Rusty' };
+    expect(companionNews({ ...before, names: called }, { ...after, names: called })).toContain(withName);
+  });
+
+  it('tells of the wolf chasing the others off by name', () => {
+    const before = dayOnly({ day: 15, companion: friends('wolf') });
+    const after: GameState = { ...before, lastWolf: { day: 15, took: 'chased' } };
+    expect(wolfMessage(before, after)).toBe('Your wolf saw the others off into the dark.');
+    expect(wolfMessage(before, withNames(after, { wolf: 'Grey' }))).toBe('Grey saw the others off into the dark.');
+  });
+
+  it('keeps the wording for a wild wolf, whatever the friendly one is called', () => {
+    const before = withNames(dayOnly({ day: 15, companion: friends('wolf') }), { wolf: 'Grey' });
+    expect(wolfMessage(before, { ...before, lastWolf: { day: 15, took: 'ration' } })).toBe('A wolf slipped into the dark camp and took a ration.');
+  });
+
+  it('says who woke you', () => {
+    expect(alarmMessage(dayOnly({ companion: friends('bird') }))).toMatch(/^Your bird woke you\./);
+    expect(alarmMessage(withNames(dayOnly({ companion: friends('bird') }), { bird: 'Pip' }))).toMatch(/^Pip woke you\./);
+  });
+
+  it('names the bird in the pillow\'s panel', () => {
+    const state = dayOnly({ companion: friends('bird'), structures: { ...game.structures, shelter: true, bed: true, toolshed: true } });
+    const ready = (view: GameState) => pillowView({ ...view, companion: { ...view.companion, keepsakesByKind: { ...view.companion.keepsakesByKind, feather: 6 } }, player: { ...view.player, x: 20, y: 15 } }).copy;
+    expect(ready(state)).toBe("Your bird's feathers would make the bed softer.");
+    expect(ready(withNames(state, { bird: 'Pip' }))).toBe("Pip's feathers would make the bed softer.");
+  });
+
+  it('remembers friends by name at the end of the story', () => {
+    const one = dayOnly({ companion: friends('fox'), ending: { day: 5 } });
+    expect(endingView(one).summary).toContain('a friend in the fox');
+    expect(endingView(withNames(one, { fox: 'Rusty' })).summary).toContain('a friend in Rusty');
+    const three = dayOnly({ companion: friends('fox', 'wolf', 'bird'), ending: { day: 5 } });
+    expect(endingView(withNames(three, { fox: 'Rusty' })).summary).toContain('3 animal friends: bird, Rusty, wolf');
+  });
+});
+
+describe('morning notes about named animals', () => {
+  const DAYS = Array.from({ length: 400 }, (_, i) => i + 1);
+  const rusty = () => withNames(withFox(), { fox: 'Rusty' });
+
+  it('says nothing with nothing named', () => {
+    expect(DAYS.map(day => namedNote(withFox(), day)).filter(Boolean)).toEqual([]);
+  });
+
+  it('comes about one day in ten, and always uses the name', () => {
+    const notes = DAYS.map(day => namedNote(rusty(), day)).filter((note): note is string => note !== null);
+    expect(notes.length).toBeGreaterThanOrEqual(20);
+    expect(notes.length).toBeLessThanOrEqual(60);
+    for (const note of notes) expect(note).toContain('Rusty');
+  });
+
+  it('gives the same note for the same day', () => {
+    for (const day of DAYS) expect(namedNote(rusty(), day)).toBe(namedNote(rusty(), day));
+  });
+
+  it('uses a name with odd characters exactly as written', () => {
+    const notes = DAYS.map(day => namedNote(withNames(withFox(), { fox: '$& <b>' }), day)).filter((note): note is string => note !== null);
+    for (const note of notes) expect(note).toContain('$& <b>');
+  });
+
+  it('only ever names the animals that have names', () => {
+    const state = withNames(rusty(), {});
+    for (const day of DAYS) expect(namedNote(state, day) ?? 'Rusty').toContain('Rusty');
+  });
+
+  it('arrives once across a dawn, and not within a day', () => {
+    const noteDay = DAYS.find(day => namedNote(rusty(), day) !== null)!;
+    const before = { ...rusty(), day: noteDay - 1 };
+    const after = { ...before, day: noteDay };
+    expect(newsBetween(before, after).filter(line => line === namedNote(rusty(), noteDay))).toHaveLength(1);
+    const same = { ...rusty(), day: noteDay };
+    expect(newsBetween(same, same)).not.toContain(namedNote(rusty(), noteDay));
   });
 });
