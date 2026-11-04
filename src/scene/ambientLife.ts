@@ -6,8 +6,8 @@ import { sprites } from '../art/sprites';
 import { firefliesOut, isSpring, isWinter, leavesFalling } from '../game/calendar';
 import { wolvesClose } from '../game/wolves';
 import { fuelLeft } from '../game/home';
-import { KEEPSAKE_SPOT, keepsakeKind, sceneryKeepsake } from '../game/companion';
-import { CHORUS_SECONDS, chorusNight, companionPose, type CompanionPose } from './companionPose';
+import { KEEPSAKE_SPOT, hasFriend } from '../game/companion';
+import { CHORUS_SECONDS, chorusNight, companionPoseFor, type CompanionPose } from './companionPose';
 import type { SoundCue } from '../game/soundscape';
 import {
   BIRD_HOMES, EYE_SPOTS, FIREFLY_HOMES, FOX, birdForageTarget, birdMayReturn, birdShouldLeave, birdGroundFrame, birdFlightFrame,
@@ -84,7 +84,7 @@ export class AmbientLife {
   /** Eases toward how strongly the wolves press in, so their eyes fade rather than blink out. */
   private wolfPresence = 0;
   private readonly friends: Record<Friend, Phaser.GameObjects.Image>;
-  private readonly keepsake: Phaser.GameObjects.Image;
+  private readonly keepsakes: Record<'feather' | 'fur', Phaser.GameObjects.Image>;
   /** The one smaller pair of eyes that comes to the firelight once the wolves begin to trust the survivor. */
   private readonly trustingEyes: Phaser.GameObjects.Image;
   /** How long the survivor has stood still, and which way they last walked, for the friend's pose. */
@@ -116,7 +116,7 @@ export class AmbientLife {
     this.wolfEyes = WOLF_SPOTS.map(() => sprite(scene, 'eyes', 'open', LIGHT_DEPTH));
     this.rabbits = RABBIT_HOMES.map((_, index) => ({ index, image: sprite(scene, 'rabbit', 'sit'), run: null, hiddenSeconds: 0, away: false }));
     this.friends = { bird: sprite(scene, 'bird', 'idle'), fox: sprite(scene, 'fox', 'sit0'), wolf: sprite(scene, 'wolf', 'sit') };
-    this.keepsake = sprite(scene, 'keepsake', 'feather');
+    this.keepsakes = { feather: sprite(scene, 'keepsake', 'feather'), fur: sprite(scene, 'keepsake', 'fur') };
     this.trustingEyes = sprite(scene, 'eyes', 'open', LIGHT_DEPTH);
   }
 
@@ -196,19 +196,25 @@ export class AmbientLife {
     this.stillSeconds = still ? this.stillSeconds + seconds : 0;
     if (Math.abs(moved) > 0.001) this.facing = moved < 0 ? -1 : 1;
     this.lastPlayer = { x, y };
-    const friend = state.companion.friend;
-    const target = state.area === 'camp' ? companionPose(state, timeMs, this.stillSeconds, this.facing) : null;
-    const pose = target && friend === 'bird' ? this.birdFlight(target, seconds) : target;
-    this.friendDrawn = pose;
     for (const [kind, image] of Object.entries(this.friends) as [Friend, Phaser.GameObjects.Image][]) {
-      if (kind !== friend || !pose) { image.setVisible(false); continue; }
+      const target = state.area === 'camp' ? companionPoseFor(state, kind, timeMs, this.stillSeconds, this.facing) : null;
+      const pose = target && kind === 'bird' ? this.birdFlight(target, seconds) : target;
+      if (kind === 'bird') this.friendDrawn = pose;
+      if (!pose) { image.setVisible(false); continue; }
       this.show(image, pose.x, pose.y - pose.height, pose.frame, pose.facing);
       image.setDepth(Math.round(worldY(pose.y)));
     }
     this.cueChorus(state, timeMs);
-    const lying = friend && state.area === 'camp' && (state.companion.keepsakeLying || sceneryKeepsake(state));
-    if (lying) this.show(this.keepsake, KEEPSAKE_SPOT.x, KEEPSAKE_SPOT.y, `keepsake:${keepsakeKind(friend)}`);
-    else this.keepsake.setVisible(false);
+    for (const kind of ['feather', 'fur'] as const) {
+      const firstKind = state.companion.friend === 'bird' ? 'feather' : 'fur';
+      const made = kind === 'feather' ? state.companion.pillow : state.companion.cloak;
+      const lying = state.companion.lyingByKind[kind] || (kind === firstKind && state.companion.keepsakeLying)
+        || (made && state.companion.lastFindByKind[kind] === state.day);
+      if (state.area === 'camp' && lying) {
+        const offset = kind === 'fur' ? 0.55 : 0;
+        this.show(this.keepsakes[kind], KEEPSAKE_SPOT.x + offset, KEEPSAKE_SPOT.y, `keepsake:${kind}`);
+      } else this.keepsakes[kind].setVisible(false);
+    }
   }
 
   /** A friendly bird flies to a new perch over a moment, rather than jumping there. */
@@ -261,7 +267,7 @@ export class AmbientLife {
 
   /** One bird lingers once the birds have begun to trust the survivor. */
   private fleeRadius(bird: Bird, state: GameState): number | undefined {
-    const trusting = bird.atCamp && bird.index === 0 && !state.companion.friend && state.companion.trust.bird > 0;
+    const trusting = bird.atCamp && bird.index === 0 && !hasFriend(state, 'bird') && state.companion.trust.bird > 0;
     return trusting ? TRUSTING_FLEE_RADIUS : undefined;
   }
 
@@ -326,7 +332,7 @@ export class AmbientLife {
       return;
     }
     // A befriended fox is the friend now, and no longer comes by as a wild one.
-    if (this.foxFledDay === state.day || state.companion.friend === 'fox') { this.fox.setVisible(false); return; }
+    if (this.foxFledDay === state.day || hasFriend(state, 'fox')) { this.fox.setVisible(false); return; }
     const pose = foxAt(state.day, state.timeOfDay, state.companion.trust.fox);
     if (!pose) { this.fox.setVisible(false); return; }
     // The rules decide when the fox is startled, so the offering and the fox agree.

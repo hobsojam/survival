@@ -1,11 +1,11 @@
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isSummer, isWinter, nightStart, yearOf } from './calendar';
-import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } from './areas';
+import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } from './areas';
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
 import { availableFiber, availableStone, availableWood, spendFiber, spendWood, bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
 import { POT_COST, cookBlocker, defaultDish, dishBlocker, foodWord, isPackedDish, packDish, potBlocker, serveDish, spendIngredients, type DishId } from './cooking';
-import { alarmAfter, cloakBlocker, companionDawn, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
+import { alarmAfter, cloakBlocker, companionDawn, hasFriend, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
 import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, stepDepth, type StepId } from './clearing';
 import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
 import { FORAGE, isForage, nodeShown } from './forage';
@@ -21,6 +21,8 @@ import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, cartSpace, countWord, fellingWood,
 import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishingSecondsFor, validRoll } from './fishing';
 import { ENDED_MESSAGE, GAVE_OUT_MESSAGE, judgeSickDay, markWarmMeal, markWarmRest, sicknessTick } from './sickness';
 import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, foodStoreCapacity, type GameState, type ResourceNode, type SiteId, type StructureId } from './state';
+import { CHICKEN_SITE, chickensDawn, settleChickens, takeEggBlocker, takenEgg } from './chickens';
+import { appleBlocker, shedBlocker } from './homestead';
 
 export type GameAction =
   | { type: 'gather'; nodeId: string }
@@ -48,7 +50,7 @@ export type GameAction =
   | { type: 'storeFood'; item: FoodItem }
   | { type: 'takeFood'; item: FoodItem }
   | { type: 'cook'; dish?: DishId }
-  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'buildMine' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' }
+  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'buildMine' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' | 'meetChickens' | 'leadChickens' | 'takeEgg' | 'gatherApples' | 'searchShed' }
   | { type: 'pickUpStone'; pileId: string }
   | { type: 'makeFishingLine' }
   | { type: 'fish'; roll: number };
@@ -182,6 +184,8 @@ export function groundBlocker(state: GameState, id: StructureId): string | null 
 export function buildStatus(state: GameState, id: StructureId): BuildStatus {
   const definition = BUILDINGS[id];
   if (state.structures[id]) return 'built';
+  if (id === 'chickenCoop' && !state.chickens.discovered) return 'locked';
+  if ('friend' in definition && !hasFriend(state, definition.friend)) return 'locked';
   if (definition.prerequisite === 'coldNight' && !state.progress.hearthUnlocked) return 'locked';
   const missingPrerequisite = missingStructurePrerequisite(state, definition);
   if (missingPrerequisite === 'shelter') return 'needsShelter';
@@ -299,6 +303,7 @@ function dawn(next: GameState, home: boolean): void {
   // Rocks give their stone once; everything else grows back at dawn.
   next.nodes = next.nodes.map(node => node.kind !== 'stone' && node.readyDay <= next.day ? { ...node, amount: 1 } : node);
   companionDawn(next);
+  chickensDawn(next);
   // The bag, the larder and the bakery shelf all throw out what has gone soft, wherever the survivor is; one note covers them.
   const bag = spoil(next.inventory.food, next.day, BALANCE.bagFreshDays);
   const larder = spoil(next.larder, next.day, BALANCE.larderFreshDays);
@@ -306,8 +311,9 @@ function dawn(next: GameState, home: boolean): void {
   next.larder = larder.store;
   const shelf = bakeryDawn(next);
   beehiveDawn(next);
-  const lost = { berry: bag.lost.berry + larder.lost.berry, greens: bag.lost.greens + larder.lost.greens, bread: bag.lost.bread + larder.lost.bread + shelf.lost };
-  if (lost.berry + lost.greens + lost.bread > 0) next.lastSpoiled = { day: next.day, ...lost };
+  const lost = { berry: bag.lost.berry + larder.lost.berry, greens: bag.lost.greens + larder.lost.greens, bread: bag.lost.bread + larder.lost.bread + shelf.lost,
+    apple: bag.lost.apple + larder.lost.apple, egg: bag.lost.egg + larder.lost.egg };
+  if (lost.berry + lost.greens + lost.bread + lost.apple + lost.egg > 0) next.lastSpoiled = { day: next.day, ...lost };
   if (!stormEnded) return;
   if (weathered) {
     next.progress = { ...next.progress, nextStormDay: null, hearthUnlocked: true };
@@ -354,18 +360,26 @@ const move: ActionHandler<'move'> = (state, action) => {
   const player = crossed
     ? { ...state.player, x: crossed.x, y: crossed.y }
     : { ...state.player, x: Math.max(0, Math.min(BALANCE.mapWidth - 1, rawX)), y: Math.max(0, Math.min(BALANCE.mapHeight - 1, rawY)) };
-  return quarryFoundOnArrival(pickUpKeepsake({ ...state, ...(crossed ? { area: crossed.area } : {}), player }));
+  const moved = settleChickens(pickUpKeepsake({ ...state, ...(crossed ? { area: crossed.area } : {}), player }));
+  if (moved.area === 'homestead' && !moved.progress.homesteadFound) {
+    return { state: { ...moved, progress: { ...moved.progress, homesteadFound: true } }, message: 'You found an abandoned homestead.' };
+  }
+  return quarryFoundOnArrival(moved);
 };
 
 const cross: ActionHandler<'cross'> = state => {
-  const toQuarry = state.area === 'camp';
-  const exit = toQuarry ? CAMP_EXIT : QUARRY_EXIT;
-  if (!near(state.player.x, state.player.y, exit.x, exit.y, 0.5)) return refuse(state, 'Walk to the end of the west path to cross.');
-  if (!pathOpen(state)) return refuse(state, 'Build a shelter to open the west path.');
-  return {
-    state: { ...state, area: toQuarry ? 'quarry' : 'camp', player: { ...state.player, x: toQuarry ? BALANCE.mapWidth - 1.5 : 0.5, y: exit.y } },
-    message: ''
-  };
+  if (state.area === 'camp') {
+    const west = near(state.player.x, state.player.y, CAMP_EXIT.x, CAMP_EXIT.y, 0.5);
+    const east = near(state.player.x, state.player.y, CAMP_HOMESTEAD_EXIT.x, CAMP_HOMESTEAD_EXIT.y, 0.5);
+    if (!west && !east) return refuse(state, 'Walk to the end of a path to cross.');
+    if (!pathOpen(state)) return refuse(state, 'Build a shelter to open the paths.');
+    if (west) return { state: { ...state, area: 'quarry', player: { ...state.player, x: BALANCE.mapWidth - 1.5, y: CAMP_EXIT.y } }, message: '' };
+    return { state: { ...state, area: 'homestead', player: { ...state.player, x: 0.5, y: CAMP_HOMESTEAD_EXIT.y },
+      progress: { ...state.progress, homesteadFound: true } }, message: state.progress.homesteadFound ? '' : 'You found an abandoned homestead.' };
+  }
+  const exit = state.area === 'quarry' ? QUARRY_EXIT : HOMESTEAD_EXIT;
+  if (!near(state.player.x, state.player.y, exit.x, exit.y, 0.5)) return refuse(state, 'Walk to the path home.');
+  return { state: { ...state, area: 'camp', player: { ...state.player, x: state.area === 'quarry' ? 0.5 : BALANCE.mapWidth - 1.5, y: exit.y } }, message: '' };
 };
 
 type Supply = keyof GameState['inventory'];
@@ -744,6 +758,7 @@ const eat: ActionHandler<'eat'> = (state, action) => {
   const item = action.item ?? quickEatItem(state);
   if (item === 'pineNeedles') return refuse(state, 'Pine needles are for tea.');
   if (item === 'rabbit') return refuse(state, 'Roast the rabbit at the fire first.');
+  if (item === 'egg') return refuse(state, 'Cook the egg at the fire first.');
   if (item === 'flour') return refuse(state, 'Bake the flour into a loaf at the fire first.');
   if (item === 'trailFood') return eatRation(state);
   const fed = item && spendFood(state, item, 1);
@@ -990,6 +1005,8 @@ function buildBlocker(state: GameState, structureId: StructureId): string | null
   if (!isInClearing(state)) return 'Return to the marked camp area to build.';
   const definition = BUILDINGS[structureId];
   if (!definition) return 'That structure is unavailable.';
+  if (structureId === 'chickenCoop' && !state.chickens.discovered) return 'Find the chickens at the old homestead first.';
+  if ('friend' in definition && !hasFriend(state, definition.friend)) return 'Befriend this animal first.';
   if (definition.prerequisite === 'coldNight' && !state.progress.hearthUnlocked) return 'Weather the cold night to unlock the hearth.';
   if (state.structures[structureId]) return 'Already built.';
   const ground = groundBlocker(state, structureId);
@@ -1122,10 +1139,65 @@ const befriend: ActionHandler<'befriend'> = state => {
   return { state: advanceTime(offered.state, BALANCE.offerSeconds, 'resting'), message: offered.message };
 };
 
-function craftKeepsake(state: GameState, item: 'pillow' | 'cloak', blocker: string | null, message: string): ActionResult {
+const meetChickens: ActionHandler<'meetChickens'> = state => {
+  if (state.area !== 'homestead' || !near(state.player.x, state.player.y, CHICKEN_SITE.x, CHICKEN_SITE.y, 2)) {
+    return refuse(state, 'Look for the chickens in the old yard.');
+  }
+  if (state.chickens.discovered) return refuse(state, 'The chickens are already here.');
+  return { state: { ...state, chickens: { ...state.chickens, discovered: true } }, message: 'A small flock has survived here. A coop at camp would give them shelter.' };
+};
+
+const leadChickens: ActionHandler<'leadChickens'> = state => {
+  if (state.area !== 'homestead' || !near(state.player.x, state.player.y, CHICKEN_SITE.x, CHICKEN_SITE.y, 2)) {
+    return refuse(state, 'Return to the old yard to find the chickens.');
+  }
+  if (!state.chickens.discovered) return refuse(state, 'Find the chickens first.');
+  if (!state.structures.chickenCoop) return refuse(state, 'Build a coop at camp before leading them home.');
+  if (state.chickens.rescued) return refuse(state, 'The flock is already home.');
+  if (state.chickens.following) return refuse(state, 'The flock is following you.');
+  return { state: { ...state, chickens: { ...state.chickens, following: true } }, message: 'The chickens peck at the old feed, then begin to follow. Lead them to their coop.' };
+};
+
+const takeEgg: ActionHandler<'takeEgg'> = state => {
+  const blocker = takeEggBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  return { state: takenEgg(state), message: 'You collect an egg from the coop.' };
+};
+
+const gatherApples: ActionHandler<'gatherApples'> = state => {
+  const blocker = appleBlocker(state);
   if (blocker) return refuse(state, blocker);
   return {
-    state: advanceTime({ ...state, player: tire(state, BALANCE.buildEnergyCost), companion: { ...state.companion, [item]: true, keepsakes: 0 } },
+    state: advanceTime({ ...state,
+      homestead: { ...state.homestead, applesReadyDay: state.day + 3 },
+      inventory: { ...state.inventory, food: addFood(state.inventory.food, 'apple', 1, state.day) },
+      player: tire(state, BALANCE.gatherEnergyCost)
+    }, workSeconds(state, BALANCE.gatherSeconds), 'working'),
+    message: 'You pick a ripe apple from the old tree.'
+  };
+};
+
+const searchShed: ActionHandler<'searchShed'> = state => {
+  const blocker = shedBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  return {
+    state: advanceTime({ ...state,
+      homestead: { ...state.homestead, shedSearched: true },
+      inventory: { ...state.inventory, wood: state.inventory.wood + 2, fiber: state.inventory.fiber + 1 },
+      player: tire(state, BALANCE.gatherEnergyCost)
+    }, workSeconds(state, BALANCE.gatherSeconds), 'working'),
+    message: 'You find two useful planks and a length of fiber in the old shed.'
+  };
+};
+
+function craftKeepsake(state: GameState, item: 'pillow' | 'cloak', blocker: string | null, message: string): ActionResult {
+  if (blocker) return refuse(state, blocker);
+  const kind = item === 'pillow' ? 'feather' : 'fur';
+  const firstKind = state.companion.friend === 'bird' ? 'feather' : 'fur';
+  return {
+    state: advanceTime({ ...state, player: tire(state, BALANCE.buildEnergyCost), companion: { ...state.companion,
+      [item]: true, keepsakesByKind: { ...state.companion.keepsakesByKind, [kind]: 0 },
+      keepsakes: kind === firstKind ? 0 : state.companion.keepsakes } },
       workSeconds(state, BALANCE.buildSeconds), 'working'),
     message
   };
@@ -1149,7 +1221,7 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, buildMine, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, dropPineNeedles, pickUpStone, burnFiber, burnPineNeedles, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, rest, sleep, befriend, craftPillow, craftCloak,
+  cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, rest, sleep, befriend, meetChickens, leadChickens, takeEgg, gatherApples, searchShed, craftPillow, craftCloak,
   makeFishingLine, fish
 };
 

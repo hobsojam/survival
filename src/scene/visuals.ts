@@ -1,5 +1,5 @@
 import { stripStage } from '../game/field';
-import { isWinter, nightStart } from '../game/calendar';
+import { isWinter, nightStart, season } from '../game/calendar';
 import { gardenPlotStage } from '../game/garden';
 import { BED_CROPS, bedSoil, bedStage } from '../game/beds';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceNode } from '../game/state';
@@ -12,6 +12,8 @@ import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 import { markedTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
 import { fireplaceBurning, woodStoreCapacity } from '../game/home';
+import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
+import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
 import type { StockLevel } from '../art/phase3Sprites';
 
 export const NIGHT_DEPTH = BALANCE.mapHeight * TILE + 1;
@@ -56,6 +58,14 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     addPiles(state, visuals, add);
     return visuals;
   }
+  if (state.area === 'homestead') {
+    add('homestead-shed', 'homesteadShed:still', HOMESTEAD_SHED.x, HOMESTEAD_SHED.y);
+    const full = season(state.day) === 'autumn' && state.homestead.applesReadyDay <= state.day;
+    add('apple-tree', `appleTree:${full ? 'full' : 'bare'}`, APPLE_TREE.x, APPLE_TREE.y);
+    addPiles(state, visuals, add);
+    addChickens(state, add, timeMs);
+    return visuals;
+  }
   for (const node of state.nodes.filter(item => nodeShown(state, item))) add(node.id, nodeTexture(node, timeMs, gathered, isWinter(state.day)), node.x, node.y);
   addPiles(state, visuals, add);
   addPuddles(state, add);
@@ -63,8 +73,25 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
   // Trees marked for clearing wear a tie of fibre; once felled they leave a stump that is cleared away with the ground.
   for (const tree of markedTrees(state)) add(tree.id, tree.readyDay <= state.day ? `${tree.sprite}:marked` : 'stump:still', tree.x, tree.y);
   addCamp(state, add, timeMs);
+  addChickens(state, add, timeMs);
   addFire(state, timeMs, visuals, add);
   return visuals;
+}
+
+/** Three birds stay together, regrouping around the survivor on the walk home. */
+function addChickens(state: GameState, add: AddVisual, timeMs: number): void {
+  let center: { x: number; y: number } | null = null;
+  if (state.chickens.following) center = { x: state.player.x - 0.8, y: state.player.y + 0.6 };
+  else if (state.area === 'homestead' && !state.chickens.rescued) center = CHICKEN_SITE;
+  else if (state.area === 'camp' && state.chickens.rescued) center = COOP_SITE;
+  if (!center) return;
+  const offsets = [[-0.7, 0.1], [0.3, -0.2], [0.8, 0.5]];
+  offsets.forEach(([dx, dy], index) => {
+    const x = Math.max(0.5, Math.min(BALANCE.mapWidth - 1.5, center.x + dx));
+    const y = Math.max(0.5, Math.min(BALANCE.mapHeight - 1.5, center.y + dy));
+    const frame = state.chickens.following ? `walk${Math.floor(timeMs / 300 + index) % 2}` : 'idle';
+    add(`chicken-${index}`, `chicken:${frame}`, x, y);
+  });
 }
 
 function addPiles(state: GameState, visuals: SceneVisual[], add: AddVisual): void {
@@ -244,6 +271,13 @@ function addCamp(state: GameState, add: AddVisual, timeMs: number): void {
   const { structures, progress } = state;
   add('shelter', shelterTexture(state), x - 3, y - 2, structures.shelter ? undefined : GROUND_DECAL_DEPTH);
   addBuildableStructures(state, add, x, y, timeMs);
+  if (state.chickens.discovered) add('chicken-coop', structures.chickenCoop ? 'chickenCoop:built' : 'chickenCoopSite:still', COOP_SITE.x, COOP_SITE.y,
+    structures.chickenCoop ? undefined : GROUND_DECAL_DEPTH);
+  if (structures.house) {
+    if (structures.birdhouse) add('birdhouse', 'birdhouse:built', x - 3, y - 7);
+    if (structures.wolfHouse) add('wolf-house', 'wolfHouse:built', x + 5, y - 5);
+    if (structures.foxDen) add('fox-den', 'foxDen:built', x - 5, y - 3.5);
+  }
   const fenceSpots = [{ dx: -2.5, dy: -5.4, frame: 'side' }, { dx: 1.4, dy: -5.4, frame: 'side' }, { dx: -0.5, dy: -9.1, frame: 'rail' }];
   fenceSpots.slice(0, state.decorations.fence).forEach((spot, index) => add(`house-fence-${index}`, `fence:${spot.frame}`, x + spot.dx, y + spot.dy));
   addGardenPlants(state, add, x, y);

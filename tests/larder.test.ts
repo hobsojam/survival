@@ -277,7 +277,7 @@ describe('the larder at dawn', () => {
     const next = advanceTime(state, 2);
     expect(next.day).toBe(7);
     expect(next.larder.berry).toEqual([3]);
-    expect(next.lastSpoiled).toEqual({ day: 7, berry: 1, greens: 0, bread: 0 });
+    expect(next.lastSpoiled).toEqual({ day: 7, berry: 1, greens: 0, bread: 0, apple: 0, egg: 0 });
   });
 
   it('spoils even while the survivor is in the quarry', () => {
@@ -288,7 +288,7 @@ describe('the larder at dawn', () => {
   it('tells of bag and larder losses in one line', () => {
     const state = lateNight(withStores(camp(), food([['berry', 1, 4]]), food([['berry', 1, 2], ['greens', 1, 2]])));
     const next = advanceTime(state, 2);
-    expect(next.lastSpoiled).toEqual({ day: 7, berry: 2, greens: 1, bread: 0 });
+    expect(next.lastSpoiled).toEqual({ day: 7, berry: 2, greens: 1, bread: 0, apple: 0, egg: 0 });
     expect(spoilMessage(state, next)).toBe('Two berries and a handful of greens had gone soft, so you threw them out.');
   });
 });

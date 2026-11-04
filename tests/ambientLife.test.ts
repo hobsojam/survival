@@ -267,10 +267,22 @@ describe('the camp friend', () => {
     const life = new AmbientLife(scene as never);
     life.update(befriended('wolf', { keepsakeLying: true }), 0.1, 100);
     expect(of('wolf')[0].visible).toBe(true);
-    expect(of('keepsake')[0]).toMatchObject({ visible: true, texture: 'keepsake:fur' });
+    expect(of('keepsake').find(image => image.visible)).toMatchObject({ visible: true, texture: 'keepsake:fur' });
     life.update(befriended('bird'), 0.1, 200);
-    expect(of('keepsake')[0].visible).toBe(false);
+    expect(of('keepsake').every(image => !image.visible)).toBe(true);
     expect(of('wolf')[0].visible).toBe(false);
+  });
+
+  it('draws every friend and both kinds of keepsake together', () => {
+    const { scene, of } = sceneWithImages();
+    const life = new AmbientLife(scene as never);
+    const state = befriended('bird', { friends: { bird: 1, fox: 2, wolf: 3 },
+      lyingByKind: { feather: true, fur: true } });
+    life.update(state, 0.1, 100);
+    expect(of('bird').some(image => image.visible)).toBe(true);
+    expect(of('fox').some(image => image.visible)).toBe(true);
+    expect(of('wolf').some(image => image.visible)).toBe(true);
+    expect(of('keepsake').filter(image => image.visible).map(image => image.texture)).toEqual(['keepsake:feather', 'keepsake:fur']);
   });
 
   it('lets a trusting wolf watch from the edge of the firelight even with the fire lit', () => {

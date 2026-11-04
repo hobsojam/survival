@@ -24,8 +24,10 @@ describe('the ending card', () => {
     const base = createGame();
     const buildings = Object.keys(base.structures).filter(id => !id.startsWith('shelter') || id === 'shelter');
     const built = Object.fromEntries(Object.keys(base.structures).map(id => [id, buildings.indexOf(id) >= 0 && buildings.indexOf(id) < 12])) as GameState['structures'];
-    const withFox = endedOn(46, { structures: built, companion: { ...base.companion, friend: 'fox' } });
+    const withFox = endedOn(46, { structures: built, companion: { ...base.companion, friend: 'fox', friends: { ...base.companion.friends, fox: 12 } } });
     expect(endingView(withFox).summary).toBe('46 days lived · 12 buildings raised · a friend in the fox');
+    const withThree = endedOn(46, { companion: { ...base.companion, friends: { bird: 12, fox: 13, wolf: 14 } } });
+    expect(endingView(withThree).summary).toBe('46 days lived · 0 buildings raised · 3 animal friends: bird, fox, wolf');
     expect(endingView(endedOn(16)).summary).toBe('16 days lived · 0 buildings raised');
     const one = endedOn(1, { structures: { ...base.structures, shelter: true } });
     expect(endingView(one).summary).toBe('1 day lived · 1 building raised');

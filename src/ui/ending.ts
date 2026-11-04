@@ -32,7 +32,9 @@ export function endingView(state: GameState): EndingView {
   // The shelter's roof, footing, porch and door finish the one shelter; they aren't buildings of their own.
   const buildings = Object.entries(state.structures).filter(([id, built]) => built && !SHELTER_WORK.has(id)).length;
   const parts = [counted(day, 'day', 'lived'), counted(buildings, 'building', 'raised')];
-  if (state.companion.friend) parts.push(`a friend in the ${state.companion.friend}`);
+  const friends = (['bird', 'fox', 'wolf'] as const).filter(animal => state.companion.friends[animal] !== null);
+  if (friends.length === 1) parts.push(`a friend in the ${friends[0]}`);
+  if (friends.length > 1) parts.push(`${friends.length} animal friends: ${friends.join(', ')}`);
   return { title, summary: parts.join(' · ') };
 }
 

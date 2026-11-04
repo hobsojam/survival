@@ -51,7 +51,7 @@ function validFood(store: unknown, day: unknown): boolean {
 function validSurvivor({ player, inventory, area, day, cakeBonus }: SaveShape): boolean {
   return bool(cakeBonus) && onMap(player.x, player.y) && meter(player.energy) && meter(player.hunger) && meter(player.warmth)
     && (['wood', 'fiber', 'stone'] as const).every(key => count(inventory[key])) && validFood(inventory.food, day)
-    && (area === 'camp' || area === 'quarry');
+    && (area === 'camp' || area === 'quarry' || area === 'homestead');
 }
 
 function validStructureDependencies(structures: ObjectValue): boolean {
@@ -65,7 +65,7 @@ function validStructureDependencies(structures: ObjectValue): boolean {
 }
 
 function validProgressDependencies(structures: ObjectValue, progress: ObjectValue, area: unknown): boolean {
-  if ((area === 'quarry' || progress.quarryFound) && !structures.shelter) return false;
+  if ((area === 'quarry' || area === 'homestead' || progress.quarryFound || progress.homesteadFound) && !structures.shelter) return false;
   if (progress.pickaxeCrafted && !(progress.quarryFound && structures.toolshed)) return false;
   if (progress.mineBuilt && !progress.pickaxeCrafted) return false;
   if ((progress.axeCrafted || progress.potCrafted || progress.packWoven) && !structures.toolshed) return false;
@@ -90,7 +90,7 @@ function validProgress({ structures, progress, area }: SaveShape): boolean {
   // Exactly the buildings there are, and no others.
   if (Object.keys(structures).length !== buildingIds.length || !buildingIds.every(id => bool(structures[id]))) return false;
   if (!validStructureDependencies(structures)) return false;
-  const flags = ['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'pickaxeCrafted', 'mineBuilt', 'potCrafted', 'packWoven', 'fishingLine'] as const;
+  const flags = ['hearthUnlocked', 'lookoutRepaired', 'axeCrafted', 'quarryFound', 'homesteadFound', 'pickaxeCrafted', 'mineBuilt', 'potCrafted', 'packWoven', 'fishingLine'] as const;
   return flags.every(key => bool(progress[key])) && validWorkshop(structures, progress) && validProgressDependencies(structures, progress, area);
 }
 
@@ -242,7 +242,7 @@ function validWorld({ nodes, trees, stonePiles, day, clearing }: SaveShape): boo
       && readyBy(tree.readyDay, today + BALANCE.treeRegrowDays);
   });
   const pilesValid = stonePiles.every(pile => object(pile) && typeof pile.id === 'string' && onMap(pile.x, pile.y)
-    && whole(pile.count) && pile.count >= 1 && (pile.area === 'camp' || pile.area === 'quarry'));
+    && whole(pile.count) && pile.count >= 1 && (pile.area === 'camp' || pile.area === 'quarry' || pile.area === 'homestead'));
   return nodesMatch && treesMatch && pilesValid;
 }
 
@@ -252,8 +252,9 @@ const WOLF_TAKES: readonly unknown[] = ['ration', 'berry', 'nothing', 'offered',
 function validSpoiled({ lastSpoiled, day }: SaveShape): boolean {
   if (lastSpoiled === null) return true;
   return object(lastSpoiled) && whole(lastSpoiled.day) && lastSpoiled.day >= 1 && lastSpoiled.day <= (day as number)
-    && count(lastSpoiled.berry) && count(lastSpoiled.greens) && count(lastSpoiled.bread)
-    && (lastSpoiled.berry as number) + (lastSpoiled.greens as number) + (lastSpoiled.bread as number) >= 1;
+    && count(lastSpoiled.berry) && count(lastSpoiled.greens) && count(lastSpoiled.bread) && count(lastSpoiled.apple) && count(lastSpoiled.egg)
+    && (lastSpoiled.berry as number) + (lastSpoiled.greens as number) + (lastSpoiled.bread as number)
+      + (lastSpoiled.apple as number) + (lastSpoiled.egg as number) >= 1;
 }
 
 /** No wolf yet, or one that came on a day already lived, taking something it could take. */
@@ -279,38 +280,58 @@ function validJournal({ journal, day }: SaveShape): boolean {
 
 const FRIENDS = ['bird', 'fox', 'wolf'] as const;
 
-type CompanionShape = ObjectValue & { trust: ObjectValue; lastOffer: ObjectValue };
+type CompanionShape = ObjectValue & { trust: ObjectValue; lastOffer: ObjectValue; friends: ObjectValue;
+  keepsakesByKind: ObjectValue; lyingByKind: ObjectValue; lastFindByKind: ObjectValue; lastGiftByFriend: ObjectValue };
 
 function companionShape(value: unknown): value is CompanionShape {
-  return object(value) && object(value.trust) && object(value.lastOffer);
+  return object(value) && object(value.trust) && object(value.lastOffer) && object(value.friends)
+    && object(value.keepsakesByKind) && object(value.lyingByKind)
+    && object(value.lastFindByKind) && object(value.lastGiftByFriend);
 }
 
 function validCompanionItems(companion: CompanionShape): boolean {
   const { friend, keepsakes, keepsakeLying, pillow, cloak } = companion;
   const knownFriend = friend === null || FRIENDS.includes(friend as typeof FRIENDS[number]);
   return knownFriend && bool(keepsakeLying) && bool(pillow) && bool(cloak)
-    && count(keepsakes) && keepsakes <= KEEPSAKES_NEEDED;
+    && count(keepsakes) && keepsakes <= KEEPSAKES_NEEDED
+    && (['feather', 'fur'] as const).every(kind => count(companion.keepsakesByKind[kind])
+      && (companion.keepsakesByKind[kind] as number) <= KEEPSAKES_NEEDED && bool(companion.lyingByKind[kind]));
 }
 
 function validCompanionHistory(companion: CompanionShape, day: number): boolean {
   const lived = (value: unknown): boolean => count(value) && value <= day;
   if (!(['lastFind', 'lastGift', 'alarmDay', 'foxFled'] as const).every(key => lived(companion[key]))) return false;
-  return FRIENDS.every(animal => count(companion.trust[animal]) && companion.trust[animal] <= TRUST_TARGET[animal]
-    && lived(companion.lastOffer[animal]));
+  if (!(['feather', 'fur'] as const).every(kind => lived(companion.lastFindByKind[kind]))) return false;
+  if (!(['fox', 'wolf'] as const).every(animal => lived(companion.lastGiftByFriend[animal]))) return false;
+  if (Object.keys(companion.friends).length !== FRIENDS.length) return false;
+  return FRIENDS.every(animal => {
+    const since = companion.friends[animal];
+    return count(companion.trust[animal]) && lived(companion.lastOffer[animal])
+      && (since === null
+        ? (companion.trust[animal] as number) < TRUST_TARGET[animal]
+        : lived(since) && (since as number) >= 1 && (companion.trust[animal] as number) === TRUST_TARGET[animal]);
+  });
 }
 
 function validUnbefriendedCompanion(companion: CompanionShape): boolean {
   const { since, trust, keepsakes, keepsakeLying, pillow, cloak } = companion;
-  return since === null && FRIENDS.every(animal => (trust[animal] as number) < TRUST_TARGET[animal])
-    && keepsakes === 0 && !keepsakeLying && !pillow && !cloak;
+  return since === null && FRIENDS.every(animal => companion.friends[animal] === null && (trust[animal] as number) < TRUST_TARGET[animal])
+    && keepsakes === 0 && !keepsakeLying && !pillow && !cloak
+    && companion.keepsakesByKind.feather === 0 && companion.keepsakesByKind.fur === 0
+    && !companion.lyingByKind.feather && !companion.lyingByKind.fur;
 }
 
 function validBefriendedCompanion(companion: CompanionShape, day: number, structures: ObjectValue): boolean {
-  const { friend, since, keepsakes, keepsakeLying, pillow, cloak } = companion;
-  const made = pillow || cloak;
-  return count(since) && since >= 1 && since <= day && !(pillow && cloak)
-    && (!pillow || (friend === 'bird' && structures.bed === true)) && (!cloak || friend !== 'bird')
-    && (!made || (keepsakes === 0 && !keepsakeLying));
+  const { friend, since, pillow, cloak } = companion;
+  return FRIENDS.includes(friend as typeof FRIENDS[number]) && count(since) && since >= 1 && since <= day
+    && companion.friends[friend as typeof FRIENDS[number]] === since
+    && (!pillow || (companion.friends.bird !== null && structures.bed === true))
+    && (!cloak || companion.friends.fox !== null || companion.friends.wolf !== null)
+    && (!pillow || (companion.keepsakesByKind.feather === 0 && !companion.lyingByKind.feather))
+    && (!cloak || (companion.keepsakesByKind.fur === 0 && !companion.lyingByKind.fur))
+    && (companion.friends.bird !== null || (companion.keepsakesByKind.feather === 0 && !companion.lyingByKind.feather))
+    && (companion.friends.fox !== null || companion.friends.wolf !== null
+      || (companion.keepsakesByKind.fur === 0 && !companion.lyingByKind.fur));
 }
 
 /**
@@ -320,8 +341,26 @@ function validBefriendedCompanion(companion: CompanionShape, day: number, struct
 function validCompanion({ companion, day, structures }: SaveShape): boolean {
   if (!companionShape(companion)) return false;
   if (!validCompanionItems(companion) || !validCompanionHistory(companion, day as number)) return false;
+  if ((structures.birdhouse && companion.friends.bird === null)
+    || (structures.wolfHouse && companion.friends.wolf === null)
+    || (structures.foxDen && companion.friends.fox === null)) return false;
   if (companion.friend === null) return validUnbefriendedCompanion(companion);
   return validBefriendedCompanion(companion, day as number, structures);
+}
+
+/** The flock cannot be following and at home at once; a coop and a discovered route precede the rescue. */
+function validChickens({ chickens, homestead, structures, progress, area, day }: SaveShape): boolean {
+  if (!object(chickens) || !object(homestead)) return false;
+  if (!bool(chickens.discovered) || !bool(chickens.following) || !bool(chickens.rescued)
+    || !count(chickens.eggs) || chickens.eggs > 3 || !whole(chickens.nextEggDay) || chickens.nextEggDay < 1) return false;
+  if (!whole(homestead.applesReadyDay) || homestead.applesReadyDay < 1 || !bool(homestead.shedSearched)) return false;
+  if (area === 'homestead' && !progress.homesteadFound) return false;
+  if ((chickens.discovered || homestead.shedSearched) && !progress.homesteadFound) return false;
+  if (chickens.following && (chickens.rescued || !chickens.discovered || !structures.chickenCoop)) return false;
+  if (chickens.rescued && (!chickens.discovered || !structures.chickenCoop)) return false;
+  if (chickens.eggs > 0 && !chickens.rescued) return false;
+  if (chickens.nextEggDay > (day as number) + 4 && !chickens.rescued) return false;
+  return !structures.chickenCoop || chickens.discovered;
 }
 
 /** No more than two empty goes at the ice in a row; well, or sick since a lived day with fewer cared-for and uncared-for days than settle it; a story that has ended, ended on a lived day. */
@@ -340,7 +379,7 @@ function validSickness({ sickness, ending, day, fishingMisses }: SaveShape): boo
 /** Checks a version 24 save, with the survivor's sickness and whether their story has ended, and: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, the workshop and its handcart, shelter upgrades, garden plots, vegetable beds, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validDecorations, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validBeehive, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validSickness];
+  const checks = [validClock, validSurvivor, validProgress, validDecorations, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validBeehive, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validChickens, validSickness];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

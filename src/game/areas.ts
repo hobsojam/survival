@@ -4,6 +4,8 @@ import { BALANCE, type AreaId, type GameState } from './state';
 export const CROSSING = { y: 15, halfWidth: 1 };
 export const CAMP_EXIT = { x: 0, y: 15 };
 export const QUARRY_EXIT = { x: BALANCE.mapWidth - 1, y: 15 };
+export const CAMP_HOMESTEAD_EXIT = { x: BALANCE.mapWidth - 1, y: 15 };
+export const HOMESTEAD_EXIT = { x: 0, y: 15 };
 export const QUARRY_SITE = { x: 12, y: 12 };
 export const RUBBLE_SITE = { x: 16, y: 16 };
 
@@ -12,12 +14,19 @@ export function pathOpen(state: GameState): boolean {
   return state.structures.shelter;
 }
 
+export function homesteadPathOpen(state: GameState): boolean {
+  return state.structures.shelter;
+}
+
 /** Where walking to (rawX, rawY) lands the survivor in the other area, or null if they stay put. */
 export function crossing(state: GameState, rawX: number, rawY: number): { area: AreaId; x: number; y: number } | null {
   // Inside the crossing's half-width, y is already well within the map, so it needs no clamp.
   if (Math.abs(rawY - CROSSING.y) > CROSSING.halfWidth) return null;
   if (state.area === 'camp') {
-    return pathOpen(state) && rawX < 0 ? { area: 'quarry', x: BALANCE.mapWidth - 1.5, y: rawY } : null;
+    if (pathOpen(state) && rawX < 0) return { area: 'quarry', x: BALANCE.mapWidth - 1.5, y: rawY };
+    if (homesteadPathOpen(state) && rawX > BALANCE.mapWidth - 1) return { area: 'homestead', x: 0.5, y: rawY };
+    return null;
   }
+  if (state.area === 'homestead') return rawX < 0 ? { area: 'camp', x: BALANCE.mapWidth - 1.5, y: rawY } : null;
   return rawX > BALANCE.mapWidth - 1 ? { area: 'camp', x: 0.5, y: rawY } : null;
 }

@@ -2,6 +2,7 @@ import { isSpring, isWinter, nightStart } from './calendar';
 import { isRaining } from './rain';
 import { wolvesClose } from './wolves';
 import { BALANCE, type GameState } from './state';
+import { hasFriend } from './companion';
 
 const MUTE_KEY = 'hearthwild.sound-muted';
 const MASTER_VOLUME = 0.34;
@@ -10,8 +11,8 @@ function birdAmbienceVolume(state: GameState, isNight: boolean, inQuarry: boolea
   // The birds leave for winter, except a friend; a friend sings loud at spring dawns.
   if (isNight) return 0;
   if (inQuarry) return winter ? 0 : 0.16;
-  if (winter) return state.companion?.friend === 'bird' ? 0.16 : 0;
-  if (state.companion?.friend === 'bird' && isSpring(state.day) && state.timeOfDay < 25) return 0.8;
+  if (winter) return hasFriend(state, 'bird') ? 0.16 : 0;
+  if (hasFriend(state, 'bird') && isSpring(state.day) && state.timeOfDay < 25) return 0.8;
   return 0.48;
 }
 

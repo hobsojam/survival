@@ -1,5 +1,6 @@
 import { isWinter, nightStart } from '../game/calendar';
 import { BALANCE, type Friend, type GameState } from '../game/state';
+import { hasFriend } from '../game/companion';
 import type { Point } from '../game/wildlife';
 import { foxFrame } from './ambient';
 
@@ -26,7 +27,7 @@ const ANSWER_TO = 3.8;
 
 /** A winter night at camp with a wolf for a friend: the nights the wolves sing to each other. */
 export function chorusNight(state: GameState): boolean {
-  return state.companion.friend === 'wolf' && state.area === 'camp' && isWinter(state.day) && state.timeOfDay >= nightStart(state.day);
+  return hasFriend(state, 'wolf') && state.area === 'camp' && isWinter(state.day) && state.timeOfDay >= nightStart(state.day);
 }
 
 /** Whether the friendly wolf has its head up, answering the howl that began this cycle. */
@@ -93,6 +94,11 @@ function daytimePose(state: GameState, friend: Friend, timeMs: number, stillSeco
 export function companionPose(state: GameState, timeMs: number, stillSeconds: number, facing: 1 | -1): CompanionPose | null {
   const friend = state.companion.friend;
   if (!friend) return null;
+  return companionPoseFor(state, friend, timeMs, stillSeconds, facing);
+}
+
+export function companionPoseFor(state: GameState, friend: Friend, timeMs: number, stillSeconds: number, facing: 1 | -1): CompanionPose | null {
+  if (!hasFriend(state, friend)) return null;
   const { x, y } = state.player;
   const away = state.area !== 'camp' || Math.hypot(x - campX, y - campY) > BALANCE.campRadius + 4;
   if (away || state.timeOfDay >= nightStart(state.day)) return fireside(state, friend, timeMs);

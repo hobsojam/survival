@@ -36,7 +36,11 @@ export const BUILDINGS = {
   windmill: { name: 'Windmill', description: 'Grind a whole granary of grain in one go', symbol: '✣', cost: { wood: 12, fiber: 4, stone: 10 }, prerequisite: 'granary', ground: 'south-outer' },
   bakery: { name: 'Bakery', description: 'Bake a fresh loaf every morning', symbol: '⌂', cost: { wood: 10, fiber: 2, stone: 10 }, prerequisite: 'windmill', ground: 'north-outer' },
   /** A straw skep: the bees make honey every few dawns, all year, and keep a little for the taking. */
-  beehive: { name: 'Beehive', description: 'Keep bees for honey all year', symbol: '❀', cost: { wood: 4, fiber: 6 }, prerequisite: null, ground: 'north-far' }
+  beehive: { name: 'Beehive', description: 'Keep bees for honey all year', symbol: '❀', cost: { wood: 4, fiber: 6 }, prerequisite: null, ground: 'north-far' },
+  chickenCoop: { name: 'Chicken coop', description: 'A safe place for the flock from the old homestead', symbol: '⌂', cost: { wood: 4, fiber: 2 }, prerequisite: null },
+  birdhouse: { name: 'Birdhouse', description: 'A small home for your bird', symbol: '♫', cost: { wood: 2, fiber: 1 }, prerequisite: 'house', friend: 'bird' },
+  wolfHouse: { name: 'Wolf house', description: 'A sheltered resting place for your wolf', symbol: '⌂', cost: { wood: 4, fiber: 2 }, prerequisite: 'house', friend: 'wolf' },
+  foxDen: { name: 'Fox den', description: 'A hollow lined with branches and fiber', symbol: '⌂', cost: { wood: 2, fiber: 2 }, prerequisite: 'house', friend: 'fox' }
 } as const;
 
 export type StructureId = keyof typeof BUILDINGS;
@@ -88,7 +92,7 @@ export interface StonePile {
   area: AreaId;
 }
 
-export type AreaId = 'camp' | 'quarry';
+export type AreaId = 'camp' | 'quarry' | 'homestead';
 
 export type HousePaint = 'natural' | 'berry' | 'leaf';
 export interface HomesteadDecorations { paint: HousePaint; flowerBoxes: boolean; fence: number }
@@ -97,13 +101,15 @@ export const emptyDecorations = (): HomesteadDecorations => ({ paint: 'natural',
 /** What a wolf took on its last visit: a ration left out for it counts as its visit, and a friendly wolf sees the others off. */
 export type WolfTake = 'ration' | 'berry' | 'nothing' | 'offered' | 'chased';
 
-/** The wild animals that can become the camp's one friend. */
+/** The wild animals that can become friends at camp. */
 export type Friend = 'bird' | 'fox' | 'wolf';
 
 export interface Companion {
-  /** The friend, once one has stayed; it never leaves. */
+  /** Historic first friend, retained for older saves while all friends coexist. */
   friend: Friend | null;
   since: number | null;
+  /** The day each animal stayed, or null while it is wild. */
+  friends: Record<Friend, number | null>;
   /** Offerings each animal has taken, and the day (or night) of the last. */
   trust: Record<Friend, number>;
   lastOffer: Record<Friend, number>;
@@ -113,6 +119,11 @@ export interface Companion {
   /** The last dawn a piece was shed, and the last the fox brought a berry. */
   lastFind: number;
   lastGift: number;
+  /** Independent supplies and dawns for feathers, fur, and each friend's gift. */
+  keepsakesByKind: Record<'feather' | 'fur', number>;
+  lyingByKind: Record<'feather' | 'fur', boolean>;
+  lastFindByKind: Record<'feather' | 'fur', number>;
+  lastGiftByFriend: Record<'fox' | 'wolf', number>;
   pillow: boolean;
   cloak: boolean;
   /** The last winter night the bird woke the sleeper. */
@@ -133,7 +144,7 @@ export interface GameState {
   structures: Record<StructureId, boolean>;
   decorations: HomesteadDecorations;
   progress: { nextStormDay: number | null; hearthUnlocked: boolean; lookoutRepaired: boolean; axeCrafted: boolean;
-    quarryFound: boolean; pickaxeCrafted: boolean; mineBuilt: boolean; potCrafted: boolean; packWoven: boolean;
+    quarryFound: boolean; homesteadFound: boolean; pickaxeCrafted: boolean; mineBuilt: boolean; potCrafted: boolean; packWoven: boolean;
     /** A fishing line, for the frozen spring in winter. */
     fishingLine: boolean;
     /** The workshop's upgrades, each made once. */
@@ -172,12 +183,14 @@ export interface GameState {
   /** The last winter night a wolf came into the dark camp, and what it took. */
   lastWolf: { day: number; took: WolfTake } | null;
   /** The last dawn that threw out food gone soft, and how much. */
-  lastSpoiled: { day: number; berry: number; greens: number; bread: number } | null;
+  lastSpoiled: { day: number; berry: number; greens: number; bread: number; apple: number; egg: number } | null;
   /** A honey cake eaten: the next rest or sleep at camp restores a little more energy. */
   cakeBonus: boolean;
   /** What the survivor has written in the year journal. */
   journal: JournalEntry[];
   companion: Companion;
+  chickens: { discovered: boolean; following: boolean; rescued: boolean; eggs: number; nextEggDay: number };
+  homestead: { applesReadyDay: number; shedSearched: boolean };
   /** How far the camp clearing has been widened, and the step whose trees are being felled. */
   clearing: ClearingState;
   /** Seconds spent at zero hunger, and the sickness a whole day of them brings: each sick day is judged at dawn. */
@@ -215,6 +228,7 @@ export const BALANCE = {
   digSeconds: 10,
   digEnergyCost: 8,
   eatHungerGain: 25,
+  appleHunger: 20,
   /** Forage eaten raw; honey gives a little energy too. Roasted hazelnuts come from the cooking pot. */
   greensHunger: 15,
   hazelnutHunger: 15,
@@ -283,6 +297,7 @@ export const BALANCE = {
   cookedFishHunger: 45,
   /** A rabbit a wolf friend brings home, roasted at the fire; one comes every this many winter dawns. */
   cookedRabbitHunger: 50,
+  omeletteHunger: 35,
   rabbitEveryDays: 2,
   fireSecondsPerWood: 90,
   /** Kindling: the same with or without the hearth. */
@@ -404,9 +419,9 @@ export function createGame(): GameState {
     fireFuel: 0,
     fireplaceFuel: 0,
     decorations: emptyDecorations(),
-    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, storehouse: false, woodpile: false, timberYard: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false, field: false, granary: false, windmill: false, bakery: false, beehive: false },
+    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, storehouse: false, woodpile: false, timberYard: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false, field: false, granary: false, windmill: false, bakery: false, beehive: false, chickenCoop: false, birdhouse: false, wolfHouse: false, foxDen: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
-      quarryFound: false, pickaxeCrafted: false, mineBuilt: false, potCrafted: false, packWoven: false, fishingLine: false,
+      quarryFound: false, homesteadFound: false, pickaxeCrafted: false, mineBuilt: false, potCrafted: false, packWoven: false, fishingLine: false,
       workshop: { saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false },
       discoveries: { basket: false, spring: false, cairn: false } },
     nodes,
@@ -431,9 +446,15 @@ export function createGame(): GameState {
     journal: [],
     clearing: { cleared: [], marked: null, felled: [] },
     companion: {
-      friend: null, since: null, trust: { bird: 0, fox: 0, wolf: 0 }, lastOffer: { bird: 0, fox: 0, wolf: 0 },
-      keepsakes: 0, keepsakeLying: false, lastFind: 0, lastGift: 0, pillow: false, cloak: false, alarmDay: 0, foxFled: 0
+      friend: null, since: null, friends: { bird: null, fox: null, wolf: null },
+      trust: { bird: 0, fox: 0, wolf: 0 }, lastOffer: { bird: 0, fox: 0, wolf: 0 },
+      keepsakes: 0, keepsakeLying: false, lastFind: 0, lastGift: 0,
+      keepsakesByKind: { feather: 0, fur: 0 }, lyingByKind: { feather: false, fur: false },
+      lastFindByKind: { feather: 0, fur: 0 }, lastGiftByFriend: { fox: 0, wolf: 0 },
+      pillow: false, cloak: false, alarmDay: 0, foxFled: 0
     },
+    chickens: { discovered: false, following: false, rescued: false, eggs: 0, nextEggDay: 1 },
+    homestead: { applesReadyDay: 1, shedSearched: false },
     sickness: { starvedSeconds: 0, sick: false, sickFromDay: null, cared: 0, uncared: 0, ateWarm: false, restedWarm: false },
     ending: null,
     fishingMisses: 0

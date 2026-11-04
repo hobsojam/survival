@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, createGame, type Friend, type GameState } from '../src/game/state';
-import { CHORUS_SECONDS, companionPose, wolfAnswering } from '../src/scene/companionPose';
+import { CHORUS_SECONDS, companionPose, companionPoseFor, wolfAnswering } from '../src/scene/companionPose';
 
 const base = createGame();
 const withFriend = (friend: Friend, changes: Partial<GameState> = {}): GameState => ({
@@ -14,6 +14,14 @@ const fromFire = (pose: { x: number; y: number }) => Math.hypot(pose.x - BALANCE
 describe('where the friend is', () => {
   it('is nowhere without a friend', () => {
     expect(companionPose(base, 0, 0, 1)).toBeNull();
+  });
+
+  it('places every befriended animal when all three have stayed', () => {
+    const state = withFriend('bird', { companion: { ...base.companion, friend: 'bird', since: 1,
+      friends: { bird: 1, fox: 2, wolf: 3 } } });
+    for (const animal of ['bird', 'fox', 'wolf'] as const) {
+      expect(companionPoseFor(state, animal, 0, 0, 1)).not.toBeNull();
+    }
   });
 
   it('naps by the fire at night, the fox sitting and the wolf lying down', () => {

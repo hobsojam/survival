@@ -504,11 +504,25 @@ describe('the companion in the save', () => {
 
   it('round-trips a friend and rejects version 14 saves', () => {
     const storage = new MemoryStorage();
-    const state = withCompanion({ friend: 'fox', since: 20, trust: { bird: 2, fox: 4, wolf: 1 }, lastOffer: { bird: 3, fox: 20, wolf: 12 },
+    const state = withCompanion({ friend: 'fox', since: 20, friends: { bird: null, fox: 20, wolf: null }, trust: { bird: 2, fox: 4, wolf: 1 }, lastOffer: { bird: 3, fox: 20, wolf: 12 },
       keepsakes: 3, keepsakeLying: true, lastFind: 28, lastGift: 27 });
     expect(saveGame(storage, state).ok).toBe(true);
     expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
     expect(store(state, 14)).toBe('invalid');
+  });
+
+  it('round-trips three friends with independent keepsakes and gifts', () => {
+    const storage = new MemoryStorage();
+    const state = withCompanion({ friend: 'bird', since: 10,
+      friends: { bird: 10, fox: 12, wolf: 15 },
+      trust: { bird: 5, fox: 4, wolf: 3 },
+      lastOffer: { bird: 10, fox: 12, wolf: 15 },
+      keepsakes: 2, keepsakesByKind: { feather: 2, fur: 4 },
+      lyingByKind: { feather: false, fur: true },
+      lastFindByKind: { feather: 25, fur: 27 },
+      lastGiftByFriend: { fox: 26, wolf: 28 } });
+    expect(saveGame(storage, state).ok).toBe(true);
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
   });
 
   it('rejects companions that could not have come about', () => {

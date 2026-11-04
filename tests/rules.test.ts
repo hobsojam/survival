@@ -1038,7 +1038,7 @@ describe('the second area', () => {
     state.player.y = 15;
     const refused = applyAction(state, { type: 'cross' });
     expect(refused.state).toBe(state);
-    expect(refused.message).toBe('Walk to the end of the west path to cross.');
+    expect(refused.message).toBe('Walk to the end of a path to cross.');
     state.player.x = 0.4;
     expect(applyAction(state, { type: 'cross' }).state.area).toBe('quarry');
   });

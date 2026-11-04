@@ -19,7 +19,7 @@ import { GAVE_OUT_MESSAGE } from '../game/sickness';
 import { ENDING_FADE_MS, endingMarkup, endingView, showEnding } from './ending';
 import { browserDownloadDoc, downloadText } from './download';
 import { showBuildList, showCampStores } from './showPanels';
-import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, decorationMarkup, decorationButtonView, DECORATION_CHOICES, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
+import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, decorationMarkup, decorationButtonView, DECORATION_CHOICES, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, chickenCoopPanelView, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
 import type { UpgradeId } from '../game/workshop';
 import { Soundscape } from '../game/soundscape';
 import { isAtHome } from '../game/home';
@@ -122,6 +122,7 @@ export class App {
               <section class="panel windmill-panel" data-tab="camp" hidden><p class="eyebrow">THE SOUTH GROUND</p><h2>Windmill</h2><p class="garden-hint" id="windmill-stored"></p><div class="tool-row"><button type="button" id="mill-button" data-action="millGrain">Mill the grain</button><small id="mill-hint"></small></div></section>
               <section class="panel bakery-panel" data-tab="camp" hidden><p class="eyebrow">THE NORTH GROUND</p><h2>Bakery</h2><p class="garden-hint"><span id="bakery-shelf"></span> <span id="bakery-note"></span></p><div class="tool-row"><button type="button" id="take-loaf-button" data-action="takeLoaf">Take a loaf</button><small id="take-loaf-hint"></small></div></section>
               <section class="panel beehive-panel" data-tab="camp" hidden><p class="eyebrow">THE NORTH GROUND</p><h2>Beehive</h2><p class="garden-hint"><span id="hive-honey"></span></p><div class="tool-row"><button type="button" id="take-honey-button" data-action="takeHoney">Take the honey</button><small id="take-honey-hint"></small></div></section>
+              <section class="panel chicken-coop-panel" data-tab="camp" hidden><p class="eyebrow">AT CAMP</p><h2>Chicken coop</h2><p class="garden-hint" id="chicken-coop-status"></p><p class="garden-hint" id="chicken-coop-eggs"></p><div class="tool-row"><button type="button" id="take-egg-button" data-action="takeEgg">Take an egg</button><small id="take-egg-hint"></small></div></section>
               <section class="panel night-panel" data-tab="camp"><p class="eyebrow">CAMP MOMENTS</p><h2>Cook or unwind</h2><p class="night-hint" id="night-hint">Cook by the fire any time. Stargazing waits for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" data-dish="berries" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button>${nightDishMarkup()}</div></section>
               <section class="panel build-panel" data-tab="build"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand anywhere in the clearing to build.</p><div id="build-list">${buildListMarkup()}</div><div id="decoration-group" hidden><h3 class="build-group-heading">Make it yours</h3><div id="decoration-list">${decorationMarkup()}</div></div><div id="clearing-group" hidden><h3 class="build-group-heading">Clear the land</h3><p id="clearing-progress" class="build-hint" hidden></p><div id="clearing-sides">${clearingMarkup}</div><div class="tool-row" id="clear-row"><h3 id="clear-title">Clear the ground</h3><p id="clear-copy" class="lookout-copy"></p><button type="button" id="clear-button" data-action="clearGround">Clear the ground</button><small id="clear-cost"></small></div></div></section>
               <section class="panel phone-only" data-tab="camp"><p class="eyebrow">THIS CAMP</p><button type="button" id="phone-new-game" class="secondary-button">Start a new game</button></section>
@@ -137,13 +138,18 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'buildMine' | 'craftPot' | 'craftPack' | 'makeFishingLine' | 'clearGround' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'storeFood' | 'takeFood' | 'drawWater' | 'grindGrain' | 'millGrain' | 'takeLoaf' | 'takeHoney';
+        const type = button.dataset.action as 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'buildMine' | 'craftPot' | 'craftPack' | 'makeFishingLine' | 'clearGround' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'storeFood' | 'takeFood' | 'drawWater' | 'grindGrain' | 'millGrain' | 'takeLoaf' | 'takeHoney' | 'takeEgg';
         const item = button.dataset.item as FoodItem | undefined;
         const dish = button.dataset.dish as DishId | undefined;
-        if (type === 'storeFood' || type === 'takeFood') {
+        if (type === 'storeFood') {
           if (item) this.scene?.perform({ type, item });
-        } else if (type === 'cook' && dish) this.scene?.perform({ type, dish });
-        else this.scene?.perform(type === 'eat' && item ? { type, item } : { type });
+        } else if (type === 'takeFood') {
+          if (item) this.scene?.perform({ type, item });
+        } else if (type === 'cook') {
+          this.scene?.perform(dish ? { type, dish } : { type });
+        } else if (type === 'eat') {
+          this.scene?.perform(item ? { type, item } : { type });
+        } else this.scene?.perform({ type });
       });
     });
     this.root.addEventListener('click', event => {
@@ -311,7 +317,11 @@ export class App {
   private continueGame(): void {
     if (this.previousSave.kind !== 'loaded') return;
     this.startGame(this.previousSave.state);
-    this.setMessage(this.previousSave.state.area === 'quarry' ? 'Welcome back. You are out by the old quarry.' : 'Welcome back to your camp.');
+    const area = this.previousSave.state.area;
+    let welcome = 'Welcome back to your camp.';
+    if (area === 'quarry') welcome = 'Welcome back. You are out by the old quarry.';
+    if (area === 'homestead') welcome = 'Welcome back. You are at the old homestead.';
+    this.setMessage(welcome);
     this.setText('save-status', 'Loaded locally');
   }
 
@@ -649,6 +659,13 @@ export class App {
     this.setText('hive-honey', beehive.stored);
     this.setActionButton('take-honey-button', beehive.take.disabled);
     this.setText('take-honey-hint', beehive.take.hint);
+    const coop = chickenCoopPanelView(this.state);
+    const coopPanel = this.root.querySelector<HTMLElement>('.chicken-coop-panel');
+    if (coopPanel) coopPanel.hidden = !coop.shown;
+    this.setText('chicken-coop-status', coop.status);
+    this.setText('chicken-coop-eggs', coop.stored);
+    this.setActionButton('take-egg-button', coop.take.disabled);
+    this.setText('take-egg-hint', coop.take.hint);
   }
 
   /** Enables an action button and marks it ready, or disables it. */

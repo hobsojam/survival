@@ -1,9 +1,9 @@
 import { BALANCE, type GameState, type ResourceKind, type ResourceNode } from '../game/state';
 import { season, type Season } from '../game/calendar';
-import { QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
+import { QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, homesteadPathOpen, pathOpen } from '../game/areas';
 import { clearingTile, pathTile, quarryGroundTile, terrainSprites } from '../art/terrain';
 import { CLEARING_STEPS, STEP_IDS, clearingKey, clearingReach, type ClearingState, type StepId } from '../game/clearing';
-import { CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_OPEN_PATHS, CAMP_PATHS, CAMP_SIGN, QUARRY_PATHS, QUARRY_SIGN, mixHash, pathDistance, type PathRoute } from './mapGeometry';
+import { CAMP_BOTH_OPEN_PATHS, CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_HOMESTEAD_PATHS, CAMP_OPEN_PATHS, CAMP_PATHS, CAMP_SIGN, HOMESTEAD_PATHS, HOMESTEAD_SIGN, QUARRY_PATHS, QUARRY_SIGN, mixHash, pathDistance, type PathRoute } from './mapGeometry';
 import { FACE_HEIGHT, QUARRY_MEADOWS, faceBottom, floorDepth } from './quarryGeometry';
 
 export interface MapItem { x: number; y: number; sprite: string }
@@ -11,20 +11,28 @@ export interface TerrainMap { ground: string[][]; pathTiles: MapItem[]; campEdge
   /** Signposts, drawn standing like the trees. */
   signs: MapItem[] }
 
-export type TerrainKey = 'camp' | 'camp-open' | 'quarry';
+export type TerrainKey = 'camp' | 'camp-open' | 'camp-homestead-open' | 'camp-both-open' | 'quarry' | 'homestead';
 
-/** Which terrain the scene should show: the quarry, or the camp with or without its west path. */
+/** Which area's terrain and which camp paths the scene should show. */
 export function terrainKey(state: GameState): TerrainKey {
   if (state.area === 'quarry') return 'quarry';
-  return pathOpen(state) ? 'camp-open' : 'camp';
+  if (state.area === 'homestead') return 'homestead';
+  const quarryOpen = pathOpen(state), homesteadOpen = homesteadPathOpen(state);
+  if (quarryOpen && homesteadOpen) return 'camp-both-open';
+  if (quarryOpen) return 'camp-open';
+  if (homesteadOpen) return 'camp-homestead-open';
+  return 'camp';
 }
 
-/** The terrain the scene has drawn: it is redrawn when the area, the west path, the cleared ground, the marked trees or the season changes. */
+/** The terrain the scene has drawn, keyed by area, paths, clearing and season. */
 export function shownTerrainKey(state: GameState): string {
   return `${terrainKey(state)}-${clearingKey(state.clearing.cleared)}-${state.clearing.marked ?? 'unmarked'}-${season(state.day)}`;
 }
 
-const ROUTES: Record<Exclude<TerrainKey, 'quarry'>, readonly PathRoute[]> = { camp: CAMP_PATHS, 'camp-open': CAMP_OPEN_PATHS };
+const ROUTES: Record<Exclude<TerrainKey, 'quarry' | 'homestead'>, readonly PathRoute[]> = {
+  camp: CAMP_PATHS, 'camp-open': CAMP_OPEN_PATHS, 'camp-homestead-open': CAMP_HOMESTEAD_PATHS,
+  'camp-both-open': CAMP_BOTH_OPEN_PATHS
+};
 
 const hash = mixHash;
 
@@ -74,6 +82,47 @@ const QUARRY_CLUMPS = [[30, 8], [33, 23], [22, 5], [7, 24], [24, 22]];
 /** What the quarrymen left on the floor: a stack of cut blocks, an old barrow and a block that tumbled from the face. */
 const QUARRY_PROPS: readonly MapItem[] = [{ x: 8, y: 13, sprite: 'cutBlocks' }, { x: 17, y: 12, sprite: 'barrow' }, { x: 11, y: 16, sprite: 'tumbledBlock' }];
 const CLUMP_OFFSETS = [[0, 0], [1, 0], [0, 1], [-1, 1], [1, 1], [-1, 0], [0, -1]];
+
+/** The abandoned yard is worn bare; the old shed, flock and orchard tree stand in its open spaces. */
+const HOMESTEAD_CLEARINGS = [{ x: 22, y: 12, radius: 3.5 }, { x: 20, y: 16, radius: 4 }, { x: 29, y: 19, radius: 3.5 }];
+function homesteadClear(x: number, y: number): boolean {
+  return HOMESTEAD_CLEARINGS.some(spot => Math.hypot(x - spot.x, y - spot.y) < spot.radius)
+    || pathDistance(x + .5, y + .5, HOMESTEAD_PATHS) < 2.4
+    || nearSign(x, y, HOMESTEAD_SIGN);
+}
+
+/** An overgrown homestead, with a track from the west, a worn yard and room for its surviving orchard. */
+function buildHomesteadMap(time: Season): TerrainMap {
+  const map = emptyMap();
+  for (let y = 0; y < BALANCE.mapHeight; y++) {
+    const row: string[] = [];
+    for (let x = 0; x < BALANCE.mapWidth; x++) {
+      const yard = Math.hypot((x - 20) / 7, (y - 16) / 5) < 1;
+      row.push(yard ? `earth${hash(x, y, 1) % 3}` : `grass${hash(x, y) % 4}`);
+      const path = pathTile(x, y, HOMESTEAD_PATHS);
+      if (path) map.pathTiles.push({ x, y, sprite: path });
+      if (homesteadClear(x, y)) continue;
+      const edge = edgeDistance(x, y);
+      const wooded = edge <= 1 || (edge <= 3 && hash(x, y, 21) % 4 !== 0)
+        || (edge > 3 && hash(x, y, 22) % 31 === 0);
+      if (wooded) {
+        map.trees.push({ x, y, sprite: TREE_SPRITES[hash(x, y, 23) % TREE_SPRITES.length] });
+      } else if (!yard) {
+        const pick = hash(x, y, 24) % 11;
+        let sprite: string | undefined;
+        if (time === 'spring' && pick < 2) sprite = `flower${hash(x, y, 25) % 3}`;
+        else if (time === 'autumn' && pick < 2) sprite = 'fallenLeaf';
+        else if (pick === 2) sprite = 'stump';
+        else if (pick < 6) sprite = `tuft${pick % 2}`;
+        else if (pick === 6) sprite = `fern${hash(x, y, 26) % 2}`;
+        if (sprite) map.decorations.push({ x, y, sprite });
+      }
+    }
+    map.ground.push(row);
+  }
+  map.signs = [{ ...HOMESTEAD_SIGN, sprite: 'signpostCamp' }];
+  return map;
+}
 
 /**
  * Whether a quarry spot is free for something standing: off the floor, the face and its lip, clear of the track by
@@ -173,6 +222,7 @@ function quarryDetail(x: number, y: number): string {
  */
 export function buildMap(nodes: ResourceNode[], key: TerrainKey, time: Season = 'summer', clearing: ClearingState = { cleared: [], marked: null, felled: [] }): TerrainMap {
   if (key === 'quarry') return buildQuarryMap(time);
+  if (key === 'homestead') return buildHomesteadMap(time);
   const standing = STEP_IDS.filter(id => !clearing.cleared.includes(id));
   const site: CampSite = { nodes, routes: ROUTES[key], cleared: clearing.cleared, reserved: standing.flatMap(id => CLEARING_STEPS[id].trees) };
   const map = emptyMap();
@@ -186,7 +236,7 @@ export function buildMap(nodes: ResourceNode[], key: TerrainKey, time: Season = 
   map.trees.push(...standing.filter(id => id !== clearing.marked).flatMap(id => CLEARING_STEPS[id].trees.map(({ x, y, sprite }) => ({ x, y, sprite }))));
   map.rimStones = campRimStones(site);
   map.decorations = map.decorations.filter(item => !nearSign(item.x, item.y, CAMP_SIGN));
-  if (key === 'camp-open') map.signs = [{ ...CAMP_SIGN, sprite: 'signpostQuarry' }];
+  if (key === 'camp-open' || key === 'camp-both-open') map.signs = [{ ...CAMP_SIGN, sprite: 'signpostQuarry' }];
   return map;
 }
 

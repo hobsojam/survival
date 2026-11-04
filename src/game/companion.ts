@@ -6,7 +6,7 @@ import { addFood, availableFood, spendFood, type FoodItem } from './food';
 import { BALANCE, type Friend, type GameState } from './state';
 import { dayHash, foxAt, foxSpookRadius } from './wildlife';
 
-// One wild animal can become the camp's friend, won over by small offerings it already likes:
+// Wild animals can become camp friends, won over by small offerings they already like:
 // the birds peck at berries, the fox noses at the bushes, and the winter wolves take rations.
 
 /** Offerings each animal takes before it stays. */
@@ -58,15 +58,19 @@ const WILLING: Record<Friend, (state: GameState) => boolean> = {
 };
 const ORDER: readonly Friend[] = ['fox', 'wolf', 'bird'];
 
-/** Which animal an offering would go to here and now, the fox first; none once a friend has stayed. */
+export function hasFriend(state: GameState, animal: Friend): boolean {
+  return state.companion.friends[animal] !== null || state.companion.friend === animal;
+}
+
+/** Which still-wild animal an offering would go to here and now, the fox first. */
 export function offerFor(state: GameState): Friend | null {
-  if (state.companion.friend || !isInClearing(state)) return null;
-  return ORDER.find(animal => state.companion.lastOffer[animal] !== state.day && WILLING[animal](state)) ?? null;
+  if (!isInClearing(state)) return null;
+  return ORDER.find(animal => !hasFriend(state, animal) && state.companion.lastOffer[animal] !== state.day && WILLING[animal](state)) ?? null;
 }
 
 export function offerBlocker(state: GameState): string | null {
   if (offerFor(state)) return null;
-  const waiting = !state.companion.friend && isInClearing(state) && ORDER.some(animal => WILLING[animal](state));
+  const waiting = isInClearing(state) && ORDER.some(animal => !hasFriend(state, animal) && WILLING[animal](state));
   return waiting ? 'You have already left something out today.' : 'Nothing here wants an offering right now.';
 }
 
@@ -81,15 +85,20 @@ export function makeOffering(state: GameState): { state: GameState; message: str
   const lastWolf = animal === 'wolf' && state.lastWolf?.day !== state.day ? { day: state.day, took: 'offered' as const } : state.lastWolf;
   const companion = {
     ...state.companion, trust, lastOffer: { ...state.companion.lastOffer, [animal]: state.day },
-    ...(stays ? { friend: animal, since: state.day, lastFind: state.day, lastGift: state.day } : {})
+    ...(stays ? {
+      friends: { ...state.companion.friends, [animal]: state.day },
+      lastFindByKind: { ...state.companion.lastFindByKind, [keepsakeKind(animal)]: state.day },
+      ...(animal === 'fox' || animal === 'wolf' ? { lastGiftByFriend: { ...state.companion.lastGiftByFriend, [animal]: state.day } } : {}),
+      ...(state.companion.friend ? {} : { friend: animal, since: state.day, lastFind: state.day, lastGift: state.day })
+    } : {})
   };
   return { state: { ...spent, lastWolf, companion }, message: stays ? STAYED[animal] : offeredMessage(state, animal) };
 }
 
 /** The wild fox runs off for the evening if the survivor comes too close. Mutates advanceTime's working copy. */
 export function startleFox(next: GameState): void {
-  const { friend, trust, foxFled } = next.companion;
-  if (friend === 'fox' || foxFled === next.day || next.area !== 'camp') return;
+  const { trust, foxFled } = next.companion;
+  if (hasFriend(next, 'fox') || foxFled === next.day || next.area !== 'camp') return;
   const fox = foxAt(next.day, next.timeOfDay, trust.fox);
   if (fox && Math.hypot(fox.x - next.player.x, fox.y - next.player.y) < foxSpookRadius(trust.fox)) {
     next.companion = { ...next.companion, foxFled: next.day };
@@ -114,53 +123,90 @@ const SHED_SALT = 71;
 const GIFT_SALT = 50;
 
 export const keepsakeKind = (friend: Friend): 'feather' | 'fur' => (friend === 'bird' ? 'feather' : 'fur');
-const itemMade = (state: GameState): boolean => state.companion.pillow || state.companion.cloak;
+const itemMade = (state: GameState, kind: 'feather' | 'fur'): boolean => kind === 'feather' ? state.companion.pillow : state.companion.cloak;
+
+function stockFor(state: GameState, kind: 'feather' | 'fur'): number {
+  if (state.companion.friend && keepsakeKind(state.companion.friend) === kind) {
+    return Math.max(state.companion.keepsakesByKind[kind], state.companion.keepsakes);
+  }
+  return state.companion.keepsakesByKind[kind];
+}
+
+export function keepsakeStock(state: GameState, kind: 'feather' | 'fur'): number { return stockFor(state, kind); }
 
 /** Once the item is made, a shed piece still shows by the fire on its dawn, as scenery only. */
-export const sceneryKeepsake = (state: GameState): boolean => itemMade(state) && state.companion.lastFind === state.day;
+export const sceneryKeepsake = (state: GameState): boolean => (['feather', 'fur'] as const).some(kind =>
+  itemMade(state, kind) && state.companion.lastFindByKind[kind] === state.day);
 
 /** The friend's dawn: now and then a piece of fur or a feather by the fire, and the fox's berry. Mutates advanceTime's working copy. */
 export function companionDawn(next: GameState): void {
   const companion = next.companion;
-  if (!companion.friend) return;
-  let changes: Partial<GameState['companion']> = {};
-  if (findDue(next.day, companion.lastFind, SHED_SALT)) {
-    if (itemMade(next)) changes = { lastFind: next.day };
-    else if (!companion.keepsakeLying && companion.keepsakes < KEEPSAKES_NEEDED) changes = { lastFind: next.day, keepsakeLying: true };
+  if (!(['bird', 'fox', 'wolf'] as const).some(animal => hasFriend(next, animal))) return;
+  const stock = { ...companion.keepsakesByKind };
+  const lying = { ...companion.lyingByKind };
+  const lastFind = { ...companion.lastFindByKind };
+  const gifts = { ...companion.lastGiftByFriend };
+  const firstKind = companion.friend ? keepsakeKind(companion.friend) : null;
+  if (firstKind && companion.keepsakeLying) lying[firstKind] = true;
+  for (const kind of ['feather', 'fur'] as const) {
+    const friendHere = kind === 'feather' ? hasFriend(next, 'bird') : hasFriend(next, 'fox') || hasFriend(next, 'wolf');
+    const previous = companion.friend && keepsakeKind(companion.friend) === kind ? Math.max(lastFind[kind], companion.lastFind) : lastFind[kind];
+    if (!friendHere || !findDue(next.day, previous, SHED_SALT)) continue;
+    if (itemMade(next, kind)) lastFind[kind] = next.day;
+    else if (!lying[kind] && stockFor(next, kind) < KEEPSAKES_NEEDED) {
+      lastFind[kind] = next.day;
+      lying[kind] = true;
+    }
   }
   // The fox leaves its berry by the bedroll, so only on a dawn the survivor wakes at camp.
   const home = next.area === 'camp';
-  if (companion.friend === 'fox' && home && findDue(next.day, companion.lastGift, GIFT_SALT) && freeSpaces(next) >= 1) {
-    changes = { ...changes, lastGift: next.day };
+  const foxGift = companion.friend === 'fox' ? Math.max(gifts.fox, companion.lastGift) : gifts.fox;
+  if (hasFriend(next, 'fox') && home && findDue(next.day, foxGift, GIFT_SALT) && freeSpaces(next) >= 1) {
+    gifts.fox = next.day;
     next.inventory = { ...next.inventory, food: addFood(next.inventory.food, 'berry', 1, next.day) };
   }
   // A wolf friend hunts in winter, and now and then brings a rabbit home, like a dog with a stick.
   // EASTER EGG: the rabbit is deliberately left out of the README and hidden on screen until the first
   // one arrives, so finding it is a surprise. Don't document it for players. See AGENTS.md.
-  if (companion.friend === 'wolf' && home && isWinter(next.day) && next.day - companion.lastGift >= BALANCE.rabbitEveryDays && freeSpaces(next) >= 1) {
-    changes = { ...changes, lastGift: next.day };
+  const wolfGift = companion.friend === 'wolf' ? Math.max(gifts.wolf, companion.lastGift) : gifts.wolf;
+  if (hasFriend(next, 'wolf') && home && isWinter(next.day) && next.day - wolfGift >= BALANCE.rabbitEveryDays && freeSpaces(next) >= 1) {
+    gifts.wolf = next.day;
     next.inventory = { ...next.inventory, food: addFood(next.inventory.food, 'rabbit', 1, next.day) };
   }
-  next.companion = { ...companion, ...changes };
+  next.companion = { ...companion, keepsakesByKind: stock, lyingByKind: lying, lastFindByKind: lastFind,
+    lastGiftByFriend: gifts, lastFind: firstKind && lastFind[firstKind] > companion.lastFind ? lastFind[firstKind] : companion.lastFind,
+    lastGift: companion.friend === 'fox' || companion.friend === 'wolf'
+      ? Math.max(gifts[companion.friend], companion.lastGift) : companion.lastGift,
+    keepsakeLying: firstKind ? lying[firstKind] : false };
 }
 
 /** Walking up to a shed piece picks it up. */
 export function pickUpKeepsake(state: GameState): GameState {
   const near = Math.hypot(state.player.x - KEEPSAKE_SPOT.x, state.player.y - KEEPSAKE_SPOT.y) <= PICK_UP_RADIUS;
-  if (!state.companion.keepsakeLying || state.area !== 'camp' || !near) return state;
-  return { ...state, companion: { ...state.companion, keepsakeLying: false, keepsakes: state.companion.keepsakes + 1 } };
+  if (state.area !== 'camp' || !near) return state;
+  const lying = { ...state.companion.lyingByKind };
+  const stock = { ...state.companion.keepsakesByKind };
+  const first = state.companion.friend ? keepsakeKind(state.companion.friend) : null;
+  if (first && state.companion.keepsakeLying) lying[first] = true;
+  if (!lying.feather && !lying.fur) return state;
+  for (const kind of ['feather', 'fur'] as const) if (lying[kind]) {
+    stock[kind] = stockFor(state, kind) + 1;
+    lying[kind] = false;
+  }
+  return { ...state, companion: { ...state.companion, keepsakesByKind: stock, lyingByKind: lying,
+    keepsakes: first ? stock[first] : state.companion.keepsakes, keepsakeLying: first ? lying[first] : false } };
 }
 
 /** What the survivor notices of their friend between two states. */
 export function companionNews(before: GameState, after: GameState): string[] {
-  const friend = after.companion.friend;
-  if (!friend) return [];
-  const piece = keepsakeKind(friend) === 'feather' ? 'a feather' : 'a tuft of fur';
   const news: string[] = [];
-  if (after.companion.lastGift > before.companion.lastGift && friend === 'fox') news.push('The fox left a berry by your bedroll.');
-  if (after.companion.lastGift > before.companion.lastGift && friend === 'wolf') news.push('Your wolf left a rabbit by your bedroll.');
-  if (after.companion.keepsakeLying && !before.companion.keepsakeLying) news.push(`${piece[0].toUpperCase()}${piece.slice(1)} lies by the fire.`);
-  if (after.companion.keepsakes > before.companion.keepsakes) news.push(`You found ${piece} by the fire.`);
+  if (after.companion.lastGiftByFriend.fox > before.companion.lastGiftByFriend.fox) news.push('The fox left a berry by your bedroll.');
+  if (after.companion.lastGiftByFriend.wolf > before.companion.lastGiftByFriend.wolf) news.push('Your wolf left a rabbit by your bedroll.');
+  for (const kind of ['feather', 'fur'] as const) {
+    const piece = kind === 'feather' ? 'a feather' : 'a tuft of fur';
+    if (after.companion.lyingByKind[kind] && !before.companion.lyingByKind[kind]) news.push(`${piece[0].toUpperCase()}${piece.slice(1)} lies by the fire.`);
+    if (after.companion.keepsakesByKind[kind] > before.companion.keepsakesByKind[kind]) news.push(`You found ${piece} by the fire.`);
+  }
   return news;
 }
 
@@ -168,24 +214,24 @@ export function companionNews(before: GameState, after: GameState): string[] {
 export function alarmAfter(state: GameState): number | null {
   const { friend, alarmDay } = state.companion;
   const fuel = fuelLeft(state);
-  if (friend !== 'bird' || !isWinter(state.day) || !night(state) || alarmDay === state.day || fuel <= 0) return null;
+  if (!hasFriend(state, 'bird') || !isWinter(state.day) || !night(state) || alarmDay === state.day || fuel <= 0) return null;
   return Math.max(0, (fuel - BALANCE.alarmFuel) / BALANCE.coldNightFireBurn);
 }
 
 const ITEMS = {
-  pillow: { friendly: (friend: Friend | null) => friend === 'bird', name: 'pillow', pieces: 'feathers' },
-  cloak: { friendly: (friend: Friend | null) => friend !== null && friend !== 'bird', name: 'cloak', pieces: 'fur' }
+  pillow: { friendly: (state: GameState) => hasFriend(state, 'bird'), name: 'pillow', pieces: 'feathers', kind: 'feather' },
+  cloak: { friendly: (state: GameState) => hasFriend(state, 'fox') || hasFriend(state, 'wolf'), name: 'cloak', pieces: 'fur', kind: 'fur' }
 } as const;
 
 function itemBlocker(state: GameState, item: keyof typeof ITEMS): string | null {
-  const { friendly, name, pieces } = ITEMS[item];
+  const { friendly, name, pieces, kind } = ITEMS[item];
   if (state.companion[item]) return `You already have the ${name}.`;
-  if (!friendly(state.companion.friend)) return `You need ${pieces} for a ${name}.`;
+  if (!friendly(state)) return `You need ${pieces} for a ${name}.`;
   if (!state.structures.toolshed) return 'Build a toolshed first.';
   if (item === 'pillow' && !state.structures.bed) return 'Build a bed first.';
   if (!isInClearing(state)) return `Return to camp to make the ${name}.`;
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
-  if (state.companion.keepsakes < KEEPSAKES_NEEDED) return `Need ${KEEPSAKES_NEEDED} ${pieces} for the ${name}.`;
+  if (stockFor(state, kind) < KEEPSAKES_NEEDED) return `Need ${KEEPSAKES_NEEDED} ${pieces} for the ${name}.`;
   return null;
 }
 

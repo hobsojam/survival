@@ -33,7 +33,7 @@ function camp(friend: Friend | null = 'wolf', changes: Partial<GameState> = {}):
     progress: { ...base.progress, nextStormDay: null, hearthUnlocked: true },
     structures: { ...base.structures, shelter: true },
     player: { ...base.player, x: BALANCE.campX, y: BALANCE.campY },
-    companion: { ...base.companion, friend, since: 1, lastFind: WINTER_DAY, lastGift: 1 },
+    companion: { ...base.companion, friend, since: 1, friends: { ...base.companion.friends, wolf: friend === 'wolf' ? 1 : null }, trust: { ...base.companion.trust, wolf: friend === 'wolf' ? 3 : 0 }, lastFind: WINTER_DAY, lastGift: 1 },
     ...changes
   };
 }

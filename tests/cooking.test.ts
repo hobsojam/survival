@@ -62,9 +62,16 @@ describe('the cooking pot', () => {
 });
 
 describe('the dishes', () => {
+  it('cooks one egg into a simple omelette without a pot', () => {
+    const state = evening({ egg: 1 }, false);
+    const cooked = applyAction(state, { type: 'cook', dish: 'omelette' });
+    expect(cooked.state.inventory.food.egg).toEqual([]);
+    expect(cooked.state.player.hunger).toBeCloseTo(29 + 35);
+    expect(cooked.message).toContain('omelette');
+  });
   it('lists every dish in order, and only a fish, a rabbit and berries cook without the pot', () => {
-    expect(DISH_ORDER).toEqual(['fish', 'rabbit', 'berries', 'pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew', 'loaf']);
-    expect(DISH_ORDER.filter(dish => !DISHES[dish].potOnly)).toEqual(['fish', 'rabbit', 'berries', 'loaf']);
+    expect(DISH_ORDER).toEqual(['fish', 'rabbit', 'berries', 'omelette', 'pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew', 'loaf']);
+    expect(DISH_ORDER.filter(dish => !DISHES[dish].potOnly)).toEqual(['fish', 'rabbit', 'berries', 'omelette', 'loaf']);
   });
 
   it('cooks berries without the pot exactly as before', () => {
@@ -130,7 +137,7 @@ describe('the dishes', () => {
 
   it('cooks every dish by day when its fire and ingredients are ready', () => {
     const ingredients: Record<keyof typeof DISHES, Partial<Record<FoodItem, number>>> = {
-      fish: { fish: 1 }, rabbit: { rabbit: 1 }, berries: { berry: 1 }, pineTea: { pineNeedles: 1 },
+      fish: { fish: 1 }, rabbit: { rabbit: 1 }, berries: { berry: 1 }, omelette: { egg: 1 }, pineTea: { pineNeedles: 1 },
       salad: { greens: 1, berry: 1 }, roastedHazelnuts: { hazelnut: 2 },
       honeyCake: { honey: 1, hazelnut: 1, berry: 1 }, stew: { vegetables: 2 }, loaf: { flour: 1 }
     };

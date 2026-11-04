@@ -1,7 +1,9 @@
 import { isWinter, nightStart } from '../game/calendar';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceKind, type SiteId, type TreeNode } from '../game/state';
 import { isAtCamp, isInClearing, mineBlocker, sleepBlocker, type GameAction } from '../game/rules';
-import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
+import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
+import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
+import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
 import { choppableTrees, isClearingStump } from '../game/clearing';
 import { sitePrompt } from '../game/sitePrompt';
 import { offerFor, offerPrompt } from '../game/companion';
@@ -19,7 +21,8 @@ export const KEY_ACTIONS: readonly [string, GameAction][] = [
 
 const ACTION_POSES: Partial<Record<GameAction['type'], SurvivorAction>> = {
   gather: 'gather', rest: 'rest', cook: 'cook', stargaze: 'stargaze',
-  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', fish: 'gather'
+  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', fish: 'gather',
+  gatherApples: 'gather', searchShed: 'gather', takeEgg: 'gather'
 };
 
 /** The survivor's pose for an action that changed the game, if it has one. */
@@ -58,7 +61,24 @@ function campChoices(state: GameState): Choice[] {
   const nearby = lookoutChoice(state) ?? (site ? { label: sitePrompt(state, site.id), action: { type: 'visitSite', siteId: site.id } as GameAction } : null) ?? treeChoice(state);
   const animal = offerFor(state);
   const offer: Choice | null = animal ? { label: offerPrompt(state, animal), action: { type: 'befriend' } } : null;
-  return [found ? gatherChoice(state, found) : null, nearby, offer].filter((choice): choice is Choice => choice !== null);
+  const coop: Choice | null = state.chickens.rescued && within(state, COOP_SITE)
+    ? { label: state.chickens.eggs ? `Collect egg (×${state.chickens.eggs})` : 'Coop · no eggs yet',
+      ...(state.chickens.eggs ? { action: { type: 'takeEgg' as const } } : {}) } : null;
+  return [found ? gatherChoice(state, found) : null, nearby, coop, offer].filter((choice): choice is Choice => choice !== null);
+}
+
+function homesteadChoices(state: GameState): Choice[] {
+  const choices: Choice[] = [];
+  if (within(state, HOMESTEAD_SHED)) choices.push(state.homestead.shedSearched
+    ? { label: 'The shed has been searched' } : { label: 'Search the old shed', action: { type: 'searchShed' } });
+  if (within(state, APPLE_TREE)) choices.push({ label: 'Pick apples', action: { type: 'gatherApples' } });
+  if (!state.chickens.rescued && within(state, CHICKEN_SITE)) {
+    if (!state.chickens.discovered) choices.push({ label: 'Look at the chickens', action: { type: 'meetChickens' } });
+    else if (!state.structures.chickenCoop) choices.push({ label: 'Chickens · build a coop at camp first' });
+    else if (state.chickens.following) choices.push({ label: 'The chickens are following you' });
+    else choices.push({ label: 'Lead the chickens home', action: { type: 'leadChickens' } });
+  }
+  return choices;
 }
 
 /** E gets the first choice it would act on; the rest are named plainly, to click. */
@@ -69,7 +89,10 @@ function choiceLabels(choices: Choice[]): string[] {
 
 /** What E does: the first thing in reach it can use, as a tap on it would, or a rest at home with nothing to use. */
 export function useKeyAction(state: GameState): GameAction | undefined {
-  const choices = state.area === 'quarry' ? quarryChoices(state) : campChoices(state);
+  let choices: Choice[];
+  if (state.area === 'quarry') choices = quarryChoices(state);
+  else if (state.area === 'homestead') choices = homesteadChoices(state);
+  else choices = campChoices(state);
   return choices.find(choice => choice.action)?.action ?? (isAtHome(state) ? { type: 'rest' } : undefined);
 }
 
@@ -119,6 +142,12 @@ export function closestSite(state: GameState): { id: SiteId; name: string; x: nu
 /** The hint line under the game: what the keys would do here, now. */
 export function promptFor(state: GameState): string {
   if (state.area === 'quarry') return quarryPrompt(state);
+  if (state.area === 'homestead') {
+    const labels = choiceLabels(homesteadChoices(state));
+    if (labels.length) return labels.join(' · ');
+    if (within(state, HOMESTEAD_EXIT)) return 'Walk west to return to camp';
+    return 'WASD / arrows  Move';
+  }
   const choices = campChoices(state);
   const labels = choiceLabels(choices);
   const only = choices.length === 1 ? choices[0] : null;
@@ -146,6 +175,7 @@ function treeChoice(state: GameState): Choice | null {
 
 function campPrompt(state: GameState): string {
   if (pathOpen(state) && within(state, CAMP_EXIT)) return 'Walk west to leave camp';
+  if (pathOpen(state) && within(state, CAMP_HOMESTEAD_EXIT)) return 'Walk east to the old homestead';
   if (!isInClearing(state)) return 'WASD / arrows  Move';
   if (livesInHouse(state)) return housePrompt(state);
   if (!isAtCamp(state)) return 'In the clearing · Watch the stars · Click an upgrade to build';

@@ -30,7 +30,9 @@ describe('field journal', () => {
     state.progress.discoveries.cairn = true;
     expect(journalView(state).nextHint).toMatch(/west path/i);
     state.progress.quarryFound = true;
-    expect(journalView(state).nextHint).toMatch(/all five paths/i);
+    expect(journalView(state).nextHint).toMatch(/east path/i);
+    state.progress.homesteadFound = true;
+    expect(journalView(state).nextHint).toMatch(/every path/i);
     expect(journalView({ ...state, progress: { ...state.progress, lookoutRepaired: false } }).milestones).toHaveLength(4);
     // Once the lookout stands, the year journal takes over and the milestones step aside.
     expect(journalView(state).milestones).toEqual([]);
@@ -48,20 +50,30 @@ describe('field journal', () => {
     const state = createGame();
     expect(journalView(state).regions).toEqual([]);
     state.structures.shelter = true;
-    expect(journalView(state).regions).toEqual([{
+    expect(journalView(state).regions[0]).toEqual({
       id: 'quarry', direction: 'West', label: 'Unexplored area', status: 'unknown',
       resources: [], features: [], current: false
-    }]);
+    });
+    expect(journalView(state).regions[1]).toEqual({
+      id: 'homestead', direction: 'East', label: 'Unexplored area', status: 'unknown',
+      resources: [], features: [], current: false
+    });
     state.area = 'quarry';
     expect(journalView(state).regions[0]).toMatchObject({
       label: 'Old quarry', status: 'visited', resources: ['Stone'], current: true
     });
     state.area = 'camp';
     state.progress.lookoutRepaired = true;
-    expect(journalView(state).regions).toEqual([{
+    expect(journalView(state).regions[0]).toEqual({
       id: 'quarry', direction: 'West', label: 'Old quarry', status: 'scouted',
       resources: ['Stone'], features: ['Loose rubble', 'Quarry face'], current: false
-    }]);
+    });
+    expect(journalView(state).regions[1].status).toBe('unknown');
+    state.area = 'homestead';
+    expect(journalView(state).regions[1]).toMatchObject({ label: 'Old homestead', status: 'visited', current: true });
+    state.area = 'camp';
+    state.progress.homesteadFound = true;
+    expect(journalView(state).regions[1]).toMatchObject({ label: 'Old homestead', status: 'visited', current: false });
     state.progress.lookoutRepaired = false;
     state.progress.quarryFound = true;
     state.area = 'quarry';
@@ -79,7 +91,7 @@ describe('field journal', () => {
     expect(journalView(state).nextHint).toMatch(/lookout/i);
   });
 
-  it('five paths in the closing line', () => {
+  it('suggests the east path before the closing line', () => {
     const state = createGame();
     state.structures.shelter = true;
     state.structures.toolshed = true;
@@ -87,8 +99,10 @@ describe('field journal', () => {
     state.progress.lookoutRepaired = true;
     state.progress.discoveries = { basket: true, spring: true, cairn: true };
     state.progress.quarryFound = true;
+    expect(journalView(state).nextHint).toMatch(/east path/i);
+    state.progress.homesteadFound = true;
     expect(journalView(state).nextHint)
-      .toBe('You have followed all five paths. Your camp is home, and the woods are yours to wander.');
+      .toBe('You have followed every path. Your camp is home, and the woods are yours to wander.');
   });
 
   it('asks for no stone before the cold night', () => {

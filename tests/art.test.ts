@@ -192,7 +192,7 @@ describe('sprite pipeline', () => {
 
 describe('food icons', () => {
   it('draws every food on the journal icon grid, each its own picture', () => {
-    expect(Object.keys(FOOD_ICONS).sort()).toEqual(['bread', 'fish', 'flour', 'greens', 'hazelnut', 'honey', 'honeyCake', 'loaf', 'pineNeedles', 'pineTea', 'rabbit', 'roastedHazelnuts', 'salad', 'stew', 'vegetables']);
+    expect(Object.keys(FOOD_ICONS).sort()).toEqual(['apple', 'bread', 'egg', 'fish', 'flour', 'greens', 'hazelnut', 'honey', 'honeyCake', 'loaf', 'omelette', 'pineNeedles', 'pineTea', 'rabbit', 'roastedHazelnuts', 'salad', 'stew', 'vegetables']);
     for (const [id, { legend, rows }] of Object.entries(FOOD_ICONS)) {
       expect(rows, id).toHaveLength(JOURNAL_ICON_SIZE);
       for (const row of rows) {
