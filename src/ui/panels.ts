@@ -3,6 +3,7 @@ import { SEASON_LENGTH, daysLeftInSeason, isSpring, isWinter, nightStart, season
 import { millGrainBlocker, takeLoafBlocker } from '../game/bakehouse';
 import { takeHoneyBlocker } from '../game/beehive';
 import { takeEggBlocker } from '../game/chickens';
+import { WOVEN, feedBlocker, shearBlocker, sheepStage, weaveBlocker, type SheepStage, type WovenId } from '../game/sheep';
 import { FOOD_ITEMS, availableFood, emptyFood, foodCount, goingSoft, isFresh, storeTotal, type FoodItem, type KeptFood } from '../game/food';
 import { foodIconUrl } from '../art/foodIcons';
 import { BALANCE, BUILDINGS, foodStoreCapacity, type GameState, type StructureId } from '../game/state';
@@ -158,6 +159,46 @@ export function windmillPanelView(state: GameState): { shown: boolean; stored: s
     stored: `${state.millFlour} of ${BALANCE.millFlourCapacity} flour`,
     mill: { disabled: Boolean(blocker), hint: blocker ?? '' }
   };
+}
+
+const FLOCK_WORDS: Record<SheepStage, string> = {
+  shorn: 'Skinny, and rather cross about it.',
+  woolly: 'Three woolly sheep.',
+  round: 'Three very round sheep.',
+  cloud: 'You can hardly see the sheep for the wool.'
+};
+
+/** The Sheep panel, once the pen stands: how the flock looks, what's in store, and the two jobs. Shearing is hidden until the shears exist. */
+export function sheepPanelView(state: GameState): { shown: boolean; status: string; straw: string; wool: string; feed: { disabled: boolean; hint: string }; shear: { shown: boolean; disabled: boolean; hint: string } } {
+  const { sheep } = state;
+  const feed = feedBlocker(state);
+  const shear = shearBlocker(state);
+  return {
+    shown: state.structures.sheepPen,
+    status: sheep.arrived ? FLOCK_WORDS[sheepStage(sheep.fluff)] : 'The pen is empty. Put out some feed.',
+    straw: `${state.field.straw} of ${BALANCE.strawCapacity} straw`,
+    wool: `${sheep.wool} of ${BALANCE.woolCapacity} wool`,
+    feed: { disabled: Boolean(feed), hint: feed ?? '' },
+    shear: { shown: state.progress.workshop.shears, disabled: Boolean(shear), hint: shear ?? '' }
+  };
+}
+
+export interface LoomItemView { id: WovenId; name: string; cost: string; disabled: boolean; hint: string }
+
+const LOOM_NAMES: Record<WovenId, string> = { blanket: 'Wool blanket', jumper: 'Warm jumper', rug: 'Rug' };
+
+/** The Loom panel, once built: each item not yet made, and what's stopping it. */
+export function loomPanelView(state: GameState): { shown: boolean; note: string; items: LoomItemView[] } {
+  const items = (Object.keys(WOVEN) as WovenId[]).filter(id => !state.sheep.woven[id]).map(id => {
+    const blocker = weaveBlocker(state, id);
+    return { id, name: LOOM_NAMES[id], cost: `${WOVEN[id].wool} wool`, disabled: Boolean(blocker), hint: blocker ?? '' };
+  });
+  return { shown: state.structures.loom, note: items.length === 0 ? "You've made everything the loom can make." : '', items };
+}
+
+export function loomItemMarkup(item: LoomItemView): string {
+  const disabled = item.disabled ? ' disabled' : '';
+  return `<div class="tool-row"><button type="button" class="${item.disabled ? '' : 'ready'}" data-weave="${item.id}"${disabled}>${item.name}</button><small>${item.cost}${item.hint ? `. ${item.hint}` : ''}</small></div>`;
 }
 
 /** The Bakery panel, once built: the loaves on the shelf, any going soft at the next dawn, and whether one can be taken. */

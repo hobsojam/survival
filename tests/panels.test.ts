@@ -5,7 +5,7 @@ import { fieldCamp, strip, withField } from './fieldCamp';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from '../src/game/state';
 import { CLEARING_STEPS } from '../src/game/clearing';
-import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, campStoresView, chickenCoopPanelView, cloakView, foodLaidByDays, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
+import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, campStoresView, chickenCoopPanelView, loomItemMarkup, loomPanelView, sheepPanelView, cloakView, foodLaidByDays, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
 import { dishBlocker } from '../src/game/cooking';
 import { addFood, emptyFood } from '../src/game/food';
 import { stock } from './stock';
@@ -746,5 +746,85 @@ describe('the field and granary panels', () => {
     expect(field.rows.quern.shown).toBe(false);
     const granary = workshopView(fieldCamp({ granary: true, ...workshop }));
     expect(granary.rows.quern).toMatchObject({ shown: true, title: 'Hand quern', cost: '1 wood · 4 stone' });
+  });
+});
+
+describe('the sheep and loom panels', () => {
+  const penCamp = (sheep: Partial<GameState['sheep']> = {}): GameState => {
+    const base = createGame();
+    return {
+      ...base,
+      day: 21,
+      player: { ...base.player, x: BALANCE.campX, y: BALANCE.campY },
+      structures: { ...base.structures, shelter: true, field: true, sheepPen: true },
+      field: { ...base.field, straw: 5 },
+      sheep: { ...base.sheep, ...sheep }
+    };
+  };
+  const flock = (fluff: number) => penCamp({ arrived: true, fluff, fedUntil: 1 });
+
+  it('shows the sheep panel once the pen stands', () => {
+    expect(sheepPanelView(createGame()).shown).toBe(false);
+    expect(sheepPanelView(penCamp())).toMatchObject({ shown: true, straw: '5 of 12 straw', feed: { disabled: false, hint: '' } });
+    expect(sheepPanelView(penCamp({ wool: 4 })).wool).toBe('4 of 8 wool');
+  });
+
+  it.each([
+    [0, 'Skinny, and rather cross about it.'],
+    [40, 'Three woolly sheep.'],
+    [120, 'Three very round sheep.'],
+    [200, 'You can hardly see the sheep for the wool.']
+  ])('describes the flock at %i fluff', (fluff, status) => {
+    expect(sheepPanelView(flock(fluff)).status).toBe(status);
+  });
+
+  it('says when the pen is empty', () => {
+    expect(sheepPanelView(penCamp()).status).toBe('The pen is empty. Put out some feed.');
+  });
+
+  it('says why feed can\'t go out', () => {
+    const state = penCamp({ arrived: true, fluff: 40, fedUntil: 24 });
+    expect(sheepPanelView(state).feed).toEqual({ disabled: true, hint: 'The sheep still have plenty.' });
+  });
+
+  it('offers shearing only once the shears are made', () => {
+    const state = flock(40);
+    expect(sheepPanelView(state).shear.shown).toBe(false);
+    const shears = { ...state, progress: { ...state.progress, workshop: { ...state.progress.workshop, shears: true } } };
+    expect(sheepPanelView(shears).shear).toEqual({ shown: true, disabled: false, hint: '' });
+    expect(sheepPanelView({ ...shears, day: 11 }).shear).toEqual({ shown: true, disabled: true, hint: 'Shearing waits for spring.' });
+  });
+
+  const loomCamp = (wool: number, woven: Partial<GameState['sheep']['woven']> = {}): GameState => {
+    const state = penCamp({ arrived: true, fluff: 0, fedUntil: 1, lastShornYear: 1, wool, woven: { blanket: false, jumper: false, rug: false, ...woven } });
+    return { ...state, structures: { ...state.structures, loom: true, bed: true } };
+  };
+
+  it('shows the loom panel once the loom stands, with each item and what stops it', () => {
+    expect(loomPanelView(penCamp()).shown).toBe(false);
+    const view = loomPanelView(loomCamp(3));
+    expect(view).toMatchObject({ shown: true, note: '' });
+    expect(view.items).toEqual([
+      { id: 'blanket', name: 'Wool blanket', cost: '3 wool', disabled: false, hint: '' },
+      { id: 'jumper', name: 'Warm jumper', cost: '4 wool', disabled: true, hint: 'You need 4 wool for the jumper.' },
+      { id: 'rug', name: 'Rug', cost: '3 wool', disabled: true, hint: 'Build the house first.' }
+    ]);
+  });
+
+  it('drops what has been made, and says when nothing is left', () => {
+    expect(loomPanelView(loomCamp(3, { blanket: true })).items.map(item => item.id)).toEqual(['jumper', 'rug']);
+    const done = loomPanelView(loomCamp(0, { blanket: true, jumper: true, rug: true }));
+    expect(done.items).toEqual([]);
+    expect(done.note).toBe("You've made everything the loom can make.");
+  });
+
+  it('writes an item as a button that names it', () => {
+    const markup = loomItemMarkup({ id: 'rug', name: 'Rug', cost: '3 wool', disabled: true, hint: 'Build the house first.' });
+    expect(markup).toContain('data-weave="rug"');
+    expect(markup).toContain('disabled');
+    expect(markup).toContain('Rug');
+    expect(markup).toContain('3 wool');
+    expect(markup).toContain('Build the house first.');
+    expect(loomItemMarkup({ id: 'rug', name: 'Rug', cost: '3 wool', disabled: false, hint: '' })).not.toContain('disabled');
   });
 });
