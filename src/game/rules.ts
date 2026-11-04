@@ -22,6 +22,7 @@ import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishing
 import { ENDED_MESSAGE, GAVE_OUT_MESSAGE, judgeSickDay, markWarmMeal, markWarmRest, sicknessTick } from './sickness';
 import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, foodStoreCapacity, type GameState, type ResourceNode, type SiteId, type StructureId } from './state';
 import { CHICKEN_SITE, chickensDawn, settleChickens, takeEggBlocker, takenEgg } from './chickens';
+import { fedSheep, feedBlocker, sheepDawn } from './sheep';
 import { appleBlocker, shedBlocker } from './homestead';
 
 export type GameAction =
@@ -42,6 +43,7 @@ export type GameAction =
   | { type: 'threshStrip'; index: number }
   | { type: 'grindGrain' }
   | { type: 'millGrain' }
+  | { type: 'feedSheep' }
   | { type: 'takeLoaf' }
   | { type: 'takeHoney' }
   | { type: 'drawWater' }
@@ -305,6 +307,7 @@ function dawn(next: GameState, home: boolean): void {
   next.nodes = next.nodes.map(node => node.kind !== 'stone' && node.readyDay <= next.day ? { ...node, amount: 1 } : node);
   companionDawn(next);
   chickensDawn(next);
+  sheepDawn(next);
   // The bag, the larder and the bakery shelf all throw out what has gone soft, wherever the survivor is; one note covers them.
   const bag = spoil(next.inventory.food, next.day, BALANCE.bagFreshDays);
   const larder = spoil(next.larder, next.day, BALANCE.larderFreshDays);
@@ -959,6 +962,14 @@ const grindGrain: ActionHandler<'grindGrain'> = state => {
 };
 
 /** One heavy job at the windmill grinds the whole granary, as far as the flour bin has room. */
+/** Feed goes out in the time and energy of a gather. */
+const feedSheep: ActionHandler<'feedSheep'> = state => {
+  const blocker = feedBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  const worked = { ...fedSheep(state), player: tire(state, BALANCE.gatherEnergyCost) };
+  return { state: advanceTime(worked, workSeconds(state, BALANCE.gatherSeconds), 'working'), message: 'You put out some feed.' };
+};
+
 const millGrain: ActionHandler<'millGrain'> = state => {
   const blocker = millGrainBlocker(state);
   if (blocker) return refuse(state, blocker);
@@ -1221,6 +1232,7 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
 };
 
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
+  feedSheep,
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, buildMine, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, dropPineNeedles, pickUpStone, burnFiber, burnPineNeedles, eat, eatTrailFood, prepareTrailFood,
   cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, rest, sleep, befriend, meetChickens, leadChickens, takeEgg, gatherApples, searchShed, craftPillow, craftCloak,

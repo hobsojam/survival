@@ -111,7 +111,7 @@ export function threshedField(state: GameState, index: number): { field: FieldSt
     strips: state.field.strips.map((strip, i) => i === index ? bareStrip() : strip),
     seed: Math.min(FIELD_STRIPS, state.field.seed + 1),
     grain: state.field.grain + stored,
-    straw: state.field.straw
+    straw: Math.min(BALANCE.strawCapacity, state.field.straw + BALANCE.strawPerStrip)
   };
   if (stored === 0) return { field, message: 'The granary is already full. You kept the seed, and the rest stays as straw.' };
   if (stored < BALANCE.grainPerStrip) return { field, message: 'Threshed the strip. The granary is full now, and the rest stays as straw.' };
