@@ -86,3 +86,11 @@ export const firstSheepName = ({ names }: GameState): string | null => names.she
 
 /** A written line with the name it was written with put in. */
 export const lineWithName = (line: string, name: string | undefined): string => (name === undefined ? line : line.replace('{name}', () => name));
+
+/** Who has been named, for a panel. It lists only the names, so an unnamed animal is never a gap to fill. */
+export function rosterLine(names: readonly (string | null)[]): string {
+  const given = names.filter((name): name is string => name !== null);
+  if (given.length === 0) return '';
+  if (given.length === 1) return `${given[0]} lives here.`;
+  return `${given.slice(0, -1).join(', ')} and ${given.at(-1)} live here.`;
+}

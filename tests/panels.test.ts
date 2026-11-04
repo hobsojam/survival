@@ -3,9 +3,10 @@ import { fieldPanelView, granaryPanelView, stripMarkup, workshopView } from '../
 import type { FieldStrip } from '../src/game/field';
 import { fieldCamp, strip, withField } from './fieldCamp';
 import { nightStart } from '../src/game/calendar';
+import { rosterLine } from '../src/game/names';
 import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from '../src/game/state';
 import { CLEARING_STEPS } from '../src/game/clearing';
-import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, campStoresView, chickenCoopPanelView, loomItemMarkup, loomPanelView, sheepPanelView, cloakView, foodLaidByDays, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
+import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, campStoresView, chickenCoopPanelView, friendRosterView, loomItemMarkup, loomPanelView, sheepPanelView, cloakView, foodLaidByDays, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
 import { dishBlocker } from '../src/game/cooking';
 import { addFood, emptyFood } from '../src/game/food';
 import { stock } from './stock';
@@ -832,5 +833,35 @@ describe('the sheep and loom panels', () => {
     expect(markup).toContain('3 wool');
     expect(markup).toContain('Build the house first.');
     expect(loomItemMarkup({ id: 'rug', name: 'Rug', cost: '3 wool', disabled: false, hint: '' })).not.toContain('disabled');
+  });
+});
+
+describe('the quiet list of names', () => {
+  it('says nothing with nobody named', () => {
+    expect(rosterLine([null, null, null])).toBe('');
+  });
+
+  it.each([
+    [['Maud', null, null], 'Maud lives here.'],
+    [[null, 'Maud', 'Bess'], 'Maud and Bess live here.'],
+    [['Maud', 'Bess', 'Dot'], 'Maud, Bess and Dot live here.']
+  ])('reads %j as "%s", with no word of who is left', (names, line) => {
+    expect(rosterLine(names)).toBe(line);
+  });
+
+  const named = (names: Partial<GameState['names']>, changes: Partial<GameState> = {}): GameState => {
+    const base = createGame();
+    return { ...base, ...changes, names: { ...base.names, ...names } };
+  };
+
+  it('shows in the sheep and coop panels', () => {
+    expect(sheepPanelView(named({ sheep: ['Maud', null, 'Bess'] })).names).toBe('Maud and Bess live here.');
+    expect(sheepPanelView(named({})).names).toBe('');
+    expect(chickenCoopPanelView(named({ chickens: [null, 'Dot', null] })).names).toBe('Dot lives here.');
+  });
+
+  it('lists only the friends with names', () => {
+    expect(friendRosterView(named({}))).toEqual({ shown: false, text: '' });
+    expect(friendRosterView(named({ fox: 'Rusty', bird: 'Pip' }))).toEqual({ shown: true, text: 'Pip and Rusty live here.' });
   });
 });

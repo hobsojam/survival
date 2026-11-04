@@ -3,7 +3,7 @@ import { SEASON_LENGTH, daysLeftInSeason, isSpring, isWinter, nightStart, season
 import { millGrainBlocker, takeLoafBlocker } from '../game/bakehouse';
 import { takeHoneyBlocker } from '../game/beehive';
 import { takeEggBlocker } from '../game/chickens';
-import { friendCalled } from '../game/names';
+import { friendCalled, rosterLine } from '../game/names';
 import { WOVEN, feedBlocker, shearBlocker, sheepStage, weaveBlocker, type SheepStage, type WovenId } from '../game/sheep';
 import { FOOD_ITEMS, availableFood, emptyFood, foodCount, goingSoft, isFresh, storeTotal, type FoodItem, type KeptFood } from '../game/food';
 import { foodIconUrl } from '../art/foodIcons';
@@ -174,14 +174,21 @@ function flockStatus({ sheep }: GameState): string {
   return sheep.fedUntil === null ? 'The pen is empty. Put out some feed.' : 'The pen is empty, with feed in the rack.';
 }
 
+/** The friends with names, for the field journal. */
+export function friendRosterView({ names }: GameState): { shown: boolean; text: string } {
+  const text = rosterLine([names.bird, names.fox, names.wolf]);
+  return { shown: text !== '', text };
+}
+
 /** The Sheep panel, once the pen stands: how the flock looks, what's in store, and the two jobs. Shearing is hidden until the shears exist. */
-export function sheepPanelView(state: GameState): { shown: boolean; status: string; straw: string; wool: string; feed: { disabled: boolean; hint: string }; shear: { shown: boolean; disabled: boolean; hint: string } } {
+export function sheepPanelView(state: GameState): { shown: boolean; status: string; names: string; straw: string; wool: string; feed: { disabled: boolean; hint: string }; shear: { shown: boolean; disabled: boolean; hint: string } } {
   const { sheep } = state;
   const feed = feedBlocker(state);
   const shear = shearBlocker(state);
   return {
     shown: state.structures.sheepPen,
     status: flockStatus(state),
+    names: rosterLine(state.names.sheep),
     straw: `${state.field.straw} of ${BALANCE.strawCapacity} straw`,
     wool: `${sheep.wool} of ${BALANCE.woolCapacity} wool`,
     feed: { disabled: Boolean(feed), hint: feed ?? '' },
@@ -231,7 +238,7 @@ export function beehivePanelView(state: GameState): { shown: boolean; stored: st
 }
 
 /** The flock's home and the eggs waiting there. */
-export function chickenCoopPanelView(state: GameState): { shown: boolean; status: string; stored: string; take: { disabled: boolean; hint: string } } {
+export function chickenCoopPanelView(state: GameState): { shown: boolean; status: string; names: string; stored: string; take: { disabled: boolean; hint: string } } {
   const { chickens } = state;
   let status = 'The coop is ready. Lead the flock here from the old homestead.';
   if (chickens.following) status = 'The flock is following you. Walk them to the coop.';
@@ -240,6 +247,7 @@ export function chickenCoopPanelView(state: GameState): { shown: boolean; status
   return {
     shown: state.structures.chickenCoop,
     status,
+    names: rosterLine(state.names.chickens),
     stored: `${chickens.eggs} of 3 eggs waiting`,
     take: { disabled: Boolean(blocker), hint: blocker ?? '' }
   };
