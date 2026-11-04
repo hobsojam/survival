@@ -22,7 +22,7 @@ import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishing
 import { ENDED_MESSAGE, GAVE_OUT_MESSAGE, judgeSickDay, markWarmMeal, markWarmRest, sicknessTick } from './sickness';
 import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, foodStoreCapacity, type GameState, type ResourceNode, type SiteId, type StructureId } from './state';
 import { CHICKEN_SITE, chickensDawn, settleChickens, takeEggBlocker, takenEgg } from './chickens';
-import { fedSheep, feedBlocker, sheepDawn } from './sheep';
+import { fedSheep, feedBlocker, shearBlocker, sheepDawn, shornSheep } from './sheep';
 import { appleBlocker, shedBlocker } from './homestead';
 
 export type GameAction =
@@ -44,6 +44,7 @@ export type GameAction =
   | { type: 'grindGrain' }
   | { type: 'millGrain' }
   | { type: 'feedSheep' }
+  | { type: 'shearFlock' }
   | { type: 'takeLoaf' }
   | { type: 'takeHoney' }
   | { type: 'drawWater' }
@@ -970,6 +971,13 @@ const feedSheep: ActionHandler<'feedSheep'> = state => {
   return { state: advanceTime(worked, workSeconds(state, BALANCE.gatherSeconds), 'working'), message: 'You put out some feed.' };
 };
 
+const shearFlock: ActionHandler<'shearFlock'> = state => {
+  const blocker = shearBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  const { state: shorn, message } = shornSheep(state);
+  return fieldWork(shorn, shorn.field, message);
+};
+
 const millGrain: ActionHandler<'millGrain'> = state => {
   const blocker = millGrainBlocker(state);
   if (blocker) return refuse(state, blocker);
@@ -1233,6 +1241,7 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
 
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   feedSheep,
+  shearFlock,
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, buildMine, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, dropPineNeedles, pickUpStone, burnFiber, burnPineNeedles, eat, eatTrailFood, prepareTrailFood,
   cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, rest, sleep, befriend, meetChickens, leadChickens, takeEgg, gatherApples, searchShed, craftPillow, craftCloak,

@@ -3,10 +3,10 @@ import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { nightStart } from '../src/game/calendar';
 import { TOO_TIRED_MESSAGE } from '../src/game/needs';
 import { newsBetween } from '../src/game/news';
-import { advanceTime, applyAction } from '../src/game/rules';
+import { advanceTime, applyAction, buildStatus } from '../src/game/rules';
 import { threshedField } from '../src/game/field';
 import { wellSickness } from '../src/game/sickness';
-import { feedBlocker, sheepStage } from '../src/game/sheep';
+import { feedBlocker, shearBlocker, sheepStage } from '../src/game/sheep';
 
 const ARRIVAL_NOTE = 'Three sheep were in the pen this morning. They seem to have decided something.';
 
@@ -133,5 +133,64 @@ describe('fluff', () => {
   it('stops at the cloud', () => {
     expect(toNextDawn(flock(200, 6)).sheep.fluff).toBe(200);
     expect(toNextDawn(flock(199, 6)).sheep.fluff).toBe(200);
+  });
+});
+
+describe('shearing', () => {
+  /** A woolly flock, with the shears, on a morning of `day`. The year opens in autumn, so day 21 is its first spring. */
+  const ready = (sheep: Partial<GameState['sheep']> = {}, day = 21): GameState => {
+    const state = penCamp({ arrived: true, fluff: 40, fedUntil: 1, ...sheep }, { day });
+    return { ...state, progress: { ...state.progress, workshop: { ...state.progress.workshop, shears: true } } };
+  };
+  const shear = (state: GameState) => applyAction(state, { type: 'shearFlock' });
+
+  it('gives each reason it has to wait, in order', () => {
+    const noSheep = penCamp();
+    expect(shearBlocker(noSheep)).toBe('The pen is empty.');
+    expect(shearBlocker(penCamp({ arrived: true, fluff: 40, fedUntil: 1 }, { day: 21 }))).toBe('Make shears at the workshop first.');
+    expect(shearBlocker(ready({}, 11))).toBe('Shearing waits for spring.');
+    expect(shearBlocker(ready({ lastShornYear: 1 }))).toBe('The flock has been sheared this year.');
+    expect(shearBlocker(ready({ fluff: 39 }))).toBe("There isn't enough wool to shear yet.");
+    const state = ready();
+    expect(shearBlocker({ ...state, player: { ...state.player, x: 1, y: 28 } })).toBe('Return to camp to shear the flock.');
+    expect(shearBlocker({ ...state, player: { ...state.player, energy: 0 } })).toBe(TOO_TIRED_MESSAGE);
+    expect(shearBlocker(state)).toBeNull();
+  });
+
+  it('allows a shearing the spring after the last one', () => {
+    expect(shearBlocker(ready({ lastShornYear: 1 }, 61))).toBeNull();
+  });
+
+  it('takes a field job, leaves them bare and fills the basket', () => {
+    const state = ready();
+    const { state: after, message } = shear(state);
+    expect(after.timeOfDay).toBeCloseTo(state.timeOfDay + BALANCE.fieldWorkSeconds);
+    expect(state.player.energy - after.player.energy).toBeCloseTo(BALANCE.fieldWorkEnergy, 0);
+    expect(after.sheep).toMatchObject({ fluff: 0, lastShornYear: 1, wool: 4 });
+    expect(sheepStage(after.sheep.fluff)).toBe('shorn');
+    expect(message).toBe('You sheared the flock. Four wool went into the basket.');
+  });
+
+  it('gets the same wool from a cloud as from a woolly flock', () => {
+    expect(shear(ready({ fluff: 200 })).state.sheep.wool).toBe(4);
+    expect(shear(ready({ fluff: 40 })).state.sheep.wool).toBe(4);
+  });
+
+  it('loses what the basket can\'t hold, and says so', () => {
+    const { state, message } = shear(ready({ wool: 6, lastShornYear: 0 }));
+    expect(state.sheep.wool).toBe(8);
+    expect(message).toBe('You sheared the flock. The basket is full, so the rest of the wool was lost.');
+  });
+
+  it('still shears with a full basket', () => {
+    const { state, message } = shear(ready({ wool: 8, lastShornYear: 0 }));
+    expect(state.sheep).toMatchObject({ wool: 8, fluff: 0, lastShornYear: 1 });
+    expect(message).toContain('the rest of the wool was lost');
+  });
+
+  it('brings the loom into the build list', () => {
+    const state = ready();
+    expect(buildStatus(state, 'loom')).toBe('locked');
+    expect(buildStatus(shear(state).state, 'loom')).not.toBe('locked');
   });
 });
