@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { nightStart } from '../src/game/calendar';
 import { TOO_TIRED_MESSAGE } from '../src/game/needs';
+import { journalSeason, recordJournal } from '../src/game/journalEntries';
 import { newsBetween } from '../src/game/news';
+import { journalPageView } from '../src/ui/yearJournal';
 import { advanceTime, applyAction, buildStatus } from '../src/game/rules';
 import { threshedField } from '../src/game/field';
 import { wellSickness } from '../src/game/sickness';
@@ -282,5 +284,48 @@ describe('the loom', () => {
     expect(after.sheep.woven).toEqual({ blanket: false, jumper: false, rug: true });
     expect(after.structures).toEqual(state.structures);
     expect(after.progress).toEqual(state.progress);
+  });
+});
+
+describe('the journal', () => {
+  const ready = (fluff: number): GameState => {
+    const state = penCamp({ arrived: true, fluff, fedUntil: 1 }, { day: 21 });
+    return { ...state, progress: { ...state.progress, workshop: { ...state.progress.workshop, shears: true } } };
+  };
+  const shorn = (fluff: number) => {
+    const before = ready(fluff);
+    const action = { type: 'shearFlock' } as const;
+    return recordJournal(before, applyAction(before, action).state, action);
+  };
+
+  it('writes the shearing on spring\'s page', () => {
+    const { state, messages } = shorn(40);
+    expect(state.journal).toContainEqual(expect.objectContaining({ id: 'shearing', variant: 0, year: 1 }));
+    expect(journalSeason('shearing')).toBe('spring');
+    expect(messages).toContain('Written in your journal: Sheared the flock. They looked smaller and rather cross.');
+  });
+
+  it('notes when it was a cloud', () => {
+    const { state, messages } = shorn(200);
+    expect(state.journal).toContainEqual(expect.objectContaining({ id: 'shearing', variant: 1 }));
+    expect(messages).toContain('Written in your journal: Sheared the cloud. There was a sheep in there after all.');
+  });
+
+  it('calls a very round flock just a flock', () => {
+    expect(shorn(199).state.journal).toContainEqual(expect.objectContaining({ id: 'shearing', variant: 0 }));
+  });
+
+  it('writes nothing for a refused shearing', () => {
+    const before = { ...ready(40), day: 11 };
+    const action = { type: 'shearFlock' } as const;
+    expect(recordJournal(before, applyAction(before, action).state, action).state.journal.map(entry => entry.id)).not.toContain('shearing');
+  });
+
+  it('leaves no blank for it until the pen stands', () => {
+    const base = createGame();
+    const spring = { ...base, day: 21 };
+    const without = journalPageView(spring, 2);
+    const withPen = journalPageView({ ...spring, structures: { ...spring.structures, sheepPen: true } }, 2);
+    expect(withPen.blanks).toBe(without.blanks + 1);
   });
 });

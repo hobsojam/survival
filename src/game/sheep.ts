@@ -18,7 +18,7 @@ export function sheepStage(fluff: number): SheepStage {
 export function feedBlocker(state: GameState): string | null {
   if (!state.structures.sheepPen) return 'Build the sheep pen first.';
   if (!isInClearing(state)) return 'Return to camp to feed the sheep.';
-  if (state.sheep.fedUntil !== null && state.day < state.sheep.fedUntil) return 'The sheep still have plenty.';
+  if (state.sheep.fedUntil !== null && state.day < state.sheep.fedUntil) return state.sheep.arrived ? 'The sheep still have plenty.' : 'The feed is already out.';
   return state.field.straw <= 0 ? 'There is no straw. Thresh a strip of the field.' : null;
 }
 

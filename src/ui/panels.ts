@@ -168,6 +168,11 @@ const FLOCK_WORDS: Record<SheepStage, string> = {
   cloud: 'You can hardly see the sheep for the wool.'
 };
 
+function flockStatus({ sheep }: GameState): string {
+  if (sheep.arrived) return FLOCK_WORDS[sheepStage(sheep.fluff)];
+  return sheep.fedUntil === null ? 'The pen is empty. Put out some feed.' : 'The pen is empty, with feed in the rack.';
+}
+
 /** The Sheep panel, once the pen stands: how the flock looks, what's in store, and the two jobs. Shearing is hidden until the shears exist. */
 export function sheepPanelView(state: GameState): { shown: boolean; status: string; straw: string; wool: string; feed: { disabled: boolean; hint: string }; shear: { shown: boolean; disabled: boolean; hint: string } } {
   const { sheep } = state;
@@ -175,7 +180,7 @@ export function sheepPanelView(state: GameState): { shown: boolean; status: stri
   const shear = shearBlocker(state);
   return {
     shown: state.structures.sheepPen,
-    status: sheep.arrived ? FLOCK_WORDS[sheepStage(sheep.fluff)] : 'The pen is empty. Put out some feed.',
+    status: flockStatus(state),
     straw: `${state.field.straw} of ${BALANCE.strawCapacity} straw`,
     wool: `${sheep.wool} of ${BALANCE.woolCapacity} wool`,
     feed: { disabled: Boolean(feed), hint: feed ?? '' },

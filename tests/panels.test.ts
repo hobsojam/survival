@@ -782,6 +782,12 @@ describe('the sheep and loom panels', () => {
     expect(sheepPanelView(penCamp()).status).toBe('The pen is empty. Put out some feed.');
   });
 
+  it('doesn\'t talk about sheep that haven\'t come yet, once the feed is out', () => {
+    const view = sheepPanelView(penCamp({ fedUntil: 24 }));
+    expect(view.status).toBe('The pen is empty, with feed in the rack.');
+    expect(view.feed).toEqual({ disabled: true, hint: 'The feed is already out.' });
+  });
+
   it('says why feed can\'t go out', () => {
     const state = penCamp({ arrived: true, fluff: 40, fedUntil: 24 });
     expect(sheepPanelView(state).feed).toEqual({ disabled: true, hint: 'The sheep still have plenty.' });

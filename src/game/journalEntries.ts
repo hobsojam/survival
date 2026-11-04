@@ -3,6 +3,7 @@ import { defaultDish, type DishId } from './cooking';
 import { keepsakeStock } from './companion';
 import { foodCount, type FoodItem } from './food';
 import { rainMessage } from './rain';
+import { sheepStage } from './sheep';
 import { fuelLeft, isAtHome, livesInHouse, warmFuel } from './home';
 import { isColdNight, isInClearing, type GameAction } from './rules';
 import { LOOKOUT, type GameState } from './state';
@@ -18,7 +19,7 @@ export type JournalId =
   | 'firstRain' | 'rabbits' | 'bushesFull' | 'stumpGrowing' | 'springRest'
   | 'fireflies' | 'twoHandfuls' | 'goldEvening' | 'warmSleep' | 'lookoutEvening'
   | 'hazelnuts' | 'pineTea' | 'salad' | 'wildHoney' | 'fireside' | 'grainIn' | 'winterBread'
-  | 'autumnGrain' | 'summerBread' | 'ovenBread'
+  | 'autumnGrain' | 'summerBread' | 'ovenBread' | 'shearing'
   | 'autumnKeepsake' | 'winterKeepsake' | 'springKeepsake' | 'summerKeepsake';
 
 export interface JournalEntry { year: number; id: JournalId; day: number; variant: number }
@@ -62,6 +63,7 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'springRest', lines: ['Sat a while at the spring, now that it\'s thawed.'] },
     { id: 'salad', lines: ['Greens and berries, the first salad of spring.'] },
     { id: 'ovenBread', lines: ['Woke to warm bread from my own oven.'] },
+    { id: 'shearing', lines: ['Sheared the flock. They looked smaller and rather cross.', 'Sheared the cloud. There was a sheep in there after all.'] },
     { id: 'springKeepsake', lines: ['A new feather by the fire, soft as the morning.', 'A tuft of winter fur by the fire, shed for spring.'] }
   ],
   summer: [
@@ -162,6 +164,9 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   wildHoney: m => onBefore(m, gathered(m, 'honey')),
   // The harvest is told on whichever page it lands: summer's last days, or the autumn after.
   grainIn: m => onBefore(m, grainWentIn(m)),
+  shearing: m => (m.after.sheep.lastShornYear !== m.before.sheep.lastShornYear
+    ? { day: m.before.day, variant: sheepStage(m.before.sheep.fluff) === 'cloud' ? 1 : 0 }
+    : null),
   autumnGrain: m => onBefore(m, grainWentIn(m)),
   // A loaf is told on summer's page or winter's, each with its own line.
   summerBread: m => onBefore(m, cooked(m, 'loaf')),
