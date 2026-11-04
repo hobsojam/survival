@@ -10,9 +10,26 @@ const base = createGame();
 const withFood = (state: GameState, food: GameState['inventory']['food']): GameState => ({ ...state, inventory: { ...state.inventory, food } });
 
 describe('the food store', () => {
+  it('eats a fresh apple but saves a raw egg for cooking', () => {
+    const state = withFood(base, { ...emptyFood(), apple: [1], egg: [1] });
+    const hungry = { ...state, player: { ...state.player, hunger: 20 } };
+    const eaten = applyAction(hungry, { type: 'eat' });
+    expect(eaten.state.inventory.food.apple).toEqual([]);
+    expect(eaten.state.inventory.food.egg).toEqual([1]);
+    expect(eaten.state.player.hunger).toBe(40);
+    expect(applyAction(hungry, { type: 'eat', item: 'egg' }).state).toBe(hungry);
+  });
+
+  it('lets apples and eggs go soft after the normal fresh-food window', () => {
+    const store = { ...emptyFood(), apple: [1], egg: [1] };
+    const result = spoil(store, 4, 3);
+    expect(result.store.apple).toEqual([]);
+    expect(result.store.egg).toEqual([]);
+    expect(result.lost).toMatchObject({ apple: 1, egg: 1 });
+  });
   it('lists every item, fresh ones first', () => {
-    expect(FOOD_ITEMS).toEqual(['berry', 'greens', 'bread', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood', 'vegetables', 'fish', 'rabbit', 'flour']);
-    expect(FOOD_ITEMS.filter(isFresh)).toEqual(['berry', 'greens', 'bread']);
+    expect(FOOD_ITEMS).toEqual(['berry', 'greens', 'bread', 'apple', 'egg', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood', 'vegetables', 'fish', 'rabbit', 'flour']);
+    expect(FOOD_ITEMS.filter(isFresh)).toEqual(['berry', 'greens', 'bread', 'apple', 'egg']);
   });
 
   it('records the day each fresh item was picked, and counts kept items', () => {
@@ -98,12 +115,12 @@ describe('berries going soft', () => {
     ({ ...withFood(state, { ...emptyFood(), berry: picked }), ...extra });
   const nearDawn = (state: GameState): GameState => ({ ...state, timeOfDay: BALANCE.daySeconds - 1 });
   const message = (before: GameState, after: GameState) => spoilMessage(before, after);
-  const lastSpoiled = (berry: number, greens = 0): GameState => ({ ...base, day: 4, lastSpoiled: { day: 4, berry, greens, bread: 0 } });
+  const lastSpoiled = (berry: number, greens = 0): GameState => ({ ...base, day: 4, lastSpoiled: { day: 4, berry, greens, bread: 0, apple: 0, egg: 0 } });
 
   it('throws out berries picked three or more days ago', () => {
     const result = spoil(berries(1, 2, 3), 4, 3);
     expect(result.store.berry).toEqual([2, 3]);
-    expect(result.lost).toEqual({ berry: 1, greens: 0, bread: 0 });
+    expect(result.lost).toEqual({ berry: 1, greens: 0, bread: 0, apple: 0, egg: 0 });
   });
 
   it('counts the berries that will be gone at the next dawn', () => {
@@ -127,7 +144,7 @@ describe('berries going soft', () => {
     const after = advanceTime(before, 2, 'working');
     expect(after.day).toBe(4);
     expect(after.inventory.food.berry).toEqual([3]);
-    expect(after.lastSpoiled).toEqual({ day: 4, berry: 2, greens: 0, bread: 0 });
+    expect(after.lastSpoiled).toEqual({ day: 4, berry: 2, greens: 0, bread: 0, apple: 0, egg: 0 });
     expect(newsBetween(before, after)).toEqual(['Two berries had gone soft, so you threw them out.']);
     expect(newsBetween(after, advanceTime(after, 2, 'working'))).toEqual([]);
   });

@@ -8,17 +8,17 @@ export type { FoodStore } from './foodStore';
 // Food the survivor carries. Fresh food remembers the day each piece was picked, so it can spoil;
 // kept food is just a count. Every eater goes through availableFood and spendFood, which reach into the larder at camp.
 
-export type FreshFood = 'berry' | 'greens' | 'bread';
+export type FreshFood = 'berry' | 'greens' | 'bread' | 'apple' | 'egg';
 export type KeptFood = 'hazelnut' | 'honey' | 'pineNeedles' | 'roastedHazelnuts' | 'trailFood' | 'vegetables' | 'fish' | 'rabbit' | 'flour';
 export type FoodItem = FreshFood | KeptFood;
 
-export const FOOD_ITEMS: readonly FoodItem[] = ['berry', 'greens', 'bread', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood', 'vegetables', 'fish', 'rabbit', 'flour'];
+export const FOOD_ITEMS: readonly FoodItem[] = ['berry', 'greens', 'bread', 'apple', 'egg', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood', 'vegetables', 'fish', 'rabbit', 'flour'];
 
 /** Fresh food in the order Q prefers it on a tie. */
-export const FRESH_FOODS: readonly FreshFood[] = ['berry', 'greens', 'bread'];
+export const FRESH_FOODS: readonly FreshFood[] = ['berry', 'greens', 'bread', 'apple', 'egg'];
 
 export function isFresh(item: FoodItem): item is FreshFood {
-  return item === 'berry' || item === 'greens' || item === 'bread';
+  return item === 'berry' || item === 'greens' || item === 'bread' || item === 'apple' || item === 'egg';
 }
 
 export function foodCount(store: FoodStore, item: FoodItem): number {
@@ -115,11 +115,12 @@ export function takeFromBag(state: GameState, item: FoodItem, n: number): GameSt
 }
 
 /** Food eaten as it is. Pine needles are for tea, and rations have their own key. */
-export type EdibleFood = 'berry' | 'greens' | 'hazelnut' | 'honey' | 'roastedHazelnuts' | 'vegetables' | 'fish' | 'bread';
+export type EdibleFood = 'berry' | 'greens' | 'hazelnut' | 'honey' | 'roastedHazelnuts' | 'vegetables' | 'fish' | 'bread' | 'apple';
 
 /** What eating one of each gives, as BALANCE keys: state.ts loads this module first, so BALANCE is read only when eating. */
 const EAT_EFFECTS: Record<EdibleFood, { hunger: keyof typeof BALANCE; energy?: keyof typeof BALANCE; message: string }> = {
   berry: { hunger: 'eatHungerGain', message: 'Ate some berries.' },
+  apple: { hunger: 'appleHunger', message: 'Ate an apple.' },
   greens: { hunger: 'greensHunger', message: 'Ate a handful of greens.' },
   hazelnut: { hunger: 'hazelnutHunger', message: 'Ate a hazelnut.' },
   honey: { hunger: 'honeyHunger', energy: 'honeyEnergy', message: 'Ate some honey.' },
@@ -150,6 +151,7 @@ function oldestPick(state: GameState, item: FreshFood): number | null {
 export function quickEatItem(state: GameState): FoodItem | null {
   let freshest: { item: FreshFood; picked: number } | null = null;
   for (const item of FRESH_FOODS) {
+    if (item === 'egg') continue;
     const picked = oldestPick(state, item);
     if (picked !== null && (freshest === null || picked < freshest.picked)) freshest = { item, picked };
   }
@@ -163,7 +165,7 @@ const gone = (picked: number, day: number, keepDays: number): boolean => day - p
 /** What a dawn on `day` throws out of a store, and what is left. */
 export function spoil(store: FoodStore, day: number, keepDays: number): { store: FoodStore; lost: Record<FreshFood, number> } {
   const kept: FoodStore = { ...store };
-  const lost: Record<FreshFood, number> = { berry: 0, greens: 0, bread: 0 };
+  const lost: Record<FreshFood, number> = { berry: 0, greens: 0, bread: 0, apple: 0, egg: 0 };
   for (const item of FRESH_FOODS) {
     kept[item] = store[item].filter(picked => !gone(picked, day, keepDays));
     lost[item] = store[item].length - kept[item].length;
@@ -188,8 +190,10 @@ export function spoilMessage(before: GameState, after: GameState): string | null
   const text = [
     spoiled.berry ? quantity(spoiled.berry, 'a berry', 'berries') : '',
     spoiled.greens ? quantity(spoiled.greens, 'a handful of greens', 'handfuls of greens') : '',
-    spoiled.bread ? quantity(spoiled.bread, 'a loaf', 'loaves') : ''
+    spoiled.bread ? quantity(spoiled.bread, 'a loaf', 'loaves') : '',
+    spoiled.apple ? quantity(spoiled.apple, 'an apple', 'apples') : '',
+    spoiled.egg ? quantity(spoiled.egg, 'an egg', 'eggs') : ''
   ].filter(Boolean).join(' and ');
-  const them = spoiled.berry + spoiled.greens + spoiled.bread === 1 ? 'it' : 'them';
+  const them = spoiled.berry + spoiled.greens + spoiled.bread + spoiled.apple + spoiled.egg === 1 ? 'it' : 'them';
   return `${text[0].toUpperCase()}${text.slice(1)} had gone soft, so you threw ${them} out.`;
 }

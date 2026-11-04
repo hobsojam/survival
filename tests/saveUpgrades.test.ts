@@ -69,6 +69,40 @@ describe('loading through the upgrades', () => {
     return loadGame(storage);
   };
 
+  it('migrates a sole friend and starts the homestead and chicken progress empty', () => {
+    const old = createGame() as Record<string, any>;
+    old.day = 3;
+    old.companion.friend = 'fox';
+    old.companion.since = 2;
+    old.companion.trust.fox = 4;
+    old.companion.lastOffer.fox = 2;
+    delete old.companion.friends;
+    delete old.progress.homesteadFound;
+    for (const id of ['chickenCoop', 'birdhouse', 'wolfHouse', 'foxDen']) delete old.structures[id];
+    delete old.chickens;
+    delete old.homestead;
+    for (const store of [old.inventory.food, old.larder]) { delete store.apple; delete store.egg; }
+    const loaded = stored(32, old);
+    expect(loaded.kind).toBe('loaded');
+    if (loaded.kind !== 'loaded') return;
+    expect(loaded.state.companion.friends).toEqual({ bird: null, fox: 2, wolf: null });
+    expect(loaded.state.chickens).toMatchObject({ discovered: false, following: false, rescued: false });
+    expect(loaded.state.structures.chickenCoop).toBe(false);
+    expect(loaded.state.inventory.food.apple).toEqual([]);
+  });
+
+  it('round-trips an in-progress chicken escort at the homestead', () => {
+    const state = createGame();
+    state.structures.shelter = true;
+    state.structures.chickenCoop = true;
+    state.progress.homesteadFound = true;
+    state.area = 'homestead';
+    state.chickens = { discovered: true, following: true, rescued: false, eggs: 0, nextEggDay: 1 };
+    const storage = new MemoryStorage();
+    expect(saveGame(storage, state).ok).toBe(true);
+    expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
+  });
+
   it('upgrades version 30 quarry saves without changing prior digging progress', () => {
     const old = createGame();
     old.day = 2;

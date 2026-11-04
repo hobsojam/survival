@@ -7,12 +7,13 @@ import { BALANCE, type GameState } from './state';
 // Cooking at the fire. Without the pot it is fish or one berry toasted on a stick; the pot, made at the toolshed,
 // adds tea, salad, roasted nuts, honey cake and, once the well stands, vegetable stew. Every dish needs a usable fire at home or camp.
 
-export type DishId = 'fish' | 'rabbit' | 'berries' | 'pineTea' | 'salad' | 'roastedHazelnuts' | 'honeyCake' | 'stew' | 'loaf';
+export type DishId = 'fish' | 'rabbit' | 'berries' | 'omelette' | 'pineTea' | 'salad' | 'roastedHazelnuts' | 'honeyCake' | 'stew' | 'loaf';
 
 export const DISHES: Record<DishId, { name: string; ingredients: Partial<Record<FoodItem, number>>; potOnly: boolean }> = {
   fish: { name: 'a fish', ingredients: { fish: 1 }, potOnly: false },
   rabbit: { name: 'a rabbit', ingredients: { rabbit: 1 }, potOnly: false },
   berries: { name: 'a berry', ingredients: { berry: 1 }, potOnly: false },
+  omelette: { name: 'an omelette', ingredients: { egg: 1 }, potOnly: false },
   pineTea: { name: 'pine needle tea', ingredients: { pineNeedles: 1 }, potOnly: true },
   salad: { name: 'greens and berry salad', ingredients: { greens: 1, berry: 1 }, potOnly: true },
   roastedHazelnuts: { name: 'roasted hazelnuts', ingredients: { hazelnut: 2 }, potOnly: true },
@@ -22,7 +23,7 @@ export const DISHES: Record<DishId, { name: string; ingredients: Partial<Record<
   loaf: { name: 'a loaf of bread', ingredients: { flour: 1 }, potOnly: false }
 };
 
-export const DISH_ORDER: readonly DishId[] = ['fish', 'rabbit', 'berries', 'pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew', 'loaf'];
+export const DISH_ORDER: readonly DishId[] = ['fish', 'rabbit', 'berries', 'omelette', 'pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew', 'loaf'];
 
 export const POT_COST = { wood: 1, fiber: 0, stone: 2 } as const;
 
@@ -58,7 +59,7 @@ const FOOD_WORDS: Record<FoodItem, [string, string]> = {
   berry: ['berry', 'berries'], greens: ['greens', 'greens'], hazelnut: ['hazelnut', 'hazelnuts'], honey: ['honey', 'honey'],
   pineNeedles: ['pine needles', 'pine needles'], roastedHazelnuts: ['roasted hazelnuts', 'roasted hazelnuts'], trailFood: ['ration', 'rations'],
   vegetables: ['vegetable', 'vegetables'], fish: ['fish', 'fish'], rabbit: ['rabbit', 'rabbits'],
-  flour: ['flour', 'flour'], bread: ['loaf', 'loaves']
+  flour: ['flour', 'flour'], bread: ['loaf', 'loaves'], apple: ['apple', 'apples'], egg: ['egg', 'eggs']
 };
 
 /** An item's name for a count of it: "berry" or "berries". */
@@ -129,6 +130,10 @@ export function serveDish(cooked: GameState, dish: DishId, dryingRack: boolean):
         hunger: up(player.hunger, dryingRack ? BALANCE.rackCookHungerGain : BALANCE.cookHungerGain),
         warmth: up(player.warmth, BALANCE.cookWarmthGain) } },
       message: 'You toast a berry by the fire. A warm little meal.'
+    };
+    case 'omelette': return {
+      state: { ...cooked, player: { ...player, hunger: up(player.hunger, BALANCE.omeletteHunger), warmth: up(player.warmth, BALANCE.cookWarmthGain) } },
+      message: 'You cook a simple omelette over the fire. A warm meal.'
     };
     case 'pineTea': return {
       state: { ...cooked, player: { ...player, warmth: up(player.warmth, BALANCE.teaWarmthGain), energy: up(player.energy, BALANCE.teaEnergyGain) } },

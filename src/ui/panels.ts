@@ -2,6 +2,7 @@ import { cutStripBlocker, grindGrainBlocker, sowStripBlocker, stripStage, thresh
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isWinter, nightStart, season } from '../game/calendar';
 import { millGrainBlocker, takeLoafBlocker } from '../game/bakehouse';
 import { takeHoneyBlocker } from '../game/beehive';
+import { takeEggBlocker } from '../game/chickens';
 import { FOOD_ITEMS, availableFood, emptyFood, foodCount, goingSoft, isFresh, storeTotal, type FoodItem, type KeptFood } from '../game/food';
 import { foodIconUrl } from '../art/foodIcons';
 import { BALANCE, BUILDINGS, foodStoreCapacity, type GameState, type StructureId } from '../game/state';
@@ -15,7 +16,7 @@ import { logsInStore } from '../game/wood';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
 import { CLEARING_STEPS, STEP_IDS, clearGroundBlocker, markBlocker, nextStep, roomLine, stepDepth, type Side } from '../game/clearing';
-import { KEEPSAKES_NEEDED, cloakBlocker, keepsakeKind, pillowBlocker } from '../game/companion';
+import { KEEPSAKES_NEEDED, cloakBlocker, keepsakeStock, pillowBlocker } from '../game/companion';
 import { DISHES, DISH_ORDER, dishBlocker, foodWord, ingredientList, potBlocker, type DishId } from '../game/cooking';
 import { fishingLineBlocker } from '../game/fishing';
 import { DECORATION_COSTS, decorationBlocker, type DecorationChoice } from '../game/rules';
@@ -182,6 +183,21 @@ export function beehivePanelView(state: GameState): { shown: boolean; stored: st
   };
 }
 
+/** The flock's home and the eggs waiting there. */
+export function chickenCoopPanelView(state: GameState): { shown: boolean; status: string; stored: string; take: { disabled: boolean; hint: string } } {
+  const { chickens } = state;
+  let status = 'The coop is ready. Lead the flock here from the old homestead.';
+  if (chickens.following) status = 'The flock is following you. Walk them to the coop.';
+  if (chickens.rescued) status = 'The flock is safely home.';
+  const blocker = takeEggBlocker(state);
+  return {
+    shown: state.structures.chickenCoop,
+    status,
+    stored: `${chickens.eggs} of 3 eggs waiting`,
+    take: { disabled: Boolean(blocker), hint: blocker ?? '' }
+  };
+}
+
 /** What a panel with one action button shows: its heading, its copy, its price line and its button state. */
 export interface ActionPanelView { title: string; copy: string; cost: string; disabled: boolean; ready: boolean; shown?: boolean }
 
@@ -298,7 +314,7 @@ export function fishingLineView(state: GameState): ActionPanelView {
 export interface DishView { dish: Exclude<DishId, 'berries'>; name: string; icon: string; cost: string; disabled: boolean; title: string }
 
 /** Dishes offered only while their one ingredient is in reach: a fish, a rabbit, and a loaf from flour. */
-const OFFERED_WHEN_HELD: Partial<Record<DishId, FoodItem>> = { fish: 'fish', rabbit: 'rabbit', loaf: 'flour' };
+const OFFERED_WHEN_HELD: Partial<Record<DishId, FoodItem>> = { fish: 'fish', rabbit: 'rabbit', loaf: 'flour', omelette: 'egg' };
 
 /** The camp panel's dishes beyond a toasted berry: a fish whenever there is one, a loaf whenever there is flour, and the pot dishes once the pot is made. Each says why it can't be cooked yet. */
 export function nightDishesView(state: GameState): DishView[] {
@@ -320,9 +336,11 @@ export function nightDishMarkup(): string {
 
 /** The fur or feathers gathered toward the friend's one item; gone once it is made. */
 export function keepsakeView(state: GameState): { shown: boolean; text: string } {
-  const { friend, keepsakes, pillow, cloak } = state.companion;
-  if (!friend || pillow || cloak) return { shown: false, text: '' };
-  return { shown: true, text: `${keepsakeKind(friend) === 'feather' ? 'Feathers' : 'Fur'} ${keepsakes}/${KEEPSAKES_NEEDED}` };
+  const { friends, pillow, cloak } = state.companion;
+  const parts: string[] = [];
+  if (friends.bird !== null && !pillow) parts.push(`Feathers ${keepsakeStock(state, 'feather')}/${KEEPSAKES_NEEDED}`);
+  if ((friends.fox !== null || friends.wolf !== null) && !cloak) parts.push(`Fur ${keepsakeStock(state, 'fur')}/${KEEPSAKES_NEEDED}`);
+  return { shown: parts.length > 0, text: parts.join(' · ') };
 }
 
 function keepsakeItemView(made: boolean, shown: boolean, blocker: string | null,
@@ -332,15 +350,15 @@ function keepsakeItemView(made: boolean, shown: boolean, blocker: string | null,
 }
 
 export function pillowView(state: GameState): ActionPanelView & { shown: boolean } {
-  return keepsakeItemView(state.companion.pillow, state.companion.friend === 'bird', pillowBlocker(state), {
+  return keepsakeItemView(state.companion.pillow, state.companion.friends.bird !== null, pillowBlocker(state), {
     title: 'Feather pillow', ready: 'Your bird\'s feathers would make the bed softer.', done: 'Resting in the bed goes a little deeper.',
     cost: `${KEEPSAKES_NEEDED} feathers`
   });
 }
 
 export function cloakView(state: GameState): ActionPanelView & { shown: boolean } {
-  const friend = state.companion.friend;
-  return keepsakeItemView(state.companion.cloak, friend === 'fox' || friend === 'wolf', cloakBlocker(state), {
+  const { fox, wolf } = state.companion.friends;
+  return keepsakeItemView(state.companion.cloak, fox !== null || wolf !== null, cloakBlocker(state), {
     title: 'Fur cloak', ready: 'Enough fur for a warm cloak against the night.', done: 'The nights bite a little less.',
     cost: `${KEEPSAKES_NEEDED} fur`
   });
@@ -446,6 +464,8 @@ export function startNote(save: LoadResult, storageAvailable: boolean): string {
 
 /** The Bag panel's forage cells, shown only while the bag holds some; all but pine needles, flour and the rabbit can be eaten from here. */
 export const BAG_FOODS = [
+  { item: 'apple', label: 'Apples', eat: 'Eat an apple' },
+  { item: 'egg', label: 'Eggs', eat: null },
   { item: 'greens', label: 'Greens', eat: 'Eat a handful of greens' },
   { item: 'hazelnut', label: 'Hazelnuts', eat: 'Eat a hazelnut' },
   { item: 'honey', label: 'Honey', eat: 'Eat some honey' },
@@ -522,7 +542,7 @@ function fireLine(state: GameState): string {
 }
 
 const LARDER_LABELS: Record<FoodItem, string> = {
-  berry: 'Berries', greens: 'Greens', hazelnut: 'Hazelnuts', honey: 'Honey', pineNeedles: 'Pine needles', roastedHazelnuts: 'Roasted hazelnuts', trailFood: 'Rations', vegetables: 'Vegetables', fish: 'Fish', rabbit: 'Rabbit', flour: 'Flour', bread: 'Bread'
+  berry: 'Berries', apple: 'Apples', egg: 'Eggs', greens: 'Greens', hazelnut: 'Hazelnuts', honey: 'Honey', pineNeedles: 'Pine needles', roastedHazelnuts: 'Roasted hazelnuts', trailFood: 'Rations', vegetables: 'Vegetables', fish: 'Fish', rabbit: 'Rabbit', flour: 'Flour', bread: 'Bread'
 };
 
 export interface LarderRowView { item: FoodItem; label: string; kept: number; storeDisabled: boolean; storeTitle: string; takeDisabled: boolean; takeTitle: string }

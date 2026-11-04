@@ -189,7 +189,7 @@ describe('the morning loaf', () => {
   it('throws out a shelf loaf five dawns after baking, then bakes into the space', () => {
     const after = acrossDawn(bakehouseCamp({ millFlour: 1, shelf: [18, 21], lastBaked: 21 }));
     expect(after.bakery.shelf).toEqual([21, 23]);
-    expect(after.lastSpoiled).toEqual({ day: 23, berry: 0, greens: 0, bread: 1 });
+    expect(after.lastSpoiled).toEqual({ day: 23, berry: 0, greens: 0, bread: 1, apple: 0, egg: 0 });
   });
 
   it('keeps a shelf loaf through its fourth dawn', () => {

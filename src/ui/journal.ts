@@ -1,4 +1,4 @@
-import { pathOpen } from '../game/areas';
+import { homesteadPathOpen, pathOpen } from '../game/areas';
 import { SITES, type AreaId, type GameState, type SiteId } from '../game/state';
 
 interface JournalLocation {
@@ -28,6 +28,15 @@ const REGION_DEFINITIONS = [{
   routeOpen: pathOpen,
   visibleFromLookout: true,
   visited: (state: GameState) => state.progress.quarryFound
+}, {
+  id: 'homestead' as const,
+  direction: 'East',
+  label: 'Old homestead',
+  resources: ['Autumn apples'],
+  features: ['Old shed', 'Chicken yard'],
+  routeOpen: homesteadPathOpen,
+  visibleFromLookout: false,
+  visited: (state: GameState) => state.progress.homesteadFound
 }];
 
 function regionSummaries(state: GameState): RegionSummary[] {
@@ -79,8 +88,9 @@ export function journalView(state: GameState): {
     ? 'Follow the northeast path and restore the old lookout.'
     : 'Build a toolshed at camp to make tools.';
   if (state.progress.lookoutRepaired && state.structures.toolshed) {
-    if (sitesFound && state.progress.quarryFound) nextHint = 'You have followed all five paths. Your camp is home, and the woods are yours to wander.';
-    else if (sitesFound) nextHint = 'Follow the west path out of camp to see what lies beyond.';
+    if (sitesFound && state.progress.quarryFound && state.progress.homesteadFound) nextHint = 'You have followed every path. Your camp is home, and the woods are yours to wander.';
+    else if (sitesFound && !state.progress.quarryFound) nextHint = 'Follow the west path out of camp to see what lies beyond.';
+    else if (sitesFound && !state.progress.homesteadFound) nextHint = 'Follow the east path out of camp to see what lies beyond.';
     else nextHint = 'Follow an unexplored path to find another quiet place.';
   }
   // Once the east far ground is clear, the workshop is the next thing to build there.

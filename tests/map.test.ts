@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { BALANCE, SITES, createGame, type ResourceKind } from '../src/game/state';
 import { terrainSprites } from '../src/art/terrain';
 import { buildMap, shownTerrainKey, terrainKey, type TerrainMap } from '../src/scene/map';
-import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
+import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { CLEARING_STEPS, STEP_IDS, clearingReach, inClearing, type ClearingState, type StepId } from '../src/game/clearing';
-import { CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_OPEN_PATHS, CAMP_SIGN, QUARRY_PATHS, QUARRY_SIGN, pathDistance as routeDistance } from '../src/scene/mapGeometry';
+import { CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_HOMESTEAD_PATHS, CAMP_OPEN_PATHS, CAMP_PATHS, CAMP_SIGN, HOMESTEAD_PATHS, HOMESTEAD_SIGN, QUARRY_PATHS, QUARRY_SIGN, pathDistance as routeDistance } from '../src/scene/mapGeometry';
 import { FACE_HEIGHT, QUARRY_MEADOWS, faceBottom, floorDepth, quarryGroundAt } from '../src/scene/quarryGeometry';
 
 function visibleGround(map: TerrainMap, x: number, y: number, pixelX = 8, pixelY = 8): string | undefined {
@@ -210,8 +210,9 @@ describe('terrain composition', () => {
     const state = createGame();
     expect(terrainKey(state)).toBe('camp');
     const sheltered = { ...state, structures: { ...state.structures, shelter: true } };
-    expect(terrainKey(sheltered)).toBe('camp-open');
+    expect(terrainKey(sheltered)).toBe('camp-both-open');
     expect(terrainKey({ ...sheltered, area: 'quarry' })).toBe('quarry');
+    expect(terrainKey({ ...sheltered, area: 'homestead' })).toBe('homestead');
   });
 
   it('the west path is drawn only once open', () => {
@@ -379,6 +380,52 @@ describe('the quarry scenery', () => {
 
   it('draws the signposts and boulders as real sprites', () => {
     for (const name of ['signpostCamp', 'signpostQuarry', 'boulder0', 'boulder1', 'cutBlocks', 'barrow', 'tumbledBlock', 'fern0', 'fern1', 'longGrass0', 'longGrass1', 'flowerClump0', 'flowerClump1']) expect(terrainSprites[name], name).toBeDefined();
+  });
+});
+
+describe('the homestead landscape', () => {
+  const nodes = createGame().nodes;
+  const homestead = buildMap([], 'homestead');
+
+  it('fills the map with registered sprites and leaves an open yard for the shed, flock and apple tree', () => {
+    expect(homestead.ground).toHaveLength(BALANCE.mapHeight);
+    expect(homestead.ground.every(row => row.length === BALANCE.mapWidth)).toBe(true);
+    for (const item of [...homestead.ground.flat(), ...homestead.pathTiles.map(item => item.sprite),
+      ...homestead.trees.map(item => item.sprite), ...homestead.decorations.map(item => item.sprite),
+      ...homestead.signs.map(item => item.sprite)]) expect(terrainSprites[item], item).toBeDefined();
+    for (const spot of [{ x: 22, y: 12 }, { x: 20, y: 16 }, { x: 29, y: 19 }]) {
+      expect(homestead.trees.every(tree => Math.hypot(tree.x - spot.x, tree.y - spot.y) >= 3)).toBe(true);
+    }
+    expect(homestead.ground[16][20]).toMatch(/^earth/);
+    expect(homestead.ground[19][29]).toMatch(/^grass/);
+    expect(homestead.trees.length).toBeGreaterThan(60);
+  });
+
+  it('connects the camp east edge to the homestead west edge without trees in the track', () => {
+    const camp = buildMap(nodes, 'camp-both-open');
+    expect(buildMap(nodes, 'camp').pathTiles.some(item => item.x === CAMP_HOMESTEAD_EXIT.x)).toBe(false);
+    const eastOnly = buildMap(nodes, 'camp-homestead-open');
+    expect(eastOnly.pathTiles.some(item => item.x === CAMP_HOMESTEAD_EXIT.x)).toBe(true);
+    expect(eastOnly.pathTiles.some(item => item.x === CAMP_EXIT.x)).toBe(false);
+    expect(buildMap(nodes, 'camp-open').pathTiles.some(item => item.x === CAMP_HOMESTEAD_EXIT.x)).toBe(false);
+    expect(camp.pathTiles.some(item => item.x === CAMP_HOMESTEAD_EXIT.x && item.y === CAMP_HOMESTEAD_EXIT.y)).toBe(true);
+    expect(homestead.pathTiles.some(item => item.x === HOMESTEAD_EXIT.x && item.y === HOMESTEAD_EXIT.y)).toBe(true);
+    for (let pixelY = 4; pixelY <= 11; pixelY++) {
+      expect(visibleGround(camp, CAMP_HOMESTEAD_EXIT.x, CAMP_HOMESTEAD_EXIT.y, 15, pixelY)).toMatch(/^path/);
+      expect(visibleGround(homestead, HOMESTEAD_EXIT.x, HOMESTEAD_EXIT.y, 0, pixelY)).toMatch(/^path/);
+    }
+    const eastRoutes = CAMP_HOMESTEAD_PATHS.slice(CAMP_PATHS.length);
+    for (const tree of camp.trees) expect(routeDistance(tree.x + .5, tree.y + .5, eastRoutes), `camp tree at ${tree.x},${tree.y}`).toBeGreaterThanOrEqual(1.35);
+    for (const tree of homestead.trees) expect(routeDistance(tree.x + .5, tree.y + .5, HOMESTEAD_PATHS)).toBeGreaterThanOrEqual(2.4);
+    expect(homestead.signs).toEqual([{ ...HOMESTEAD_SIGN, sprite: 'signpostCamp' }]);
+  });
+
+  it('shows spring flowers and autumn leaves, with no flowers in winter', () => {
+    const count = (map: TerrainMap, sprite: string) => map.decorations.filter(item => item.sprite.startsWith(sprite)).length;
+    expect(count(buildMap([], 'homestead', 'spring'), 'flower')).toBeGreaterThan(0);
+    expect(count(buildMap([], 'homestead', 'winter'), 'flower')).toBe(0);
+    expect(count(buildMap([], 'homestead', 'autumn'), 'fallenLeaf')).toBeGreaterThan(0);
+    expect(count(buildMap([], 'homestead', 'summer'), 'fallenLeaf')).toBe(0);
   });
 });
 

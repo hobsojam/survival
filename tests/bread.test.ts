@@ -99,14 +99,14 @@ describe('bread going soft', () => {
   it('goes soft in the bag like a berry, and keeps longer in the larder', () => {
     const loaf = addFood(emptyFood(), 'bread', 1, 1);
     expect(spoil(loaf, 3, BALANCE.bagFreshDays).store.bread).toEqual([1]);
-    expect(spoil(loaf, 4, BALANCE.bagFreshDays)).toEqual({ store: emptyFood(), lost: { berry: 0, greens: 0, bread: 1 } });
+    expect(spoil(loaf, 4, BALANCE.bagFreshDays)).toEqual({ store: emptyFood(), lost: { berry: 0, greens: 0, bread: 1, apple: 0, egg: 0 } });
     expect(spoil(loaf, 5, BALANCE.larderFreshDays).store.bread).toEqual([1]);
     expect(spoil(loaf, 6, BALANCE.larderFreshDays).lost.bread).toBe(1);
   });
 
   it('is named in the morning line', () => {
     const before = granary();
-    const after = (berry: number, bread: number): GameState => ({ ...before, lastSpoiled: { day: 22, berry, greens: 0, bread } });
+    const after = (berry: number, bread: number): GameState => ({ ...before, lastSpoiled: { day: 22, berry, greens: 0, bread, apple: 0, egg: 0 } });
     expect(spoilMessage(before, after(0, 1))).toBe('A loaf had gone soft, so you threw it out.');
     expect(spoilMessage(before, after(0, 2))).toBe('Two loaves had gone soft, so you threw them out.');
     expect(spoilMessage(before, after(1, 1))).toBe('A berry and a loaf had gone soft, so you threw them out.');
@@ -116,7 +116,7 @@ describe('bread going soft', () => {
     const state = { ...granary(0, addFood(emptyFood(), 'bread', 1, 19)), timeOfDay: BALANCE.daySeconds - 1 };
     const after = applyAction(state, { type: 'rest' }).state;
     expect(after.inventory.food.bread).toEqual([]);
-    expect(after.lastSpoiled).toEqual({ day: 23, berry: 0, greens: 0, bread: 1 });
+    expect(after.lastSpoiled).toEqual({ day: 23, berry: 0, greens: 0, bread: 1, apple: 0, egg: 0 });
   });
 });
 

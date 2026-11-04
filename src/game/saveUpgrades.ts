@@ -6,7 +6,7 @@ import { emptyField } from './field';
 // anything the player had. Loading runs every step a save needs, in order, then validates the result as usual.
 
 /** The saved shape's version. Bump it by one with every change to the shape, and add its upgrade step below. */
-export const SAVE_VERSION = 32;
+export const SAVE_VERSION = 33;
 
 /** The oldest save that can still be brought up to date: earlier formats were never upgraded and don't load. */
 export const OLDEST_UPGRADABLE_VERSION = 23;
@@ -90,6 +90,36 @@ export const SAVE_UPGRADES: Readonly<Record<number, SaveUpgrade>> = {
   31: old => {
     const state = old as Upgradable & { structures: Upgradable };
     return { ...state, structures: { storehouse: false, ...state.structures } };
+  },
+  // Version 33: the east homestead, its chickens and orchard, and room for every animal friend.
+  32: old => {
+    const state = old as Upgradable & { structures: Upgradable; progress: Upgradable; companion: Upgradable;
+      inventory: Upgradable & { food: Upgradable }; larder: Upgradable; lastSpoiled: Upgradable | null };
+    const first = state.companion.friend;
+    const since = state.companion.since;
+    return { ...state,
+      structures: { chickenCoop: false, birdhouse: false, wolfHouse: false, foxDen: false, ...state.structures },
+      progress: { homesteadFound: false, ...state.progress },
+      companion: { ...state.companion,
+        keepsakesByKind: { feather: first === 'bird' ? state.companion.keepsakes : 0,
+          fur: first === 'fox' || first === 'wolf' ? state.companion.keepsakes : 0 },
+        lyingByKind: { feather: first === 'bird' ? state.companion.keepsakeLying : false,
+          fur: first === 'fox' || first === 'wolf' ? state.companion.keepsakeLying : false },
+        lastFindByKind: { feather: first === 'bird' ? state.companion.lastFind : 0,
+          fur: first === 'fox' || first === 'wolf' ? state.companion.lastFind : 0 },
+        lastGiftByFriend: { fox: first === 'fox' ? state.companion.lastGift : 0,
+          wolf: first === 'wolf' ? state.companion.lastGift : 0 },
+        friends: {
+        bird: first === 'bird' ? since : null,
+        fox: first === 'fox' ? since : null,
+        wolf: first === 'wolf' ? since : null
+      } },
+      chickens: { discovered: false, following: false, rescued: false, eggs: 0, nextEggDay: 1 },
+      homestead: { applesReadyDay: 1, shedSearched: false },
+      inventory: { ...state.inventory, food: { apple: [], egg: [], ...state.inventory.food } },
+      larder: { apple: [], egg: [], ...state.larder },
+      lastSpoiled: state.lastSpoiled && { apple: 0, egg: 0, ...state.lastSpoiled }
+    };
   }
 };
 

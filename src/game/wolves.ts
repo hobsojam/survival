@@ -1,4 +1,5 @@
 import { isWinter, nightStart } from './calendar';
+import { hasFriend } from './companion';
 import { takeFromBag } from './food';
 import { fuelLeft } from './home';
 import type { GameState, WolfTake } from './state';
@@ -27,7 +28,7 @@ export function wolvesClose(state: GameState): boolean {
 /** The first moment of a winter night that the fire is out (in the house, the fireplace with nothing left in store), a wolf takes a ration, else a berry, unless a friendly wolf sees it off. Mutates advanceTime's working copy. */
 export function wolfVisit(next: GameState): void {
   if (!winterNight(next) || fuelLeft(next) > 0 || next.lastWolf?.day === next.day) return;
-  if (next.companion.friend === 'wolf') {
+  if (hasFriend(next, 'wolf')) {
     next.lastWolf = { day: next.day, took: 'chased' };
     return;
   }

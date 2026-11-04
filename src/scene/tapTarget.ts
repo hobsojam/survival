@@ -3,7 +3,9 @@ import { isAtCamp, type GameAction } from '../game/rules';
 import { choppableTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
 import { sprites } from '../art/sprites';
-import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
+import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
+import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
+import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
 
 /** What a tap on the map points at, in tile units like `state.player`. */
 export type TapTarget =
@@ -16,6 +18,8 @@ export type TapTarget =
   | { kind: 'crossing'; x: number; y: number }
   | { kind: 'quarry'; x: number; y: number }
   | { kind: 'rubble'; x: number; y: number }
+  | { kind: 'chickens'; x: number; y: number; action: 'meetChickens' | 'leadChickens' }
+  | { kind: 'appleTree' | 'shed' | 'coop'; x: number; y: number }
   | { kind: 'ground'; x: number; y: number };
 
 /** A tap this close to something counts as tapping it. */
@@ -57,20 +61,31 @@ function tapDistance(target: TapTarget, sprite: string | undefined, x: number, y
 export function pickTapTarget(state: GameState, x: number, y: number): TapTarget {
   const piles = state.stonePiles.filter(pile => pile.area === state.area)
     .map(pile => ({ target: { kind: 'pile' as const, id: pile.id, x: pile.x, y: pile.y } }));
-  const candidates: { target: TapTarget; sprite?: string }[] = state.area === 'quarry' ? [
-    ...piles,
-    { target: { kind: 'quarry', x: QUARRY_SITE.x, y: QUARRY_SITE.y }, sprite: 'quarry' },
-    { target: { kind: 'rubble', x: RUBBLE_SITE.x, y: RUBBLE_SITE.y } },
-    { target: { kind: 'crossing', x: QUARRY_EXIT.x, y: QUARRY_EXIT.y } }
-  ] : [
-    ...state.nodes.filter(node => node.amount > 0 && nodeShown(state, node)).map(node => ({ target: { kind: 'node' as const, id: node.id, x: node.x, y: node.y } })),
-    ...piles,
-    ...choppableTrees(state).map(tree => ({ target: { kind: 'tree' as const, id: tree.id, x: tree.x, y: tree.y }, sprite: tree.sprite })),
-    ...(Object.keys(SITES) as SiteId[]).map(id => ({ target: { kind: 'site' as const, id, x: SITES[id].x, y: SITES[id].y } })),
-    { target: { kind: 'lookout', x: LOOKOUT.x, y: LOOKOUT.y }, sprite: 'lookout' },
-    { target: { kind: 'fire', x: BALANCE.campX, y: BALANCE.campY } },
-    ...(pathOpen(state) ? [{ target: { kind: 'crossing' as const, x: CAMP_EXIT.x, y: CAMP_EXIT.y } }] : [])
-  ];
+  let candidates: { target: TapTarget; sprite?: string }[];
+  if (state.area === 'quarry') {
+    candidates = [...piles,
+      { target: { kind: 'quarry', x: QUARRY_SITE.x, y: QUARRY_SITE.y }, sprite: 'quarry' },
+      { target: { kind: 'rubble', x: RUBBLE_SITE.x, y: RUBBLE_SITE.y } },
+      { target: { kind: 'crossing', x: QUARRY_EXIT.x, y: QUARRY_EXIT.y } }];
+  } else if (state.area === 'homestead') {
+    candidates = [...piles,
+      { target: { kind: 'shed', ...HOMESTEAD_SHED } },
+      { target: { kind: 'appleTree', ...APPLE_TREE } },
+      ...(!state.chickens.rescued ? [{ target: { kind: 'chickens' as const, ...CHICKEN_SITE,
+        action: state.chickens.discovered ? 'leadChickens' as const : 'meetChickens' as const } }] : []),
+      { target: { kind: 'crossing', ...HOMESTEAD_EXIT } }];
+  } else {
+    candidates = [
+      ...state.nodes.filter(node => node.amount > 0 && nodeShown(state, node)).map(node => ({ target: { kind: 'node' as const, id: node.id, x: node.x, y: node.y } })),
+      ...piles,
+      ...choppableTrees(state).map(tree => ({ target: { kind: 'tree' as const, id: tree.id, x: tree.x, y: tree.y }, sprite: tree.sprite })),
+      ...(Object.keys(SITES) as SiteId[]).map(id => ({ target: { kind: 'site' as const, id, x: SITES[id].x, y: SITES[id].y } })),
+      { target: { kind: 'lookout', x: LOOKOUT.x, y: LOOKOUT.y }, sprite: 'lookout' },
+      { target: { kind: 'fire', x: BALANCE.campX, y: BALANCE.campY } },
+      ...(state.chickens.rescued ? [{ target: { kind: 'coop' as const, ...COOP_SITE } }] : []),
+      ...(pathOpen(state) ? [{ target: { kind: 'crossing' as const, ...CAMP_EXIT } }, { target: { kind: 'crossing' as const, ...CAMP_HOMESTEAD_EXIT } }] : [])
+    ];
+  }
   const hit = candidates
     .map(({ target, sprite }) => ({ target, away: tapDistance(target, sprite, x, y) }))
     .filter(({ away }) => away <= TAP_HIT_RADIUS)
@@ -89,7 +104,7 @@ export function closestGatherable(state: GameState): Gatherable | undefined {
   if (state.area === 'quarry') {
     if (state.rubbleReadyDay <= state.day) options.push({ found: { kind: 'rubble' }, away: distance(RUBBLE_SITE.x, RUBBLE_SITE.y, x, y) });
     if (state.quarryReadyDay <= state.day || (state.progress.mineBuilt && state.mineReadyDay <= state.day)) options.push({ found: { kind: 'quarry' }, away: distance(QUARRY_SITE.x, QUARRY_SITE.y, x, y) });
-  } else {
+  } else if (state.area === 'camp') {
     options.push(...state.nodes.filter(node => node.amount > 0 && nodeShown(state, node)).map(node => ({ found: { kind: 'node' as const, node }, away: distance(node.x, node.y, x, y) })));
   }
   return options.filter(option => option.away <= BALANCE.interactionRadius).sort((a, b) => a.away - b.away)[0]?.found;
@@ -125,6 +140,10 @@ export function targetAction(target: TapTarget): GameAction | null {
     case 'crossing': return { type: 'cross' };
     case 'quarry': return { type: 'digQuarry' };
     case 'rubble': return { type: 'gatherRubble' };
+    case 'chickens': return { type: target.action };
+    case 'appleTree': return { type: 'gatherApples' };
+    case 'shed': return { type: 'searchShed' };
+    case 'coop': return { type: 'takeEgg' };
     case 'ground': return null;
   }
 }

@@ -5,11 +5,12 @@ import { fieldCamp, strip, withField } from './fieldCamp';
 import { nightStart } from '../src/game/calendar';
 import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from '../src/game/state';
 import { CLEARING_STEPS } from '../src/game/clearing';
-import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, campStoresView, cloakView, foodLaidByDays, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
+import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, campStoresView, chickenCoopPanelView, cloakView, foodLaidByDays, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
 import { dishBlocker } from '../src/game/cooking';
 import { addFood, emptyFood } from '../src/game/food';
 import { stock } from './stock';
 import { QUARRY_SITE } from '../src/game/areas';
+import { COOP_SITE } from '../src/game/chickens';
 
 type Changes = { structures?: Partial<GameState['structures']>; progress?: Partial<GameState['progress']>; inventory?: Partial<GameState['inventory']> };
 
@@ -288,13 +289,13 @@ describe('bag panel', () => {
   });
 
   it('draws each forage cell with its icon, and an Eat button for all but pine needles, flour and the rabbit', () => {
-    expect(BAG_FOODS.map(cell => cell.item)).toEqual(['greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'vegetables', 'fish', 'bread', 'flour', 'rabbit']);
+    expect(BAG_FOODS.map(cell => cell.item)).toEqual(['apple', 'egg', 'greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'vegetables', 'fish', 'bread', 'flour', 'rabbit']);
     const markup = bagFoodMarkup();
     for (const { item } of BAG_FOODS) {
       const cell = markup.split('</div>').find(part => part.includes(`data-food="${item}"`))!;
       expect(cell, item).toContain('src="data:image/svg+xml,');
       expect(cell, item).toContain(`id="${item}-count"`);
-      expect(cell.includes(`data-action="eat" data-item="${item}"`), item).toBe(item !== 'pineNeedles' && item !== 'rabbit' && item !== 'flour');
+      expect(cell.includes(`data-action="eat" data-item="${item}"`), item).toBe(item !== 'egg' && item !== 'pineNeedles' && item !== 'rabbit' && item !== 'flour');
     }
   });
 
@@ -436,7 +437,7 @@ describe('forecast card visibility', () => {
 describe('keepsakes and what they make', () => {
   const friend = (friendId: 'bird' | 'fox', changes: Partial<GameState['companion']> = {}): GameState => {
     const state = createGame();
-    return { ...state, companion: { ...state.companion, friend: friendId, since: 1, ...changes } };
+    return { ...state, companion: { ...state.companion, friend: friendId, since: 1, friends: { ...state.companion.friends, [friendId]: 1 }, ...changes } };
   };
 
   it('counts feathers or fur until the item is made', () => {
@@ -572,7 +573,7 @@ describe('eating from the bag panel with a larder', () => {
 
   it('enables Eat for food within reach, the larder included in the clearing', () => {
     const view = bagView(atCamp);
-    expect(view.eatable).toEqual({ berry: true, trailFood: true, greens: false, hazelnut: true, honey: false, roastedHazelnuts: false, vegetables: false, fish: false, bread: false });
+    expect(view.eatable).toEqual({ berry: true, trailFood: true, apple: false, greens: false, hazelnut: true, honey: false, roastedHazelnuts: false, vegetables: false, fish: false, bread: false });
     expect(view.foods.hazelnut).toEqual({ count: 0, shown: true, note: '' });
     expect(view.foods.pineNeedles.shown).toBe(false);
   });
@@ -580,8 +581,29 @@ describe('eating from the bag panel with a larder', () => {
   it('follows the bag alone away from camp', () => {
     const away = { ...atCamp, player: { ...atCamp.player, x: 5, y: 5 }, inventory: { ...atCamp.inventory, food: addFood(emptyFood(), 'honey', 1, 1) } };
     const view = bagView(away);
-    expect(view.eatable).toEqual({ berry: false, trailFood: false, greens: false, hazelnut: false, honey: true, roastedHazelnuts: false, vegetables: false, fish: false, bread: false });
+    expect(view.eatable).toEqual({ berry: false, trailFood: false, apple: false, greens: false, hazelnut: false, honey: true, roastedHazelnuts: false, vegetables: false, fish: false, bread: false });
     expect(view.foods.hazelnut.shown).toBe(false);
+  });
+});
+
+describe('chicken coop panel', () => {
+  it('shows the flock journey and collects eggs only when the player can reach the coop', () => {
+    const fresh = createGame();
+    expect(chickenCoopPanelView(fresh).shown).toBe(false);
+    const built = { ...fresh, structures: { ...fresh.structures, chickenCoop: true } };
+    expect(chickenCoopPanelView(built)).toMatchObject({ shown: true, take: { disabled: true } });
+    const following = { ...built, chickens: { ...built.chickens, discovered: true, following: true } };
+    expect(chickenCoopPanelView(following).status).toMatch(/following/i);
+    const rescued = { ...following, chickens: { ...following.chickens, following: false, rescued: true, eggs: 1 }, player: { ...following.player, ...COOP_SITE } };
+    expect(chickenCoopPanelView(rescued)).toMatchObject({ status: 'The flock is safely home.', stored: '1 of 3 eggs waiting', take: { disabled: false, hint: '' } });
+    expect(chickenCoopPanelView({ ...rescued, area: 'homestead' }).take.disabled).toBe(true);
+  });
+
+  it('offers an omelette by the fire when an egg is in reach', () => {
+    const withEgg = createGame();
+    withEgg.inventory.food = addFood(withEgg.inventory.food, 'egg', 1, withEgg.day);
+    expect(nightDishesView(withEgg).some(dish => dish.dish === 'omelette')).toBe(true);
+    expect(nightDishesView(createGame()).some(dish => dish.dish === 'omelette')).toBe(false);
   });
 });
 

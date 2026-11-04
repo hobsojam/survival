@@ -14,8 +14,11 @@ export interface FoodStore {
   flour: number;
   /** Loaves baked at the fire, each remembering the day it was baked: bread goes soft like berries. */
   bread: number[];
+  /** Fresh apples from the old homestead orchard, and eggs collected from the coop. */
+  apple: number[];
+  egg: number[];
 }
 
 export function emptyFood(): FoodStore {
-  return { berry: [], greens: [], hazelnut: 0, honey: 0, pineNeedles: 0, roastedHazelnuts: 0, trailFood: 0, vegetables: 0, fish: 0, rabbit: 0, flour: 0, bread: [] };
+  return { berry: [], greens: [], hazelnut: 0, honey: 0, pineNeedles: 0, roastedHazelnuts: 0, trailFood: 0, vegetables: 0, fish: 0, rabbit: 0, flour: 0, bread: [], apple: [], egg: [] };
 }

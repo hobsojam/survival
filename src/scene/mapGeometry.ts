@@ -1,5 +1,5 @@
 import { BALANCE } from '../game/state';
-import { CAMP_EXIT, QUARRY_EXIT } from '../game/areas';
+import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT } from '../game/areas';
 
 /** A path runs between two tile centres: [fromX, fromY, toX, toY]. */
 export type PathRoute = readonly [number, number, number, number];
@@ -12,13 +12,21 @@ const fromCamp = ([x, y]: readonly [number, number]): PathRoute => [BALANCE.camp
 export const CAMP_PATHS: readonly PathRoute[] = PATH_DESTINATIONS.map(fromCamp);
 /** Once the shelter stands, a fifth path leads west and continues through the map edge. */
 export const CAMP_OPEN_PATHS: readonly PathRoute[] = [...CAMP_PATHS, fromCamp([CAMP_EXIT.x, CAMP_EXIT.y]), [CAMP_EXIT.x, CAMP_EXIT.y, CAMP_EXIT.x - 1, CAMP_EXIT.y]];
+/** A second path runs east to the old homestead. Either edge can open independently. */
+export const CAMP_HOMESTEAD_PATHS: readonly PathRoute[] = [...CAMP_PATHS,
+  [30, 9, 34, 9], [34, 9, CAMP_HOMESTEAD_EXIT.x, CAMP_HOMESTEAD_EXIT.y],
+  [CAMP_HOMESTEAD_EXIT.x, CAMP_HOMESTEAD_EXIT.y, CAMP_HOMESTEAD_EXIT.x + 1, CAMP_HOMESTEAD_EXIT.y]];
+export const CAMP_BOTH_OPEN_PATHS: readonly PathRoute[] = [...CAMP_OPEN_PATHS, ...CAMP_HOMESTEAD_PATHS.slice(CAMP_PATHS.length)];
 
 /** In the quarry, a worn track runs from the floor through the east edge to the way home. */
 export const QUARRY_PATHS: readonly PathRoute[] = [[19, 14, QUARRY_EXIT.x, QUARRY_EXIT.y], [QUARRY_EXIT.x, QUARRY_EXIT.y, QUARRY_EXIT.x + 1, QUARRY_EXIT.y]];
+/** The old homestead's entrance reaches an open yard from the west edge. */
+export const HOMESTEAD_PATHS: readonly PathRoute[] = [[HOMESTEAD_EXIT.x - 1, HOMESTEAD_EXIT.y, 19, 15], [19, 15, 24, 15]];
 
 /** Signposts beside each end of the west path: one at the quarry pointing home, one at camp pointing to the quarry. */
 export const QUARRY_SIGN = { x: QUARRY_EXIT.x - 2, y: QUARRY_EXIT.y - 2 } as const;
 export const CAMP_SIGN = { x: CAMP_EXIT.x + 2, y: CAMP_EXIT.y - 2 } as const;
+export const HOMESTEAD_SIGN = { x: HOMESTEAD_EXIT.x + 2, y: HOMESTEAD_EXIT.y - 2 } as const;
 
 export function segmentDistance(x: number, y: number, [fromX, fromY, toX, toY]: PathRoute): number {
   const startX = fromX + .5, startY = fromY + .5;

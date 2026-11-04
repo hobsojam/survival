@@ -2,7 +2,7 @@ import { iconUrl, type JournalIcon } from './journalIcons';
 
 // The Bag panel's little pictures of foraged food and what the camp makes from it, on the journal icons' 10×10 grid.
 
-type FoodIconId = 'greens' | 'hazelnut' | 'honey' | 'pineNeedles' | 'roastedHazelnuts' | 'vegetables' | 'fish' | 'rabbit' | 'pineTea' | 'salad' | 'honeyCake' | 'stew' | 'bread' | 'flour' | 'loaf';
+type FoodIconId = 'greens' | 'hazelnut' | 'honey' | 'pineNeedles' | 'roastedHazelnuts' | 'vegetables' | 'fish' | 'rabbit' | 'pineTea' | 'salad' | 'honeyCake' | 'stew' | 'bread' | 'flour' | 'loaf' | 'apple' | 'egg' | 'omelette';
 
 /** A round loaf, its crust scored and dusted with flour. */
 const LOAF: JournalIcon = { legend: { k: 'wood1', c: 'earth2', C: 'earth3', W: 'earth4', s: 'canvas4' }, rows: [
@@ -19,6 +19,42 @@ const LOAF: JournalIcon = { legend: { k: 'wood1', c: 'earth2', C: 'earth3', W: '
   ] };
 
 export const FOOD_ICONS: Record<FoodIconId, JournalIcon> = {
+  apple: { legend: { d: 'wood2', l: 'leaf3', L: 'leaf4', r: 'berry1', R: 'berry2', W: 'berry3' }, rows: [
+    '..........',
+    '....d.....',
+    '...dLL....',
+    '..rrrRR...',
+    '.rRRRRRR..',
+    '.rRWRRRRr.',
+    '.rRRRRRRr.',
+    '..rRRRr...',
+    '...rrr....',
+    '..........'
+  ] },
+  egg: { legend: { c: 'canvas1', C: 'canvas3', W: 'canvas4', s: 'stone1' }, rows: [
+    '..........',
+    '....cc....',
+    '...cWWc...',
+    '..cWWWWc..',
+    '..cWWWWc..',
+    '.cWWWWWWc.',
+    '.cWWWWWWc.',
+    '..cCCCCc..',
+    '...cccc...',
+    '..........'
+  ] },
+  omelette: { legend: { p: 'stone2', P: 'stone3', y: 'scarf2', Y: 'scarf3', o: 'fire2' }, rows: [
+    '..........',
+    '..........',
+    '..pppppp..',
+    '.pPYYYYPp.',
+    'pPYYYYYYPp',
+    'pPYYoYYYYp',
+    '.pPYYYYPp.',
+    '..pPPPPp..',
+    '...pppp...',
+    '..........'
+  ] },
   bread: LOAF,
   loaf: LOAF,
   // A little sack of flour, tied at the neck.
