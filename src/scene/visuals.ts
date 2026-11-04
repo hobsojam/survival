@@ -278,7 +278,7 @@ function addCamp(state: GameState, add: AddVisual, timeMs: number): void {
     if (structures.wolfHouse) add('wolf-house', 'wolfHouse:built', x + 5, y - 5);
     if (structures.foxDen) add('fox-den', 'foxDen:built', x - 5, y - 3.5);
   }
-  const fenceSpots = [{ dx: -2.5, dy: -5.4, frame: 'side' }, { dx: 1.4, dy: -5.4, frame: 'side' }, { dx: -0.5, dy: -9.1, frame: 'rail' }];
+  const fenceSpots = [{ dx: -3, dy: -5.625, frame: 'left' }, { dx: 2, dy: -5.625, frame: 'right' }, { dx: -0.5, dy: -6.625, frame: 'rail' }];
   fenceSpots.slice(0, state.decorations.fence).forEach((spot, index) => add(`house-fence-${index}`, `fence:${spot.frame}`, x + spot.dx, y + spot.dy));
   addGardenPlants(state, add, x, y);
   add('logSeat', 'logSeat:still', x - 1, y + 1);
