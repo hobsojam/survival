@@ -314,7 +314,7 @@ export function fishingLineView(state: GameState): ActionPanelView {
 export interface DishView { dish: Exclude<DishId, 'berries'>; name: string; icon: string; cost: string; disabled: boolean; title: string }
 
 /** Dishes offered only while their one ingredient is in reach: a fish, a rabbit, and a loaf from flour. */
-const OFFERED_WHEN_HELD: Partial<Record<DishId, FoodItem>> = { fish: 'fish', rabbit: 'rabbit', loaf: 'flour', omelette: 'egg' };
+const OFFERED_WHEN_HELD: Partial<Record<DishId, FoodItem>> = { fish: 'fish', rabbit: 'rabbit', loaf: 'flour', omelette: 'egg', bakedApple: 'apple', eggOnBread: 'egg' };
 
 /** The camp panel's dishes beyond a toasted berry: a fish whenever there is one, a loaf whenever there is flour, and the pot dishes once the pot is made. Each says why it can't be cooked yet. */
 export function nightDishesView(state: GameState): DishView[] {
