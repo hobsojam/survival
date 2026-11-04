@@ -87,7 +87,9 @@ function addChickens(state: GameState, add: AddVisual, timeMs: number): void {
   else if (state.area === 'homestead' && !state.chickens.rescued) center = CHICKEN_SITE;
   else if (state.area === 'camp' && state.chickens.rescued) center = COOP_SITE;
   if (!center) return;
-  const offsets = [[-0.7, 0.1], [0.3, -0.2], [0.8, 0.5]];
+  // Home at the coop they stand out in front of it, where each can be tapped without tapping the coop.
+  const home = state.area === 'camp' && state.chickens.rescued;
+  const offsets = home ? [[-1.6, 1.2], [0, 1.5], [1.6, 1.2]] : [[-0.7, 0.1], [0.3, -0.2], [0.8, 0.5]];
   offsets.forEach(([dx, dy], index) => {
     const x = Math.max(0.5, Math.min(BALANCE.mapWidth - 1.5, center.x + dx));
     const y = Math.max(0.5, Math.min(BALANCE.mapHeight - 1.5, center.y + dy));

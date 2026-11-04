@@ -94,3 +94,8 @@ export function rosterLine(names: readonly (string | null)[]): string {
   if (given.length === 1) return `${given[0]} lives here.`;
   return `${given.slice(0, -1).join(', ')} and ${given.at(-1)} live here.`;
 }
+
+/** The animal that has just stayed, between two states of the same game. */
+export function newlyStayed(before: GameState, after: GameState): Friend | null {
+  return (['bird', 'fox', 'wolf'] as const).find(animal => before.companion.friends[animal] === null && after.companion.friends[animal] !== null) ?? null;
+}
