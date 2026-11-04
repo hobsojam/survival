@@ -20,8 +20,7 @@ import { ENDING_FADE_MS, endingMarkup, endingView, showEnding } from './ending';
 import { browserDownloadDoc, downloadText } from './download';
 import { showBuildList, showCampStores } from './showPanels';
 import type { WovenId } from '../game/sheep';
-import { nameBlocker, type NameTarget } from '../game/names';
-import { keepKeysInDialog, namePromptCopy } from './nameDialog';
+import { NameDialog, wireNameDialog } from './nameDialog';
 import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, decorationMarkup, decorationButtonView, DECORATION_CHOICES, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, chickenCoopPanelView, friendRosterView, sheepPanelView, loomPanelView, loomItemMarkup, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
 import type { UpgradeId } from '../game/workshop';
 import { Soundscape } from '../game/soundscape';
@@ -58,7 +57,7 @@ export class App {
   /** The journal page being read, or null to follow the current season. */
   private journalPage: number | null = null;
   private readonly pause: PauseControl;
-  private naming: NameTarget | null = null;
+  private nameDialog: NameDialog | null = null;
   private toastTimer?: number;
 
   constructor(root: HTMLElement) {
@@ -71,7 +70,7 @@ export class App {
       this.previousSave = { kind: 'invalid', reason: `Browser storage is unavailable: ${String(error)}` };
     }
     this.soundscape = new Soundscape(this.storage);
-    this.pause = createPause(this.root, { scenes: () => this.game?.scene, sound: this.soundscape, save: () => { if (this.storage) this.saveCurrent(); }, started: () => Boolean(this.scene) });
+    this.pause = createPause(this.root, { scenes: () => this.game?.scene, sound: this.soundscape, save: () => { if (this.storage) this.saveCurrent(); }, started: () => Boolean(this.scene), asking: () => this.nameDialog?.open ?? false });
     const clearingMarkup = (['north', 'east', 'south', 'west'] as const).map(side => `<button type="button" class="build-item" data-clear-side="${side}"><span class="build-copy"><strong></strong><small></small></span></button>`).join('');
     this.root.innerHTML = `
       <div class="shell">
@@ -182,16 +181,21 @@ export class App {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-weave]');
       if (button) this.scene?.perform({ type: 'weave', item: button.dataset.weave as WovenId });
     });
+    const nameOverlay = this.root.querySelector<HTMLElement>('#name-overlay')!;
     const nameForm = this.root.querySelector<HTMLFormElement>('#name-form')!;
-    keepKeysInDialog(nameForm);
-    nameForm.addEventListener('submit', event => {
-      event.preventDefault();
-      this.confirmName();
+    this.nameDialog = new NameDialog({
+      overlay: nameOverlay,
+      form: nameForm,
+      input: this.root.querySelector<HTMLInputElement>('#name-input')!,
+      title: this.root.querySelector<HTMLElement>('#name-title')!,
+      error: this.root.querySelector<HTMLElement>('#name-error')!
+    }, {
+      state: () => this.state,
+      holdGame: hold => { if (hold) this.game?.scene.pause('GameScene'); else this.game?.scene.resume('GameScene'); },
+      setTyping: typing => this.scene?.setTyping(typing),
+      perform: action => this.scene?.perform(action)
     });
-    nameForm.addEventListener('keydown', event => {
-      if (event.key === 'Escape') this.closeNaming();
-    });
-    this.root.querySelector('#name-cancel')!.addEventListener('click', () => this.closeNaming());
+    wireNameDialog({ overlay: nameOverlay, form: nameForm, cancel: this.root.querySelector<HTMLButtonElement>('#name-cancel')! }, document, this.nameDialog);
     this.root.querySelectorAll<HTMLButtonElement>('[data-upgrade]').forEach(button => {
       button.addEventListener('click', () => this.scene?.perform({ type: 'makeUpgrade', upgrade: button.dataset.upgrade as UpgradeId }));
     });
@@ -276,7 +280,7 @@ export class App {
       if ((cause === 'action' && next !== previous && !this.saveFailures) || due) this.saveCurrent();
     }, message => this.setMessage(message), cue => this.soundscape.playCue(cue));
     // A tap on the game while a phone sheet is open only closes the sheet.
-    this.scene.setNameAsker(target => this.askName(target));
+    this.scene.setNameAsker(target => this.nameDialog?.ask(target));
     this.scene.setTapGate(() => {
       const dock = this.root.querySelector<HTMLElement>('.phone-dock');
       const { allowTap, closeTab } = gateTap(this.openTab, Boolean(dock && getComputedStyle(dock).display !== 'none'));
@@ -786,41 +790,6 @@ export class App {
     this.setText(id, text);
     const element = this.root.querySelector<HTMLElement>(`#${id}`);
     if (element) element.hidden = text === '';
-  }
-
-  private askName(target: NameTarget): void {
-    const overlay = this.root.querySelector<HTMLElement>('#name-overlay');
-    const input = this.root.querySelector<HTMLInputElement>('#name-input');
-    if (!overlay || !input || !overlay.hidden) return;
-    this.naming = target;
-    this.setText('name-title', namePromptCopy(target).title);
-    this.setText('name-error', '');
-    input.value = '';
-    overlay.hidden = false;
-    this.scene?.setTyping(true);
-    this.game?.scene.pause('GameScene');
-    input.focus();
-  }
-
-  private closeNaming(): void {
-    const overlay = this.root.querySelector<HTMLElement>('#name-overlay');
-    if (overlay) overlay.hidden = true;
-    this.naming = null;
-    this.game?.scene.resume('GameScene');
-    this.scene?.setTyping(false);
-  }
-
-  private confirmName(): void {
-    const target = this.naming;
-    const name = this.root.querySelector<HTMLInputElement>('#name-input')?.value ?? '';
-    if (!target) return;
-    const blocker = nameBlocker(this.state, target, name);
-    if (blocker) {
-      this.setText('name-error', blocker);
-      return;
-    }
-    this.closeNaming();
-    this.scene?.perform({ type: 'nameAnimal', target, name });
   }
 
   private setText(id: string, text: string): void {
