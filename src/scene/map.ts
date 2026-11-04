@@ -2,7 +2,7 @@ import { BALANCE, type GameState, type ResourceKind, type ResourceNode } from '.
 import { season, type Season } from '../game/calendar';
 import { QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, homesteadPathOpen, pathOpen } from '../game/areas';
 import { clearingTile, pathTile, quarryGroundTile, terrainSprites } from '../art/terrain';
-import { CLEARING_STEPS, STEP_IDS, clearingKey, clearingReach, type ClearingState, type StepId } from '../game/clearing';
+import { CLEARING_STEPS, STEP_IDS, clearingKey, clearingReach, inClearedPatch, type ClearingState, type StepId } from '../game/clearing';
 import { CAMP_BOTH_OPEN_PATHS, CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_HOMESTEAD_PATHS, CAMP_OPEN_PATHS, CAMP_PATHS, CAMP_SIGN, HOMESTEAD_PATHS, HOMESTEAD_SIGN, QUARRY_PATHS, QUARRY_SIGN, mixHash, pathDistance, type PathRoute } from './mapGeometry';
 import { FACE_HEIGHT, QUARRY_MEADOWS, faceBottom, floorDepth } from './quarryGeometry';
 
@@ -56,6 +56,7 @@ const nearSign = (x: number, y: number, sign: { x: number; y: number }): boolean
 const TREE_CLEARANCE: Record<ResourceKind, number> = { branch: 1.5, berry: 3.5, fiber: 3.5, stone: 3.5, hazel: 1.4, pine: 2.5, greens: 2.5, honey: 2.5, wildGrain: 2.5 };
 function clearForTree(x: number, y: number, site: CampSite): boolean {
   return Math.hypot(x - BALANCE.campX, y - BALANCE.campY) > clearingReach(x, y, site.cleared) + 1 && !nearSign(x, y, CAMP_SIGN) &&
+    !inClearedPatch(x, y, site.cleared) &&
     site.nodes.every(node => Math.hypot(x - node.x, y - node.y) >= TREE_CLEARANCE[node.kind]) &&
     site.reserved.every(tree => Math.hypot(x - tree.x, y - tree.y) >= 1.2) &&
     pathDistance(x + .5, y + .5, site.routes) >= 1.35;

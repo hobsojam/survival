@@ -9,11 +9,11 @@ import { availableStone } from './stone';
 // building the cleared ground makes room for.
 
 export type Side = 'north' | 'east' | 'south' | 'west';
-export type StepId = `${Side}-${'near' | 'far'}` | 'north-outer' | 'south-outer';
+export type StepId = `${Side}-${'near' | 'far'}` | 'north-outer' | 'south-outer' | 'east-outer';
 export type StepDepth = 'near' | 'far' | 'outer';
 
 export const STEP_IDS: readonly StepId[] = [
-  'north-near', 'north-far', 'north-outer', 'east-near', 'east-far', 'south-near', 'south-far', 'south-outer', 'west-near', 'west-far'
+  'north-near', 'north-far', 'north-outer', 'east-near', 'east-far', 'east-outer', 'south-near', 'south-far', 'south-outer', 'west-near', 'west-far'
 ];
 
 /** How far out a step lies on its side: near, far or outer. */
@@ -40,6 +40,8 @@ export interface ClearingStep {
   room: readonly string[];
   /** An outer step clears only a nook: the arc of directions, in degrees from the fire, its reach applies to. */
   arc?: { from: number; to: number };
+  /** A separate patch of ground out in the woods, in tiles, instead of a wider clearing round the fire. It stays grass. */
+  patch?: { x: number; y: number; width: number; height: number };
 }
 
 export interface ClearingState {
@@ -91,6 +93,13 @@ export const CLEARING_STEPS: Record<StepId, ClearingStep> = {
       { x: 29.25, y: 15, sprite: 'treeBroadleaf' }, { x: 27.25, y: 17.25, sprite: 'treePine' },
       { x: 28.5, y: 16.5, sprite: 'treeBroadleaf' }, { x: 28.5, y: 11.75, sprite: 'treePine' },
       { x: 27.5, y: 13.5, sprite: 'treeBroadleaf' }, { x: 29, y: 13, sprite: 'treePine' }
+    ]
+  },
+  'east-outer': {
+    // A meadow up past the lookout, for the sheep: no wedge from the fire big enough for them would spare the wild things.
+    side: 'east', reach: 9, cost: OUTER_COST, room: ['sheepPen'], patch: { x: 31, y: 2, width: 6, height: 5 },
+    trees: [
+      { x: 32.5, y: 3.5, sprite: 'treePine' }, { x: 35, y: 5.5, sprite: 'treeBroadleaf' }, { x: 36, y: 3, sprite: 'treePine' }
     ]
   },
   'south-near': {
@@ -156,9 +165,10 @@ const NOOK_BLEND_DEGREES = 4;
 
 /** How far a cleared step reaches at `angle`: its full reach, or for a nook only within its arc, blending back outside it. */
 function stepReach(step: StepId, angle: number): number {
-  const { reach, arc } = CLEARING_STEPS[step];
-  if (!arc) return reach;
+  const { reach, arc, patch } = CLEARING_STEPS[step];
   const before = previousStep(step);
+  if (patch && before) return stepReach(before, angle);
+  if (!arc) return reach;
   const inner = before ? stepReach(before, angle) : BALANCE.campRadius;
   const outside = Math.max(arc.from - angle, angle - arc.to, 0);
   if (outside >= NOOK_BLEND_DEGREES) return inner;
@@ -185,7 +195,15 @@ export function clearingReach(x: number, y: number, cleared: readonly StepId[]):
 }
 
 export function inClearing(x: number, y: number, cleared: readonly StepId[]): boolean {
-  return Math.hypot(x - BALANCE.campX, y - BALANCE.campY) <= clearingReach(x, y, cleared);
+  return Math.hypot(x - BALANCE.campX, y - BALANCE.campY) <= clearingReach(x, y, cleared) || inClearedPatch(x, y, cleared);
+}
+
+/** Whether a point lies on a separate patch of ground that has been cleared. */
+export function inClearedPatch(x: number, y: number, cleared: readonly StepId[]): boolean {
+  return cleared.some(id => {
+    const patch = CLEARING_STEPS[id].patch;
+    return patch !== undefined && x >= patch.x && x <= patch.x + patch.width && y >= patch.y && y <= patch.y + patch.height;
+  });
 }
 
 /** Whether the survivor stands anywhere in the camp clearing, including ground cleared beyond the fire's warmth. */

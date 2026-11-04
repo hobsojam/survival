@@ -5,7 +5,7 @@ import { BALANCE, type GameState } from './state';
 // The workshop on the east far ground, and the three upgrades made there once each: a saw that doubles the wood from
 // felling, a handcart that catches felled wood, and bed tools that keep a dry vegetable bed alive a day longer.
 
-export type UpgradeId = 'saw' | 'handcart' | 'bedTools' | 'harvestTools' | 'quern';
+export type UpgradeId = 'saw' | 'handcart' | 'bedTools' | 'harvestTools' | 'quern' | 'shears';
 
 type Cost = { wood: number; fiber: number; stone: number };
 
@@ -14,7 +14,8 @@ export const WORKSHOP_UPGRADES: Record<UpgradeId, { name: string; cost: Cost }> 
   handcart: { name: 'handcart', cost: { wood: 8, fiber: 2, stone: 1 } },
   bedTools: { name: 'bed tools', cost: { wood: 3, fiber: 1, stone: 1 } },
   harvestTools: { name: 'sickle and flail', cost: { wood: 3, fiber: 1, stone: 2 } },
-  quern: { name: 'hand quern', cost: { wood: 1, fiber: 0, stone: 4 } }
+  quern: { name: 'hand quern', cost: { wood: 1, fiber: 0, stone: 4 } },
+  shears: { name: 'shears', cost: { wood: 1, fiber: 0, stone: 2 } }
 };
 
 export const UPGRADE_MESSAGES: Record<UpgradeId, string> = {
@@ -22,7 +23,8 @@ export const UPGRADE_MESSAGES: Record<UpgradeId, string> = {
   handcart: 'You built a handcart. Felled wood goes into the cart now.',
   bedTools: 'You made a hoe and a watering can. A dry bed holds on a day longer before it withers.',
   harvestTools: 'You made a sickle and a flail. The grain can come in now.',
-  quern: 'You made a hand quern. Grain can be ground into flour at the granary.'
+  quern: 'You made a hand quern. Grain can be ground into flour at the granary.',
+  shears: 'You made a pair of shears. The flock can be sheared in spring.'
 };
 
 /** "3 wood and 3 stone", or "8 wood, 2 fiber, and 1 stone": the cost's parts, leaving out any it doesn't need. */
@@ -40,6 +42,7 @@ export function upgradeBlocker(state: GameState, id: UpgradeId): string | null {
   if (id === 'bedTools' && !state.structures.vegetableBeds) return 'Build the vegetable beds first.';
   if (id === 'harvestTools' && !state.structures.field) return 'Build the field first.';
   if (id === 'quern' && !state.structures.granary) return 'Build the granary first.';
+  if (id === 'shears' && !state.structures.sheepPen) return 'Build the sheep pen first.';
   if (!isInClearing(state)) return 'Return to camp to work at the workshop.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   if (availableWood(state) < cost.wood || availableFiber(state) < cost.fiber || availableStone(state) < cost.stone) {

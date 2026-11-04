@@ -185,6 +185,7 @@ export function buildStatus(state: GameState, id: StructureId): BuildStatus {
   const definition = BUILDINGS[id];
   if (state.structures[id]) return 'built';
   if (id === 'chickenCoop' && !state.chickens.discovered) return 'locked';
+  if (id === 'loom' && state.sheep.lastShornYear === null) return 'locked';
   if ('friend' in definition && !hasFriend(state, definition.friend)) return 'locked';
   if (definition.prerequisite === 'coldNight' && !state.progress.hearthUnlocked) return 'locked';
   const missingPrerequisite = missingStructurePrerequisite(state, definition);
@@ -1006,6 +1007,7 @@ function buildBlocker(state: GameState, structureId: StructureId): string | null
   const definition = BUILDINGS[structureId];
   if (!definition) return 'That structure is unavailable.';
   if (structureId === 'chickenCoop' && !state.chickens.discovered) return 'Find the chickens at the old homestead first.';
+  if (structureId === 'loom' && state.sheep.lastShornYear === null) return 'Shear the flock first.';
   if ('friend' in definition && !hasFriend(state, definition.friend)) return 'Befriend this animal first.';
   if (definition.prerequisite === 'coldNight' && !state.progress.hearthUnlocked) return 'Weather the cold night to unlock the hearth.';
   if (state.structures[structureId]) return 'Already built.';

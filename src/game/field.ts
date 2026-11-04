@@ -22,11 +22,13 @@ export interface FieldState {
   seed: number;
   /** Grain in the granary. */
   grain: number;
+  /** Straw left from threshing, feed for the sheep. */
+  straw: number;
 }
 
 export const bareStrip = (): FieldStrip => ({ sownDay: null, cut: false });
 
-export const emptyField = (): FieldState => ({ strips: Array.from({ length: FIELD_STRIPS }, bareStrip), seed: 0, grain: 0 });
+export const emptyField = (): FieldState => ({ strips: Array.from({ length: FIELD_STRIPS }, bareStrip), seed: 0, grain: 0, straw: 0 });
 
 /** The first day a strip sown on `sownDay` is ripe: summer's fifth day of the same year. */
 export function ripeDay(sownDay: number): number {
@@ -108,7 +110,8 @@ export function threshedField(state: GameState, index: number): { field: FieldSt
   const field = {
     strips: state.field.strips.map((strip, i) => i === index ? bareStrip() : strip),
     seed: Math.min(FIELD_STRIPS, state.field.seed + 1),
-    grain: state.field.grain + stored
+    grain: state.field.grain + stored,
+    straw: state.field.straw
   };
   if (stored === 0) return { field, message: 'The granary is already full. You kept the seed, and the rest stays as straw.' };
   if (stored < BALANCE.grainPerStrip) return { field, message: 'Threshed the strip. The granary is full now, and the rest stays as straw.' };

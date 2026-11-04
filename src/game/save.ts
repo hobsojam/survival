@@ -27,7 +27,7 @@ const whole = (value: unknown): value is number => Number.isInteger(value) && fi
 const count = (value: unknown): value is number => whole(value) && value >= 0;
 const onMap = (x: unknown, y: unknown): boolean => finite(x) && x >= 0 && x <= BALANCE.mapWidth - 1 && finite(y) && y >= 0 && y <= BALANCE.mapHeight - 1;
 
-type SaveShape = ObjectValue & { player: ObjectValue; inventory: ObjectValue; structures: ObjectValue; progress: ObjectValue; nodes: unknown[]; trees: unknown[]; stonePiles: unknown[]; gardenPlots: unknown[] };
+type SaveShape = ObjectValue & { sheep: unknown; player: ObjectValue; inventory: ObjectValue; structures: ObjectValue; progress: ObjectValue; nodes: unknown[]; trees: unknown[]; stonePiles: unknown[]; gardenPlots: unknown[] };
 const bool = (value: unknown): value is boolean => typeof value === 'boolean';
 
 function hasShape(value: unknown): value is SaveShape {
@@ -180,7 +180,8 @@ function validField({ field, structures, day }: SaveShape): boolean {
   });
   const seedOk = count(field.seed) && field.seed <= FIELD_STRIPS;
   const grainOk = count(field.grain) && field.grain <= BALANCE.granaryCapacity && (structures.granary === true || field.grain === 0);
-  return stripsOk && seedOk && grainOk;
+  const strawOk = count(field.straw) && field.straw <= BALANCE.strawCapacity;
+  return stripsOk && seedOk && grainOk && strawOk;
 }
 
 /** Flour only in a built windmill's bin and no more than it holds; loaves only on a built bakery's shelf, no more than it holds, each baked on a day already lived, as are the last bake and the last fresh start, which comes no later than it. */
@@ -376,10 +377,27 @@ function validSickness({ sickness, ending, day, fishingMisses }: SaveShape): boo
     && cared < BALANCE.sickDaysToRecover && (uncared < BALANCE.sickDaysToDie || ending !== null);
 }
 
+/** Sheep need their pen; a shearing needs sheep and shears; the loom follows a shearing, and each woven item its loom and what it goes with. */
+function validSheep({ sheep, structures, progress, day }: SaveShape): boolean {
+  if (!object(sheep) || !object(sheep.woven) || !bool(sheep.arrived) || !object(progress.workshop)) return false;
+  const { arrived, fluff, fedUntil, lastShornYear, wool, woven } = sheep as ObjectValue & { woven: ObjectValue };
+  if (!count(fluff) || fluff > BALANCE.fluffCap || !count(wool) || wool > BALANCE.woolCapacity) return false;
+  if (fedUntil !== null && (!whole(fedUntil) || fedUntil > (day as number) + BALANCE.feedDays)) return false;
+  if (fedUntil !== null && structures.sheepPen !== true) return false;
+  if (arrived ? (structures.sheepPen !== true || fedUntil === null) : fluff !== 0) return false;
+  const shorn = lastShornYear !== null;
+  if (shorn && (!whole(lastShornYear) || !arrived || progress.workshop.shears !== true)) return false;
+  if (!shorn && (wool !== 0 || structures.loom === true)) return false;
+  const items = ['blanket', 'jumper', 'rug'] as const;
+  if (Object.keys(woven).length !== items.length || !items.every(item => bool(woven[item]))) return false;
+  if (items.some(item => woven[item]) && structures.loom !== true) return false;
+  return (!woven.blanket || structures.bed === true) && (!woven.rug || structures.house === true);
+}
+
 /** Checks a version 24 save, with the survivor's sickness and whether their story has ended, and: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, the workshop and its handcart, shelter upgrades, garden plots, vegetable beds, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validDecorations, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validBeehive, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validChickens, validSickness];
+  const checks = [validClock, validSurvivor, validProgress, validDecorations, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validBeehive, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validChickens, validSickness, validSheep];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 
