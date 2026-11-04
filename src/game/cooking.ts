@@ -5,9 +5,9 @@ import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { BALANCE, type GameState } from './state';
 
 // Cooking at the fire. Without the pot it is fish or one berry toasted on a stick; the pot, made at the toolshed,
-// adds tea, salad, roasted nuts, honey cake and, once the well stands, vegetable stew. Every dish needs a usable fire at home or camp.
+// adds tea, salad, roasted nuts, honey cake, apple pie and, once the well stands, vegetable stew. Every dish needs a usable fire at home or camp.
 
-export type DishId = 'fish' | 'rabbit' | 'berries' | 'omelette' | 'pineTea' | 'salad' | 'roastedHazelnuts' | 'honeyCake' | 'stew' | 'loaf';
+export type DishId = 'fish' | 'rabbit' | 'berries' | 'omelette' | 'pineTea' | 'salad' | 'roastedHazelnuts' | 'honeyCake' | 'stew' | 'loaf' | 'bakedApple' | 'eggOnBread' | 'applePie';
 
 export const DISHES: Record<DishId, { name: string; ingredients: Partial<Record<FoodItem, number>>; potOnly: boolean }> = {
   fish: { name: 'a fish', ingredients: { fish: 1 }, potOnly: false },
@@ -20,10 +20,13 @@ export const DISHES: Record<DishId, { name: string; ingredients: Partial<Record<
   honeyCake: { name: 'honey cake', ingredients: { honey: 1, hazelnut: 1, berry: 1 }, potOnly: true },
   stew: { name: 'vegetable stew', ingredients: { vegetables: 2 }, potOnly: true },
   // Baked on the hot stones by the fire, so it needs no pot; the loaf is kept in the bag for later.
-  loaf: { name: 'a loaf of bread', ingredients: { flour: 1 }, potOnly: false }
+  loaf: { name: 'a loaf of bread', ingredients: { flour: 1 }, potOnly: false },
+  bakedApple: { name: 'a baked apple', ingredients: { apple: 1 }, potOnly: false },
+  eggOnBread: { name: 'egg on bread', ingredients: { egg: 1, bread: 1 }, potOnly: false },
+  applePie: { name: 'apple pie', ingredients: { apple: 1, egg: 1, flour: 1 }, potOnly: true }
 };
 
-export const DISH_ORDER: readonly DishId[] = ['fish', 'rabbit', 'berries', 'omelette', 'pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew', 'loaf'];
+export const DISH_ORDER: readonly DishId[] = ['fish', 'rabbit', 'berries', 'omelette', 'pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew', 'loaf', 'bakedApple', 'eggOnBread', 'applePie'];
 
 export const POT_COST = { wood: 1, fiber: 0, stone: 2 } as const;
 
@@ -158,6 +161,18 @@ export function serveDish(cooked: GameState, dish: DishId, dryingRack: boolean):
     case 'stew': return {
       state: { ...cooked, player: { ...player, hunger: up(player.hunger, BALANCE.stewHungerGain), warmth: up(player.warmth, BALANCE.stewWarmthGain) } },
       message: 'You simmer a vegetable stew. It fills you up and warms you through.'
+    };
+    case 'bakedApple': return {
+      state: { ...cooked, player: { ...player, hunger: up(player.hunger, BALANCE.bakedAppleHunger), warmth: up(player.warmth, BALANCE.cookWarmthGain) } },
+      message: 'You bake an apple in the embers. It comes out soft and sweet.'
+    };
+    case 'eggOnBread': return {
+      state: { ...cooked, player: { ...player, hunger: up(player.hunger, BALANCE.eggOnBreadHunger), warmth: up(player.warmth, BALANCE.cookWarmthGain) } },
+      message: 'You fry an egg and lay it on thick bread. A proper breakfast, whatever the hour.'
+    };
+    case 'applePie': return {
+      state: { ...cooked, player: { ...player, hunger: up(player.hunger, BALANCE.applePieHunger), warmth: up(player.warmth, BALANCE.applePieWarmth) } },
+      message: 'You bake a little apple pie. The whole camp smells of it.'
     };
   }
 }

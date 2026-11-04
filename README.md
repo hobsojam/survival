@@ -203,6 +203,9 @@ Once the toolshed is built, you can make a **cooking pot** in the Forest tools p
 | Roasted hazelnuts | 2 hazelnuts | a portion of roasted hazelnuts for your bag, eaten later for 50 hunger |
 | Honey cake | 1 honey, 1 hazelnut, 1 berry | 60 hunger, and your next rest or sleep at camp restores 10 more energy |
 | Vegetable stew | 2 vegetables | 55 hunger, 15 warmth; needs the well |
+| Baked apple | 1 apple | 30 hunger, 10 warmth; no pot needed |
+| Egg on bread | 1 egg, 1 loaf | 55 hunger, 10 warmth; no pot needed |
+| Apple pie | 1 apple, 1 egg, 1 flour | 60 hunger, 15 warmth |
 
 Pot dishes can be made by day or night at a usable fire, taking eight seconds each. Any of them except roasted hazelnuts counts as a warm meal for a sick survivor. Stargazing still waits for nightfall.
 

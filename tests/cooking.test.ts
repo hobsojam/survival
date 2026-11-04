@@ -3,7 +3,7 @@ import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { nightStart } from '../src/game/calendar';
 import { addFood, emptyFood, type FoodItem } from '../src/game/food';
 import { applyAction } from '../src/game/rules';
-import { DISHES, DISH_ORDER, defaultDish, dishBlocker, potBlocker } from '../src/game/cooking';
+import { DISHES, DISH_ORDER, defaultDish, dishBlocker, isPackedDish, potBlocker, type DishId } from '../src/game/cooking';
 
 const NIGHT = nightStart(1);
 
@@ -61,6 +61,9 @@ describe('the cooking pot', () => {
   });
 });
 
+/** Warmth after toasting a berry: the same eight seconds by the fire and the plain warm meal, to measure other dishes against. */
+const toastedBerryWarmth = (): number => applyAction(evening({ berry: 1 }), { type: 'cook', dish: 'berries' }).state.player.warmth;
+
 describe('the dishes', () => {
   it('cooks one egg into a simple omelette without a pot', () => {
     const state = evening({ egg: 1 }, false);
@@ -69,9 +72,74 @@ describe('the dishes', () => {
     expect(cooked.state.player.hunger).toBeCloseTo(29 + 35);
     expect(cooked.message).toContain('omelette');
   });
-  it('lists every dish in order, and only a fish, a rabbit and berries cook without the pot', () => {
-    expect(DISH_ORDER).toEqual(['fish', 'rabbit', 'berries', 'omelette', 'pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew', 'loaf']);
-    expect(DISH_ORDER.filter(dish => !DISHES[dish].potOnly)).toEqual(['fish', 'rabbit', 'berries', 'omelette', 'loaf']);
+  it('lists every dish in order, and which cook without the pot', () => {
+    expect(DISH_ORDER).toEqual(['fish', 'rabbit', 'berries', 'omelette', 'pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew', 'loaf', 'bakedApple', 'eggOnBread', 'applePie']);
+    expect(DISH_ORDER.filter(dish => !DISHES[dish].potOnly)).toEqual(['fish', 'rabbit', 'berries', 'omelette', 'loaf', 'bakedApple', 'eggOnBread']);
+  });
+
+  it('bakes an apple without a pot into a warmer meal than a raw one', () => {
+    const cooked = applyAction(evening({ apple: 1 }, false), { type: 'cook', dish: 'bakedApple' });
+    expect(cooked.state.inventory.food.apple).toEqual([]);
+    expect(cooked.state.player.hunger).toBeCloseTo(29 + 30);
+    expect(BALANCE.bakedAppleHunger).toBeGreaterThan(BALANCE.appleHunger);
+    expect(cooked.state.player.warmth).toBeCloseTo(toastedBerryWarmth());
+    expect(cooked.message).toContain('apple');
+  });
+
+  it('fries an egg onto a loaf without a pot', () => {
+    const cooked = applyAction(evening({ egg: 1, bread: 1 }, false), { type: 'cook', dish: 'eggOnBread' });
+    expect(cooked.state.inventory.food.egg).toEqual([]);
+    expect(cooked.state.inventory.food.bread).toEqual([]);
+    expect(cooked.state.player.hunger).toBeCloseTo(29 + 55);
+    expect(cooked.state.player.warmth).toBeCloseTo(toastedBerryWarmth());
+    expect(cooked.message).toContain('egg');
+  });
+
+  it('asks for what egg on bread is missing', () => {
+    expect(dishBlocker(evening({ egg: 1 }, false), 'eggOnBread')).toBe('You need 1 egg and 1 loaf for egg on bread.');
+  });
+
+  it('bakes an apple pie in the pot from an apple, an egg and a flour', () => {
+    const cooked = applyAction(evening({ apple: 1, egg: 1, flour: 1 }), { type: 'cook', dish: 'applePie' });
+    expect(cooked.state.inventory.food.apple).toEqual([]);
+    expect(cooked.state.inventory.food.egg).toEqual([]);
+    expect(cooked.state.inventory.food.flour).toBe(0);
+    expect(cooked.state.player.hunger).toBeCloseTo(29 + 60);
+    expect(cooked.state.player.warmth).toBeCloseTo(toastedBerryWarmth() - BALANCE.cookWarmthGain + 15);
+    expect(cooked.message).toContain('pie');
+  });
+
+  it('needs the pot for an apple pie', () => {
+    expect(dishBlocker(evening({ apple: 1, egg: 1, flour: 1 }, false), 'applePie')).toBe('Make a cooking pot first.');
+  });
+
+  it('bakes an apple pie with flour from the windmill', () => {
+    const state = evening({ apple: 1, egg: 1 });
+    const milled = { ...state, structures: { ...state.structures, windmill: true }, millFlour: 1 };
+    expect(applyAction(milled, { type: 'cook', dish: 'applePie' }).state.millFlour).toBe(0);
+  });
+
+  it('keeps nothing in the bag from the new dishes: they are eaten at the fire', () => {
+    expect(isPackedDish('bakedApple')).toBe(false);
+    expect(isPackedDish('eggOnBread')).toBe(false);
+    expect(isPackedDish('applePie')).toBe(false);
+  });
+
+  it('counts each new dish as a warm meal for a sick survivor', () => {
+    const foods: [DishId, Partial<Record<FoodItem, number>>][] = [
+      ['bakedApple', { apple: 1 }], ['eggOnBread', { egg: 1, bread: 1 }], ['applePie', { apple: 1, egg: 1, flour: 1 }]
+    ];
+    for (const [dish, food] of foods) {
+      const state = evening(food);
+      const ill = { ...state, sickness: { ...state.sickness, sick: true, sickFromDay: state.day } };
+      expect(applyAction(ill, { type: 'cook', dish }).state.sickness.ateWarm, dish).toBe(true);
+    }
+  });
+
+  it('lets C keep cooking what it did before when an older dish is ready', () => {
+    expect(defaultDish(evening({ egg: 1, apple: 1, flour: 1 }))).toBe('omelette');
+    expect(defaultDish(evening({ flour: 1, apple: 1 }))).toBe('loaf');
+    expect(defaultDish(evening({ apple: 1 }))).toBe('bakedApple');
   });
 
   it('cooks berries without the pot exactly as before', () => {
@@ -139,7 +207,8 @@ describe('the dishes', () => {
     const ingredients: Record<keyof typeof DISHES, Partial<Record<FoodItem, number>>> = {
       fish: { fish: 1 }, rabbit: { rabbit: 1 }, berries: { berry: 1 }, omelette: { egg: 1 }, pineTea: { pineNeedles: 1 },
       salad: { greens: 1, berry: 1 }, roastedHazelnuts: { hazelnut: 2 },
-      honeyCake: { honey: 1, hazelnut: 1, berry: 1 }, stew: { vegetables: 2 }, loaf: { flour: 1 }
+      honeyCake: { honey: 1, hazelnut: 1, berry: 1 }, stew: { vegetables: 2 }, loaf: { flour: 1 },
+      bakedApple: { apple: 1 }, eggOnBread: { egg: 1, bread: 1 }, applePie: { apple: 1, egg: 1, flour: 1 }
     };
     for (const dish of DISH_ORDER) {
       const state = evening(ingredients[dish]);

@@ -554,7 +554,7 @@ describe('the pot dishes after dark', () => {
   it('lists each pot dish with its blocker', () => {
     const state = night(true);
     const dishes = nightDishesView(state);
-    expect(dishes.map(entry => entry.dish)).toEqual(['pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew']);
+    expect(dishes.map(entry => entry.dish)).toEqual(['pineTea', 'salad', 'roastedHazelnuts', 'honeyCake', 'stew', 'applePie']);
     for (const entry of dishes) {
       const blocker = dishBlocker(state, entry.dish);
       expect(entry.disabled, entry.dish).toBe(Boolean(blocker));
@@ -604,6 +604,21 @@ describe('chicken coop panel', () => {
     withEgg.inventory.food = addFood(withEgg.inventory.food, 'egg', 1, withEgg.day);
     expect(nightDishesView(withEgg).some(dish => dish.dish === 'omelette')).toBe(true);
     expect(nightDishesView(createGame()).some(dish => dish.dish === 'omelette')).toBe(false);
+  });
+
+  it('offers a baked apple by the fire when an apple is in reach', () => {
+    const withApple = createGame();
+    withApple.inventory.food = addFood(withApple.inventory.food, 'apple', 1, withApple.day);
+    expect(nightDishesView(withApple).some(dish => dish.dish === 'bakedApple')).toBe(true);
+    expect(nightDishesView(createGame()).some(dish => dish.dish === 'bakedApple')).toBe(false);
+  });
+
+  it('offers egg on bread when an egg is in reach, saying if the loaf is missing', () => {
+    const withEgg = createGame();
+    withEgg.inventory.food = addFood(withEgg.inventory.food, 'egg', 1, withEgg.day);
+    const offered = nightDishesView(withEgg).find(dish => dish.dish === 'eggOnBread');
+    expect(offered).toMatchObject({ disabled: true, cost: `1 egg and 1 loaf · ${BALANCE.cookSeconds} seconds` });
+    expect(nightDishesView(createGame()).some(dish => dish.dish === 'eggOnBread')).toBe(false);
   });
 });
 
