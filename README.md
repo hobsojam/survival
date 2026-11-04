@@ -107,7 +107,7 @@ The birds, the fox and even the winter wolves can come to trust you, if you shar
 
 Every few days a friend leaves a feather or a tuft of fur by the fire; walk over to pick it up. The first you pick up each season goes in the year journal, and once you've found a feather, a few hang at the shelter for good. These keepsakes don't take bag space. Six feathers make a **feather pillow** for the bed (resting there restores 10 more energy), and six tufts of fur make a **fur cloak** (you lose a quarter less warmth at night). You can make both. Once the house stands, each befriended animal can have a small home of its own nearby: a birdhouse, a fox den, or a wolf house. These are decorative.
 
-**Names.** When an animal stays, you're asked what to call it. Tap a sheep or a hen to name that one too, whenever you feel like it, or tap a friend you didn't name at the time. Names can't be changed, and nothing about the game depends on them. Morning notes and journal lines use them, and the panels list who lives here.
+**Names.** When an animal stays, you're asked what to call it. Tap a sheep or a hen to name that one too, whenever you feel like it, or stop walking and tap a friend you didn't name at the time. Names can't be changed, and nothing about the game depends on them. Morning notes and journal lines use them, and the panels list who lives here.
 
 ### The cold night
 
