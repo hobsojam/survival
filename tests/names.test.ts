@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { createGame, type GameState } from '../src/game/state';
 import { alarmMessage, applyAction } from '../src/game/rules';
+import { placeBranches } from '../src/game/clearing';
 import { companionNews } from '../src/game/companion';
 import { newsBetween } from '../src/game/news';
 import { wolfMessage } from '../src/game/wolves';
 import { endingView } from '../src/ui/ending';
 import { pillowView } from '../src/ui/panels';
-import { saveGame } from '../src/game/save';
+import { recordJournal } from '../src/game/journalEntries';
+import { loadGame, saveGame } from '../src/game/save';
+import { currentPage, journalPageView, renderJournalPage, type JournalNode } from '../src/ui/yearJournal';
 import { SAVE_VERSION, upgradeSave } from '../src/game/saveUpgrades';
-import { anyNamed, cleanName, friendCalled, nameBlocker, nameOf, namedNote, type NameTarget } from '../src/game/names';
+import { anyNamed, cleanName, friendCalled, nameBlocker, nameOf, named, namedNote, type NameTarget } from '../src/game/names';
 
 const fakeStorage = (): Storage => {
   const items = new Map<string, string>();
@@ -219,5 +222,116 @@ describe('morning notes about named animals', () => {
     expect(newsBetween(before, after).filter(line => line === namedNote(rusty(), noteDay))).toHaveLength(1);
     const same = { ...rusty(), day: noteDay };
     expect(newsBetween(same, same)).not.toContain(namedNote(rusty(), noteDay));
+  });
+});
+
+describe('the journal and names', () => {
+  const CLEARED: GameState['clearing']['cleared'] = ['east-near', 'east-far', 'east-outer', 'south-near', 'south-far'];
+  /** A flock on a spring morning, ready to shear. */
+  const ready = (fluff: number, sheepNames: (string | null)[] = [null, null, null]): GameState => {
+    const state: GameState = {
+      ...game,
+      day: 21,
+      timeOfDay: 30,
+      player: { ...game.player, x: 20, y: 15 },
+      nodes: game.nodes.map((node, i) => ({ ...node, ...placeBranches(game.nodes, CLEARED)[i] })),
+      structures: { ...game.structures, shelter: true, toolshed: true, workshop: true, field: true, sheepPen: true },
+      progress: { ...game.progress, nextStormDay: null, hearthUnlocked: true, workshop: { ...game.progress.workshop, shears: true } },
+      clearing: { cleared: CLEARED, marked: null, felled: [] },
+      sheep: { ...game.sheep, arrived: true, fluff, fedUntil: 1 }
+    };
+    return withNames(state, { sheep: sheepNames });
+  };
+  const shear = (state: GameState) => {
+    const action = { type: 'shearFlock' } as const;
+    return recordJournal(state, applyAction(state, action).state, action);
+  };
+  const shearing = (state: GameState) => state.journal.find(entry => entry.id === 'shearing')!;
+  const line = (state: GameState, id: string): string | undefined =>
+    journalPageView(state, currentPage(state.day)).entries.find((_, i) => state.journal[i]?.id === id)?.line;
+  /** The dawn after a state, in its journal. */
+  const dawnAfter = (state: GameState) => {
+    const after = { ...state, day: state.day + 1, timeOfDay: 1 };
+    return recordJournal(state, after);
+  };
+
+  it('keeps today\'s shearing lines with no name', () => {
+    expect(shear(ready(40)).messages).toContain('Written in your journal: Sheared the flock. They looked smaller and rather cross.');
+    expect(shearing(shear(ready(40)).state).name).toBeUndefined();
+  });
+
+  it('shears a named sheep by name, using the first one named', () => {
+    const { state, messages } = shear(ready(40, [null, 'Maud', 'Bess']));
+    expect(messages).toContain('Written in your journal: Sheared Maud and the others. They looked smaller and rather cross.');
+    expect(shearing(state).name).toBe('Maud');
+  });
+
+  it('finds a Maud in the cloud', () => {
+    const { messages } = shear(ready(200, ['Maud', null, null]));
+    expect(messages).toContain('Written in your journal: Sheared the cloud. There was a Maud in there after all.');
+  });
+
+  it('writes a named line at the first dawn of the season with something named', () => {
+    const named = withNames(withFox({ day: 25 }), { fox: 'Rusty' });
+    const { state, messages } = dawnAfter(named);
+    const entry = state.journal.find(item => item.id === 'namedSpring')!;
+    expect(entry).toMatchObject({ name: 'Rusty', day: 26, year: 1 });
+    expect(messages.some(message => message.includes('Rusty'))).toBe(true);
+    expect(dawnAfter(state).state.journal.filter(item => item.id === 'namedSpring')).toHaveLength(1);
+  });
+
+  it('writes no named line with nothing named', () => {
+    expect(dawnAfter(withFox({ day: 25 })).state.journal.map(item => item.id)).not.toContain('namedSpring');
+  });
+
+  it('leaves no blank for it until something is named', () => {
+    const plain = withFox({ day: 25 });
+    expect(journalPageView(withNames(plain, { fox: 'Rusty' }), 2).blanks).toBe(journalPageView(plain, 2).blanks + 1);
+  });
+
+  it('keeps a line as written when an animal is named afterwards', () => {
+    const { state } = shear(ready(40));
+    const before = line(state, 'shearing');
+    expect(before).toBe('Sheared the flock. They looked smaller and rather cross.');
+    expect(line(named(state, { kind: 'sheep', index: 0 }, 'Maud'), 'shearing')).toBe(before);
+  });
+
+  it('keeps a name in a line through a save and load', () => {
+    const storage = fakeStorage();
+    const { state } = shear(ready(40, ['Maud', null, null]));
+    expect(saveGame(storage, state).ok).toBe(true);
+    const loaded = loadGame(storage);
+    expect(loaded.kind === 'loaded' && line(loaded.state, 'shearing')).toBe('Sheared Maud and the others. They looked smaller and rather cross.');
+  });
+
+  it('draws a name with markup in it as plain characters', () => {
+    const made: string[] = [];
+    const node = (): JournalNode & { text: string[] } => {
+      const self = {
+        className: '', textContent: '' as string | null, disabled: false, text: [] as string[],
+        classList: { toggle: () => undefined }, setAttribute: () => undefined,
+        append: (...nodes: (JournalNode | string)[]) => { for (const item of nodes) if (typeof item === 'string') self.text.push(item); },
+        replaceChildren: () => undefined
+      };
+      return self;
+    };
+    const rows: (JournalNode & { text: string[] })[] = [];
+    const { state } = shear(ready(40, ['<b>x</b>', null, null]));
+    renderJournalPage({ querySelector: () => node() }, journalPageView(state, 2), {
+      createElement: (tag: string) => { made.push(tag); const item = node(); rows.push(item); return item; }
+    });
+    expect(made).not.toContain('b');
+    expect(rows.some(item => item.text.some(text => text.includes('<b>x</b>')))).toBe(true);
+  });
+
+  it('turns down a named line with no name, and a name that would not be allowed', () => {
+    const { state } = shear(ready(40, ['Maud', null, null]));
+    const entry = shearing(state);
+    const swap = (changes: object): GameState => ({ ...state, journal: state.journal.map(item => (item === entry ? { ...item, ...changes } : item)) });
+    expect(saves(state)).toBe(true);
+    expect(saves(swap({ name: undefined }))).toBe(false);
+    expect(saves(swap({ name: 'a'.repeat(13) }))).toBe(false);
+    expect(saves(swap({ name: 7 }))).toBe(false);
+    expect(saves(swap({ variant: 0 }))).toBe(false);
   });
 });

@@ -74,3 +74,15 @@ export function namedNote(state: GameState, day: number): string | null {
   const lines = NOTES[kind];
   return lines[Math.floor(dayHash(day + 1777) * lines.length)].replace('{name}', () => name);
 }
+
+/** One named animal's name for this day, or null with nothing named. */
+export function nameForDay(state: GameState, day: number): string | null {
+  const animals = fellows(state);
+  return animals.length === 0 ? null : animals[Math.floor(dayHash(day + 2111) * animals.length)].name;
+}
+
+/** The first sheep's name that has been given, or null. */
+export const firstSheepName = ({ names }: GameState): string | null => names.sheep.find(name => name !== null) ?? null;
+
+/** A written line with the name it was written with put in. */
+export const lineWithName = (line: string, name: string | undefined): string => (name === undefined ? line : line.replace('{name}', () => name));

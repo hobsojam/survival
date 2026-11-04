@@ -276,7 +276,9 @@ function validJournal({ journal, day }: SaveShape): boolean {
     if (!known || seen.has(key)) return false;
     seen.add(key);
     return entry.day >= 1 && entry.day <= (day as number) && yearOf(entry.day) === entry.year
-      && season(entry.day) === journalSeason(entry.id as JournalId) && entry.variant < known.lines.length;
+      && season(entry.day) === journalSeason(entry.id as JournalId) && entry.variant < known.lines.length
+      // A line with a place for a name has one, and only those lines do.
+      && (known.lines[entry.variant].includes('{name}') ? typeof entry.name === 'string' && cleanName(entry.name) === entry.name : entry.name === undefined);
   });
 }
 

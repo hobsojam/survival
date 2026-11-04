@@ -2,6 +2,7 @@ import { duskLength, nightStart, season, seasonMessage, yearOf, type Season } fr
 import { defaultDish, type DishId } from './cooking';
 import { keepsakeStock } from './companion';
 import { foodCount, type FoodItem } from './food';
+import { firstSheepName, lineWithName, nameForDay } from './names';
 import { rainMessage } from './rain';
 import { sheepStage } from './sheep';
 import { fuelLeft, isAtHome, livesInHouse, warmFuel } from './home';
@@ -20,9 +21,11 @@ export type JournalId =
   | 'fireflies' | 'twoHandfuls' | 'goldEvening' | 'warmSleep' | 'lookoutEvening'
   | 'hazelnuts' | 'pineTea' | 'salad' | 'wildHoney' | 'fireside' | 'grainIn' | 'winterBread'
   | 'autumnGrain' | 'summerBread' | 'ovenBread' | 'shearing'
-  | 'autumnKeepsake' | 'winterKeepsake' | 'springKeepsake' | 'summerKeepsake';
+  | 'autumnKeepsake' | 'winterKeepsake' | 'springKeepsake' | 'summerKeepsake'
+  | 'namedAutumn' | 'namedWinter' | 'namedSpring' | 'namedSummer';
 
-export interface JournalEntry { year: number; id: JournalId; day: number; variant: number }
+/** `name` is the animal's name when the line was written, so naming one later never changes old lines. */
+export interface JournalEntry { year: number; id: JournalId; day: number; variant: number; name?: string }
 
 interface PageEntry {
   id: JournalId;
@@ -42,7 +45,8 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'hazelnuts', lines: ['Found hazelnuts in the leaf litter.'] },
     { id: 'fireside', lines: ['A night by the fireplace, the door shut against the wind.'] },
     { id: 'autumnGrain', lines: ['Threshed the grain with the leaves coming down.'] },
-    { id: 'autumnKeepsake', lines: ['Found a feather by the fire, among the fallen leaves.', 'Found a tuft of fur by the fire, among the fallen leaves.'] }
+    { id: 'autumnKeepsake', lines: ['Found a feather by the fire, among the fallen leaves.', 'Found a tuft of fur by the fire, among the fallen leaves.'] },
+    { id: 'namedAutumn', lines: ['{name} watched the leaves come down, and seemed to take it personally.'] }
   ],
   winter: [
     { id: 'firstSnow', lines: ['Snow fell in the night.'], silent: true },
@@ -53,7 +57,8 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
       'Cooked a warm supper by the fire, with the snow coming down.'] },
     { id: 'pineTea', lines: ['Pine needle tea, hot in the snow.'] },
     { id: 'winterBread', lines: ['Bread from my own field, warm by the fire.'] },
-    { id: 'winterKeepsake', lines: ['A feather by the fire, bright against the snow.', 'A tuft of fur by the fire, frost on its tips.'] }
+    { id: 'winterKeepsake', lines: ['A feather by the fire, bright against the snow.', 'A tuft of fur by the fire, frost on its tips.'] },
+    { id: 'namedWinter', lines: ['{name} and I agreed that it was cold.'] }
   ],
   spring: [
     { id: 'firstRain', lines: ['The first rain of spring.'], silent: true },
@@ -63,7 +68,9 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'springRest', lines: ['Sat a while at the spring, now that it\'s thawed.'] },
     { id: 'salad', lines: ['Greens and berries, the first salad of spring.'] },
     { id: 'ovenBread', lines: ['Woke to warm bread from my own oven.'] },
-    { id: 'shearing', lines: ['Sheared the flock. They looked smaller and rather cross.', 'Sheared the cloud. There was a sheep in there after all.'] },
+    { id: 'shearing', lines: ['Sheared the flock. They looked smaller and rather cross.', 'Sheared the cloud. There was a sheep in there after all.',
+      'Sheared {name} and the others. They looked smaller and rather cross.', 'Sheared the cloud. There was a {name} in there after all.'] },
+    { id: 'namedSpring', lines: ['Spring, and {name} is still here. I\'m glad.'] },
     { id: 'springKeepsake', lines: ['A new feather by the fire, soft as the morning.', 'A tuft of winter fur by the fire, shed for spring.'] }
   ],
   summer: [
@@ -75,7 +82,8 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'wildHoney', lines: ['Wild honey from the hollow tree.'] },
     { id: 'grainIn', lines: ['Brought the grain in. The granary smells of summer.'] },
     { id: 'summerBread', lines: ['The first loaf from the new grain, still warm.'] },
-    { id: 'summerKeepsake', lines: ['A feather by the fire on a warm morning.', 'A wisp of fur by the fire on a warm morning.'] }
+    { id: 'summerKeepsake', lines: ['A feather by the fire on a warm morning.', 'A wisp of fur by the fire on a warm morning.'] },
+    { id: 'namedSummer', lines: ['A long warm evening with {name}. Neither of us did much.'] }
   ]
 };
 
@@ -86,7 +94,7 @@ export const journalSeason = (id: JournalId): Season | undefined =>
   (Object.keys(JOURNAL_PAGES) as Season[]).find(s => JOURNAL_PAGES[s].some(entry => entry.id === id));
 
 /** A moment just noticed: the day it belongs to, which line tells it, and whether its own message already said so. */
-interface Noticed { day: number; variant?: number; silent?: boolean }
+interface Noticed { day: number; variant?: number; silent?: boolean; name?: string }
 interface Moment { before: GameState; after: GameState; action?: GameAction }
 
 const awake = ({ action }: Moment): boolean => action?.type !== 'sleep';
@@ -116,6 +124,20 @@ const grainWentIn = (m: Moment): boolean => acted(m, 'threshStrip') && m.after.f
 function keepsakeFound(m: Moment): Noticed | null {
   if (keepsakeStock(m.after, 'feather') > keepsakeStock(m.before, 'feather')) return { day: m.after.day, variant: 0 };
   return keepsakeStock(m.after, 'fur') > keepsakeStock(m.before, 'fur') ? { day: m.after.day, variant: 1 } : null;
+}
+
+/** The shearing's line: a flock or a cloud, by a sheep's name once one has been given. */
+function shorn(m: Moment): Noticed | null {
+  if (m.after.sheep.lastShornYear === m.before.sheep.lastShornYear) return null;
+  const cloud = sheepStage(m.before.sheep.fluff) === 'cloud' ? 1 : 0;
+  const name = firstSheepName(m.before);
+  return name ? { day: m.before.day, variant: cloud + 2, name } : { day: m.before.day, variant: cloud };
+}
+
+/** The first dawn of a season with something named goes on that season's page, with one of the names. */
+function namedMoment(m: Moment): Noticed | null {
+  const name = dawn(m) ? nameForDay(m.after, m.after.day) : null;
+  return name ? { day: m.after.day, name } : null;
 }
 
 /** Which winter cooking line a meal gets: berries, a fish, or any other supper. */
@@ -164,9 +186,7 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   wildHoney: m => onBefore(m, gathered(m, 'honey')),
   // The harvest is told on whichever page it lands: summer's last days, or the autumn after.
   grainIn: m => onBefore(m, grainWentIn(m)),
-  shearing: m => (m.after.sheep.lastShornYear !== m.before.sheep.lastShornYear
-    ? { day: m.before.day, variant: sheepStage(m.before.sheep.fluff) === 'cloud' ? 1 : 0 }
-    : null),
+  shearing: shorn,
   autumnGrain: m => onBefore(m, grainWentIn(m)),
   // A loaf is told on summer's page or winter's, each with its own line.
   summerBread: m => onBefore(m, cooked(m, 'loaf')),
@@ -178,6 +198,10 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   winterKeepsake: keepsakeFound,
   springKeepsake: keepsakeFound,
   summerKeepsake: keepsakeFound,
+  namedAutumn: namedMoment,
+  namedWinter: namedMoment,
+  namedSpring: namedMoment,
+  namedSummer: namedMoment,
   // Slept through at home in the house, the fireplace still alight at dawn.
   fireside: m => onBefore(m, acted(m, 'sleep') && dawn(m) && livesInHouse(m.before) && isAtHome(m.before) && fuelLeft(m.after) > 0)
 };
@@ -197,8 +221,8 @@ export function recordJournal(before: GameState, after: GameState, action?: Game
       const year = yearOf(noticed.day);
       if (after.journal.some(item => item.year === year && item.id === entry.id)) continue;
       const variant = noticed.variant ?? 0;
-      written.push({ year, id: entry.id, day: noticed.day, variant });
-      if (!entry.silent && !noticed.silent) messages.push(`Written in your journal: ${entry.lines[variant]}`);
+      written.push({ year, id: entry.id, day: noticed.day, variant, ...(noticed.name === undefined ? {} : { name: noticed.name }) });
+      if (!entry.silent && !noticed.silent) messages.push(`Written in your journal: ${lineWithName(entry.lines[variant], noticed.name)}`);
     }
   }
   return written.length ? { state: { ...after, journal: [...after.journal, ...written] }, messages } : { state: after, messages };
