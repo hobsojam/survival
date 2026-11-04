@@ -1,5 +1,6 @@
 import { duskLength, nightStart, season, seasonMessage, yearOf, type Season } from './calendar';
 import { defaultDish, type DishId } from './cooking';
+import { keepsakeStock } from './companion';
 import { foodCount, type FoodItem } from './food';
 import { rainMessage } from './rain';
 import { fuelLeft, isAtHome, livesInHouse, warmFuel } from './home';
@@ -17,7 +18,8 @@ export type JournalId =
   | 'firstRain' | 'rabbits' | 'bushesFull' | 'stumpGrowing' | 'springRest'
   | 'fireflies' | 'twoHandfuls' | 'goldEvening' | 'warmSleep' | 'lookoutEvening'
   | 'hazelnuts' | 'pineTea' | 'salad' | 'wildHoney' | 'fireside' | 'grainIn' | 'winterBread'
-  | 'autumnGrain' | 'summerBread' | 'ovenBread';
+  | 'autumnGrain' | 'summerBread' | 'ovenBread'
+  | 'autumnKeepsake' | 'winterKeepsake' | 'springKeepsake' | 'summerKeepsake';
 
 export interface JournalEntry { year: number; id: JournalId; day: number; variant: number }
 
@@ -38,7 +40,8 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'stars', lines: ['Lay back and counted stars.'] },
     { id: 'hazelnuts', lines: ['Found hazelnuts in the leaf litter.'] },
     { id: 'fireside', lines: ['A night by the fireplace, the door shut against the wind.'] },
-    { id: 'autumnGrain', lines: ['Threshed the grain with the leaves coming down.'] }
+    { id: 'autumnGrain', lines: ['Threshed the grain with the leaves coming down.'] },
+    { id: 'autumnKeepsake', lines: ['Found a feather by the fire, among the fallen leaves.', 'Found a tuft of fur by the fire, among the fallen leaves.'] }
   ],
   winter: [
     { id: 'firstSnow', lines: ['Snow fell in the night.'], silent: true },
@@ -48,7 +51,8 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'winterCooking', lines: ['Cooked berries by the fire, with the snow coming down.', 'Cooked a fish by the fire, with the snow coming down.',
       'Cooked a warm supper by the fire, with the snow coming down.'] },
     { id: 'pineTea', lines: ['Pine needle tea, hot in the snow.'] },
-    { id: 'winterBread', lines: ['Bread from my own field, warm by the fire.'] }
+    { id: 'winterBread', lines: ['Bread from my own field, warm by the fire.'] },
+    { id: 'winterKeepsake', lines: ['A feather by the fire, bright against the snow.', 'A tuft of fur by the fire, frost on its tips.'] }
   ],
   spring: [
     { id: 'firstRain', lines: ['The first rain of spring.'], silent: true },
@@ -57,7 +61,8 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'stumpGrowing', lines: ['A stump I cut is growing back already.'] },
     { id: 'springRest', lines: ['Sat a while at the spring, now that it\'s thawed.'] },
     { id: 'salad', lines: ['Greens and berries, the first salad of spring.'] },
-    { id: 'ovenBread', lines: ['Woke to warm bread from my own oven.'] }
+    { id: 'ovenBread', lines: ['Woke to warm bread from my own oven.'] },
+    { id: 'springKeepsake', lines: ['A new feather by the fire, soft as the morning.', 'A tuft of winter fur by the fire, shed for spring.'] }
   ],
   summer: [
     { id: 'fireflies', lines: ['Fireflies over camp.'] },
@@ -67,7 +72,8 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'lookoutEvening', lines: ['Watched the land from the lookout on a long evening.'] },
     { id: 'wildHoney', lines: ['Wild honey from the hollow tree.'] },
     { id: 'grainIn', lines: ['Brought the grain in. The granary smells of summer.'] },
-    { id: 'summerBread', lines: ['The first loaf from the new grain, still warm.'] }
+    { id: 'summerBread', lines: ['The first loaf from the new grain, still warm.'] },
+    { id: 'summerKeepsake', lines: ['A feather by the fire on a warm morning.', 'A wisp of fur by the fire on a warm morning.'] }
   ]
 };
 
@@ -103,6 +109,12 @@ const atSpring = (m: Moment): boolean => ((m.action?.type === 'visitSite' && m.a
 
 /** A strip threshed that put grain into the granary, not into a granary already full. */
 const grainWentIn = (m: Moment): boolean => acted(m, 'threshStrip') && m.after.field.grain > m.before.field.grain;
+
+/** A feather or a tuft of fur just picked up by the fire, told by its own line. */
+function keepsakeFound(m: Moment): Noticed | null {
+  if (keepsakeStock(m.after, 'feather') > keepsakeStock(m.before, 'feather')) return { day: m.after.day, variant: 0 };
+  return keepsakeStock(m.after, 'fur') > keepsakeStock(m.before, 'fur') ? { day: m.after.day, variant: 1 } : null;
+}
 
 /** Which winter cooking line a meal gets: berries, a fish, or any other supper. */
 function winterMealLine(m: Moment): number {
@@ -156,6 +168,11 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   winterBread: m => onBefore(m, cooked(m, 'loaf')),
   // Woke in camp on a dawn the bakery's oven baked its loaf.
   ovenBread: m => onAfter(m, dawn(m) && m.after.bakery.lastBaked === m.after.day && isInClearing(m.after)),
+  // The first keepsake of each season goes on that season's page.
+  autumnKeepsake: keepsakeFound,
+  winterKeepsake: keepsakeFound,
+  springKeepsake: keepsakeFound,
+  summerKeepsake: keepsakeFound,
   // Slept through at home in the house, the fireplace still alight at dawn.
   fireside: m => onBefore(m, acted(m, 'sleep') && dawn(m) && livesInHouse(m.before) && isAtHome(m.before) && fuelLeft(m.after) > 0)
 };

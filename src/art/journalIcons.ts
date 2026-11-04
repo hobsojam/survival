@@ -11,7 +11,17 @@ const flame = { r: 'fire1', o: 'fire2', O: 'fire3', W: 'fire4' } as const;
 /** A cloud's outline and body, for the snow and rain icons. */
 const cloud = (light: PaletteKey, dark: PaletteKey): Record<string, PaletteKey> => ({ c: dark, C: light });
 
+/** A feather beside a tuft of fur, with a touch of the season in the corner: the same picture for either find. */
+const keepsakeIcon = (accent: PaletteKey, top: readonly [string, string]): JournalIcon => ({
+  legend: { x: accent, g: 'stone2', w: 'stone4', k: 'wood1', f: 'fox2', F: 'fox3' },
+  rows: [...top, '..gg......', '.gwwg.....', '.gwwg.....', '..gwg.ff..', '..gw.fFFf.', '...k.fFFf.', '...k..ff..', '..........']
+});
+
 export const JOURNAL_ICONS: Record<JournalId, JournalIcon> = {
+  autumnKeepsake: keepsakeIcon('fire2', ['.......xx.', '........x.']),
+  winterKeepsake: keepsakeIcon('frost', ['.......x.x', '........x.']),
+  springKeepsake: keepsakeIcon('leaf3', ['........x.', '.......xx.']),
+  summerKeepsake: keepsakeIcon('scarf3', ['.......xx.', '.......xx.']),
   // A sheaf of grain, tied round its middle.
   grainIn: { legend: { g: 'scarf2', G: 'scarf3', W: 'scarf4', t: 'wood1' }, rows: [
     '..........',

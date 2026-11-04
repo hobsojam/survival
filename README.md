@@ -105,7 +105,7 @@ The birds, the fox and even the winter wolves can come to trust you, if you shar
 - **The fox** now and then leaves a berry by your bedroll at dawn, if your bag has room.
 - **A young wolf** sees the wild wolves off when the fire goes out on a winter night, so nothing is taken. On winter nights it lifts its head and answers their howls.
 
-Every few days a friend leaves a feather or a tuft of fur by the fire; walk over to pick it up. These keepsakes don't take bag space. Six feathers make a **feather pillow** for the bed (resting there restores 10 more energy), and six tufts of fur make a **fur cloak** (you lose a quarter less warmth at night). You can make both. Once the house stands, each befriended animal can have a small home of its own nearby: a birdhouse, a fox den, or a wolf house. These are decorative.
+Every few days a friend leaves a feather or a tuft of fur by the fire; walk over to pick it up. The first you pick up each season goes in the year journal, and once you've found a feather, a few hang at the shelter for good. These keepsakes don't take bag space. Six feathers make a **feather pillow** for the bed (resting there restores 10 more energy), and six tufts of fur make a **fur cloak** (you lose a quarter less warmth at night). You can make both. Once the house stands, each befriended animal can have a small home of its own nearby: a birdhouse, a fox den, or a wolf house. These are decorative.
 
 ### The cold night
 

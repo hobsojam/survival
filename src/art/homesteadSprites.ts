@@ -112,7 +112,19 @@ function apples(g: Grid): void {
   }
 }
 
+/** Three feathers hung from a thread, one with a tip of colour. The clear space below keeps the anchor in front of the shelter while they hang high on its roof. */
+function shelterFeathers(g: Grid): void {
+  line(g, 0, 0, 8, 0, 't');
+  for (const [x, length] of [[1, 5], [4, 7], [7, 4]]) {
+    dot(g, x, 1, 't');
+    box(g, x - 1, 2, 2, length - 1, 'w');
+    line(g, x, 2, x, length, 'g');
+  }
+  dot(g, 3, 7, 'r'); dot(g, 4, 7, 'r');
+}
+
 export const homesteadSprites: Record<string, SpriteDef> = {
+  shelterFeathers: define(9, 16, { t: 'wood1', w: 'canvas4', g: 'stone3', r: 'fire2' }, { still: shelterFeathers }, [4, 15]),
   chicken: define(16, 16, woodLegend, { idle: g => chicken(g, 0), walk0: g => chicken(g, -1), walk1: g => chicken(g, 1) }, [8, 15]),
   chickenCoop: define(32, 32, woodLegend, { built: coop }, [16, 29]),
   chickenCoopSite: define(32, 16, woodLegend, { still: coopSite }, [16, 14]),

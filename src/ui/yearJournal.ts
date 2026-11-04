@@ -1,4 +1,5 @@
 import { SEASON_LENGTH, YEAR_LENGTH, seasonName, type Season } from '../game/calendar';
+import { keepsakesToCome } from '../game/companion';
 import { journalIconUrl } from '../art/journalIcons';
 import { JOURNAL_PAGES, journalEntry, journalSeason, type JournalId } from '../game/journalEntries';
 import type { GameState, StructureId } from '../game/state';
@@ -27,6 +28,8 @@ const WAITS_ON: Partial<Record<JournalId, StructureId>> = {
   fireside: 'house', grainIn: 'field', autumnGrain: 'field', summerBread: 'field', winterBread: 'field', ovenBread: 'bakery'
 };
 
+const KEEPSAKE_MOMENTS: ReadonlySet<JournalId> = new Set<JournalId>(['autumnKeepsake', 'winterKeepsake', 'springKeepsake', 'summerKeepsake']);
+
 /** One season's page of the year journal; pages before the first or after today show the nearest real one. */
 export function journalPageView(state: GameState, page: number): JournalPageView {
   const last = currentPage(state.day);
@@ -35,7 +38,9 @@ export function journalPageView(state: GameState, page: number): JournalPageView
   const s = YEAR[index % 4];
   const first = (year - 1) * YEAR_LENGTH + (index % 4) * SEASON_LENGTH + 1;
   // A moment that waits on a building stays off the page until it stands, so a camp without it keeps its page as it was.
+  // A keepsake line waits on a friend with more to give, unless this page already has it.
   const entries = JOURNAL_PAGES[s].filter(entry => {
+    if (KEEPSAKE_MOMENTS.has(entry.id)) return keepsakesToCome(state) || state.journal.some(item => item.year === year && item.id === entry.id);
     const building = WAITS_ON[entry.id];
     return !building || state.structures[building];
   });
