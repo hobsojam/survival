@@ -64,15 +64,16 @@ describe('the workshop', () => {
     expect(BUILDINGS.workshop).toEqual({ name: 'Workshop', description: 'Make a saw, a handcart and bed tools', symbol: '⚒',
       cost: { wood: 10, fiber: 4, stone: 6 }, prerequisite: 'toolshed', ground: 'east-far' });
     expect(createGame().structures.workshop).toBe(false);
-    expect(createGame().progress.workshop).toEqual({ saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false });
+    expect(createGame().progress.workshop).toEqual({ saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false, shears: false });
     expect(WORKSHOP_UPGRADES).toEqual({
       saw: { name: 'saw', cost: { wood: 3, fiber: 0, stone: 3 } },
       handcart: { name: 'handcart', cost: { wood: 8, fiber: 2, stone: 1 } },
       bedTools: { name: 'bed tools', cost: { wood: 3, fiber: 1, stone: 1 } },
       harvestTools: { name: 'sickle and flail', cost: { wood: 3, fiber: 1, stone: 2 } },
-      quern: { name: 'hand quern', cost: { wood: 1, fiber: 0, stone: 4 } }
+      quern: { name: 'hand quern', cost: { wood: 1, fiber: 0, stone: 4 } },
+      shears: { name: 'shears', cost: { wood: 1, fiber: 0, stone: 2 } }
     });
-    expect(Object.keys(WORKSHOP_UPGRADES)).toEqual(['saw', 'handcart', 'bedTools', 'harvestTools', 'quern']);
+    expect(Object.keys(WORKSHOP_UPGRADES)).toEqual(['saw', 'handcart', 'bedTools', 'harvestTools', 'quern', 'shears']);
     expect(BALANCE.sawWood).toBe(4);
   });
 
@@ -106,7 +107,7 @@ describe('making an upgrade', () => {
     const state = workshopCamp({ woodpile: true, stonePile: true }, { storedWood: 2, storedStone: 3 });
     const result = applyAction(withBag(state, { wood: 1 }), { type: 'makeUpgrade', upgrade: 'saw' });
     expect(result.message).toBe('You made a saw. A felled tree gives twice the wood now.');
-    expect(result.state.progress.workshop).toEqual({ saw: true, handcart: false, bedTools: false, harvestTools: false, quern: false });
+    expect(result.state.progress.workshop).toEqual({ saw: true, handcart: false, bedTools: false, harvestTools: false, quern: false, shears: false });
     expect(result.state).toMatchObject({ storedWood: 0, storedStone: 0, inventory: { wood: 0, stone: 0 } });
     expect(result.state.timeOfDay).toBe(state.timeOfDay + BALANCE.buildSeconds);
     expect(result.state.player.energy).toBe(state.player.energy - BALANCE.buildEnergyCost);
@@ -171,7 +172,7 @@ describe('saving the workshop', () => {
   it('keeps the upgrades made', () => {
     const loaded = roundTrip(made(workshopCamp(), 'saw'));
     expect(loaded.kind).toBe('loaded');
-    if (loaded.kind === 'loaded') expect(loaded.state.progress.workshop).toEqual({ saw: true, handcart: false, bedTools: false, harvestTools: false, quern: false });
+    if (loaded.kind === 'loaded') expect(loaded.state.progress.workshop).toEqual({ saw: true, handcart: false, bedTools: false, harvestTools: false, quern: false, shears: false });
   });
 
   const tampered = (edit: (data: Record<string, any>) => void): string => {

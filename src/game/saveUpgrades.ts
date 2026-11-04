@@ -6,7 +6,7 @@ import { emptyField } from './field';
 // anything the player had. Loading runs every step a save needs, in order, then validates the result as usual.
 
 /** The saved shape's version. Bump it by one with every change to the shape, and add its upgrade step below. */
-export const SAVE_VERSION = 33;
+export const SAVE_VERSION = 34;
 
 /** The oldest save that can still be brought up to date: earlier formats were never upgraded and don't load. */
 export const OLDEST_UPGRADABLE_VERSION = 23;
@@ -120,6 +120,15 @@ export const SAVE_UPGRADES: Readonly<Record<number, SaveUpgrade>> = {
       larder: { apple: [], egg: [], ...state.larder },
       lastSpoiled: state.lastSpoiled && { apple: 0, egg: 0, ...state.lastSpoiled }
     };
+  },
+  // Version 34: a sheep pen and a loom, straw from threshing, and shears at the workshop. An older camp has none of them yet.
+  33: old => {
+    const state = old as Upgradable & { structures: Upgradable; field: Upgradable; progress: Upgradable & { workshop: Upgradable } };
+    return { ...state,
+      structures: { ...state.structures, sheepPen: false, loom: false },
+      field: { ...state.field, straw: 0 },
+      progress: { ...state.progress, workshop: { ...state.progress.workshop, shears: false } },
+      sheep: { arrived: false, fluff: 0, fedUntil: null, lastShornYear: null, wool: 0, woven: { blanket: false, jumper: false, rug: false } } };
   }
 };
 

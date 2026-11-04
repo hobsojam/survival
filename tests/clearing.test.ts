@@ -79,6 +79,8 @@ describe('clearing steps', () => {
   it('keeps each marked tree on its side, just past the old edge and within the new one', () => {
     for (const id of STEP_IDS) {
       const step = CLEARING_STEPS[id];
+      // A separate patch isn't a wider ring round the fire; the sheep tests cover where its trees stand.
+      if (step.patch) continue;
       for (const tree of step.trees) {
         const distance = Math.hypot(tree.x - FIRE.x, tree.y - FIRE.y);
         expect(sideAt(tree.x, tree.y), id).toBe(step.side);
@@ -118,7 +120,7 @@ describe('clearing steps', () => {
     const room = Object.fromEntries(STEP_IDS.map(id => [id, CLEARING_STEPS[id].room]));
     expect(room).toEqual({
       'north-near': ['larder'], 'north-far': ['house', 'beehive'], 'north-outer': ['bakery'],
-      'east-near': ['woodpile', 'fibreStack'], 'east-far': ['workshop'],
+      'east-near': ['woodpile', 'fibreStack'], 'east-far': ['workshop'], 'east-outer': ['sheepPen'],
       'south-near': ['granary'], 'south-far': ['field'], 'south-outer': ['windmill'],
       'west-near': ['vegetableBeds'], 'west-far': ['well']
     });
@@ -136,8 +138,8 @@ describe('clearing steps', () => {
 });
 
 describe('the outer ground', () => {
-  it('opens a third step on the north and south sides only', () => {
-    expect(STEP_IDS).toEqual(['north-near', 'north-far', 'north-outer', 'east-near', 'east-far', 'south-near', 'south-far', 'south-outer', 'west-near', 'west-far']);
+  it('opens a third step on the north, east and south sides only', () => {
+    expect(STEP_IDS).toEqual(['north-near', 'north-far', 'north-outer', 'east-near', 'east-far', 'east-outer', 'south-near', 'south-far', 'south-outer', 'west-near', 'west-far']);
     expect(previousStep('north-outer')).toBe('north-far');
     expect(previousStep('south-far')).toBe('south-near');
     expect(previousStep('east-near')).toBeNull();
@@ -241,6 +243,8 @@ describe('marking a side and felling its trees', () => {
     state.clearing.cleared = ['east-near'];
     expect(nextStep(state, 'east')).toBe('east-far');
     state.clearing.cleared = ['east-near', 'east-far'];
+    expect(nextStep(state, 'east')).toBe('east-outer');
+    state.clearing.cleared = ['east-near', 'east-far', 'east-outer'];
     expect(nextStep(state, 'east')).toBeNull();
   });
 

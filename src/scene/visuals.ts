@@ -14,6 +14,7 @@ import { markedTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
 import { fireplaceBurning, woodStoreCapacity } from '../game/home';
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
+import { sheepStage, type SheepStage } from '../game/sheep';
 import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
 import type { StockLevel } from '../art/phase3Sprites';
 
@@ -95,6 +96,36 @@ function addChickens(state: GameState, add: AddVisual, timeMs: number): void {
   });
 }
 
+/** Where the feed rack stands in the pen, in tiles. */
+export const SHEEP_RACK = { x: 33.5, y: 2.9 };
+
+const SHEEP_HOMES = [{ x: 32.25, y: 5.5 }, { x: 34.75, y: 5.2 }, { x: 33.5, y: 4.2 }];
+const SHEEP_AT_RACK = [{ x: 32.5, y: 4.3 }, { x: 34.5, y: 4.3 }, { x: 33.5, y: 5.6 }];
+/** Clouds fill the pen, so they keep their own spots, fed or not, where every small face still shows. */
+const CLOUD_SPOTS = [{ x: 32.15, y: 5.8 }, { x: 34.85, y: 5.75 }, { x: 33.5, y: 3.85 }];
+/** How far above its feet each look's snow cap sits, in tiles. */
+const SNOW_LIFT: Record<SheepStage, number> = { shorn: 11 / TILE, woolly: 15 / TILE, round: 22 / TILE, cloud: 36 / TILE };
+const WANDER_MS: Record<SheepStage, number> = { shorn: 2600, woolly: 3200, round: 4200, cloud: 6400 };
+
+/** Three sheep in the pen. They drift about on a slow timer, closer to the rack while the feed lasts, and always in front of the fence: their feet never reach its front rail. */
+function addSheep(state: GameState, add: AddVisual, timeMs: number): void {
+  const { sheep } = state;
+  if (!sheep.arrived || !state.structures.sheepPen) return;
+  const stage = sheepStage(sheep.fluff);
+  const fed = sheep.fedUntil !== null && state.day < sheep.fedUntil;
+  const cloud = stage === 'cloud';
+  const homes = cloud ? CLOUD_SPOTS : fed ? SHEEP_AT_RACK : SHEEP_HOMES;
+  homes.forEach((home, index) => {
+    const phase = timeMs / WANDER_MS[stage] + index * 2.1;
+    const x = home.x + Math.sin(phase) * (cloud ? 0.1 : 0.2);
+    const y = home.y + Math.sin(phase * 0.7 + index) * (cloud ? 0.05 : 0.12);
+    const walking = Math.abs(Math.cos(phase)) > 0.4 && Math.floor(timeMs / 320) % 2 === 1;
+    const depth = worldY(4.5) + worldY(y) / 1000;
+    add(`sheep-${index}`, `sheep:${stage}${walking ? 'Walk' : 'Idle'}`, x, y, depth);
+    if (isWinter(state.day)) add(`sheep-${index}-snow`, `sheepSnow:${stage === 'cloud' || stage === 'round' ? 'large' : 'small'}`, x, y - SNOW_LIFT[stage], depth + 0.0005);
+  });
+}
+
 function addPiles(state: GameState, visuals: SceneVisual[], add: AddVisual): void {
   for (const pile of state.stonePiles) {
     if (pile.area !== state.area) continue;
@@ -152,7 +183,7 @@ function addPuddles(state: GameState, add: AddVisual): void {
 }
 
 /** Small camp structures: where each stands from the fire, drawn as a flat site until built; one on cleared ground only once it is clear. */
-export const CAMP_STRUCTURES = [['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3], ['larder', 2.5, -4.5], ['woodpile', 5.5, -1.5], ['fibreStack', 5.5, 1.5], ['house', -0.5, -6.5], ['vegetableBeds', -4.5, 0], ['well', -7, -1.5], ['workshop', 8, -1], ['granary', 3, 4.5], ['field', -1.5, 7], ['windmill', -2.75, 9.75], ['bakery', -2, -10], ['beehive', 2, -7]] as const;
+export const CAMP_STRUCTURES = [['dryingRack', 2, -2], ['windbreak', -2, 2], ['stonePile', 0, -3], ['toolshed', 4, 0], ['garden', -6, 3], ['larder', 2.5, -4.5], ['woodpile', 5.5, -1.5], ['fibreStack', 5.5, 1.5], ['house', -0.5, -6.5], ['vegetableBeds', -4.5, 0], ['well', -7, -1.5], ['workshop', 8, -1], ['granary', 3, 4.5], ['field', -1.5, 7], ['windmill', -2.75, 9.75], ['bakery', -2, -10], ['beehive', 2, -7], ['sheepPen', 14, -10.5], ['loom', 6.5, 3.5]] as const;
 
 /** Where each of the field's four strips stands across from the field's spot, in tiles. */
 export const FIELD_STRIP_OFFSETS = [-1.5, -0.5, 0.5, 1.5] as const;
@@ -244,6 +275,8 @@ function addBuildableStructures(state: GameState, add: AddVisual, x: number, y: 
   const { structures } = state;
   for (const [id, dx, dy] of CAMP_STRUCTURES) {
     if (groundBlocker(state, id)) continue;
+    // The loom stays a surprise until the first shearing brings it into the build list.
+    if (id === 'loom' && state.sheep.lastShornYear === null) continue;
     if (id === 'vegetableBeds' && structures.vegetableBeds) {
       addVegetableBeds(state, add, x + dx, y + dy);
       continue;
@@ -254,6 +287,8 @@ function addBuildableStructures(state: GameState, add: AddVisual, x: number, y: 
     }
     add(id, structures[id] ? builtTexture(state, id, timeMs) : `${id}Site:still`, x + dx, y + dy, structures[id] ? undefined : GROUND_DECAL_DEPTH);
   }
+  addSheep(state, add, timeMs);
+  if (state.sheep.woven.rug && structures.house) add('rug', 'rug:still', x - 0.5, y - 5.6, GROUND_DECAL_DEPTH);
   if (state.progress.workshop.handcart && !groundBlocker(state, 'workshop')) {
     add('handcart', `handcart:${stockFrame(state.cartWood)}`, x + CART_SPOT.dx, y + CART_SPOT.dy);
   }

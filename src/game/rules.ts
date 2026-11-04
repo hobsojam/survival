@@ -6,7 +6,7 @@ import { wolfVisit } from './wolves';
 import { availableFiber, availableStone, availableWood, spendFiber, spendWood, bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
 import { POT_COST, cookBlocker, defaultDish, dishBlocker, foodWord, isPackedDish, packDish, potBlocker, serveDish, spendIngredients, type DishId } from './cooking';
 import { alarmAfter, cloakBlocker, companionDawn, hasFriend, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
-import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, stepDepth, type StepId } from './clearing';
+import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, stepDepth, stepGround, stepWhere, type StepId } from './clearing';
 import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
 import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
@@ -22,6 +22,7 @@ import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishing
 import { ENDED_MESSAGE, GAVE_OUT_MESSAGE, judgeSickDay, markWarmMeal, markWarmRest, sicknessTick } from './sickness';
 import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, foodStoreCapacity, type GameState, type ResourceNode, type SiteId, type StructureId } from './state';
 import { CHICKEN_SITE, chickensDawn, settleChickens, takeEggBlocker, takenEgg } from './chickens';
+import { fedSheep, feedBlocker, shearBlocker, sheepDawn, shornSheep, weaveBlocker, wovenState, type WovenId } from './sheep';
 import { appleBlocker, shedBlocker } from './homestead';
 
 export type GameAction =
@@ -42,6 +43,9 @@ export type GameAction =
   | { type: 'threshStrip'; index: number }
   | { type: 'grindGrain' }
   | { type: 'millGrain' }
+  | { type: 'feedSheep' }
+  | { type: 'shearFlock' }
+  | { type: 'weave'; item: WovenId }
   | { type: 'takeLoaf' }
   | { type: 'takeHoney' }
   | { type: 'drawWater' }
@@ -185,6 +189,7 @@ export function buildStatus(state: GameState, id: StructureId): BuildStatus {
   const definition = BUILDINGS[id];
   if (state.structures[id]) return 'built';
   if (id === 'chickenCoop' && !state.chickens.discovered) return 'locked';
+  if (id === 'loom' && state.sheep.lastShornYear === null) return 'locked';
   if ('friend' in definition && !hasFriend(state, definition.friend)) return 'locked';
   if (definition.prerequisite === 'coldNight' && !state.progress.hearthUnlocked) return 'locked';
   const missingPrerequisite = missingStructurePrerequisite(state, definition);
@@ -278,6 +283,8 @@ function warmthChange(state: GameState, step: number, camp: boolean, home: boole
   if ((camp || home) && !lit && state.structures.windbreak) change *= 0.5;
   // A fur cloak keeps a quarter of the night's chill off, wherever the survivor is.
   if (state.companion.cloak && state.timeOfDay >= nightStart(state.day)) change *= BALANCE.cloakWarmthLoss;
+  // A wool jumper keeps a tenth more off, on top of the cloak.
+  if (state.sheep.woven.jumper && state.timeOfDay >= nightStart(state.day)) change *= BALANCE.jumperWarmthLoss;
   // Summer nights are warm, except the forecast cold night.
   return isSummer(state.day) && !coldNight ? Math.max(0, change) : change;
 }
@@ -304,6 +311,7 @@ function dawn(next: GameState, home: boolean): void {
   next.nodes = next.nodes.map(node => node.kind !== 'stone' && node.readyDay <= next.day ? { ...node, amount: 1 } : node);
   companionDawn(next);
   chickensDawn(next);
+  sheepDawn(next);
   // The bag, the larder and the bakery shelf all throw out what has gone soft, wherever the survivor is; one note covers them.
   const bag = spoil(next.inventory.food, next.day, BALANCE.bagFreshDays);
   const larder = spoil(next.larder, next.day, BALANCE.larderFreshDays);
@@ -592,11 +600,11 @@ const chopTree: ActionHandler<'chopTree'> = (state, action) => {
 const markClearing: ActionHandler<'markClearing'> = (state, action) => {
   const blocker = markBlocker(state, action.step);
   if (blocker) return refuse(state, blocker);
-  const { side, trees } = CLEARING_STEPS[action.step];
+  const { trees } = CLEARING_STEPS[action.step];
   const felled = state.clearing.marked === action.step ? state.clearing.felled : [];
   return {
     state: { ...state, clearing: { ...state.clearing, marked: action.step, felled } },
-    message: `Tied pale fibre round ${trees.length} trees on the ${side} side.`
+    message: `Tied pale fibre round ${trees.length} trees ${stepWhere(action.step)}.`
   };
 };
 
@@ -609,7 +617,7 @@ const clearGround: ActionHandler<'clearGround'> = state => {
   const nodes = state.nodes.map((node, index) => ({ ...node, x: placed[index].x, y: placed[index].y }));
   return {
     state: payAndBuild(state, CLEARING_STEPS[step].cost, { nodes, clearing: { cleared, marked: null, felled: [] } }),
-    message: `The ${CLEARING_STEPS[step].side} side is open now.${roomLine(step, state.structures, id => Object.hasOwn(BUILDINGS, id))}`
+    message: `${capitalised(stepGround(step))} is open now.${roomLine(step, state.structures, id => Object.hasOwn(BUILDINGS, id))}`
   };
 };
 
@@ -958,6 +966,28 @@ const grindGrain: ActionHandler<'grindGrain'> = state => {
 };
 
 /** One heavy job at the windmill grinds the whole granary, as far as the flour bin has room. */
+/** Feed goes out in the time and energy of a gather. */
+const feedSheep: ActionHandler<'feedSheep'> = state => {
+  const blocker = feedBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  const worked = { ...fedSheep(state), player: tire(state, BALANCE.gatherEnergyCost) };
+  return { state: advanceTime(worked, workSeconds(state, BALANCE.gatherSeconds), 'working'), message: 'You put out some feed.' };
+};
+
+const shearFlock: ActionHandler<'shearFlock'> = state => {
+  const blocker = shearBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  const { state: shorn, message } = shornSheep(state);
+  return fieldWork(shorn, shorn.field, message);
+};
+
+const weave: ActionHandler<'weave'> = (state, action) => {
+  const blocker = weaveBlocker(state, action.item);
+  if (blocker) return refuse(state, blocker);
+  const { state: woven, message } = wovenState(state, action.item);
+  return { state: advanceTime({ ...woven, player: tire(state, BALANCE.buildEnergyCost) }, workSeconds(state, BALANCE.buildSeconds), 'working'), message };
+};
+
 const millGrain: ActionHandler<'millGrain'> = state => {
   const blocker = millGrainBlocker(state);
   if (blocker) return refuse(state, blocker);
@@ -1006,6 +1036,7 @@ function buildBlocker(state: GameState, structureId: StructureId): string | null
   const definition = BUILDINGS[structureId];
   if (!definition) return 'That structure is unavailable.';
   if (structureId === 'chickenCoop' && !state.chickens.discovered) return 'Find the chickens at the old homestead first.';
+  if (structureId === 'loom' && state.sheep.lastShornYear === null) return 'Shear the flock first.';
   if ('friend' in definition && !hasFriend(state, definition.friend)) return 'Befriend this animal first.';
   if (definition.prerequisite === 'coldNight' && !state.progress.hearthUnlocked) return 'Weather the cold night to unlock the hearth.';
   if (state.structures[structureId]) return 'Already built.';
@@ -1088,7 +1119,7 @@ const decorate: ActionHandler<'decorate'> = (state, action) => {
 const rest: ActionHandler<'rest'> = state => {
   if (!isAtHome(state)) return refuse(state, livesInHouse(state) ? 'Go home to rest.' : 'Move closer to the fire to rest.');
   const rested = advanceTime(markWarmRest(state), BALANCE.restSeconds, 'resting');
-  const bedGain = BALANCE.bedRestEnergyGain + (state.companion.pillow ? BALANCE.pillowEnergyGain : 0);
+  const bedGain = BALANCE.bedRestEnergyGain + (state.companion.pillow ? BALANCE.pillowEnergyGain : 0) + (state.sheep.woven.blanket ? BALANCE.blanketEnergyGain : 0);
   const gain = recovery(state, rested.structures.bed ? bedGain : BALANCE.restEnergyGain) + cakeEnergy(state);
   return {
     state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + gain) }, cakeBonus: false },
@@ -1219,6 +1250,9 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
 };
 
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
+  feedSheep,
+  shearFlock,
+  weave,
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, buildMine, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, dropPineNeedles, pickUpStone, burnFiber, burnPineNeedles, eat, eatTrailFood, prepareTrailFood,
   cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, rest, sleep, befriend, meetChickens, leadChickens, takeEgg, gatherApples, searchShed, craftPillow, craftCloak,

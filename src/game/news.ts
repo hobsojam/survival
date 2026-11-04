@@ -4,6 +4,7 @@ import { heatMessage } from './rules';
 import type { GameState } from './state';
 import { wolfMessage } from './wolves';
 import { companionNews } from './companion';
+import { sheepNews } from './sheep';
 import { coldNightWarning } from './coldNight';
 import { spoilMessage } from './food';
 import { witheredMessage } from './beds';
@@ -20,5 +21,5 @@ export function lateAutumnMessage(before: GameState, after: GameState): string |
 /** What happened while time passed, whether a frame ticked by or an action took its seconds: a shower, the midday heat, a wolf, food gone soft, beds withered, a new season, the field's turn, a friend's doings. */
 export function newsBetween(before: GameState, after: GameState): string[] {
   return [coldNightWarning(before, after), rainMessage(before, after), heatMessage(before, after), wolfMessage(before, after), spoilMessage(before, after), witheredMessage(before, after), seasonMessage(before.day, after.day), fieldNews(before, after), bakeryNews(before, after), lateAutumnMessage(before, after), fallingIllMessage(before, after), sickDayMessage(before, after)]
-    .filter((text): text is string => text !== null).concat(companionNews(before, after));
+    .filter((text): text is string => text !== null).concat(companionNews(before, after), sheepNews(before, after));
 }

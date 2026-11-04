@@ -3,6 +3,7 @@ import { SEASON_LENGTH, daysLeftInSeason, isSpring, isWinter, nightStart, season
 import { millGrainBlocker, takeLoafBlocker } from '../game/bakehouse';
 import { takeHoneyBlocker } from '../game/beehive';
 import { takeEggBlocker } from '../game/chickens';
+import { WOVEN, feedBlocker, shearBlocker, sheepStage, weaveBlocker, type SheepStage, type WovenId } from '../game/sheep';
 import { FOOD_ITEMS, availableFood, emptyFood, foodCount, goingSoft, isFresh, storeTotal, type FoodItem, type KeptFood } from '../game/food';
 import { foodIconUrl } from '../art/foodIcons';
 import { BALANCE, BUILDINGS, foodStoreCapacity, type GameState, type StructureId } from '../game/state';
@@ -15,7 +16,7 @@ import { WORKSHOP_UPGRADES, upgradeBlocker, type UpgradeId } from '../game/works
 import { logsInStore } from '../game/wood';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
-import { CLEARING_STEPS, STEP_IDS, clearGroundBlocker, markBlocker, nextStep, roomLine, stepDepth, type Side } from '../game/clearing';
+import { CLEARING_STEPS, STEP_IDS, clearGroundBlocker, markBlocker, nextStep, roomLine, stepDepth, stepGround, stepWhere, type Side } from '../game/clearing';
 import { KEEPSAKES_NEEDED, cloakBlocker, keepsakeStock, pillowBlocker } from '../game/companion';
 import { DISHES, DISH_ORDER, dishBlocker, foodWord, ingredientList, potBlocker, type DishId } from '../game/cooking';
 import { fishingLineBlocker } from '../game/fishing';
@@ -160,6 +161,51 @@ export function windmillPanelView(state: GameState): { shown: boolean; stored: s
   };
 }
 
+const FLOCK_WORDS: Record<SheepStage, string> = {
+  shorn: 'Skinny, and rather cross about it.',
+  woolly: 'Three woolly sheep.',
+  round: 'Three very round sheep.',
+  cloud: 'You can hardly see the sheep for the wool.'
+};
+
+function flockStatus({ sheep }: GameState): string {
+  if (sheep.arrived) return FLOCK_WORDS[sheepStage(sheep.fluff)];
+  return sheep.fedUntil === null ? 'The pen is empty. Put out some feed.' : 'The pen is empty, with feed in the rack.';
+}
+
+/** The Sheep panel, once the pen stands: how the flock looks, what's in store, and the two jobs. Shearing is hidden until the shears exist. */
+export function sheepPanelView(state: GameState): { shown: boolean; status: string; straw: string; wool: string; feed: { disabled: boolean; hint: string }; shear: { shown: boolean; disabled: boolean; hint: string } } {
+  const { sheep } = state;
+  const feed = feedBlocker(state);
+  const shear = shearBlocker(state);
+  return {
+    shown: state.structures.sheepPen,
+    status: flockStatus(state),
+    straw: `${state.field.straw} of ${BALANCE.strawCapacity} straw`,
+    wool: `${sheep.wool} of ${BALANCE.woolCapacity} wool`,
+    feed: { disabled: Boolean(feed), hint: feed ?? '' },
+    shear: { shown: state.progress.workshop.shears, disabled: Boolean(shear), hint: shear ?? '' }
+  };
+}
+
+export interface LoomItemView { id: WovenId; name: string; cost: string; disabled: boolean; hint: string }
+
+const LOOM_NAMES: Record<WovenId, string> = { blanket: 'Wool blanket', jumper: 'Warm jumper', rug: 'Rug' };
+
+/** The Loom panel, once built: each item not yet made, and what's stopping it. */
+export function loomPanelView(state: GameState): { shown: boolean; note: string; items: LoomItemView[] } {
+  const items = (Object.keys(WOVEN) as WovenId[]).filter(id => !state.sheep.woven[id]).map(id => {
+    const blocker = weaveBlocker(state, id);
+    return { id, name: LOOM_NAMES[id], cost: `${WOVEN[id].wool} wool`, disabled: Boolean(blocker), hint: blocker ?? '' };
+  });
+  return { shown: state.structures.loom, note: items.length === 0 ? "You've made everything the loom can make." : '', items };
+}
+
+export function loomItemMarkup(item: LoomItemView): string {
+  const disabled = item.disabled ? ' disabled' : '';
+  return `<div class="tool-row"><button type="button" class="${item.disabled ? '' : 'ready'}" data-weave="${item.id}"${disabled}>${item.name}</button><small>${item.cost}${item.hint ? `. ${item.hint}` : ''}</small></div>`;
+}
+
 /** The Bakery panel, once built: the loaves on the shelf, any going soft at the next dawn, and whether one can be taken. */
 export function bakeryPanelView(state: GameState): { shown: boolean; shelf: string; note: string; take: { disabled: boolean; hint: string } } {
   const { shelf } = state.bakery;
@@ -207,13 +253,14 @@ const UPGRADE_COPY: Record<UpgradeId, { title: string; copy: string; made: strin
   handcart: { title: 'Handcart', copy: 'Felled wood goes into a cart by the workshop, and counts as stored wood.', made: 'Felled wood goes into the cart, and from there onto the wood store whenever it has room.' },
   bedTools: { title: 'Hoe and watering can', copy: 'A dry bed holds on a day longer before it withers.', made: 'A dry bed holds on a day longer before it withers.' },
   harvestTools: { title: 'Sickle and flail', copy: 'Cut and thresh the grain field.', made: 'Cut and thresh the grain field.' },
-  quern: { title: 'Hand quern', copy: 'Grind the granary\'s grain into flour.', made: 'Grind the granary\'s grain into flour.' }
+  quern: { title: 'Hand quern', copy: 'Grind the granary\'s grain into flour.', made: 'Grind the granary\'s grain into flour.' },
+  shears: { title: 'Shears', copy: 'Shear the flock once a year, in spring.', made: 'Shear the flock once a year, in spring.' }
 };
 
 /** Whether an upgrade's row shows: the bed tools once there are beds, the harvest tools once there is a field, the quern once there is a granary. */
 const UPGRADE_SHOWN: Record<UpgradeId, (state: GameState) => boolean> = {
   saw: () => true, handcart: () => true, bedTools: state => state.structures.vegetableBeds,
-  harvestTools: state => state.structures.field, quern: state => state.structures.granary
+  harvestTools: state => state.structures.field, quern: state => state.structures.granary, shears: state => state.structures.sheepPen
 };
 
 /** "3 wood · 3 stone": an upgrade's cost, leaving out what it doesn't need. */
@@ -234,7 +281,7 @@ export function workshopView(state: GameState): WorkshopView {
     const blocker = upgradeBlocker(state, id);
     return { shown, title, copy: blocker ?? copy, cost: costLabel(WORKSHOP_UPGRADES[id].cost), disabled: false, ready: !blocker };
   };
-  const rows = { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools'), harvestTools: row('harvestTools'), quern: row('quern') };
+  const rows = { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools'), harvestTools: row('harvestTools'), quern: row('quern'), shears: row('shears') };
   return { shown: state.structures.workshop && Object.values(rows).some(item => item.shown), rows };
 }
 
@@ -699,12 +746,12 @@ export function clearingView(state: GameState): { shown: boolean; sides: Clearin
   else if (state.clearing.cleared.length > 0) progress = `Cleared ground: ${state.clearing.cleared.map(step => step.replace('-', ' ')).join(', ')}.`;
   const shown = state.progress.axeCrafted;
   if (!marked) return { shown, sides, progress, clear: { ...clear, copy: 'Choose a side to mark its trees for felling.', cost: 'Choose a side first' } };
-  const { side, trees, cost } = CLEARING_STEPS[marked];
+  const { trees, cost } = CLEARING_STEPS[marked];
   const left = trees.length - felled.length;
-  let copy = `Ready to clear the ${side} side.`;
+  let copy = `Ready to clear ${stepGround(marked)}.`;
   if (left > 0) {
     const treeWord = left === 1 ? 'tree' : 'trees';
-    copy = `Fell the ${left} marked ${treeWord} left on the ${side} side.`;
+    copy = `Fell the ${left} marked ${treeWord} left ${stepWhere(marked)}.`;
   }
   return { shown, sides, progress, clear: { ...clear, copy, cost: `${cost.wood} wood · ${cost.fiber} fiber${cost.stone > 0 ? ` · ${cost.stone} stone` : ''}` } };
 }

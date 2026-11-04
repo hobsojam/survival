@@ -20,6 +20,19 @@ const keepsakeIcon = (accent: PaletteKey, top: readonly [string, string]): Journ
 export const JOURNAL_ICONS: Record<JournalId, JournalIcon> = {
   autumnKeepsake: keepsakeIcon('fire2', ['.......xx.', '........x.']),
   winterKeepsake: keepsakeIcon('frost', ['.......x.x', '........x.']),
+  // A little sheep, seen from the side.
+  shearing: { legend: { w: 'paper', x: 'canvas3', k: 'ink', l: 'stone1' }, rows: [
+    '..........',
+    '...wwww...',
+    '.wwwwwwww.',
+    'wwwwwwwwkk',
+    'wwwwwwwwkk',
+    'xwwwwwwwk.',
+    '.xxxxxxx..',
+    '.l.l.l.l..',
+    '.l.l.l.l..',
+    '..........'
+  ] },
   springKeepsake: keepsakeIcon('leaf3', ['........x.', '.......xx.']),
   summerKeepsake: keepsakeIcon('scarf3', ['.......xx.', '.......xx.']),
   // A sheaf of grain, tied round its middle.
