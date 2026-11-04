@@ -4,7 +4,7 @@ import { CLEARING_STEPS, STEP_IDS, clearingReach, inClearing, placeBranches, pre
 import { applyAction, groundBlocker } from '../src/game/rules';
 import { clearingView } from '../src/ui/panels';
 import { saveGame } from '../src/game/save';
-import { SAVE_VERSION, upgradeSave } from '../src/game/saveUpgrades';
+import { upgradeSave } from '../src/game/saveUpgrades';
 import { buildMap } from '../src/scene/map';
 import { CAMP_STRUCTURES } from '../src/scene/visuals';
 

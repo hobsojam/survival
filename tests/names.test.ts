@@ -88,7 +88,7 @@ describe('naming an animal', () => {
 describe('saving names', () => {
   const flock = (): GameState => ({
     ...withFox(),
-    structures: { ...game.structures, chickenCoop: true },
+    structures: { ...game.structures, shelter: true, chickenCoop: true },
     progress: { ...game.progress, homesteadFound: true },
     chickens: { ...game.chickens, discovered: true, rescued: true }
   });
