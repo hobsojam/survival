@@ -212,7 +212,7 @@ export function companionNews(before: GameState, after: GameState): string[] {
 
 /** Seconds of sleep before a friendly bird wakes the sleeper on a winter night, as the fire falls to 20 s; null if it won't. In the house, the logs in store keep the fireplace going. */
 export function alarmAfter(state: GameState): number | null {
-  const { friend, alarmDay } = state.companion;
+  const { alarmDay } = state.companion;
   const fuel = fuelLeft(state);
   if (!hasFriend(state, 'bird') || !isWinter(state.day) || !night(state) || alarmDay === state.day || fuel <= 0) return null;
   return Math.max(0, (fuel - BALANCE.alarmFuel) / BALANCE.coldNightFireBurn);
