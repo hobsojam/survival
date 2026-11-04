@@ -4,7 +4,7 @@ import { validateSprite } from '../src/art/textures';
 
 const expected: Record<string, string[]> = {
   chicken: ['idle', 'walk0', 'walk1'], chickenCoop: ['built'], chickenCoopSite: ['still'],
-  birdhouse: ['built'], wolfHouse: ['built'], foxDen: ['built'], homesteadShed: ['still'],
+  birdhouse: ['built'], wolfHouse: ['built'], foxDen: ['built'], homesteadShed: ['still'], shelterFeathers: ['still'],
   appleTree: ['full', 'bare'], applePile: ['still']
 };
 

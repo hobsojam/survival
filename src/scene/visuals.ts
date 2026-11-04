@@ -1,3 +1,4 @@
+import { feathersFound } from '../game/companion';
 import { stripStage } from '../game/field';
 import { isWinter, nightStart, season } from '../game/calendar';
 import { gardenPlotStage } from '../game/garden';
@@ -270,6 +271,7 @@ function addCamp(state: GameState, add: AddVisual, timeMs: number): void {
   const { campX: x, campY: y } = BALANCE;
   const { structures, progress } = state;
   add('shelter', shelterTexture(state), x - 3, y - 2, structures.shelter ? undefined : GROUND_DECAL_DEPTH);
+  if (structures.shelter && feathersFound(state)) add('shelter-feathers', 'shelterFeathers:still', x - 3.75, y - 1.95);
   addBuildableStructures(state, add, x, y, timeMs);
   if (state.chickens.discovered) add('chicken-coop', structures.chickenCoop ? 'chickenCoop:built' : 'chickenCoopSite:still', COOP_SITE.x, COOP_SITE.y,
     structures.chickenCoop ? undefined : GROUND_DECAL_DEPTH);

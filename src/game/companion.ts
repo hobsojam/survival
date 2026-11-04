@@ -134,6 +134,13 @@ function stockFor(state: GameState, kind: 'feather' | 'fur'): number {
 
 export function keepsakeStock(state: GameState, kind: 'feather' | 'fur'): number { return stockFor(state, kind); }
 
+/** Whether a feather has ever been picked up: one still held, or those spent on the pillow. */
+export const feathersFound = (state: GameState): boolean => stockFor(state, 'feather') > 0 || state.companion.pillow;
+
+/** Whether a friend can still leave a keepsake: each kind stops once its item is made. */
+export const keepsakesToCome = (state: GameState): boolean =>
+  (hasFriend(state, 'bird') && !state.companion.pillow) || ((hasFriend(state, 'fox') || hasFriend(state, 'wolf')) && !state.companion.cloak);
+
 /** Once the item is made, a shed piece still shows by the fire on its dawn, as scenery only. */
 export const sceneryKeepsake = (state: GameState): boolean => (['feather', 'fur'] as const).some(kind =>
   itemMade(state, kind) && state.companion.lastFindByKind[kind] === state.day);
