@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, SITES, createGame, type ResourceKind } from '../src/game/state';
 import { terrainSprites } from '../src/art/terrain';
+import { sprites } from '../src/art/sprites';
 import { buildMap, shownTerrainKey, terrainKey, type TerrainMap } from '../src/scene/map';
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { CLEARING_STEPS, STEP_IDS, clearingReach, inClearing, type ClearingState, type StepId } from '../src/game/clearing';
@@ -586,5 +587,25 @@ describe('seasonal flowers', () => {
       expect(Math.hypot(item.x - BALANCE.campX, item.y - BALANCE.campY)).toBeGreaterThan(BALANCE.campRadius);
       expect(nodes.every(node => Math.hypot(item.x - node.x, item.y - node.y) >= 1)).toBe(true);
     }
+  });
+});
+
+describe('every map variant can be drawn', () => {
+  const KEYS = ['camp', 'camp-open', 'camp-homestead-open', 'camp-both-open', 'quarry', 'homestead'] as const;
+  const namesIn = (map: TerrainMap): string[] => [
+    ...map.ground.flat(),
+    ...[map.pathTiles, map.campEdges, map.decorations, map.rimStones, map.trees, map.groves.flat(), map.signs].flat().map(item => item.sprite)
+  ];
+
+  it.each(KEYS)('finds a sprite the renderer can read for everything on the %s map', key => {
+    const camp = key.startsWith('camp');
+    const missing = namesIn(buildMap(camp ? createGame().nodes : [], key)).filter(name => !sprites[name]);
+    expect([...new Set(missing)]).toEqual([]);
+  });
+
+  it('finds them on the camp map with the clearing fully grown too', () => {
+    const clearing = { cleared: [...STEP_IDS], marked: null, felled: [] };
+    const missing = namesIn(buildMap(createGame().nodes, 'camp-both-open', 'winter', clearing)).filter(name => !sprites[name]);
+    expect([...new Set(missing)]).toEqual([]);
   });
 });
