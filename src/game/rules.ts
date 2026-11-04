@@ -22,6 +22,7 @@ import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishing
 import { ENDED_MESSAGE, GAVE_OUT_MESSAGE, judgeSickDay, markWarmMeal, markWarmRest, sicknessTick } from './sickness';
 import { BALANCE, BUILDINGS, LOOKOUT, PACK, PICKAXE, SITES, createGame, foodStoreCapacity, type GameState, type ResourceNode, type SiteId, type StructureId } from './state';
 import { CHICKEN_SITE, chickensDawn, settleChickens, takeEggBlocker, takenEgg } from './chickens';
+import { cleanName, nameBlocker, named, type NameTarget } from './names';
 import { fedSheep, feedBlocker, shearBlocker, sheepDawn, shornSheep, weaveBlocker, wovenState, type WovenId } from './sheep';
 import { appleBlocker, shedBlocker } from './homestead';
 
@@ -44,6 +45,7 @@ export type GameAction =
   | { type: 'grindGrain' }
   | { type: 'millGrain' }
   | { type: 'feedSheep' }
+  | { type: 'nameAnimal'; target: NameTarget; name: string }
   | { type: 'shearFlock' }
   | { type: 'weave'; item: WovenId }
   | { type: 'takeLoaf' }
@@ -966,6 +968,12 @@ const grindGrain: ActionHandler<'grindGrain'> = state => {
 };
 
 /** One heavy job at the windmill grinds the whole granary, as far as the flour bin has room. */
+/** A name takes no time at all. */
+const nameAnimal: ActionHandler<'nameAnimal'> = (state, { target, name }) => {
+  const blocker = nameBlocker(state, target, name);
+  return blocker ? refuse(state, blocker) : { state: named(state, target, cleanName(name)!), message: '' };
+};
+
 /** Feed goes out in the time and energy of a gather. */
 const feedSheep: ActionHandler<'feedSheep'> = state => {
   const blocker = feedBlocker(state);
@@ -1251,6 +1259,7 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
 
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   feedSheep,
+  nameAnimal,
   shearFlock,
   weave,
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, buildMine, chopTree, markClearing, clearGround, visitSite,
