@@ -176,12 +176,12 @@ function pathSpriteFor(g: Grid): string {
   let name = pathSprites.get(shape);
   if (!name) {
     name = `pathTile${pathSprites.size}`;
-    terrainSprites[name] = sprite(g, pathLegend);
+    addTerrainSprite(name, sprite(g, pathLegend));
     pathSprites.set(shape, name);
   }
   return name;
 }
-// Build every area's paths up front so their sprites are registered as textures with the rest.
+// The camp's first paths are built up front; other route lists make their tiles when first drawn.
 for (const routes of [CAMP_PATHS, CAMP_OPEN_PATHS]) pathTiles(routes);
 
 export function pathTile(x: number, y: number, destinations: readonly PathRoute[]): string | undefined {
