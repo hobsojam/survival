@@ -193,6 +193,8 @@ export interface GameState {
   companion: Companion;
   chickens: { discovered: boolean; following: boolean; rescued: boolean; eggs: number; nextEggDay: number };
   /** The flock shares one fluff count; fedUntil is the last dawn their feed lasts, and wool waits in a basket at the pen. */
+  /** What the player has called each animal; for reading only. */
+  names: { bird: string | null; fox: string | null; wolf: string | null; sheep: (string | null)[]; chickens: (string | null)[] };
   sheep: { arrived: boolean; fluff: number; fedUntil: number | null; lastShornYear: number | null; wool: number; woven: { blanket: boolean; jumper: boolean; rug: boolean } };
   homestead: { applesReadyDay: number; shedSearched: boolean };
   /** How far the camp clearing has been widened, and the step whose trees are being felled. */
@@ -302,6 +304,8 @@ export const BALANCE = {
   /** A rabbit a wolf friend brings home, roasted at the fire; one comes every this many winter dawns. */
   cookedRabbitHunger: 50,
   omeletteHunger: 35,
+  /** The longest name an animal can have. */
+  nameLength: 12,
   /** Straw from threshing feeds the sheep; a feed lasts three dawns. */
   strawPerStrip: 2,
   strawCapacity: 12,
@@ -479,6 +483,7 @@ export function createGame(): GameState {
     },
     chickens: { discovered: false, following: false, rescued: false, eggs: 0, nextEggDay: 1 },
     sheep: { arrived: false, fluff: 0, fedUntil: null, lastShornYear: null, wool: 0, woven: { blanket: false, jumper: false, rug: false } },
+    names: { bird: null, fox: null, wolf: null, sheep: [null, null, null], chickens: [null, null, null] },
     homestead: { applesReadyDay: 1, shedSearched: false },
     sickness: { starvedSeconds: 0, sick: false, sickFromDay: null, cared: 0, uncared: 0, ateWarm: false, restedWarm: false },
     ending: null,

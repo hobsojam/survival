@@ -15,6 +15,10 @@ describe('pausing', () => {
     expect(nextPaused(false, { started: true, endingShown: true })).toBe(false);
   });
 
+  it('stays out of the way while a name is being asked for', () => {
+    expect(nextPaused(false, { ...playing, asking: true })).toBe(false);
+  });
+
   it('pauses on Esc, once per press', () => {
     expect(isPauseKey({ key: 'Escape', repeat: false })).toBe(true);
     expect(isPauseKey({ key: 'Escape', repeat: true })).toBe(false);

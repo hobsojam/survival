@@ -107,6 +107,8 @@ The birds, the fox and even the winter wolves can come to trust you, if you shar
 
 Every few days a friend leaves a feather or a tuft of fur by the fire; walk over to pick it up. The first you pick up each season goes in the year journal, and once you've found a feather, a few hang at the shelter for good. These keepsakes don't take bag space. Six feathers make a **feather pillow** for the bed (resting there restores 10 more energy), and six tufts of fur make a **fur cloak** (you lose a quarter less warmth at night). You can make both. Once the house stands, each befriended animal can have a small home of its own nearby: a birdhouse, a fox den, or a wolf house. These are decorative.
 
+**Names.** When an animal stays, you're asked what to call it. Tap a sheep or a hen to name that one too, whenever you feel like it, or stop walking and tap a friend you didn't name at the time. Names can't be changed, and nothing about the game depends on them. Morning notes and journal lines use them, and the panels list who lives here.
+
 ### The cold night
 
 The forecast card warns you about the cold night on **day 3**. It shows only while a cold night is on its way, in winter, and in late autumn (days 8–10) when it warns the bushes are about to go bare, and steps aside the rest of the year. Build a shelter and keep the fire burning through dawn while you stay at camp. The cold night burns fire fuel twice as fast. On day 3 two fresh logs at nightfall last the full night, but nights grow longer toward winter, so a later cold night can need three; the card says how many to bring. The card shows your shelter status and how much fuel is needed. Sleeping passes the night, but the fire still burns and the cold-night outcome still applies.

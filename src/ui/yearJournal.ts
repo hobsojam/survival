@@ -2,6 +2,7 @@ import { SEASON_LENGTH, YEAR_LENGTH, seasonName, type Season } from '../game/cal
 import { keepsakesToCome } from '../game/companion';
 import { journalIconUrl } from '../art/journalIcons';
 import { JOURNAL_PAGES, journalEntry, journalSeason, type JournalId } from '../game/journalEntries';
+import { anyNamed, lineWithName } from '../game/names';
 import type { GameState, StructureId } from '../game/state';
 
 const YEAR: readonly Season[] = ['autumn', 'winter', 'spring', 'summer'];
@@ -28,6 +29,8 @@ const WAITS_ON: Partial<Record<JournalId, StructureId>> = {
   fireside: 'house', grainIn: 'field', autumnGrain: 'field', summerBread: 'field', winterBread: 'field', ovenBread: 'bakery', shearing: 'sheepPen'
 };
 
+const NAMED_MOMENTS: ReadonlySet<JournalId> = new Set<JournalId>(['namedAutumn', 'namedWinter', 'namedSpring', 'namedSummer']);
+
 const KEEPSAKE_MOMENTS: ReadonlySet<JournalId> = new Set<JournalId>(['autumnKeepsake', 'winterKeepsake', 'springKeepsake', 'summerKeepsake']);
 
 /** One season's page of the year journal; pages before the first or after today show the nearest real one. */
@@ -41,6 +44,8 @@ export function journalPageView(state: GameState, page: number): JournalPageView
   // A keepsake line waits on a friend with more to give, unless this page already has it.
   const entries = JOURNAL_PAGES[s].filter(entry => {
     if (KEEPSAKE_MOMENTS.has(entry.id)) return keepsakesToCome(state) || state.journal.some(item => item.year === year && item.id === entry.id);
+    // A named line waits on a name, and a page that has one keeps it.
+    if (NAMED_MOMENTS.has(entry.id)) return anyNamed(state) || state.journal.some(item => item.year === year && item.id === entry.id);
     const building = WAITS_ON[entry.id];
     return !building || state.structures[building];
   });
@@ -53,7 +58,7 @@ export function journalPageView(state: GameState, page: number): JournalPageView
     days: `Days ${first}–${first + SEASON_LENGTH - 1}`,
     entries: written.map(entry => {
       const known = journalEntry(entry.id)!;
-      return { icon: journalIconUrl(entry.id), day: `Day ${entry.day}`, line: known.lines[entry.variant] ?? known.lines[0] };
+      return { icon: journalIconUrl(entry.id), day: `Day ${entry.day}`, line: lineWithName(known.lines[entry.variant] ?? known.lines[0], entry.name) };
     }),
     blanks: entries.length - written.length,
     hasPrevious: index > 0,

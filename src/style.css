@@ -34,6 +34,11 @@ button:focus-visible { outline: 3px solid #d69c5d; outline-offset: 3px; }
 .pause-icon { font-size: 9px; letter-spacing: -1px; }
 .pause-overlay { position: absolute; inset: 0; z-index: 7; display: grid; place-items: center; padding: 16px; background: #18382b9e; backdrop-filter: blur(2px); }
 .pause-overlay[hidden] { display: none; }
+.name-overlay { position: fixed; inset: 0; z-index: 30; display: flex; justify-content: center; align-items: flex-start; padding: 12vh 16px 16px; background: #18382e66; }
+.name-overlay[hidden] { display: none; }
+.name-overlay input { display: block; width: 100%; box-sizing: border-box; margin: 12px 0 4px; padding: 10px 12px; border: 1px solid #b9c9b4; border-radius: 10px; font: inherit; font-size: 16px; }
+.name-overlay small { display: block; min-height: 1.3em; color: #a0472f; }
+.name-actions { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
 .pause-card { max-width: 320px; padding: 22px 24px; border-radius: 16px; background: #fffdf7; text-align: center; box-shadow: 0 12px 32px #17302466; }
 .pause-card h2 { margin: 4px 0 8px; }
 .pause-card p:not(.eyebrow) { margin: 0 0 16px; color: #536d55; font-size: 13px; line-height: 1.45; }

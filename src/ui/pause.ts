@@ -1,6 +1,8 @@
-/** Pausing needs a running game, and the lookout ending already holds the game still. */
-export function nextPaused(paused: boolean, game: { started: boolean; endingShown: boolean }): boolean {
-  if (!game.started || game.endingShown) return false;
+interface PauseGame { started: boolean; endingShown: boolean; asking?: boolean }
+
+/** Pausing needs a running game. The lookout ending and the naming box each hold the game still already. */
+export function nextPaused(paused: boolean, game: PauseGame): boolean {
+  if (!game.started || game.endingShown || game.asking) return false;
   return !paused;
 }
 
@@ -27,7 +29,7 @@ export interface PauseEffects {
 export class PauseControl {
   paused = false;
 
-  constructor(private readonly effects: PauseEffects, private readonly game: () => { started: boolean; endingShown: boolean }) {}
+  constructor(private readonly effects: PauseEffects, private readonly game: () => PauseGame) {}
 
   toggle(): void {
     this.set(nextPaused(this.paused, this.game()));
@@ -90,6 +92,7 @@ export function createPause(
     sound: { setPaused(paused: boolean): void };
     save(): void;
     started(): boolean;
+    asking?(): boolean;
   }
 ): PauseControl {
   return new PauseControl({
@@ -97,7 +100,7 @@ export function createPause(
     save: () => deps.save(),
     sound: paused => deps.sound.setPaused(paused),
     show: (view, paused) => renderPause(page, view, paused)
-  }, () => ({ started: deps.started(), endingShown: page.querySelector('#lookout-ending')?.classList.contains('hidden') === false }));
+  }, () => ({ started: deps.started(), asking: deps.asking?.(), endingShown: page.querySelector('#lookout-ending')?.classList.contains('hidden') === false }));
 }
 
 /** The top button and the card's Resume both toggle; Esc toggles from anywhere on the page. */

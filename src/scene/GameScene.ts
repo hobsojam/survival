@@ -19,6 +19,8 @@ import { ENDING_FADE_MS } from '../ui/ending';
 import { SceneEffects } from './SceneEffects';
 import { SceneLighting } from './SceneLighting';
 import { NightWatch } from './sleepReplay';
+import { newlyStayed, type NameTarget } from '../game/names';
+import { unnamedAnimalAt } from './animalTap';
 import { hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from './tapTarget';
 import { palette } from '../art/palette';
 import type { SoundCue } from '../game/soundscape';
@@ -44,6 +46,7 @@ export class GameScene extends Phaser.Scene {
   private endingFaded = false;
   private walkTarget?: TapTarget;
   private tapGate: () => boolean = () => true;
+  private askName: (target: NameTarget) => void = () => undefined;
   private terrain: Phaser.GameObjects.GameObject[] = [];
   private terrainShown = '';
   private seasonPainted: Season | null = null;
@@ -74,6 +77,10 @@ export class GameScene extends Phaser.Scene {
     // The phone viewport can be set before the scene boots, so take the size the game already has.
     this.lighting = new SceneLighting(this, this.scale.gameSize.width, this.scale.gameSize.height);
     this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,T,P,C,G,Z,L,O,X,V') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      const over = this.unnamedAnimalUnder(pointer.worldX, pointer.worldY);
+      this.game.canvas.style.cursor = over ? 'pointer' : '';
+    });
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       // Right and middle clicks don't walk; touches report button 0.
       if (pointer.button === 0) this.handleTap(pointer.worldX, pointer.worldY);
@@ -207,10 +214,12 @@ export class GameScene extends Phaser.Scene {
     }
     this.state = written.state;
     this.showDawn(before, this.state);
+    const stayed = newlyStayed(before, this.state);
     if (result.state !== before) this.showActionDone(action, before);
     if (action.type === 'gather') this.noteBerryPicked(action.nodeId, before);
     const message = coldNightMessage(before, this.state) ?? (announce ? result.message : '');
     this.say(message, ...newsBetween(before, this.state), ...written.messages, this.needsAlert());
+    if (stayed) this.askName({ kind: 'friend', animal: stayed });
     if (announce) {
       this.onStateChange(this.state, 'action');
       if (this.playerSprite) this.paintObjects();
@@ -241,6 +250,21 @@ export class GameScene extends Phaser.Scene {
   }
 
   getState(): GameState { return this.state; }
+
+  private unnamedAnimalUnder(pixelX: number, pixelY: number): NameTarget | null {
+    return unnamedAnimalAt(this.state, this.time.now, pixelX / TILE - 0.5, pixelY / TILE - 0.5, { friends: this.ambient.friendsDrawn, stillSeconds: this.ambient.stillSeconds, replaying: this.nightWatch.running });
+  }
+
+  setNameAsker(ask: (target: NameTarget) => void): void {
+    this.askName = ask;
+  }
+
+  /** While a name is being typed the game hears no keys, and a key held as the box opened doesn't stay down. */
+  setTyping(typing: boolean): void {
+    const keyboard = this.input.keyboard!;
+    keyboard.resetKeys();
+    keyboard.enabled = !typing;
+  }
 
   /** Swallows taps while the gate says no, such as when a phone sheet is open. */
   setTapGate(gate: () => boolean): void {
@@ -280,6 +304,12 @@ export class GameScene extends Phaser.Scene {
 
   private handleTap(pixelX: number, pixelY: number): void {
     if (!this.tapGate()) return;
+    const animal = this.unnamedAnimalUnder(pixelX, pixelY);
+    if (animal) {
+      this.walkTarget = undefined;
+      this.askName(animal);
+      return;
+    }
     const target = pickTapTarget(this.state, pixelX / TILE - 0.5, pixelY / TILE - 0.5);
     this.showTapMarker(target);
     this.walkTarget = nextWalk(this.walkTarget, { kind: 'tap', target });

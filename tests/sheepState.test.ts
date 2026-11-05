@@ -4,7 +4,7 @@ import { CLEARING_STEPS, STEP_IDS, clearingReach, inClearing, placeBranches, pre
 import { applyAction, groundBlocker } from '../src/game/rules';
 import { clearingView } from '../src/ui/panels';
 import { saveGame } from '../src/game/save';
-import { SAVE_VERSION, upgradeSave } from '../src/game/saveUpgrades';
+import { upgradeSave } from '../src/game/saveUpgrades';
 import { buildMap } from '../src/scene/map';
 import { CAMP_STRUCTURES } from '../src/scene/visuals';
 
@@ -77,7 +77,8 @@ describe('upgrading a save', () => {
     delete old.structures.sheepPen;
     delete old.structures.loom;
     delete old.progress.workshop.shears;
-    const result = upgradeSave(SAVE_VERSION - 1, old);
+    delete old.names;
+    const result = upgradeSave(33, old);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.state).toEqual(createGame());
   });

@@ -20,7 +20,8 @@ import { ENDING_FADE_MS, endingMarkup, endingView, showEnding } from './ending';
 import { browserDownloadDoc, downloadText } from './download';
 import { showBuildList, showCampStores } from './showPanels';
 import type { WovenId } from '../game/sheep';
-import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, decorationMarkup, decorationButtonView, DECORATION_CHOICES, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, chickenCoopPanelView, sheepPanelView, loomPanelView, loomItemMarkup, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
+import { NameDialog, wireNameDialog } from './nameDialog';
+import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, decorationMarkup, decorationButtonView, DECORATION_CHOICES, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, chickenCoopPanelView, friendRosterView, sheepPanelView, loomPanelView, loomItemMarkup, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
 import type { UpgradeId } from '../game/workshop';
 import { Soundscape } from '../game/soundscape';
 import { isAtHome } from '../game/home';
@@ -56,6 +57,7 @@ export class App {
   /** The journal page being read, or null to follow the current season. */
   private journalPage: number | null = null;
   private readonly pause: PauseControl;
+  private nameDialog: NameDialog | null = null;
   private toastTimer?: number;
 
   constructor(root: HTMLElement) {
@@ -68,7 +70,7 @@ export class App {
       this.previousSave = { kind: 'invalid', reason: `Browser storage is unavailable: ${String(error)}` };
     }
     this.soundscape = new Soundscape(this.storage);
-    this.pause = createPause(this.root, { scenes: () => this.game?.scene, sound: this.soundscape, save: () => { if (this.storage) this.saveCurrent(); }, started: () => Boolean(this.scene) });
+    this.pause = createPause(this.root, { scenes: () => this.game?.scene, sound: this.soundscape, save: () => { if (this.storage) this.saveCurrent(); }, started: () => Boolean(this.scene), asking: () => this.nameDialog?.open ?? false });
     const clearingMarkup = (['north', 'east', 'south', 'west'] as const).map(side => `<button type="button" class="build-item" data-clear-side="${side}"><span class="build-copy"><strong></strong><small></small></span></button>`).join('');
     this.root.innerHTML = `
       <div class="shell">
@@ -78,7 +80,7 @@ export class App {
         </header>
         <div class="layout">
           <main class="game-panel">
-            <div class="game-frame"><div id="game-canvas"></div><div class="phone-meters" aria-hidden="true"><span class="track"><span id="mini-energy" class="fill energy"></span></span><span class="track"><span id="mini-hunger" class="fill hunger"></span></span><span class="track"><span id="mini-warmth" class="fill warmth"></span></span></div><div id="pause-overlay" class="pause-overlay" hidden><div class="pause-card" role="dialog" aria-labelledby="pause-title"><p class="eyebrow">TAKING A BREATH</p><h2 id="pause-title">Paused</h2><p>The clock, the fire, and your survivor will wait for you.</p><button type="button" id="pause-resume" class="primary-button">Resume</button><small class="pause-key">or press Esc</small></div></div><div class="prompt" id="prompt">WASD / arrows  Move</div></div>
+            <div class="game-frame"><div id="game-canvas"></div><div class="phone-meters" aria-hidden="true"><span class="track"><span id="mini-energy" class="fill energy"></span></span><span class="track"><span id="mini-hunger" class="fill hunger"></span></span><span class="track"><span id="mini-warmth" class="fill warmth"></span></span></div><div id="name-overlay" class="name-overlay" hidden><form class="pause-card" id="name-form" role="dialog" aria-modal="true" aria-labelledby="name-title"><h2 id="name-title"></h2><input id="name-input" type="text" maxlength="12" autocomplete="off" aria-labelledby="name-title"><small id="name-error"></small><div class="name-actions"><button type="submit" class="primary-button">Name</button><button type="button" id="name-cancel">Not now</button></div></form></div><div id="pause-overlay" class="pause-overlay" hidden><div class="pause-card" role="dialog" aria-labelledby="pause-title"><p class="eyebrow">TAKING A BREATH</p><h2 id="pause-title">Paused</h2><p>The clock, the fire, and your survivor will wait for you.</p><button type="button" id="pause-resume" class="primary-button">Resume</button><small class="pause-key">or press Esc</small></div></div><div class="prompt" id="prompt">WASD / arrows  Move</div></div>
             <div class="message" id="message">Gather a few branches. Your camp is waiting.</div>
             <div class="shortcuts"><span><kbd>WASD</kbd> Walk</span><span><kbd>E</kbd> Use</span><span><kbd>R</kbd> Rest</span><span><kbd>Z</kbd> Sleep</span><span>or just click</span></div>
           </main>
@@ -97,7 +99,7 @@ export class App {
               <section class="panel workshop-panel" id="workshop-panel" data-tab="build" hidden><p class="eyebrow">THE WORKSHOP</p><div id="saw-row" class="tool-row"><h2 id="saw-title"></h2><p id="saw-copy" class="lookout-copy"></p><button type="button" id="saw-button" data-upgrade="saw">Make a saw</button><small id="saw-cost"></small></div><div id="handcart-row" class="tool-row"><h2 id="handcart-title"></h2><p id="handcart-copy" class="lookout-copy"></p><button type="button" id="handcart-button" data-upgrade="handcart">Build a handcart</button><small id="handcart-cost"></small></div><div id="bedtools-row" class="tool-row"><h2 id="bedtools-title"></h2><p id="bedtools-copy" class="lookout-copy"></p><button type="button" id="bedtools-button" data-upgrade="bedTools">Make bed tools</button><small id="bedtools-cost"></small></div><div id="harvesttools-row" class="tool-row"><h2 id="harvesttools-title"></h2><p id="harvesttools-copy" class="lookout-copy"></p><button type="button" id="harvesttools-button" data-upgrade="harvestTools">Make a sickle and flail</button><small id="harvesttools-cost"></small></div><div id="quern-row" class="tool-row"><h2 id="quern-title"></h2><p id="quern-copy" class="lookout-copy"></p><button type="button" id="quern-button" data-upgrade="quern">Make a hand quern</button><small id="quern-cost"></small></div><div id="shears-row" class="tool-row"><h2 id="shears-title"></h2><p id="shears-copy" class="lookout-copy"></p><button type="button" id="shears-button" data-upgrade="shears">Make shears</button><small id="shears-cost"></small></div></section>
               <section class="panel ration-panel" data-tab="bag"><p class="eyebrow">TRAIL FOOD</p><h2>Drying rack</h2><p class="lookout-copy">Dry a berry at camp for a ration you can eat anywhere. Each restores 45 hunger.</p><button type="button" id="prepare-button" data-action="prepareTrailFood">Prepare trail ration</button><small id="prepare-hint">Build a drying rack first.</small></section>
               <section class="panel sites-panel" data-tab="camp"><p class="eyebrow">BEYOND CAMP</p><h2>Follow the paths</h2><p class="lookout-copy">An old basket, a quiet spring, and a stone cairn wait beyond the clearing.</p><button type="button" id="site-button">Explore nearby place</button><small>Stand beside a place and press V</small></section>
-              <section class="panel journal-panel" data-tab="camp"><p class="eyebrow">YOUR FIELD JOURNAL</p><h2>Areas beyond camp</h2><p id="journal-hint" class="journal-hint"></p>
+              <section class="panel journal-panel" data-tab="camp"><p class="eyebrow">YOUR FIELD JOURNAL</p><h2>Areas beyond camp</h2><p id="friends-named" class="journal-hint" hidden></p><p id="journal-hint" class="journal-hint"></p>
                 <details open><summary id="journal-summary">Areas and milestones</summary>
                   <div class="region-overview" role="group" aria-label="Areas beyond camp">
                     <div class="region-home"><span class="region-symbol">✦</span><div><strong>Camp</strong><small id="region-home-status">You are here</small></div></div>
@@ -123,9 +125,9 @@ export class App {
               <section class="panel windmill-panel" data-tab="camp" hidden><p class="eyebrow">THE SOUTH GROUND</p><h2>Windmill</h2><p class="garden-hint" id="windmill-stored"></p><div class="tool-row"><button type="button" id="mill-button" data-action="millGrain">Mill the grain</button><small id="mill-hint"></small></div></section>
               <section class="panel bakery-panel" data-tab="camp" hidden><p class="eyebrow">THE NORTH GROUND</p><h2>Bakery</h2><p class="garden-hint"><span id="bakery-shelf"></span> <span id="bakery-note"></span></p><div class="tool-row"><button type="button" id="take-loaf-button" data-action="takeLoaf">Take a loaf</button><small id="take-loaf-hint"></small></div></section>
               <section class="panel beehive-panel" data-tab="camp" hidden><p class="eyebrow">THE NORTH GROUND</p><h2>Beehive</h2><p class="garden-hint"><span id="hive-honey"></span></p><div class="tool-row"><button type="button" id="take-honey-button" data-action="takeHoney">Take the honey</button><small id="take-honey-hint"></small></div></section>
-              <section class="panel sheep-panel" data-tab="camp" hidden><p class="eyebrow">THE EAST MEADOW</p><h2>Sheep</h2><p class="garden-hint" id="sheep-status"></p><p class="garden-hint" id="sheep-stores"></p><div class="tool-row"><button type="button" id="feed-button" data-action="feedSheep">Put out feed</button><small id="feed-hint"></small></div><div class="tool-row" id="shear-row" hidden><button type="button" id="shear-button" data-action="shearFlock">Shear the flock</button><small id="shear-hint"></small></div></section>
+              <section class="panel sheep-panel" data-tab="camp" hidden><p class="eyebrow">THE EAST MEADOW</p><h2>Sheep</h2><p class="garden-hint" id="sheep-status"></p><p class="garden-hint" id="sheep-names" hidden></p><p class="garden-hint" id="sheep-stores"></p><div class="tool-row"><button type="button" id="feed-button" data-action="feedSheep">Put out feed</button><small id="feed-hint"></small></div><div class="tool-row" id="shear-row" hidden><button type="button" id="shear-button" data-action="shearFlock">Shear the flock</button><small id="shear-hint"></small></div></section>
               <section class="panel loom-panel" data-tab="build" hidden><p class="eyebrow">BESIDE THE WORKSHOP</p><h2>Loom</h2><p class="garden-hint" id="loom-note"></p><div id="loom-list"></div></section>
-              <section class="panel chicken-coop-panel" data-tab="camp" hidden><p class="eyebrow">AT CAMP</p><h2>Chicken coop</h2><p class="garden-hint" id="chicken-coop-status"></p><p class="garden-hint" id="chicken-coop-eggs"></p><div class="tool-row"><button type="button" id="take-egg-button" data-action="takeEgg">Take an egg</button><small id="take-egg-hint"></small></div></section>
+              <section class="panel chicken-coop-panel" data-tab="camp" hidden><p class="eyebrow">AT CAMP</p><h2>Chicken coop</h2><p class="garden-hint" id="chicken-coop-status"></p><p class="garden-hint" id="coop-names" hidden></p><p class="garden-hint" id="chicken-coop-eggs"></p><div class="tool-row"><button type="button" id="take-egg-button" data-action="takeEgg">Take an egg</button><small id="take-egg-hint"></small></div></section>
               <section class="panel night-panel" data-tab="camp"><p class="eyebrow">CAMP MOMENTS</p><h2>Cook or unwind</h2><p class="night-hint" id="night-hint">Cook by the fire any time. Stargazing waits for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" data-dish="berries" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button>${nightDishMarkup()}</div></section>
               <section class="panel build-panel" data-tab="build"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand anywhere in the clearing to build.</p><div id="build-list">${buildListMarkup()}</div><div id="decoration-group" hidden><h3 class="build-group-heading">Make it yours</h3><div id="decoration-list">${decorationMarkup()}</div></div><div id="clearing-group" hidden><h3 class="build-group-heading">Clear the land</h3><p id="clearing-progress" class="build-hint" hidden></p><div id="clearing-sides">${clearingMarkup}</div><div class="tool-row" id="clear-row"><h3 id="clear-title">Clear the ground</h3><p id="clear-copy" class="lookout-copy"></p><button type="button" id="clear-button" data-action="clearGround">Clear the ground</button><small id="clear-cost"></small></div></div></section>
               <section class="panel phone-only" data-tab="camp"><p class="eyebrow">THIS CAMP</p><button type="button" id="phone-new-game" class="secondary-button">Start a new game</button></section>
@@ -179,6 +181,21 @@ export class App {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-weave]');
       if (button) this.scene?.perform({ type: 'weave', item: button.dataset.weave as WovenId });
     });
+    const nameOverlay = this.root.querySelector<HTMLElement>('#name-overlay')!;
+    const nameForm = this.root.querySelector<HTMLFormElement>('#name-form')!;
+    this.nameDialog = new NameDialog({
+      overlay: nameOverlay,
+      form: nameForm,
+      input: this.root.querySelector<HTMLInputElement>('#name-input')!,
+      title: this.root.querySelector<HTMLElement>('#name-title')!,
+      error: this.root.querySelector<HTMLElement>('#name-error')!
+    }, {
+      state: () => this.state,
+      holdGame: hold => { if (hold) this.game?.scene.pause('GameScene'); else this.game?.scene.resume('GameScene'); },
+      setTyping: typing => this.scene?.setTyping(typing),
+      perform: action => this.scene?.perform(action)
+    });
+    wireNameDialog({ overlay: nameOverlay, form: nameForm, cancel: this.root.querySelector<HTMLButtonElement>('#name-cancel')! }, document, this.nameDialog);
     this.root.querySelectorAll<HTMLButtonElement>('[data-upgrade]').forEach(button => {
       button.addEventListener('click', () => this.scene?.perform({ type: 'makeUpgrade', upgrade: button.dataset.upgrade as UpgradeId }));
     });
@@ -263,6 +280,7 @@ export class App {
       if ((cause === 'action' && next !== previous && !this.saveFailures) || due) this.saveCurrent();
     }, message => this.setMessage(message), cue => this.soundscape.playCue(cue));
     // A tap on the game while a phone sheet is open only closes the sheet.
+    this.scene.setNameAsker(target => this.nameDialog?.ask(target));
     this.scene.setTapGate(() => {
       const dock = this.root.querySelector<HTMLElement>('.phone-dock');
       const { allowTap, closeTab } = gateTap(this.openTab, Boolean(dock && getComputedStyle(dock).display !== 'none'));
@@ -672,6 +690,7 @@ export class App {
     const flockPanel = this.root.querySelector<HTMLElement>('.sheep-panel');
     if (flockPanel) flockPanel.hidden = !flock.shown;
     this.setText('sheep-status', flock.status);
+    this.setRoster('sheep-names', flock.names);
     this.setText('sheep-stores', `${flock.straw}, ${flock.wool}`);
     this.setActionButton('feed-button', flock.feed.disabled);
     this.setText('feed-hint', flock.feed.hint);
@@ -689,6 +708,8 @@ export class App {
     const coopPanel = this.root.querySelector<HTMLElement>('.chicken-coop-panel');
     if (coopPanel) coopPanel.hidden = !coop.shown;
     this.setText('chicken-coop-status', coop.status);
+    this.setRoster('coop-names', coop.names);
+    this.setRoster('friends-named', friendRosterView(this.state).text);
     this.setText('chicken-coop-eggs', coop.stored);
     this.setActionButton('take-egg-button', coop.take.disabled);
     this.setText('take-egg-hint', coop.take.hint);
@@ -763,6 +784,13 @@ export class App {
     button.querySelector<HTMLElement>('.build-price')!.textContent = view.price;
   }
 
+
+  /** A list of names: plain text, and out of the way when there are none. */
+  private setRoster(id: string, text: string): void {
+    this.setText(id, text);
+    const element = this.root.querySelector<HTMLElement>(`#${id}`);
+    if (element) element.hidden = text === '';
+  }
 
   private setText(id: string, text: string): void {
     const element = this.root.querySelector<HTMLElement>(`#${id}`);

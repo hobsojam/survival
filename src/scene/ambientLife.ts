@@ -7,6 +7,7 @@ import { firefliesOut, isSpring, isWinter, leavesFalling } from '../game/calenda
 import { wolvesClose } from '../game/wolves';
 import { fuelLeft } from '../game/home';
 import { KEEPSAKE_SPOT, hasFriend } from '../game/companion';
+import type { DrawnFriend } from './animalTap';
 import { CHORUS_SECONDS, chorusNight, companionPoseFor, type CompanionPose } from './companionPose';
 import type { SoundCue } from '../game/soundscape';
 import {
@@ -88,7 +89,9 @@ export class AmbientLife {
   /** The one smaller pair of eyes that comes to the firelight once the wolves begin to trust the survivor. */
   private readonly trustingEyes: Phaser.GameObjects.Image;
   /** How long the survivor has stood still, and which way they last walked, for the friend's pose. */
-  private stillSeconds = 0;
+  stillSeconds = 0;
+  /** Every friend as last drawn, so a tap can find it. */
+  friendsDrawn: DrawnFriend[] = [];
   private facing: 1 | -1 = 1;
   private lastPlayer: Point | null = null;
   /** Where the friend was last drawn, and its flight when it moves to a new perch. */
@@ -200,6 +203,8 @@ export class AmbientLife {
       const target = state.area === 'camp' ? companionPoseFor(state, kind, timeMs, this.stillSeconds, this.facing) : null;
       const pose = target && kind === 'bird' ? this.birdFlight(target, seconds) : target;
       if (kind === 'bird') this.friendDrawn = pose;
+      this.friendsDrawn = this.friendsDrawn.filter(friend => friend.animal !== kind);
+      if (pose) this.friendsDrawn.push({ ...pose, animal: kind });
       if (!pose) { image.setVisible(false); continue; }
       this.show(image, pose.x, pose.y - pose.height, pose.frame, pose.facing);
       image.setDepth(Math.round(worldY(pose.y)));

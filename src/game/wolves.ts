@@ -1,5 +1,6 @@
 import { isWinter, nightStart } from './calendar';
 import { hasFriend } from './companion';
+import { friendCalled } from './names';
 import { takeFromBag } from './food';
 import { fuelLeft } from './home';
 import type { GameState, WolfTake } from './state';
@@ -10,13 +11,12 @@ import type { GameState, WolfTake } from './state';
 /** Below this much fuel on a winter night, wolves gather at the camp edge. In the house, the logs in store count too, since the fireplace draws them itself. */
 export const WOLF_LOW_FUEL = 20;
 
-const MESSAGES: Record<WolfTake, string | null> = {
+const MESSAGES: Record<Exclude<WolfTake, 'chased'>, string | null> = {
   ration: 'A wolf slipped into the dark camp and took a ration.',
   berry: 'A wolf slipped into the dark camp and took a berry.',
   nothing: 'A wolf circled the dark camp but found nothing to take.',
   // The offering said so itself.
-  offered: null,
-  chased: 'Your wolf saw the others off into the dark.'
+  offered: null
 };
 
 const winterNight = (state: GameState): boolean => isWinter(state.day) && state.timeOfDay >= nightStart(state.day);
@@ -45,6 +45,7 @@ export function wolfVisit(next: GameState): void {
 export function wolfMessage(before: GameState, after: GameState): string | null {
   const visit = after.lastWolf;
   if (!visit || visit.day === before.lastWolf?.day) return null;
+  if (visit.took === 'chased') return `${friendCalled(after, 'wolf', 'Your wolf')} saw the others off into the dark.`;
   return MESSAGES[visit.took];
 }
 

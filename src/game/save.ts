@@ -1,3 +1,4 @@
+import { cleanName } from './names';
 import { BALANCE, BUILDINGS, SITES, createGame, foodStoreCapacity, type GameState, type StructureId } from './state';
 import { bagCapacity, carriedCount } from './rules';
 import { season, yearOf } from './calendar';
@@ -275,7 +276,9 @@ function validJournal({ journal, day }: SaveShape): boolean {
     if (!known || seen.has(key)) return false;
     seen.add(key);
     return entry.day >= 1 && entry.day <= (day as number) && yearOf(entry.day) === entry.year
-      && season(entry.day) === journalSeason(entry.id as JournalId) && entry.variant < known.lines.length;
+      && season(entry.day) === journalSeason(entry.id as JournalId) && entry.variant < known.lines.length
+      // A line with a place for a name has one, and only those lines do.
+      && (known.lines[entry.variant].includes('{name}') ? typeof entry.name === 'string' && cleanName(entry.name) === entry.name : entry.name === undefined);
   });
 }
 
@@ -377,6 +380,16 @@ function validSickness({ sickness, ending, day, fishingMisses }: SaveShape): boo
     && cared < BALANCE.sickDaysToRecover && (uncared < BALANCE.sickDaysToDie || ending !== null);
 }
 
+/** Each name is a kept name on an animal that's really there, with three places each for the sheep and the hens. */
+function validNames({ names, sheep, chickens, companion }: SaveShape): boolean {
+  if (!object(names) || !object(sheep) || !object(chickens) || !object(companion) || !object(companion.friends)) return false;
+  const ok = (name: unknown): boolean => name === null || (typeof name === 'string' && cleanName(name) === name);
+  const flock = (places: unknown, here: boolean): boolean => Array.isArray(places) && places.length === 3 && places.every(ok) && (here || places.every(name => name === null));
+  const friendsOk = (['bird', 'fox', 'wolf'] as const).every(animal => ok(names[animal])
+    && (names[animal] === null || (companion.friends as ObjectValue)[animal] !== null || companion.friend === animal));
+  return friendsOk && flock(names.sheep, sheep.arrived === true) && flock(names.chickens, chickens.rescued === true);
+}
+
 /** Sheep need their pen; a shearing needs sheep and shears; the loom follows a shearing, and each woven item its loom and what it goes with. */
 function validSheep({ sheep, structures, progress, day }: SaveShape): boolean {
   if (!object(sheep) || !object(sheep.woven) || !bool(sheep.arrived) || !object(progress.workshop)) return false;
@@ -397,7 +410,7 @@ function validSheep({ sheep, structures, progress, day }: SaveShape): boolean {
 /** Checks a version 24 save, with the survivor's sickness and whether their story has ended, and: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, the workshop and its handcart, shelter upgrades, garden plots, vegetable beds, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validDecorations, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validBeehive, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validChickens, validSickness, validSheep];
+  const checks = [validClock, validSurvivor, validProgress, validDecorations, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validBeehive, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validChickens, validSickness, validSheep, validNames];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

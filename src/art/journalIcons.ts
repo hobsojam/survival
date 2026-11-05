@@ -17,7 +17,17 @@ const keepsakeIcon = (accent: PaletteKey, top: readonly [string, string]): Journ
   rows: [...top, '..gg......', '.gwwg.....', '.gwwg.....', '..gwg.ff..', '..gw.fFFf.', '...k.fFFf.', '...k..ff..', '..........']
 });
 
+/** A little paw with a touch of the season in the corner: the lines about an animal with a name. */
+const namedIcon = (accent: PaletteKey, top: readonly [string, string]): JournalIcon => ({
+  legend: { x: accent, k: 'wood1', K: 'wood2' },
+  rows: [...top, '..........', '.k.k......', '.k.k.k....', '..KKK.....', '.KKKKK....', '.KKKKK....', '..KKK.....', '..........']
+});
+
 export const JOURNAL_ICONS: Record<JournalId, JournalIcon> = {
+  namedAutumn: namedIcon('fire2', ['.......xx.', '........x.']),
+  namedWinter: namedIcon('frost', ['.......x.x', '........x.']),
+  namedSpring: namedIcon('leaf3', ['........x.', '.......xx.']),
+  namedSummer: namedIcon('scarf3', ['.......xx.', '.......xx.']),
   autumnKeepsake: keepsakeIcon('fire2', ['.......xx.', '........x.']),
   winterKeepsake: keepsakeIcon('frost', ['.......x.x', '........x.']),
   // A little sheep, seen from the side.

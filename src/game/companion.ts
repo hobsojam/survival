@@ -4,6 +4,7 @@ import { freeSpaces, isInClearing } from './camp';
 import { fuelLeft } from './home';
 import { addFood, availableFood, spendFood, type FoodItem } from './food';
 import { BALANCE, type Friend, type GameState } from './state';
+import { friendCalled } from './names';
 import { dayHash, foxAt, foxSpookRadius } from './wildlife';
 
 // Wild animals can become camp friends, won over by small offerings they already like:
@@ -207,8 +208,8 @@ export function pickUpKeepsake(state: GameState): GameState {
 /** What the survivor notices of their friend between two states. */
 export function companionNews(before: GameState, after: GameState): string[] {
   const news: string[] = [];
-  if (after.companion.lastGiftByFriend.fox > before.companion.lastGiftByFriend.fox) news.push('The fox left a berry by your bedroll.');
-  if (after.companion.lastGiftByFriend.wolf > before.companion.lastGiftByFriend.wolf) news.push('Your wolf left a rabbit by your bedroll.');
+  if (after.companion.lastGiftByFriend.fox > before.companion.lastGiftByFriend.fox) news.push(`${friendCalled(after, 'fox', 'The fox')} left a berry by your bedroll.`);
+  if (after.companion.lastGiftByFriend.wolf > before.companion.lastGiftByFriend.wolf) news.push(`${friendCalled(after, 'wolf', 'Your wolf')} left a rabbit by your bedroll.`);
   for (const kind of ['feather', 'fur'] as const) {
     const piece = kind === 'feather' ? 'a feather' : 'a tuft of fur';
     if (after.companion.lyingByKind[kind] && !before.companion.lyingByKind[kind]) news.push(`${piece[0].toUpperCase()}${piece.slice(1)} lies by the fire.`);

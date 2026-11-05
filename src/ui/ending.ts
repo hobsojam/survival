@@ -1,4 +1,5 @@
 import { SEASON_LENGTH, YEAR_LENGTH, season, seasonName } from '../game/calendar';
+import { friendCalled } from '../game/names';
 import type { GameState } from '../game/state';
 
 // The run's end, when sickness wins: told gently, with the journal to keep. Death is the end; there is no carrying on.
@@ -33,8 +34,8 @@ export function endingView(state: GameState): EndingView {
   const buildings = Object.entries(state.structures).filter(([id, built]) => built && !SHELTER_WORK.has(id)).length;
   const parts = [counted(day, 'day', 'lived'), counted(buildings, 'building', 'raised')];
   const friends = (['bird', 'fox', 'wolf'] as const).filter(animal => state.companion.friends[animal] !== null);
-  if (friends.length === 1) parts.push(`a friend in the ${friends[0]}`);
-  if (friends.length > 1) parts.push(`${friends.length} animal friends: ${friends.join(', ')}`);
+  if (friends.length === 1) parts.push(`a friend in ${friendCalled(state, friends[0], `the ${friends[0]}`)}`);
+  if (friends.length > 1) parts.push(`${friends.length} animal friends: ${friends.map(animal => friendCalled(state, animal, animal)).join(', ')}`);
   return { title, summary: parts.join(' · ') };
 }
 
