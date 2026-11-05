@@ -1,4 +1,5 @@
 import { emptyField } from './field';
+import { emptyOrchard } from './orchard';
 
 // Bringing an older save up to date as it loads. Every change to the saved shape bumps SAVE_VERSION by one and adds
 // the step that upgrades a save from the version before: SAVE_UPGRADES[23] turns a version 23 save into version 24.
@@ -6,7 +7,7 @@ import { emptyField } from './field';
 // anything the player had. Loading runs every step a save needs, in order, then validates the result as usual.
 
 /** The saved shape's version. Bump it by one with every change to the shape, and add its upgrade step below. */
-export const SAVE_VERSION = 35;
+export const SAVE_VERSION = 36;
 
 /** The oldest save that can still be brought up to date: earlier formats were never upgraded and don't load. */
 export const OLDEST_UPGRADABLE_VERSION = 23;
@@ -131,7 +132,12 @@ export const SAVE_UPGRADES: Readonly<Record<number, SaveUpgrade>> = {
       sheep: { arrived: false, fluff: 0, fedUntil: null, lastShornYear: null, wool: 0, woven: { blanket: false, jumper: false, rug: false } } };
   },
   // Version 35: names for the animals. Every animal in an older camp is unnamed, and friends can be named by tapping them.
-  34: old => ({ ...(old as Upgradable), names: { bird: null, fox: null, wolf: null, sheep: [null, null, null], chickens: [null, null, null] } })
+  34: old => ({ ...(old as Upgradable), names: { bird: null, fox: null, wolf: null, sheep: [null, null, null], chickens: [null, null, null] } }),
+  // Version 36: pips can be saved and an orchard planted. An older camp has neither.
+  35: old => {
+    const state = old as Upgradable & { structures: Upgradable };
+    return { ...state, structures: { ...state.structures, orchard: false }, orchard: emptyOrchard() };
+  }
 };
 
 export type UpgradeResult = { ok: true; state: unknown } | { ok: false; reason: string };

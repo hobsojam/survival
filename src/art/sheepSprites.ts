@@ -3,17 +3,17 @@ import type { SpriteDef } from './sprites';
 
 // The flock: skinny after a shearing, woolly, very round, then a giant cloud with tiny legs and a small face peeking out.
 
-type Grid = string[][];
+export type Grid = string[][];
 const blank = (width: number, height: number): Grid => Array.from({ length: height }, () => Array.from({ length: width }, () => '.'));
-const dot = (g: Grid, x: number, y: number, c: string): void => { if (g[y]?.[x] !== undefined) g[y][x] = c; };
-const box = (g: Grid, x: number, y: number, width: number, height: number, c: string): void => {
+export const dot = (g: Grid, x: number, y: number, c: string): void => { if (g[y]?.[x] !== undefined) g[y][x] = c; };
+export const box = (g: Grid, x: number, y: number, width: number, height: number, c: string): void => {
   for (let yy = y; yy < y + height; yy++) for (let xx = x; xx < x + width; xx++) dot(g, xx, yy, c);
 };
-const oval = (g: Grid, cx: number, cy: number, rx: number, ry: number, c: string): void => {
+export const oval = (g: Grid, cx: number, cy: number, rx: number, ry: number, c: string): void => {
   for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++)
     if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1) dot(g, x, y, c);
 };
-function define(width: number, height: number, painters: Record<string, (g: Grid) => void>, anchor: [number, number]): SpriteDef {
+export function define(width: number, height: number, painters: Record<string, (g: Grid) => void>, anchor: [number, number]): SpriteDef {
   return { size: [width, height], anchor, legend, frames: Object.fromEntries(Object.entries(painters).map(([name, paint]) => {
     const g = blank(width, height); paint(g); return [name, g.map(row => row.join(''))];
   })) };

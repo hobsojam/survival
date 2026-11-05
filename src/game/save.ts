@@ -12,6 +12,7 @@ import { woodStoreCapacity } from './home';
 import { BED_CROPS, dryLimitsFor } from './beds';
 import { WORKSHOP_UPGRADES, type UpgradeId } from './workshop';
 import { FIELD_STRIPS, ripeDay } from './field';
+import { ORCHARD_SPOTS } from './orchard';
 
 import { SAVE_VERSION, upgradeSave } from './saveUpgrades';
 
@@ -407,10 +408,22 @@ function validSheep({ sheep, structures, progress, day }: SaveShape): boolean {
   return (!woven.blanket || structures.bed === true) && (!woven.rug || structures.house === true);
 }
 
+/** Pips and the orchard follow the old homestead's apples, a tree needs the orchard and non-frozen ground, and pips and trees together never pass the spots. */
+function validOrchard({ orchard, structures, progress, day }: SaveShape): boolean {
+  if (!object(orchard) || !count(orchard.pips) || !Array.isArray(orchard.trees) || orchard.trees.length !== ORCHARD_SPOTS.length) return false;
+  const today = day as number;
+  const treeOk = (tree: unknown): boolean => tree === null || (object(tree) && count(tree.plantedDay) && tree.plantedDay >= 1 && tree.plantedDay <= today
+    && season(tree.plantedDay) !== 'winter' && count(tree.ripeDay) && tree.ripeDay >= tree.plantedDay && tree.ripeDay <= today + BALANCE.orchardRipenDays);
+  const trees = (orchard.trees as unknown[]).filter(tree => tree !== null);
+  if (!orchard.trees.every(treeOk) || orchard.pips + trees.length > ORCHARD_SPOTS.length) return false;
+  if (trees.length > 0 && structures.orchard !== true) return false;
+  return progress.homesteadFound === true || (orchard.pips === 0 && structures.orchard !== true);
+}
+
 /** Checks a version 24 save, with the survivor's sickness and whether their story has ended, and: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, the workshop and its handcart, shelter upgrades, garden plots, vegetable beds, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validDecorations, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validBeehive, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validChickens, validSickness, validSheep, validNames];
+  const checks = [validClock, validSurvivor, validProgress, validDecorations, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validBeehive, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validChickens, validSickness, validSheep, validNames, validOrchard];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 
