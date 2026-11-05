@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { CLEARING_STEPS, STEP_IDS, inClearedPatch, placeBranches, previousStep, stepGround, stepWhere, type StepId } from '../src/game/clearing';
-import { ORCHARD_SPOTS, emptyOrchard, treesPlanted, type OrchardState } from '../src/game/orchard';
-import { applyAction, buildStatus } from '../src/game/rules';
+import { addFood } from '../src/game/food';
+import { recordJournal } from '../src/game/journalEntries';
+import { newsBetween } from '../src/game/news';
+import { ORCHARD_SPOTS, autumnsPassed, emptyOrchard, nearestSpot, orchardNews, spotAction, treeBears, treeRipe, treeStage, treesPlanted, type OrchardState } from '../src/game/orchard';
+import { applyAction, buildStatus, type GameAction } from '../src/game/rules';
 import { saveGame } from '../src/game/save';
 import { upgradeSave } from '../src/game/saveUpgrades';
 import { BUILDINGS, SITES, createGame, type GameState } from '../src/game/state';
 import { buildMap } from '../src/scene/map';
+import { journalPageView } from '../src/ui/yearJournal';
 
 const game = createGame();
 const fakeStorage = (): Storage => {
@@ -18,7 +22,7 @@ const NO_ORCHARD = { ...game.structures, shelter: true };
 const NOT_FOUND = { ...game.progress, homesteadFound: false, nextStormDay: null, hearthUnlocked: true };
 
 /** A real camp in year two's spring with the orchard standing, that saves unless its orchard is impossible. */
-export function orchardCamp(orchard: Partial<OrchardState> = {}, changes: Partial<GameState> = {}): GameState {
+function orchardCamp(orchard: Partial<OrchardState> = {}, changes: Partial<GameState> = {}): GameState {
   const placed = placeBranches(game.nodes, [...STEP_IDS]);
   return {
     ...game,
@@ -163,5 +167,242 @@ describe('saves an orchard can really reach', () => {
 
   it('refuses the orchard before its ground is cleared', () => {
     expect(saves(orchardCamp({}, { clearing: { cleared: ['west-near', 'west-far'], marked: null, felled: [] } }))).toBe(false);
+  });
+});
+
+describe('growing', () => {
+  it.each([[1, 40, 0], [1, 41, 1], [1, 120, 2], [1, 121, 3], [40, 41, 1], [40, 121, 3], [21, 121, 3]])(
+    'planted day %i, on day %i, has seen %i autumns', (planted, day, autumns) => {
+      expect(autumnsPassed(planted, day)).toBe(autumns);
+    });
+
+  it.each([[5, 'sprout'], [41, 'sapling'], [81, 'young'], [121, 'grown'], [400, 'grown']] as const)('on day %i a tree planted on day 1 is a %s', (day, stage) => {
+    expect(treeStage({ plantedDay: 1, ripeDay: 1 }, day)).toBe(stage);
+  });
+
+  it('bears at its third autumn and only in autumn', () => {
+    const tree = { plantedDay: 40, ripeDay: 40 };
+    expect(treeBears(tree, 81)).toBe(false);
+    expect(treeBears(tree, 121)).toBe(true);
+    expect(treeBears(tree, 131)).toBe(false);
+    expect(treeBears(tree, 161)).toBe(true);
+  });
+
+  it('is ripe only while bearing and past its ripe day', () => {
+    expect(treeRipe({ plantedDay: 1, ripeDay: 1 }, 121)).toBe(true);
+    expect(treeRipe({ plantedDay: 1, ripeDay: 124 }, 123)).toBe(false);
+    expect(treeRipe({ plantedDay: 1, ripeDay: 124 }, 124)).toBe(true);
+    expect(treeRipe({ plantedDay: 1, ripeDay: 1 }, 81)).toBe(false);
+  });
+});
+
+const withFood = (state: GameState, item: Parameters<typeof addFood>[1], n = 1): GameState => ({ ...state, inventory: { ...state.inventory, food: addFood(state.inventory.food, item, n, state.day) } });
+const tree = { plantedDay: 1, ripeDay: 1 };
+const treesOf = (count: number) => Array.from({ length: 6 }, (_, i) => (i < count ? tree : null));
+
+describe('saving pips', () => {
+  const found = orchardCamp({}, { day: 5, structures: { ...game.structures, shelter: true } });
+  const eat = (state: GameState) => applyAction(state, { type: 'eat', item: 'apple' });
+
+  it('keeps one for each apple eaten, and says so only the first time', () => {
+    const first = eat(withFood(found, 'apple', 2));
+    expect(first.state.orchard.pips).toBe(1);
+    expect(first.message).toBe('Ate an apple. You keep the pips.');
+    const second = eat(first.state);
+    expect(second.state.orchard.pips).toBe(2);
+    expect(second.message).toBe('Ate an apple.');
+  });
+
+  it('stays quiet once a tree is planted, even with no pips left', () => {
+    const planted = eat(withFood({ ...found, structures: { ...found.structures, orchard: true }, orchard: { pips: 0, trees: treesOf(1) } }, 'apple'));
+    expect(planted.state.orchard.pips).toBe(1);
+    expect(planted.message).toBe('Ate an apple.');
+  });
+
+  it('keeps none past six, counting trees and pips together', () => {
+    const full = eat(withFood({ ...found, orchard: { pips: 2, trees: treesOf(4) } }, 'apple'));
+    expect(full.state.orchard.pips).toBe(2);
+    expect(full.message).toBe('Ate an apple.');
+  });
+
+  it('keeps none from other food', () => {
+    expect(applyAction(withFood(found, 'berry'), { type: 'eat', item: 'berry' }).state.orchard.pips).toBe(0);
+    expect(applyAction(withFood(found, 'greens'), { type: 'eat', item: 'greens' }).state.orchard.pips).toBe(0);
+  });
+
+  const atFire: Partial<GameState> = { fireFuel: 300, player: { ...game.player, x: 20, y: 16 } };
+
+  it('keeps one from a baked apple, with the same word', () => {
+    const baked = applyAction(withFood({ ...found, ...atFire }, 'apple'), { type: 'cook', dish: 'bakedApple' });
+    expect(baked.state.inventory.food.apple).toEqual([]);
+    expect(baked.state.orchard.pips).toBe(1);
+    expect(baked.message.endsWith(' You keep the pips.')).toBe(true);
+  });
+
+  it('keeps one from an apple pie', () => {
+    const ready = withFood(withFood(withFood({ ...found, ...atFire, progress: { ...found.progress, potCrafted: true } }, 'apple'), 'egg'), 'flour');
+    const pie = applyAction(ready, { type: 'cook', dish: 'applePie' });
+    expect(pie.state.orchard.pips).toBe(1);
+  });
+
+  it('keeps none from another dish', () => {
+    const berries = applyAction(withFood({ ...found, ...atFire }, 'berry'), { type: 'cook', dish: 'berries' });
+    expect(berries.state.inventory.food.berry).toEqual([]);
+    expect(berries.state.orchard.pips).toBe(0);
+  });
+
+  it('keeps none from an apple that goes rotten', () => {
+    const old = withFood({ ...found, day: 1 }, 'apple');
+    const later = applyAction({ ...old, day: 30, timeOfDay: 200, player: { ...old.player, x: 20, y: 16 } }, { type: 'sleep' }).state;
+    expect(later.inventory.food.apple).toEqual([]);
+    expect(later.orchard.pips).toBe(0);
+  });
+});
+
+describe('planting a pip', () => {
+  const by = (spot: number) => ({ x: ORCHARD_SPOTS[spot].x, y: ORCHARD_SPOTS[spot].y });
+  const standing = (spot: number, orchard: Partial<OrchardState>, changes: Partial<GameState> = {}): GameState =>
+    orchardCamp(orchard, { player: { ...game.player, ...by(spot) }, ...changes });
+  const plant = (state: GameState, spot: number) => applyAction(state, { type: 'plantPip', spot });
+
+  it('spends a pip and fills the spot, for the work of gathering', () => {
+    const state = standing(2, { pips: 2 });
+    const { state: after, message } = plant(state, 2);
+    expect(after.orchard.pips).toBe(1);
+    expect(after.orchard.trees[2]).toEqual({ plantedDay: 62, ripeDay: 62 });
+    expect(message).toBe('You plant a pip and mark it with a stake.');
+    expect(after.player.energy).toBeLessThan(state.player.energy);
+    expect(after.timeOfDay).toBeGreaterThan(state.timeOfDay);
+  });
+
+  it.each([
+    ['away from the spot', standing(0, { pips: 1 }), 5, 'Stand beside the spot.'],
+    ['on a tree', standing(0, { pips: 1, trees: treesOf(1) }), 0, 'Something is already growing here.'],
+    ['with no pips', standing(0, {}), 0, 'You have no pips to plant.'],
+    ['in winter', standing(0, { pips: 1 }, { day: 55 }), 0, 'The ground is frozen hard.'],
+    ['off the plot', standing(0, { pips: 1 }), 6, "That spot isn't there."],
+    ['with no index', standing(0, { pips: 1 }), 0.5, "That spot isn't there."],
+    ['with no orchard', standing(0, { pips: 1 }, { structures: game.structures }), 0, 'Build the orchard first.']
+  ])('refuses %s', (_label, state, spot, message) => {
+    const refused = plant(state, spot);
+    expect(refused.message).toBe(message);
+    expect(refused.state).toBe(state);
+  });
+
+  it('plants from another area never', () => {
+    const state = standing(0, { pips: 1 }, { area: 'homestead' });
+    expect(plant(state, 0).message).toBe('Stand beside the spot.');
+  });
+});
+
+describe('picking from your own tree', () => {
+  const AUTUMN = 121;
+  const standing = (spot: number, orchard: Partial<OrchardState>, changes: Partial<GameState> = {}): GameState =>
+    orchardCamp(orchard, { day: AUTUMN, player: { ...game.player, x: ORCHARD_SPOTS[spot].x, y: ORCHARD_SPOTS[spot].y }, ...changes });
+  const pick = (state: GameState, spot: number) => applyAction(state, { type: 'pickOrchardApple', spot });
+
+  it('gives an apple and leaves only that tree waiting', () => {
+    const state = standing(1, { trees: treesOf(3) });
+    const { state: after, message } = pick(state, 1);
+    expect(message).toBe('You pick an apple from your own tree.');
+    expect(after.inventory.food.apple).toEqual([AUTUMN]);
+    expect(after.orchard.trees[1]).toEqual({ plantedDay: 1, ripeDay: AUTUMN + 3 });
+    expect(after.orchard.trees[0]).toEqual(tree);
+    expect(after.orchard.trees[2]).toEqual(tree);
+    expect(after.player.energy).toBeLessThan(state.player.energy);
+  });
+
+  const full = { ...game.inventory, food: addFood(game.inventory.food, 'berry', 20, AUTUMN) };
+  it.each([
+    ['away from it', standing(0, { trees: treesOf(6) }), 5, 'Stand beside the tree.'],
+    ['an empty spot', standing(0, {}), 0, 'Stand beside the tree.'],
+    ['a young tree', standing(0, { trees: [{ plantedDay: 41, ripeDay: 41 }, null, null, null, null, null] }), 0, 'This tree is too young for apples.'],
+    ['out of season', standing(0, { trees: treesOf(1) }, { day: 141 }), 0, 'The tree bears apples in autumn.'],
+    ['just picked', standing(0, { trees: [{ plantedDay: 1, ripeDay: AUTUMN + 1 }, null, null, null, null, null] }), 0, 'The tree has no ripe apples yet.'],
+    ['a full bag', standing(0, { trees: treesOf(1) }, { inventory: full }), 0, 'Make room in your bag for an apple.'],
+    ['off the plot', standing(0, { trees: treesOf(1) }), 9, "That spot isn't there."]
+  ])('refuses %s', (_label, state, spot, message) => {
+    const refused = pick(state, spot);
+    expect(refused.message).toBe(message);
+    expect(refused.state).toBe(state);
+  });
+});
+
+describe('the nearest spot', () => {
+  const at = (x: number, y: number, changes: Partial<GameState> = {}) => orchardCamp({}, { player: { ...game.player, x, y }, ...changes });
+
+  it('is the closer of two in reach', () => {
+    expect(nearestSpot(at(3.8, 10))).toBe(0);
+    expect(nearestSpot(at(4.2, 10))).toBe(1);
+  });
+
+  it('is nothing far away, in another area, or with no orchard', () => {
+    expect(nearestSpot(at(20, 16))).toBeNull();
+    expect(nearestSpot(at(3, 10, { area: 'homestead' }))).toBeNull();
+    expect(nearestSpot(at(3, 10, { structures: game.structures }))).toBeNull();
+  });
+});
+
+describe('what a spot offers', () => {
+  const at = (day: number, orchard: Partial<OrchardState>) => orchardCamp(orchard, { day, player: { ...game.player, x: 3, y: 10 } });
+  const action = (state: GameState): GameAction | null => spotAction(state, 0);
+
+  it('plants an empty spot with a pip in the right season', () => {
+    expect(action(at(62, { pips: 1 }))).toEqual({ type: 'plantPip', spot: 0 });
+    expect(action(at(62, {}))).toBeNull();
+    expect(action(at(55, { pips: 1 }))).toBeNull();
+  });
+
+  it('picks a ripe tree, and nothing else on a tree', () => {
+    expect(action(at(121, { trees: treesOf(1) }))).toEqual({ type: 'pickOrchardApple', spot: 0 });
+    expect(action(at(141, { trees: treesOf(1) }))).toBeNull();
+    expect(action(at(121, { trees: [{ plantedDay: 1, ripeDay: 122 }, null, null, null, null, null] }))).toBeNull();
+  });
+});
+
+describe('the first apples', () => {
+  const NOTE = 'There are apples on your own tree this morning.';
+  const on = (day: number, trees = [{ plantedDay: 1, ripeDay: 1 }, null, null, null, null, null] as OrchardState['trees']) => orchardCamp({ trees }, { day });
+
+  it('gets a morning note, as part of the day\'s news', () => {
+    expect(orchardNews(on(120), on(121))).toEqual([NOTE]);
+    expect(newsBetween(on(120), on(121))).toContain(NOTE);
+  });
+
+  it('gets none in other years, on other mornings, or with no trees', () => {
+    expect(orchardNews(on(160), on(161))).toEqual([]);
+    expect(orchardNews(on(121), on(122))).toEqual([]);
+    expect(orchardNews(on(80), on(81))).toEqual([]);
+    expect(orchardNews(orchardCamp({}, { day: 120 }), orchardCamp({}, { day: 121 }))).toEqual([]);
+  });
+
+  it('gets none when a younger tree comes to bear later', () => {
+    const both = [{ plantedDay: 1, ripeDay: 1 }, { plantedDay: 41, ripeDay: 41 }, null, null, null, null];
+    expect(orchardNews(on(160, both), on(161, both))).toEqual([]);
+  });
+});
+
+describe('the journal line', () => {
+  const LINE = 'Picked an apple from a tree I grew myself.';
+  const ready = orchardCamp({ trees: treesOf(2) }, { day: 121, player: { ...game.player, x: 3, y: 10 } });
+  const written = (state: GameState, spot: number) => {
+    const action: GameAction = { type: 'pickOrchardApple', spot };
+    return recordJournal(state, applyAction(state, action).state, action).state;
+  };
+
+  it('is written on the first pick of the autumn, once', () => {
+    const once = written(ready, 0);
+    expect(journalPageView(once, 12).entries.map(entry => entry.line)).toContain(LINE);
+    const twice = written({ ...once, player: ready.player }, 1);
+    expect(twice.journal.filter(entry => entry.id === 'orchardApple')).toHaveLength(1);
+  });
+
+  it('is not written by a refused pick', () => {
+    expect(written({ ...ready, day: 81 }, 0).journal.filter(entry => entry.id === 'orchardApple')).toEqual([]);
+  });
+
+  it('stays off the page until the orchard stands', () => {
+    const blanks = (state: GameState) => journalPageView(state, 0).blanks;
+    expect(blanks(orchardCamp({}, { day: 5 }))).toBe(blanks(orchardCamp({}, { day: 5, structures: { ...game.structures, shelter: true } })) + 1);
   });
 });

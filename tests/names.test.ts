@@ -10,7 +10,7 @@ import { pillowView } from '../src/ui/panels';
 import { recordJournal } from '../src/game/journalEntries';
 import { loadGame, saveGame } from '../src/game/save';
 import { currentPage, journalPageView, renderJournalPage, type JournalNode } from '../src/ui/yearJournal';
-import { SAVE_VERSION, upgradeSave } from '../src/game/saveUpgrades';
+import { upgradeSave } from '../src/game/saveUpgrades';
 import { anyNamed, cleanName, friendCalled, nameBlocker, nameOf, named, namedNote, type NameTarget } from '../src/game/names';
 
 const fakeStorage = (): Storage => {

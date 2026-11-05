@@ -30,6 +30,19 @@ export const JOURNAL_ICONS: Record<JournalId, JournalIcon> = {
   namedSummer: namedIcon('scarf3', ['.......xx.', '.......xx.']),
   autumnKeepsake: keepsakeIcon('fire2', ['.......xx.', '........x.']),
   winterKeepsake: keepsakeIcon('frost', ['.......x.x', '........x.']),
+  // An apple with a leaf.
+  orchardApple: { legend: { r: 'fire2', g: 'leaf3', k: 'ink' }, rows: [
+    '.....kg...',
+    '.....kgg..',
+    '..rrrkrr..',
+    '.rrrrrrrr.',
+    '.rrrrrrrr.',
+    '.rrrrrrrr.',
+    '.rrrrrrrr.',
+    '..rrrrrr..',
+    '...rr.rr..',
+    '..........'
+  ] },
   // A little sheep, seen from the side.
   shearing: { legend: { w: 'paper', x: 'canvas3', k: 'ink', l: 'stone1' }, rows: [
     '..........',

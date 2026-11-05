@@ -26,7 +26,7 @@ export interface JournalPageView {
 
 /** The journal moments that wait on a building: the fireside on the house, the grain and bread on the field, the oven on the bakery. */
 const WAITS_ON: Partial<Record<JournalId, StructureId>> = {
-  fireside: 'house', grainIn: 'field', autumnGrain: 'field', summerBread: 'field', winterBread: 'field', ovenBread: 'bakery', shearing: 'sheepPen'
+  fireside: 'house', grainIn: 'field', autumnGrain: 'field', summerBread: 'field', winterBread: 'field', ovenBread: 'bakery', shearing: 'sheepPen', orchardApple: 'orchard'
 };
 
 const NAMED_MOMENTS: ReadonlySet<JournalId> = new Set<JournalId>(['namedAutumn', 'namedWinter', 'namedSpring', 'namedSummer']);
