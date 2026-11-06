@@ -1,16 +1,24 @@
 import { describe, expect, it } from 'vitest';
+import { sprites } from '../src/art/sprites';
+import { keepWindowGlow } from '../src/scene/lighting';
+import { HILLS_PATHS, pathDistance } from '../src/scene/mapGeometry';
+import { KEEP_PONY, ponyPoseFor } from '../src/scene/ponyPose';
+import { actionEffect, actionPose, promptFor, useKeyAction } from '../src/scene/prompts';
+import { replaysSleep } from '../src/scene/sleepReplay';
+import { hasArrived, pickTapTarget, targetAction } from '../src/scene/tapTarget';
+import { keepFrame, sceneVisuals } from '../src/scene/visuals';
 import { STEP_IDS, placeBranches } from '../src/game/clearing';
 import { KEEP_DOOR_AT, KEEP_SITE, KEEP_STONES, hangDoorBlocker, inKeep, layStoneBlocker, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor, type KeepState } from '../src/game/keep';
-import { HILLS_EXIT } from '../src/game/hills';
+import { HILLS_EXIT, OUTCROP_SITE } from '../src/game/hills';
 import { isAtHome } from '../src/game/home';
 import { alarmAfter } from '../src/game/companion';
 import { isWarmRestHere } from '../src/game/sickness';
 import { wolfMessage } from '../src/game/wolves';
-import { emptyPony, ponyWith } from '../src/game/pony';
+import { PONY_SPOTS, emptyPony, ponyWith } from '../src/game/pony';
 import { bagCapacity } from '../src/game/camp';
 import { QUARRY_SITE } from '../src/game/areas';
 import { TOO_TIRED_MESSAGE, workSeconds } from '../src/game/needs';
-import { advanceTime, applyAction, cookBlocker } from '../src/game/rules';
+import { advanceTime, applyAction, cookBlocker, type GameAction } from '../src/game/rules';
 import { loadGame, saveGame } from '../src/game/save';
 import { SAVE_VERSION, upgradeSave } from '../src/game/saveUpgrades';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
@@ -411,5 +419,140 @@ describe('the pony at the keep', () => {
     expect(state.area).toBe('quarry');
     expect(ponyWith(state)).toBe(false);
     expect(saves(state)).toBe(true);
+  });
+});
+
+describe('the keep on the map', () => {
+  const NIGHT = 190;
+  const AUTUMN = 5;
+  const WINTER = 12;
+  const stage = (stones: number, changes: Changes = {}): GameState => byKeep({ hinges: true, keep: raised(stones), ...changes });
+
+  it('draws nothing before the forge', () => {
+    const state = byKeep();
+    expect(keepFrame({ ...state, progress: { ...state.progress, workshop: { ...state.progress.workshop, forge: false } } })).toBeNull();
+  });
+
+  it('marks out the site once the forge stands', () => {
+    expect(keepFrame(byKeep())).toBe('keep:0');
+    expect(keepFrame(byKeep({ day: WINTER }))).toBe('keep:0s');
+  });
+
+  it.each([[1, 'keep:1'], [4, 'keep:1'], [5, 'keep:2'], [24, 'keep:6'], [25, 'keep:7d'], [60, 'keep:15d']])('stones %i draw frame %s', (stones, frame) => {
+    expect(keepFrame(stage(stones, { day: AUTUMN }))).toBe(frame);
+  });
+
+  it('adds the door at 24 stones and snow in winter', () => {
+    expect(keepFrame(stage(24, { keep: { ...raised(24), door: true } }))).toBe('keep:6d');
+    expect(keepFrame(stage(24, { day: WINTER }))).toBe('keep:6s');
+    expect(keepFrame(stage(60, { day: WINTER }))).toBe('keep:15ds');
+  });
+
+  it('has a frame for every state the keep can be in', () => {
+    const { frames } = sprites.keep;
+    for (let stones = 0; stones <= KEEP_STONES; stones++) for (const day of [AUTUMN, WINTER]) for (const door of stones === KEEP_DOOR_AT ? [false, true] : [stones > KEEP_DOOR_AT]) {
+      const [, frame] = keepFrame(stage(stones, { day, keep: { ...raised(stones), door } }))!.split(':');
+      expect(frames[frame], `${stones} stones, day ${day}, door ${door}`).toBeDefined();
+    }
+  });
+
+  const filled = (frame: string): number => sprites.keep.frames[frame].join('').replaceAll('.', '').length;
+  const topRow = (frame: string): number => sprites.keep.frames[frame].findIndex(row => /[^.]/.test(row));
+
+  it('gets taller every few stones', () => {
+    const name = (step: number): string => `${step}${step > 6 ? 'd' : ''}`;
+    for (let step = 0; step < 14; step++) expect(filled(name(step + 1)), `step ${step + 1}`).toBeGreaterThan(filled(name(step)));
+    for (let step = 3; step < 15; step++) expect(topRow(name(step + 1)), `step ${step + 1}`).toBeLessThan(topRow(name(step)));
+  });
+
+  it('takes the scaffolding down with the last stone', () => {
+    const wood = (frame: string): number => sprites.keep.frames[frame].join('').replaceAll(/[^tu]/g, '').length;
+    expect(wood('14d')).toBeGreaterThan(wood('15d') + 20);
+  });
+
+  it('keeps the same picture size, with its foot at the door', () => {
+    for (const rows of Object.values(sprites.keep.frames)) expect(rows.length).toBe(sprites.keep.size[1]);
+  });
+
+  const glow = (state: GameState) => sceneVisuals(state, 0).find(visual => visual.id === 'keepGlow');
+  it('lights one window at night once finished, whoever is there', () => {
+    expect(glow(stage(60, { timeOfDay: NIGHT, player: { x: 30, y: 15 } }))?.texture).toBe('keepGlow:lit');
+    expect(glow(stage(60, { timeOfDay: 40 }))).toBeUndefined();
+    expect(glow(stage(59, { timeOfDay: NIGHT }))).toBeUndefined();
+    expect(keepWindowGlow(stage(60, { timeOfDay: NIGHT }))).not.toBeNull();
+    expect(keepWindowGlow(stage(60, { timeOfDay: 40 }))).toBeNull();
+    expect(keepWindowGlow({ ...stage(60, { timeOfDay: NIGHT }), area: 'quarry' })).toBeNull();
+  });
+
+  it('leads the path to the door', () => {
+    expect(pathDistance(KEEP_SITE.x, KEEP_SITE.y, HILLS_PATHS)).toBeLessThanOrEqual(1);
+  });
+
+  it('keeps clear of the outcrop and the pony spots', () => {
+    for (const place of [OUTCROP_SITE, ...PONY_SPOTS]) expect(Math.hypot(place.x - KEEP_SITE.x, place.y - KEEP_SITE.y)).toBeGreaterThan(3);
+  });
+
+  it('offers nothing before the forge', () => {
+    const state = byKeep();
+    const before = { ...state, progress: { ...state.progress, workshop: { ...state.progress.workshop, forge: false } } };
+    expect(pickTapTarget(before, KEEP_SITE.x, KEEP_SITE.y).kind).toBe('ground');
+    expect(promptFor(before)).not.toContain('eep');
+    expect(useKeyAction(before)).toBeUndefined();
+  });
+
+  it.each<[string, Changes, string]>([
+    ['with stone in the bag', { keep: raised(1) }, 'E  Lay a stone (1/60)'],
+    ['with no stone', { keep: raised(1), inventory: { stone: 0 } }, 'Keep · bring stone up from the quarry'],
+    ['needing a door, hinges and wood ready', { hinges: true, keep: raised(24), inventory: { wood: 4 } }, 'E  Hang the door'],
+    ['needing a door, no hinges', { hinges: false, keep: raised(24), inventory: { wood: 4 } }, 'Keep · make iron hinges at the forge'],
+    ['needing a door, no wood', { hinges: true, keep: raised(24) }, 'Keep · needs 4 wood for the door'],
+    ['finished, by day', { hinges: true, keep: raised(60), timeOfDay: 40 }, 'E  Climb to the top'],
+    ['finished, at night', { hinges: true, keep: raised(60), timeOfDay: NIGHT }, 'E  Sleep in the keep until morning']
+  ])('prompts %s', (_name, changes, prompt) => {
+    expect(promptFor(byKeep(changes))).toBe(prompt);
+  });
+
+  it.each<[string, Changes, GameAction['type']]>([
+    ['a stone', { keep: raised(1) }, 'layStone'],
+    ['the door', { hinges: true, keep: raised(24), inventory: { wood: 4 } }, 'hangDoor'],
+    ['going in', { hinges: true, keep: raised(60), timeOfDay: 40 }, 'enterKeep']
+  ])('E and a tap do the same thing for %s', (_name, changes, type) => {
+    const state = byKeep(changes);
+    expect(useKeyAction(state)?.type).toBe(type);
+    expect(targetAction(pickTapTarget(state, KEEP_SITE.x, KEEP_SITE.y))?.type).toBe(type);
+  });
+
+  it('a tap on the tower reaches the door, wherever on the picture', () => {
+    const state = stage(60, { player: { x: 30, y: 15 } });
+    const target = pickTapTarget(state, KEEP_SITE.x + 1, KEEP_SITE.y - 5);
+    expect(target).toEqual({ kind: 'keepDoor', ...KEEP_SITE });
+    expect(hasArrived(state, target)).toBe(false);
+    expect(hasArrived(byKeep({ hinges: true, keep: raised(60), player: { x: KEEP_SITE.x + 2, y: KEEP_SITE.y } }), target)).toBe(true);
+  });
+
+  it('only the footings themselves take a tap while the walls are low', () => {
+    expect(pickTapTarget(stage(4), KEEP_SITE.x, KEEP_SITE.y - 5).kind).toBe('ground');
+    expect(pickTapTarget(stage(4), KEEP_SITE.x, KEEP_SITE.y).kind).toBe('keepSite');
+    expect(pickTapTarget(stage(12), KEEP_SITE.x, KEEP_SITE.y - 2).kind).toBe('keepSite');
+  });
+
+  it('draws the pony beside the keep at night, and beside the survivor by day', () => {
+    const shod = (state: GameState): GameState => ({ ...state, pony: { ...emptyPony(), trust: BALANCE.ponyTrustTarget, won: 1, home: true, shod: 1 } });
+    const night = ponyPoseFor(shod(stage(60, { timeOfDay: NIGHT })), 0, 1, false);
+    expect(night).toMatchObject({ ...KEEP_PONY, frame: 'pony:loadStand' });
+    const day = ponyPoseFor(shod(stage(60, { timeOfDay: 40 })), 0, 1, false);
+    expect(day?.x).toBeCloseTo(KEEP_SITE.x - 1.1);
+    expect(ponyPoseFor(shod(stage(59, { timeOfDay: NIGHT })), 0, 1, false)).toBeNull();
+  });
+
+  it('plays no storm replay for a night in the keep', () => {
+    const state = stage(60, { timeOfDay: NIGHT, progress: { ...byKeep().progress, nextStormDay: 5, hearthUnlocked: false } });
+    expect(replaysSleep(state, applyAction(state, { type: 'sleep' }).state, { type: 'sleep' })).toBe(false);
+  });
+
+  it('raises dust and shows work when stone goes on', () => {
+    expect(actionEffect({ type: 'layStone' }, byKeep())).toEqual({ kind: 'dust', ...KEEP_SITE });
+    expect(actionPose('layStone')).toBe(actionPose('digOre'));
+    expect(actionPose('hangDoor')).toBe(actionPose('digOre'));
   });
 });

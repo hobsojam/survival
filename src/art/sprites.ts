@@ -3,6 +3,7 @@ import { mirrorTerrainSprites, terrainSprites } from './terrain';
 import { wildlifeSprites } from './wildlifeSprites';
 import { homesteadSprites } from './homesteadSprites';
 import { hillsSprites } from './hillsSprites';
+import { keepSprites } from './keepSprites';
 import { orchardSprites } from './orchardSprites';
 import { sheepSprites } from './sheepSprites';
 import { phase3Sprites } from './phase3Sprites';
@@ -84,6 +85,6 @@ const branchPile: SpriteDef = {
 };
 
 /** Palette-indexed art shared by the game and contact sheet. */
-export const sprites: Record<string, SpriteDef> = { grassPlain, ...terrainSprites, ...wildlifeSprites, ...homesteadSprites, ...sheepSprites, ...orchardSprites, ...hillsSprites, ...phase3Sprites, branchPile, survivor: survivorSprite };
+export const sprites: Record<string, SpriteDef> = { grassPlain, ...terrainSprites, ...wildlifeSprites, ...homesteadSprites, ...sheepSprites, ...orchardSprites, ...hillsSprites, ...keepSprites, ...phase3Sprites, branchPile, survivor: survivorSprite };
 // Terrain sprites made later, such as the edges of a grown clearing, join this table too.
 mirrorTerrainSprites(sprites);

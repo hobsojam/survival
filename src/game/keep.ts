@@ -8,7 +8,7 @@ import { BALANCE, type GameState } from './state';
 // until the last stone is laid; after that its door is a place to sleep at night and a way up to the top by day.
 
 /** Where the keep's door stands on the hills. */
-export const KEEP_SITE = { x: 16, y: 9 };
+export const KEEP_SITE = { x: 18, y: 10 };
 export const KEEP_STONES = 60;
 export const KEEP_DOOR_AT = 24;
 export const KEEP_DOOR_WOOD = 4;

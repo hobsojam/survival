@@ -6,6 +6,8 @@ import { sprites } from '../art/sprites';
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, hillsPathOpen, pathOpen } from '../game/areas';
 import { wildPonyAt } from '../game/pony';
 import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, outcropLeft } from '../game/hills';
+import { KEEP_SITE, keepFinished, keepNeedsDoor, keepOpen } from '../game/keep';
+import { keepStep } from './visuals';
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
 import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
 import { ORCHARD_SPOTS, spotAction, treeStage } from '../game/orchard';
@@ -23,6 +25,7 @@ export type TapTarget =
   | { kind: 'rubble'; x: number; y: number }
   | { kind: 'outcrop'; x: number; y: number }
   | { kind: 'pony'; x: number; y: number }
+  | { kind: 'keepSite' | 'keepHang' | 'keepDoor'; x: number; y: number }
   | { kind: 'chickens'; x: number; y: number; action: 'meetChickens' | 'leadChickens' }
   | { kind: 'appleTree' | 'shed' | 'coop'; x: number; y: number }
   | { kind: 'orchard'; spot: number; x: number; y: number; action: GameAction | null }
@@ -73,6 +76,16 @@ function orchardTargets(state: GameState): { target: TapTarget; sprite?: string 
   });
 }
 
+/** The keep's one spot: what it asks for now. The tower can be tapped anywhere on it once it has walls; the low footings only at their foot. */
+function keepTargets(state: GameState): { target: TapTarget; sprite?: string }[] {
+  if (!keepOpen(state)) return [];
+  let kind: 'keepSite' | 'keepHang' | 'keepDoor' = 'keepSite';
+  if (keepFinished(state)) kind = 'keepDoor';
+  else if (keepNeedsDoor(state)) kind = 'keepHang';
+  const target: TapTarget = { kind, ...KEEP_SITE };
+  return keepStep(state.keep.stones) >= 3 ? [{ target, sprite: 'keep' }] : [{ target }];
+}
+
 /** The closest interactive thing near the tap, or the tapped ground. */
 export function pickTapTarget(state: GameState, x: number, y: number): TapTarget {
   const piles = state.stonePiles.filter(pile => pile.area === state.area)
@@ -88,6 +101,7 @@ export function pickTapTarget(state: GameState, x: number, y: number): TapTarget
     const wild = wildPonyAt(state);
     candidates = [...piles,
       { target: { kind: 'outcrop', ...OUTCROP_SITE }, sprite: 'outcrop' },
+      ...keepTargets(state),
       ...(wild ? [{ target: { kind: 'pony' as const, ...wild }, sprite: 'pony' }] : []),
       { target: { kind: 'crossing', ...HILLS_EXIT } }];
   } else if (state.area === 'homestead') {
@@ -168,6 +182,9 @@ export function targetAction(target: TapTarget): GameAction | null {
     case 'rubble': return { type: 'gatherRubble' };
     case 'outcrop': return { type: 'digOre' };
     case 'pony': return { type: 'offerPony' };
+    case 'keepSite': return { type: 'layStone' };
+    case 'keepHang': return { type: 'hangDoor' };
+    case 'keepDoor': return { type: 'enterKeep' };
     case 'chickens': return { type: target.action };
     case 'appleTree': return { type: 'gatherApples' };
     case 'shed': return { type: 'searchShed' };

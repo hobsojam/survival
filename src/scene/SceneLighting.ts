@@ -2,10 +2,11 @@ import Phaser from 'phaser';
 import type { GameState } from '../game/state';
 import { BALANCE } from '../game/state';
 import { HOUSE_SPOT } from '../game/home';
+import { KEEP_SITE } from '../game/keep';
 import { FIREFLY_HOMES, fireflyGlow, fireflyOffset } from './ambient';
 import { firefliesOut } from '../game/calendar';
 import { worldX, worldY } from './art';
-import { HOUSE_WINDOW_OFFSET, fireGlow, houseGlow, lightMaskPixels, lightScreenPosition, lightingTint, withSunrise, type LightRadii } from './lighting';
+import { HOUSE_WINDOW_OFFSET, KEEP_WINDOW_OFFSET, fireGlow, keepWindowGlow, houseGlow, lightMaskPixels, lightScreenPosition, lightingTint, withSunrise, type LightRadii } from './lighting';
 import { NIGHT_DEPTH } from './visuals';
 
 /** One screen-sized tint with palette-aware, stepped light holes erased from it. */
@@ -22,6 +23,11 @@ export class SceneLighting {
   }
 
   /** Draws the tint for the state; a sunrise that began sunriseAgeMs ago warms it for a few seconds. */
+  /** No lighting at all: the layer is fixed to the screen, so it can't follow the camera when the view from the keep pulls back. */
+  hide(): void {
+    this.layer.setVisible(false);
+  }
+
   update(state: GameState, timeMs: number, sunriseAgeMs: number): void {
     const tint = withSunrise(lightingTint(state), sunriseAgeMs);
     if (tint.alpha <= 0) {
@@ -41,6 +47,11 @@ export class SceneLighting {
     if (house) {
       const position = lightScreenPosition(worldX(HOUSE_SPOT.x) + HOUSE_WINDOW_OFFSET.x, worldY(HOUSE_SPOT.y) + HOUSE_WINDOW_OFFSET.y, camera.scrollX, camera.scrollY);
       this.layer.erase(this.mask(house), position.x, position.y);
+    }
+    const keep = keepWindowGlow(state);
+    if (keep) {
+      const position = lightScreenPosition(worldX(KEEP_SITE.x) + KEEP_WINDOW_OFFSET.x, worldY(KEEP_SITE.y) + KEEP_WINDOW_OFFSET.y, camera.scrollX, camera.scrollY);
+      this.layer.erase(this.mask(keep), position.x, position.y);
     }
     // Fireflies live at camp and only come out in summer.
     if (state.area === 'camp' && firefliesOut(state.day)) FIREFLY_HOMES.forEach((home, index) => {

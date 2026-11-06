@@ -11,6 +11,7 @@ import { rainWindow } from '../game/rain';
 import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 import { OUTCROP_SITE, outcropLeft } from '../game/hills';
+import { KEEP_SITE, keepFinished, keepOpen } from '../game/keep';
 import { markedTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
 import { fireplaceBurning, woodStoreCapacity } from '../game/home';
@@ -36,6 +37,15 @@ export interface SceneVisual {
   x: number;
   y: number;
   depth: number;
+}
+
+/** Which picture of the keep this many stones show: a new one every four. */
+export const keepStep = (stones: number): number => Math.ceil(stones / 4);
+
+/** The keep's picture as things stand, or null before the forge stands and there is nothing to see on the hills. */
+export function keepFrame(state: GameState): string | null {
+  if (!keepOpen(state)) return null;
+  return `keep:${keepStep(state.keep.stones)}${state.keep.door ? 'd' : ''}${isWinter(state.day) ? 's' : ''}`;
 }
 
 type AddVisual = (id: string, texture: string, tileX: number, tileY: number, depth?: number) => void;
@@ -64,6 +74,10 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
   }
   if (state.area === 'hills') {
     add('outcrop', `outcrop:${outcropLeft(state) > 0 ? 'ready' : 'spent'}`, OUTCROP_SITE.x, OUTCROP_SITE.y);
+    const keep = keepFrame(state);
+    if (keep) add('keep', keep, KEEP_SITE.x, KEEP_SITE.y);
+    // One window is lit at night once the keep is finished, whether or not anybody is in.
+    if (keepFinished(state) && state.timeOfDay >= nightStart(state.day)) add('keepGlow', 'keepGlow:lit', KEEP_SITE.x, KEEP_SITE.y, Math.round(worldY(KEEP_SITE.y)) + 1);
     const frame = isWinter(state.day) ? 'snow' : season(state.day);
     HILL_TREES.forEach((tree, index) => add(`hill-tree-${index}`, `${tree.sprite}:${frame}`, tree.x, tree.y));
     addPiles(state, visuals, add);
