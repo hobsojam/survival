@@ -1,5 +1,5 @@
 import { nightStart } from './calendar';
-import { BALANCE } from './state';
+import { BALANCE, type AreaId } from './state';
 
 // The wild animals' comings and goings are worked out from the day number alone,
 // so the rules and the scene agree on them and nothing here is saved.
@@ -14,6 +14,12 @@ export const dayHash = (n: number): number => {
 
 /** Where the spring rabbits live: in the meadow beside the bushes at (16, 18), (25, 11) and (23, 17). */
 export const RABBIT_HOMES: readonly Point[] = [{ x: 14.5, y: 17.5 }, { x: 26.5, y: 13.5 }, { x: 22.5, y: 20.5 }];
+
+/** Where the same rabbits live up on the hills, on the slope below the outcrop. */
+export const HILL_RABBIT_HOMES: readonly Point[] = [{ x: 27, y: 20 }, { x: 31, y: 22 }, { x: 24, y: 23 }];
+
+/** Whose rabbits these are, by area. */
+export const rabbitHomes = (area: AreaId): readonly Point[] => (area === 'hills' ? HILL_RABBIT_HOMES : RABBIT_HOMES);
 
 export const FOX = {
   travel: 12,

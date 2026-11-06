@@ -12,7 +12,9 @@ import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { BED_CROPS, bedSoil, bedStage, drawWaterBlocker, harvestBedBlocker, sowBedBlocker, type BedSoil, type BedStage } from '../game/beds';
 import { workSeconds } from '../game/needs';
 import { hasWoodStore, livesInHouse, woodStoreCapacity } from '../game/home';
-import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, mineBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
+import { availableFiber, availableWood, isAtCamp, axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, mineBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
+import { availableOre } from '../game/hills';
+import { ponyWith } from '../game/pony';
 import { WORKSHOP_UPGRADES, upgradeBlocker, type UpgradeId } from '../game/workshop';
 import { logsInStore } from '../game/wood';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
@@ -176,7 +178,7 @@ function flockStatus({ sheep }: GameState): string {
 
 /** The friends with names, for the field journal. */
 export function friendRosterView({ names }: GameState): { shown: boolean; text: string } {
-  const text = rosterLine([names.bird, names.fox, names.wolf]);
+  const text = rosterLine([names.bird, names.fox, names.wolf, names.pony]);
   return { shown: text !== '', text };
 }
 
@@ -270,23 +272,40 @@ const UPGRADE_COPY: Record<UpgradeId, { title: string; copy: string; made: strin
   bedTools: { title: 'Hoe and watering can', copy: 'A dry bed holds on a day longer before it withers.', made: 'A dry bed holds on a day longer before it withers.' },
   harvestTools: { title: 'Sickle and flail', copy: 'Cut and thresh the grain field.', made: 'Cut and thresh the grain field.' },
   quern: { title: 'Hand quern', copy: 'Grind the granary\'s grain into flour.', made: 'Grind the granary\'s grain into flour.' },
-  shears: { title: 'Shears', copy: 'Shear the flock once a year, in spring.', made: 'Shear the flock once a year, in spring.' }
+  shears: { title: 'Shears', copy: 'Shear the flock once a year, in spring.', made: 'Shear the flock once a year, in spring.' },
+  forge: { title: 'Forge', copy: 'Add a stone lean-to and an anvil, to work the ore from the hills.', made: 'Ore from the hills is kept at the forge.' },
+  horseshoes: { title: 'Horseshoes', copy: 'Shoe the pony, so it can come with you and carry a load.', made: 'The pony can come with you and carry a load.' },
+  ironPickaxe: { title: 'Iron pickaxe', copy: 'Each dig at the quarry face gives two stone.', made: 'Each dig at the quarry face gives two stone.' }
 };
 
 /** Whether an upgrade's row shows: the bed tools once there are beds, the harvest tools once there is a field, the quern once there is a granary. */
 const UPGRADE_SHOWN: Record<UpgradeId, (state: GameState) => boolean> = {
   saw: () => true, handcart: () => true, bedTools: state => state.structures.vegetableBeds,
-  harvestTools: state => state.structures.field, quern: state => state.structures.granary, shears: state => state.structures.sheepPen
+  harvestTools: state => state.structures.field, quern: state => state.structures.granary, shears: state => state.structures.sheepPen,
+  forge: state => state.progress.oreFoundDay !== null, horseshoes: state => state.progress.workshop.forge && state.pony.won !== null, ironPickaxe: state => state.progress.workshop.forge
 };
 
 /** "3 wood · 3 stone": an upgrade's cost, leaving out what it doesn't need. */
-const costLabel = (cost: Record<'wood' | 'fiber' | 'stone', number>): string =>
-  (['wood', 'fiber', 'stone'] as const).filter(key => cost[key] > 0).map(key => `${cost[key]} ${key}`).join(' · ');
+const costLabel = (cost: Record<'wood' | 'fiber' | 'stone', number> & { ore?: number }): string =>
+  (['wood', 'fiber', 'stone', 'ore'] as const).filter(key => (cost[key] ?? 0) > 0).map(key => `${cost[key]} ${key}`).join(' · ');
 
 export interface WorkshopView {
   shown: boolean;
   rows: Record<UpgradeId, ActionPanelView & { shown: boolean }>;
 }
+
+/** What each Burn or Drop button spends, as a count in the bag; Eat buttons follow the bag view instead. */
+const SUPPLY_COUNTS: Record<string, (inventory: GameState['inventory']) => number> = {
+  wood: inventory => inventory.wood,
+  fiber: inventory => inventory.fiber,
+  stone: inventory => inventory.stone,
+  ore: inventory => inventory.ore,
+  pineNeedles: inventory => inventory.food.pineNeedles
+};
+/** Burn reaches the woodpile and the fibre stack at camp; everything else follows the bag. */
+const AT_CAMP_COUNTS: Record<string, (state: GameState) => number> = { wood: availableWood, fiber: availableFiber };
+export const supplyCount = (state: GameState, supply: string): number =>
+  (isAtCamp(state) ? AT_CAMP_COUNTS[supply]?.(state) : undefined) ?? SUPPLY_COUNTS[supply]?.(state.inventory) ?? 0;
 
 /** The workshop panel, once it stands: each upgrade with its cost or why it can't be made. */
 export function workshopView(state: GameState): WorkshopView {
@@ -297,7 +316,7 @@ export function workshopView(state: GameState): WorkshopView {
     const blocker = upgradeBlocker(state, id);
     return { shown, title, copy: blocker ?? copy, cost: costLabel(WORKSHOP_UPGRADES[id].cost), disabled: false, ready: !blocker };
   };
-  const rows = { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools'), harvestTools: row('harvestTools'), quern: row('quern'), shears: row('shears') };
+  const rows = { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools'), harvestTools: row('harvestTools'), quern: row('quern'), shears: row('shears'), forge: row('forge'), horseshoes: row('horseshoes'), ironPickaxe: row('ironPickaxe') };
   return { shown: state.structures.workshop && Object.values(rows).some(item => item.shown), rows };
 }
 
@@ -558,7 +577,7 @@ export function bagFoodMarkup(): string {
 export const EATABLE_FOODS = ['berry', 'trailFood', ...BAG_FOODS.filter(cell => cell.eat).map(cell => cell.item)] as const satisfies readonly FoodItem[];
 export type EatableFood = (typeof EATABLE_FOODS)[number];
 
-export interface BagView { foods: Record<BagFood, { count: number; shown: boolean; note: string }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; spacesLabel: string; packHint: string; prepareReady: boolean; prepareHint: string; storedAtCamp: string; woodAtCamp: string; fiberAtCamp: string; fire: string }
+export interface BagView { oreAtForge: string; oreShown: boolean; foods: Record<BagFood, { count: number; shown: boolean; note: string }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; spacesLabel: string; packHint: string; prepareReady: boolean; prepareHint: string; storedAtCamp: string; woodAtCamp: string; fiberAtCamp: string; fire: string }
 
 export function bagView(state: GameState): BagView {
   const prepareBlocker = trailFoodBlocker(state);
@@ -581,11 +600,13 @@ export function bagView(state: GameState): BagView {
     eatable,
     berries: `Berries ${foodCount(state.inventory.food, 'berry')}${softNote('berry')}`,
     spaces: `${carriedCount(state)}/${bagCapacity(state)}`,
-    spacesLabel: state.progress.packWoven ? 'Carried · woven pack' : 'Carried',
+    spacesLabel: ['Carried', ...(state.progress.packWoven ? ['woven pack'] : []), ...(ponyWith(state) ? ['the pony'] : [])].join(' · '),
     packHint: state.progress.packWoven ? '' : `Weave a pack at the toolshed to carry ${BALANCE.packCapacity}.`,
     prepareReady: !prepareBlocker,
     prepareHint: prepareBlocker ?? `1 berry · ${workSeconds(state, BALANCE.trailFoodSeconds)} seconds · 1 ration`,
     storedAtCamp: pile ? `+${state.storedStone} at camp` : '',
+    oreAtForge: state.progress.workshop.forge ? `+${state.storedOre} at the forge` : '',
+    oreShown: availableOre(state) > 0 || state.inventory.ore > 0,
     // The handcart's load counts as wood at camp even before there is a woodpile to unload it onto.
     woodAtCamp: woodStore || state.progress.workshop.handcart ? `+${logsInStore(state)} at camp` : '',
     fiberAtCamp: state.structures.fibreStack ? `+${state.storedFiber} at camp` : '',
@@ -629,7 +650,7 @@ export function larderMarkup(): string {
   return `<div id="larder-controls" class="stone-pile-controls larder-controls" hidden><span id="larder-stored">Stored food 0/${BALANCE.larderCapacity}</span>${rows}</div>`;
 }
 
-export type CampStoreId = 'wood' | 'fiber' | 'stone' | 'cart';
+export type CampStoreId = 'wood' | 'fiber' | 'stone' | 'ore' | 'cart';
 export interface CampStoresView { shown: boolean; lines: { id: CampStoreId; text: string; shown: boolean }[] }
 
 export function campStoresView(state: GameState): CampStoresView {
@@ -639,6 +660,7 @@ export function campStoresView(state: GameState): CampStoresView {
     { id: 'wood', text: `Wood ${state.storedWood}/${woodStoreCapacity(state)}`, shown: hasWoodStore(state) },
     { id: 'fiber', text: `Fiber ${state.storedFiber}/${BALANCE.fibreStackCapacity}`, shown: structures.fibreStack },
     { id: 'stone', text: `Stone ${state.storedStone}/${BALANCE.stonePileCapacity}`, shown: structures.stonePile },
+    { id: 'ore', text: `Ore ${state.storedOre}/${BALANCE.forgeOreCapacity}`, shown: state.progress.workshop.forge },
     { id: 'cart', text: `Cart ${state.cartWood}/${BALANCE.handcartCapacity}`, shown: handcart }
   ];
   return { shown: structures.larder || lines.some(line => line.shown), lines };
@@ -653,7 +675,7 @@ export function buildListMarkup(): string {
   }).join('');
 }
 
-const CAMP_STORE_IDS: readonly CampStoreId[] = ['wood', 'fiber', 'stone', 'cart'];
+const CAMP_STORE_IDS: readonly CampStoreId[] = ['wood', 'fiber', 'stone', 'ore', 'cart'];
 
 /** The Camp stores panel, hidden until a store exists, with a hidden line per store and the larder's controls. */
 export function campStoresMarkup(): string {

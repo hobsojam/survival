@@ -10,6 +10,7 @@ import { wolfTracksShown } from '../game/wolves';
 import { rainWindow } from '../game/rain';
 import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
+import { OUTCROP_SITE, outcropLeft } from '../game/hills';
 import { markedTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
 import { fireplaceBurning, woodStoreCapacity } from '../game/home';
@@ -58,6 +59,13 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     }
     add('quarry', quarryTexture, QUARRY_SITE.x, QUARRY_SITE.y);
     add('rubble', state.rubbleReadyDay <= state.day ? 'rubble:ready' : 'rubble:gathered', RUBBLE_SITE.x, RUBBLE_SITE.y);
+    addPiles(state, visuals, add);
+    return visuals;
+  }
+  if (state.area === 'hills') {
+    add('outcrop', `outcrop:${outcropLeft(state) > 0 ? 'ready' : 'spent'}`, OUTCROP_SITE.x, OUTCROP_SITE.y);
+    const frame = isWinter(state.day) ? 'snow' : season(state.day);
+    HILL_TREES.forEach((tree, index) => add(`hill-tree-${index}`, `${tree.sprite}:${frame}`, tree.x, tree.y));
     addPiles(state, visuals, add);
     return visuals;
   }
@@ -132,7 +140,7 @@ function addSheep(state: GameState, add: AddVisual, timeMs: number): void {
 function addPiles(state: GameState, visuals: SceneVisual[], add: AddVisual): void {
   for (const pile of state.stonePiles) {
     if (pile.area !== state.area) continue;
-    add(pile.id, `looseStones:${pileSize(pile.count)}`, pile.x, pile.y);
+    add(pile.id, `${pile.item === 'ore' ? 'orePile' : 'looseStones'}:${pileSize(pile.count)}`, pile.x, pile.y);
     if (pile.count < 2) continue;
     const base = visuals.at(-1)!;
     visuals.push({ id: `${pile.id}-count`, texture: `pileCount:${pileCountFrame(pile.count)}`, x: base.x, y: base.y - 14, depth: base.depth + 0.5 });
@@ -195,6 +203,16 @@ export const FIELD_STRIP_OFFSETS = [-1.5, -0.5, 0.5, 1.5] as const;
 function addFieldStrips(state: GameState, add: AddVisual, x: number, y: number): void {
   state.field.strips.forEach((strip, index) => add(`field-strip-${index}`, `fieldStrip:${stripStage(strip, state.day)}`, x + FIELD_STRIP_OFFSETS[index], y));
 }
+
+/** The small wind-bent trees on the lower hills. They are only to look at, and none grow near the top. */
+export const HILL_TREES = [
+  { x: 29, y: 18, sprite: 'hillThorn' }, { x: 33, y: 19, sprite: 'hillRowan' }, { x: 36.5, y: 21, sprite: 'hillThorn' }, { x: 35, y: 25, sprite: 'hillRowan' },
+  { x: 31, y: 9.5, sprite: 'hillRowan' }, { x: 35, y: 10.5, sprite: 'hillThorn' }, { x: 37.5, y: 8, sprite: 'hillRowan' }
+] as const;
+
+/** Where the forge's lean-to stands, from the fire: built against the workshop's east side. */
+export const FORGE_SPOT = { dx: 9.75, dy: -1 } as const;
+const FORGE_GLOW_MS = 300;
 
 /** Where the handcart parks, from the fire: just below the workshop, on the same cleared ground. */
 export const CART_SPOT = { dx: 7.5, dy: 1.5 } as const;
@@ -300,6 +318,7 @@ function addBuildableStructures(state: GameState, add: AddVisual, x: number, y: 
   }
   addSheep(state, add, timeMs);
   if (state.sheep.woven.rug && structures.house) add('rug', 'rug:still', x - 0.5, y - 5.6, GROUND_DECAL_DEPTH);
+  if (state.progress.workshop.forge) add('forge', `forge:${Math.floor(timeMs / FORGE_GLOW_MS) % 2 === 0 ? 'a' : 'b'}`, x + FORGE_SPOT.dx, y + FORGE_SPOT.dy);
   if (state.progress.workshop.handcart && !groundBlocker(state, 'workshop')) {
     add('handcart', `handcart:${stockFrame(state.cartWood)}`, x + CART_SPOT.dx, y + CART_SPOT.dy);
   }

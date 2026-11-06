@@ -1,9 +1,10 @@
 import { BALANCE, type GameState, type ResourceKind, type ResourceNode } from '../game/state';
 import { season, type Season } from '../game/calendar';
-import { QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, homesteadPathOpen, pathOpen } from '../game/areas';
-import { clearingTile, pathTile, quarryGroundTile, terrainSprites } from '../art/terrain';
+import { QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, hillsPathOpen, homesteadPathOpen, pathOpen } from '../game/areas';
+import { clearingTile, hillGroundTile, pathTile, quarryGroundTile, terrainSprites } from '../art/terrain';
+import { hillRockAt } from './hillsGeometry';
 import { CLEARING_STEPS, STEP_IDS, clearingKey, clearingReach, inClearedPatch, type ClearingState, type StepId } from '../game/clearing';
-import { CAMP_BOTH_OPEN_PATHS, CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_HOMESTEAD_PATHS, CAMP_OPEN_PATHS, CAMP_PATHS, CAMP_SIGN, HOMESTEAD_PATHS, HOMESTEAD_SIGN, QUARRY_PATHS, QUARRY_SIGN, mixHash, pathDistance, type PathRoute } from './mapGeometry';
+import { CAMP_BOTH_OPEN_PATHS, CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_HOMESTEAD_PATHS, CAMP_OPEN_PATHS, CAMP_PATHS, CAMP_SIGN, HOMESTEAD_PATHS, HOMESTEAD_SIGN, QUARRY_PATHS, QUARRY_HILLS_PATHS, HILLS_PATHS, HILLS_SIGN, QUARRY_SIGN, mixHash, pathDistance, type PathRoute } from './mapGeometry';
 import { FACE_HEIGHT, QUARRY_MEADOWS, faceBottom, floorDepth } from './quarryGeometry';
 
 export interface MapItem { x: number; y: number; sprite: string }
@@ -11,11 +12,12 @@ export interface TerrainMap { ground: string[][]; pathTiles: MapItem[]; campEdge
   /** Signposts, drawn standing like the trees. */
   signs: MapItem[] }
 
-export type TerrainKey = 'camp' | 'camp-open' | 'camp-homestead-open' | 'camp-both-open' | 'quarry' | 'homestead';
+export type TerrainKey = 'camp' | 'camp-open' | 'camp-homestead-open' | 'camp-both-open' | 'quarry' | 'quarry-hills-open' | 'homestead' | 'hills';
 
 /** Which area's terrain and which camp paths the scene should show. */
 export function terrainKey(state: GameState): TerrainKey {
-  if (state.area === 'quarry') return 'quarry';
+  if (state.area === 'quarry') return hillsPathOpen(state) ? 'quarry-hills-open' : 'quarry';
+  if (state.area === 'hills') return 'hills';
   if (state.area === 'homestead') return 'homestead';
   const quarryOpen = pathOpen(state), homesteadOpen = homesteadPathOpen(state);
   if (quarryOpen && homesteadOpen) return 'camp-both-open';
@@ -29,7 +31,7 @@ export function shownTerrainKey(state: GameState): string {
   return `${terrainKey(state)}-${clearingKey(state.clearing.cleared)}-${state.clearing.marked ?? 'unmarked'}-${season(state.day)}`;
 }
 
-const ROUTES: Record<Exclude<TerrainKey, 'quarry' | 'homestead'>, readonly PathRoute[]> = {
+const ROUTES: Record<Exclude<TerrainKey, 'quarry' | 'quarry-hills-open' | 'homestead' | 'hills'>, readonly PathRoute[]> = {
   camp: CAMP_PATHS, 'camp-open': CAMP_OPEN_PATHS, 'camp-homestead-open': CAMP_HOMESTEAD_PATHS,
   'camp-both-open': CAMP_BOTH_OPEN_PATHS
 };
@@ -152,9 +154,10 @@ function quarryWoods(x: number, y: number): boolean {
 }
 
 /** The quarry: a cut face in the west above a gravel floor, a worn track home, boulders and stones, and woods all round. */
-function buildQuarryMap(time: Season): TerrainMap {
+function buildQuarryMap(time: Season, onward: readonly PathRoute[] = []): TerrainMap {
   const map = emptyMap();
-  const boulders = QUARRY_BOULDERS.filter(([x, y]) => quarryClear(x, y, BOULDER_TRACK_CLEARANCE))
+  const offPath = (x: number, y: number, clearance: number) => onward.length === 0 || pathDistance(x + .5, y + .5, onward) >= clearance;
+  const boulders = QUARRY_BOULDERS.filter(([x, y]) => quarryClear(x, y, BOULDER_TRACK_CLEARANCE) && offPath(x, y, BOULDER_TRACK_CLEARANCE))
     .map(([x, y]) => ({ x, y, sprite: `boulder${hash(x, y, 11) % 2}` }));
   const taken = (x: number, y: number) => [...boulders, ...map.trees].some(item => Math.hypot(item.x - x, item.y - y) < 1.2);
   const treeAt = (x: number, y: number) => ({ x, y, sprite: TREE_SPRITES[hash(x, y, 3) % 3] });
@@ -163,9 +166,11 @@ function buildQuarryMap(time: Season): TerrainMap {
     for (let x = 0; x < BALANCE.mapWidth; x++) {
       const ground = quarryGroundTile(x, y);
       row.push(ground);
+      const path = onward.length > 0 ? pathTile(x, y, onward) : null;
+      if (path) map.pathTiles.push({ x, y, sprite: path });
       if (quarryWoods(x, y)) {
-        if (quarryClear(x, y, TREE_TRACK_CLEARANCE) && !boulders.some(item => Math.hypot(item.x - x, item.y - y) < 1.2)) map.trees.push(treeAt(x, y));
-      } else if (/^grass\d$/.test(ground) && quarryOpen(x, y, boulders)) {
+        if (quarryClear(x, y, TREE_TRACK_CLEARANCE) && offPath(x, y, TREE_TRACK_CLEARANCE) && !boulders.some(item => Math.hypot(item.x - x, item.y - y) < 1.2)) map.trees.push(treeAt(x, y));
+      } else if (/^grass\d$/.test(ground) && quarryOpen(x, y, boulders) && offPath(x, y, 1)) {
         const sprite = quarryDecoration(x, y, time);
         if (sprite) map.decorations.push({ x, y, sprite });
       }
@@ -175,7 +180,7 @@ function buildQuarryMap(time: Season): TerrainMap {
   for (const [cx, cy] of QUARRY_CLUMPS) {
     const clump = CLUMP_OFFSETS.filter((_, index) => index < 3 || hash(cx, cy, 12 + index) % 2 === 0)
       .map(([dx, dy]) => ({ x: cx + dx, y: cy + dy }))
-      .filter(({ x, y }) => quarryClear(x, y, TREE_TRACK_CLEARANCE) && !taken(x, y));
+      .filter(({ x, y }) => quarryClear(x, y, TREE_TRACK_CLEARANCE) && offPath(x, y, TREE_TRACK_CLEARANCE) && !taken(x, y));
     map.trees.push(...clump.map(({ x, y }) => treeAt(x, y)));
   }
   // Nothing lies flat under a clump's trunks; the boulders go in last, among the stones.
@@ -216,6 +221,35 @@ function quarryDetail(x: number, y: number): string {
   return `pebbles${detail % 2}`;
 }
 
+/** The plant a tile grows this season, if any: heather on the high ground, gorse on the shoulders, and bracken lower down. Snow lies over them all. */
+function hillPlant(x: number, y: number, time: Season): string | undefined {
+  if (time === 'winter' || hash(x, y, 42) % 3 !== 0) return undefined;
+  const pick = hash(x, y, 43) % 10 + (y - 15) / 3 + (x - 20) / 6;
+  if (pick < 4) return time === 'summer' ? 'hillHeatherBloom' : 'hillHeather';
+  if (pick < 7) return time === 'spring' ? 'hillGorseBloom' : 'hillGorse';
+  if (time === 'autumn') return 'hillBrackenRust';
+  return time === 'summer' ? 'hillBracken' : undefined;
+}
+
+/** The hills: open rolling grass, rock showing near the top, and plants that change with the season. Nothing here is gathered. */
+function buildHillsMap(time: Season): TerrainMap {
+  const map = emptyMap();
+  for (let y = 0; y < BALANCE.mapHeight; y++) {
+    const row: string[] = [];
+    for (let x = 0; x < BALANCE.mapWidth; x++) {
+      row.push(hillGroundTile(x, y));
+      const path = pathTile(x, y, HILLS_PATHS);
+      if (path) map.pathTiles.push({ x, y, sprite: path });
+      const sprite = hillRockAt(x, y) || pathDistance(x + .5, y + .5, HILLS_PATHS) < 1.7 || nearSign(x, y, HILLS_SIGN) ? undefined : hillPlant(x, y, time);
+      // A little off the tile's middle, so the plants don't stand in rows.
+      if (sprite) map.decorations.push({ x: x + (hash(x, y, 46) % 5 - 2) / 5, y: y + (hash(x, y, 47) % 5 - 2) / 5, sprite });
+    }
+    map.ground.push(row);
+  }
+  map.signs = [{ ...HILLS_SIGN, sprite: 'signpostCamp' }];
+  return map;
+}
+
 /**
  * Builds an area's terrain. The camp meadow flowers more in spring, and its flowers are under the snow in winter.
  * The camp's clearing is as wide as the cleared steps make it; the trees of steps still to clear stand in their places,
@@ -223,6 +257,8 @@ function quarryDetail(x: number, y: number): string {
  */
 export function buildMap(nodes: ResourceNode[], key: TerrainKey, time: Season = 'summer', clearing: ClearingState = { cleared: [], marked: null, felled: [] }): TerrainMap {
   if (key === 'quarry') return buildQuarryMap(time);
+  if (key === 'quarry-hills-open') return buildQuarryMap(time, QUARRY_HILLS_PATHS);
+  if (key === 'hills') return buildHillsMap(time);
   if (key === 'homestead') return buildHomesteadMap(time);
   const standing = STEP_IDS.filter(id => !clearing.cleared.includes(id));
   const site: CampSite = { nodes, routes: ROUTES[key], cleared: clearing.cleared, reserved: standing.flatMap(id => CLEARING_STEPS[id].trees) };

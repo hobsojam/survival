@@ -3,7 +3,9 @@ import { isAtCamp, type GameAction } from '../game/rules';
 import { choppableTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
 import { sprites } from '../art/sprites';
-import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
+import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, hillsPathOpen, pathOpen } from '../game/areas';
+import { wildPonyAt } from '../game/pony';
+import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, outcropLeft } from '../game/hills';
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
 import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
 import { ORCHARD_SPOTS, spotAction, treeStage } from '../game/orchard';
@@ -19,6 +21,8 @@ export type TapTarget =
   | { kind: 'crossing'; x: number; y: number }
   | { kind: 'quarry'; x: number; y: number }
   | { kind: 'rubble'; x: number; y: number }
+  | { kind: 'outcrop'; x: number; y: number }
+  | { kind: 'pony'; x: number; y: number }
   | { kind: 'chickens'; x: number; y: number; action: 'meetChickens' | 'leadChickens' }
   | { kind: 'appleTree' | 'shed' | 'coop'; x: number; y: number }
   | { kind: 'orchard'; spot: number; x: number; y: number; action: GameAction | null }
@@ -78,7 +82,14 @@ export function pickTapTarget(state: GameState, x: number, y: number): TapTarget
     candidates = [...piles,
       { target: { kind: 'quarry', x: QUARRY_SITE.x, y: QUARRY_SITE.y }, sprite: 'quarry' },
       { target: { kind: 'rubble', x: RUBBLE_SITE.x, y: RUBBLE_SITE.y } },
-      { target: { kind: 'crossing', x: QUARRY_EXIT.x, y: QUARRY_EXIT.y } }];
+      { target: { kind: 'crossing', x: QUARRY_EXIT.x, y: QUARRY_EXIT.y } },
+      ...(hillsPathOpen(state) ? [{ target: { kind: 'crossing' as const, ...QUARRY_HILLS_EXIT } }] : [])];
+  } else if (state.area === 'hills') {
+    const wild = wildPonyAt(state);
+    candidates = [...piles,
+      { target: { kind: 'outcrop', ...OUTCROP_SITE }, sprite: 'outcrop' },
+      ...(wild ? [{ target: { kind: 'pony' as const, ...wild }, sprite: 'pony' }] : []),
+      { target: { kind: 'crossing', ...HILLS_EXIT } }];
   } else if (state.area === 'homestead') {
     candidates = [...piles,
       { target: { kind: 'shed', ...HOMESTEAD_SHED } },
@@ -107,7 +118,7 @@ export function pickTapTarget(state: GameState, x: number, y: number): TapTarget
 }
 
 /** What E can act on: a node, a loose pile, the rubble or the quarry face. */
-export type Gatherable = { kind: 'node'; node: ResourceNode } | { kind: 'pile'; pile: StonePile } | { kind: 'rubble' } | { kind: 'quarry' };
+export type Gatherable = { kind: 'node'; node: ResourceNode } | { kind: 'pile'; pile: StonePile } | { kind: 'rubble' } | { kind: 'quarry' } | { kind: 'outcrop' };
 
 /** The nearest thing E can act on within reach: ready camp nodes in season and this area's loose piles, or the quarry's rubble and face when ready. */
 export function closestGatherable(state: GameState): Gatherable | undefined {
@@ -117,6 +128,8 @@ export function closestGatherable(state: GameState): Gatherable | undefined {
   if (state.area === 'quarry') {
     if (state.rubbleReadyDay <= state.day) options.push({ found: { kind: 'rubble' }, away: distance(RUBBLE_SITE.x, RUBBLE_SITE.y, x, y) });
     if (state.quarryReadyDay <= state.day || (state.progress.mineBuilt && state.mineReadyDay <= state.day)) options.push({ found: { kind: 'quarry' }, away: distance(QUARRY_SITE.x, QUARRY_SITE.y, x, y) });
+  } else if (state.area === 'hills') {
+    if (outcropLeft(state) > 0) options.push({ found: { kind: 'outcrop' }, away: distance(OUTCROP_SITE.x, OUTCROP_SITE.y, x, y) });
   } else if (state.area === 'camp') {
     options.push(...state.nodes.filter(node => node.amount > 0 && nodeShown(state, node)).map(node => ({ found: { kind: 'node' as const, node }, away: distance(node.x, node.y, x, y) })));
   }
@@ -153,6 +166,8 @@ export function targetAction(target: TapTarget): GameAction | null {
     case 'crossing': return { type: 'cross' };
     case 'quarry': return { type: 'digQuarry' };
     case 'rubble': return { type: 'gatherRubble' };
+    case 'outcrop': return { type: 'digOre' };
+    case 'pony': return { type: 'offerPony' };
     case 'chickens': return { type: target.action };
     case 'appleTree': return { type: 'gatherApples' };
     case 'shed': return { type: 'searchShed' };

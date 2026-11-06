@@ -36,7 +36,7 @@ const away = (state: GameState): GameState => ({ ...state, player: { ...state.pl
 const inQuarry = (state: GameState): GameState => ({ ...state, area: 'quarry', player: { ...state.player, x: 30, y: 15 } });
 
 describe('building the larder', () => {
-  const supplies = { wood: 5, fiber: 2, stone: 2, food: emptyFood() };
+  const supplies = { wood: 5, fiber: 2, stone: 2, ore: 0, food: emptyFood() };
 
   it('is defined as asked', () => {
     expect(BUILDINGS.larder).toEqual({ name: 'Larder', description: 'Keep up to 10 food raised off the ground', symbol: '▥',

@@ -157,6 +157,7 @@ Once the toolshed is built and the east side's far ground is cleared, you can bu
 
 - **Sickle and flail** (three wood, one fiber, two stone; needs the grain field): cut and thresh the field's grain.
 - **Hand quern** (one wood, four stone; needs the granary): grind the granary's grain into flour.
+- **Forge** (two wood, six stone; needs ore from the hills): see **The hills**.
 
 If the bag (and cart) can't take all of a felled tree's wood, felling is refused and nothing is lost.
 
@@ -260,6 +261,21 @@ Once the shelter is built, a west path opens toward the camp's edge. Walk off th
 Walk close to the **old quarry** to find it. Beside it lies a heap of loose **rubble**: pick a stone from it by hand (E or a tap) when you have two free bag spaces, and it loosens again three dawns later. Finding the quarry adds a **pickaxe** to the Forest tools panel. Craft it at camp with the toolshed built, for two wood, one fiber, and two stone; it does not need the axe. Then stand at the quarry face and dig (E, a tap, or the prompt). Digging takes ten seconds and eight energy and gives one stone, and the face shows as spent until the next dawn. On a day when both are ready, the rubble and the dig together give two stone. However you spend your stone, more always comes back.
 
 At night, pairs of glowing eyes watch from the dark edges of the quarry area. They blink, back away, and vanish as you approach. They are only a look: nothing follows you, and they never harm you.
+
+### The hills
+
+Once you've found the old quarry, the path carries on past it, out of the quarry's west edge and up on to the hills: low open ground of short grass, heather, bracken and gorse, with a few small wind-bent trees low down and bare rock near the top. Gorse flowers in spring, heather is out in summer, bracken goes rusty in autumn and snow lies over everything in winter. Rabbits are about in spring, as they are in the meadow. Nothing up there is gathered but ore.
+
+**Ore.** A rocky outcrop near the top has rust-red streaks in it. With your pickaxe it gives three ore a day, one at a time. Ore is as heavy as stone and has no use until you have a forge. You can set it down and pick it up again, as you can stone.
+
+**The forge.** Once you've found ore and the workshop stands, you can add a **forge** to the workshop for two wood and six stone. It keeps up to twelve ore, which goes to it by itself whenever you're in the clearing, and it makes two things, once each:
+
+- **Iron pickaxe** (one wood, three ore): each dig at the quarry face gives two stone instead of one. It changes nothing else.
+- **Horseshoes** (one wood, two ore; needs the pony): the pony can come with you.
+
+**The pony.** A shaggy wild pony grazes on the hills by day. If you come too close it ambles off, which costs nothing. Offer it an apple or vegetables, once a day, from a little way off. After four offers it's won over and follows you home, and you can give it a name, as you can the other animals. It looks after itself: it needs no feed, can't get ill and won't leave.
+
+Until it's shod, the pony stays at camp, because its hooves can't take the stony path. Once it's shod it walks beside you by day wherever you go, with packs on its back, and adds eight spaces to your bag. It won't go up on the hills in the snow, and waits at the foot of the path. Its spaces go with it, and it goes home to camp at nightfall. If your bag is over its limit while the pony is elsewhere, nothing is lost; you just can't pick up more until there's room.
 
 ## Saving
 

@@ -32,8 +32,8 @@ const carted = (state: GameState, cartWood: number): GameState =>
 describe('materials storing themselves', () => {
   it('moves the bag\'s wood, fiber and stone into their stores, and leaves food alone', () => {
     const food = stock(2);
-    const settled = settleStores(withBag(camp(), { wood: 3, fiber: 2, stone: 1, food }));
-    expect(settled.inventory).toEqual({ wood: 0, fiber: 0, stone: 0, food });
+    const settled = settleStores(withBag(camp(), { wood: 3, fiber: 2, stone: 1, ore: 0, food }));
+    expect(settled.inventory).toEqual({ wood: 0, fiber: 0, stone: 0, ore: 0, food });
     expect(settled).toMatchObject({ storedWood: 3, storedFiber: 2, storedStone: 1 });
   });
 
@@ -109,6 +109,6 @@ describe('storing after an action', () => {
     const result = loadGame({ getItem: (key: string) => storage.get(key) ?? null } as unknown as Storage);
     expect(result.kind).toBe('loaded');
     const was = JSON.parse(FIXTURE).state.inventory;
-    if (result.kind === 'loaded') expect(result.state.inventory).toEqual({ ...was, food: { ...was.food, fish: 0, rabbit: 0, flour: 0, bread: [], apple: [], egg: [] } });
+    if (result.kind === 'loaded') expect(result.state.inventory).toEqual({ ...was, ore: 0, food: { ...was.food, fish: 0, rabbit: 0, flour: 0, bread: [], apple: [], egg: [] } });
   });
 });

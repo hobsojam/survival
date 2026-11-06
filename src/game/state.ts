@@ -5,6 +5,7 @@ import type { Bed } from './beds';
 import type { UpgradeId } from './workshop';
 import { emptyField, type FieldState } from './field';
 import { emptyOrchard, type OrchardState } from './orchard';
+import { emptyPony, type PonyState } from './pony';
 export type ResourceKind = 'branch' | 'berry' | 'fiber' | 'stone' | 'hazel' | 'pine' | 'greens' | 'honey' | 'wildGrain';
 
 export const BUILDINGS = {
@@ -94,9 +95,11 @@ export interface StonePile {
   y: number;
   count: number;
   area: AreaId;
+  /** What the pile is: dropped stone, or dropped ore. */
+  item: 'stone' | 'ore';
 }
 
-export type AreaId = 'camp' | 'quarry' | 'homestead';
+export type AreaId = 'camp' | 'quarry' | 'homestead' | 'hills';
 
 export type HousePaint = 'natural' | 'berry' | 'leaf';
 export interface HomesteadDecorations { paint: HousePaint; flowerBoxes: boolean; fence: number }
@@ -141,14 +144,14 @@ export interface GameState {
   day: number;
   timeOfDay: number;
   player: { x: number; y: number; energy: number; hunger: number; warmth: number };
-  inventory: { wood: number; fiber: number; stone: number; food: FoodStore };
+  inventory: { wood: number; fiber: number; stone: number; ore: number; food: FoodStore };
   fireFuel: number;
   /** Seconds the house's fireplace has left to burn; it stays 0 until the house is built. */
   fireplaceFuel: number;
   structures: Record<StructureId, boolean>;
   decorations: HomesteadDecorations;
   progress: { nextStormDay: number | null; hearthUnlocked: boolean; lookoutRepaired: boolean; axeCrafted: boolean;
-    quarryFound: boolean; homesteadFound: boolean; pickaxeCrafted: boolean; mineBuilt: boolean; potCrafted: boolean; packWoven: boolean;
+    quarryFound: boolean; homesteadFound: boolean; hillsFound: boolean; oreFoundDay: number | null; pickaxeCrafted: boolean; mineBuilt: boolean; potCrafted: boolean; packWoven: boolean;
     /** A fishing line, for the frozen spring in winter. */
     fishingLine: boolean;
     /** The workshop's upgrades, each made once. */
@@ -170,6 +173,11 @@ export interface GameState {
   beehive: { honey: number; nextHoney: number | null };
   /** Stone kept in the camp stone pile, outside the bag. */
   storedStone: number;
+  /** Ore kept at the forge: it counts as ore for making things, from anywhere. */
+  storedOre: number;
+  /** How much of the outcrop has been dug, and on which day. */
+  outcrop: { day: number; dug: number };
+  pony: PonyState;
   /** Wood split and stacked on the woodpile, outside the bag: it counts for building and the fire, from anywhere. */
   storedWood: number;
   /** Felled wood waiting in the handcart: it counts as stored wood, for building and the fires, from anywhere. */
@@ -197,7 +205,7 @@ export interface GameState {
   /** The flock shares one fluff count; fedUntil is the last dawn their feed lasts, and wool waits in a basket at the pen. */
   /** What the player has called each animal; for reading only. */
   orchard: OrchardState;
-  names: { bird: string | null; fox: string | null; wolf: string | null; sheep: (string | null)[]; chickens: (string | null)[] };
+  names: { bird: string | null; fox: string | null; wolf: string | null; pony: string | null; sheep: (string | null)[]; chickens: (string | null)[] };
   sheep: { arrived: boolean; fluff: number; fedUntil: number | null; lastShornYear: number | null; wool: number; woven: { blanket: boolean; jumper: boolean; rug: boolean } };
   homestead: { applesReadyDay: number; shedSearched: boolean };
   /** How far the camp clearing has been widened, and the step whose trees are being felled. */
@@ -337,6 +345,14 @@ export const BALANCE = {
   fiberFireSeconds: 30,
   /** Stone is heavy: each one takes this many bag spaces. */
   stoneSpaces: 2,
+  /** Ore the outcrop gives in a day: it is a long walk, so one lump wouldn't be worth it. */
+  outcropPerDay: 3,
+  /** Ore the forge keeps. */
+  forgeOreCapacity: 12,
+  /** Spaces a shod pony carries while it is with the survivor. */
+  ponySpaces: 8,
+  /** Offers that win the pony over. */
+  ponyTrustTarget: 4,
   /** A stone dropped this close to a pile joins it. */
   pileMergeRadius: 1,
   pickUpSeconds: 2,
@@ -448,14 +464,14 @@ export function createGame(): GameState {
     day: 1,
     timeOfDay: 0,
     player: { x: BALANCE.campX + 1, y: BALANCE.campY + 1, energy: 100, hunger: 100, warmth: 100 },
-    inventory: { wood: 0, fiber: 0, stone: 0, food: emptyFood() },
+    inventory: { wood: 0, fiber: 0, stone: 0, ore: 0, food: emptyFood() },
     fireFuel: 0,
     fireplaceFuel: 0,
     decorations: emptyDecorations(),
     structures: { orchard: false, shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, storehouse: false, woodpile: false, timberYard: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false, field: false, granary: false, windmill: false, bakery: false, beehive: false, sheepPen: false, loom: false, chickenCoop: false, birdhouse: false, wolfHouse: false, foxDen: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
-      quarryFound: false, homesteadFound: false, pickaxeCrafted: false, mineBuilt: false, potCrafted: false, packWoven: false, fishingLine: false,
-      workshop: { saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false, shears: false },
+      quarryFound: false, homesteadFound: false, hillsFound: false, oreFoundDay: null, pickaxeCrafted: false, mineBuilt: false, potCrafted: false, packWoven: false, fishingLine: false,
+      workshop: { saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false, shears: false, forge: false, horseshoes: false, ironPickaxe: false },
       discoveries: { basket: false, spring: false, cairn: false } },
     nodes,
     trees,
@@ -467,6 +483,9 @@ export function createGame(): GameState {
     bakery: { shelf: [], lastBaked: null, resumed: null },
     beehive: { honey: 0, nextHoney: null },
     storedStone: 0,
+    storedOre: 0,
+    outcrop: { day: 0, dug: 0 },
+    pony: emptyPony(),
     storedWood: 0, cartWood: 0,
     storedFiber: 0,
     larder: emptyFood(),
@@ -489,7 +508,7 @@ export function createGame(): GameState {
     chickens: { discovered: false, following: false, rescued: false, eggs: 0, nextEggDay: 1 },
     sheep: { arrived: false, fluff: 0, fedUntil: null, lastShornYear: null, wool: 0, woven: { blanket: false, jumper: false, rug: false } },
     orchard: emptyOrchard(),
-    names: { bird: null, fox: null, wolf: null, sheep: [null, null, null], chickens: [null, null, null] },
+    names: { bird: null, fox: null, wolf: null, pony: null, sheep: [null, null, null], chickens: [null, null, null] },
     homestead: { applesReadyDay: 1, shedSearched: false },
     sickness: { starvedSeconds: 0, sick: false, sickFromDay: null, cared: 0, uncared: 0, ateWarm: false, restedWarm: false },
     ending: null,

@@ -1,3 +1,4 @@
+import { HILLS_EXIT } from './hills';
 import { BALANCE, type AreaId, type GameState } from './state';
 
 /** The west path: a gap in the camp's west edge that leads to the quarry's east edge. */
@@ -18,6 +19,11 @@ export function homesteadPathOpen(state: GameState): boolean {
   return state.structures.shelter;
 }
 
+/** The way on to the hills opens once the quarry is found. */
+export function hillsPathOpen(state: GameState): boolean {
+  return state.progress.quarryFound;
+}
+
 /** Where walking to (rawX, rawY) lands the survivor in the other area, or null if they stay put. */
 export function crossing(state: GameState, rawX: number, rawY: number): { area: AreaId; x: number; y: number } | null {
   // Inside the crossing's half-width, y is already well within the map, so it needs no clamp.
@@ -28,5 +34,7 @@ export function crossing(state: GameState, rawX: number, rawY: number): { area: 
     return null;
   }
   if (state.area === 'homestead') return rawX < 0 ? { area: 'camp', x: BALANCE.mapWidth - 1.5, y: rawY } : null;
+  if (state.area === 'hills') return rawX > HILLS_EXIT.x ? { area: 'quarry', x: 0.5, y: rawY } : null;
+  if (hillsPathOpen(state) && rawX < 0) return { area: 'hills', x: BALANCE.mapWidth - 1.5, y: rawY };
   return rawX > BALANCE.mapWidth - 1 ? { area: 'camp', x: 0.5, y: rawY } : null;
 }

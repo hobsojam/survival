@@ -82,7 +82,7 @@ describe('camp prompts', () => {
   });
 
   it('counts the stones in a loose pile', () => {
-    const state = { ...bareCamp(5, 25), stonePiles: [{ id: 'p', x: 5, y: 25, count: 3, area: 'camp' as const }] };
+    const state = { ...bareCamp(5, 25), stonePiles: [{ id: 'p', x: 5, y: 25, count: 3, area: 'camp' as const, item: 'stone' as const }] };
     expect(promptFor(state)).toBe('E  Pick up stone (×3)');
   });
 
@@ -165,7 +165,7 @@ describe('quarry prompts', () => {
   });
 
   it('still mentions the quarry face when a loose pile beside it is nearer', () => {
-    const pile = { id: 'p', x: QUARRY_SITE.x + 1, y: QUARRY_SITE.y, count: 2, area: 'quarry' as const };
+    const pile = { id: 'p', x: QUARRY_SITE.x + 1, y: QUARRY_SITE.y, count: 2, area: 'quarry' as const, item: 'stone' as const };
     const state = { ...quarry(QUARRY_SITE.x + 1, QUARRY_SITE.y), stonePiles: [pile] };
     expect(promptFor(state)).toBe('E  Pick up stone (×2) · Quarry · craft a pickaxe at the toolshed');
     const withPickaxe = { ...state, progress: { ...state.progress, pickaxeCrafted: true } };
@@ -209,7 +209,7 @@ describe('the E key', () => {
   it('gathers the nearest node, pile, rubble or quarry face', () => {
     const state = bareCamp(5, 25);
     expect(useKeyAction({ ...state, nodes: [{ id: 'n', kind: 'berry', x: 5, y: 25, amount: 1, readyDay: 1 }] })).toEqual({ type: 'gather', nodeId: 'n' });
-    expect(useKeyAction({ ...state, stonePiles: [{ id: 'p', x: 5, y: 25, count: 1, area: 'camp' }] })).toEqual({ type: 'pickUpStone', pileId: 'p' });
+    expect(useKeyAction({ ...state, stonePiles: [{ id: 'p', x: 5, y: 25, count: 1, area: 'camp', item: 'stone' }] })).toEqual({ type: 'pickUpStone', pileId: 'p' });
     const quarry = { ...state, area: 'quarry' as const, progress: { ...state.progress, pickaxeCrafted: true } };
     expect(useKeyAction(at(quarry, RUBBLE_SITE.x, RUBBLE_SITE.y))).toEqual({ type: 'gatherRubble' });
     expect(useKeyAction(at(quarry, QUARRY_SITE.x, QUARRY_SITE.y))).toEqual({ type: 'digQuarry' });
@@ -274,7 +274,7 @@ describe('action feedback', () => {
     const state = { ...bareCamp(5, 25),
       nodes: [{ id: 'n', kind: 'fiber' as const, x: 3, y: 4, amount: 1, readyDay: 1 }],
       trees: [{ id: 't', x: 7, y: 8, sprite: 'treePine' as const, readyDay: 1 }],
-      stonePiles: [{ id: 'p', x: 9, y: 10, count: 2, area: 'camp' as const }] };
+      stonePiles: [{ id: 'p', x: 9, y: 10, count: 2, area: 'camp' as const, item: 'stone' as const }] };
     expect(gatherSpot({ type: 'gather', nodeId: 'n' }, state)).toMatchObject({ x: 3, y: 4, kind: 'fiber' });
     expect(gatherSpot({ type: 'chopTree', treeId: 't' }, state)).toEqual({ x: 7, y: 8, kind: 'branch' });
     expect(gatherSpot({ type: 'pickUpStone', pileId: 'p' }, state)).toEqual({ x: 9, y: 10, kind: 'stone' });

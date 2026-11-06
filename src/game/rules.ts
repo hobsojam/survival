@@ -1,5 +1,7 @@
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isSummer, isWinter, nightStart, yearOf } from './calendar';
-import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } from './areas';
+import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, hillsPathOpen, pathOpen } from './areas';
+import { offerToPony, ponyArrives, ponyOfferBlocker, startlePony } from './pony';
+import { HILLS_EXIT, HILLS_FOUND_MESSAGE, OUTCROP_MESSAGES, QUARRY_HILLS_EXIT, digOreBlocker, outcropLeft, spendOre } from './hills';
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
@@ -57,7 +59,7 @@ export type GameAction =
   | { type: 'storeFood'; item: FoodItem }
   | { type: 'takeFood'; item: FoodItem }
   | { type: 'cook'; dish?: DishId }
-  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'buildMine' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' | 'meetChickens' | 'leadChickens' | 'takeEgg' | 'gatherApples' | 'searchShed' }
+  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'digOre' | 'dropOre' | 'offerPony' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'buildMine' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' | 'meetChickens' | 'leadChickens' | 'takeEgg' | 'gatherApples' | 'searchShed' }
   | { type: 'pickUpStone'; pileId: string }
   | { type: 'plantPip'; spot: number }
   | { type: 'pickOrchardApple'; spot: number }
@@ -243,6 +245,7 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
     remaining -= step;
     wolfVisit(next);
     startleFox(next);
+    startlePony(next);
     if (next.timeOfDay >= BALANCE.daySeconds - 0.000001) dawn(next, home);
   }
   return next;
@@ -359,11 +362,31 @@ function payAndBuild(state: GameState, cost: { wood: number; fiber: number; ston
   }, workSeconds(state, seconds), 'working');
 }
 
+/** Coming out on the hills for the first time, whichever way the survivor crossed. */
+function hillsFoundOnArrival(moved: GameState): ActionResult {
+  if (moved.area !== 'hills' || moved.progress.hillsFound) return { state: moved, message: '' };
+  return { state: { ...moved, progress: { ...moved.progress, hillsFound: true } }, message: HILLS_FOUND_MESSAGE };
+}
+
 function quarryFoundOnArrival(moved: GameState): ActionResult {
   if (moved.area === 'quarry' && !moved.progress.quarryFound && near(moved.player.x, moved.player.y, QUARRY_SITE.x, QUARRY_SITE.y, 2)) {
     return { state: { ...moved, progress: { ...moved.progress, quarryFound: true } }, message: 'You found an old quarry. A pickaxe could work this stone.' };
   }
   return { state: moved, message: '' };
+}
+
+function walkedArrival(moved: GameState): ActionResult {
+  if (moved.area === 'homestead' && !moved.progress.homesteadFound) {
+    return { state: { ...moved, progress: { ...moved.progress, homesteadFound: true } }, message: 'You found an abandoned homestead.' };
+  }
+  if (moved.area === 'hills') return hillsFoundOnArrival(moved);
+  return quarryFoundOnArrival(moved);
+}
+
+/** Adds what changing area means for the pony to whatever the crossing itself said. */
+function withPonyArrival(before: GameState, result: ActionResult): ActionResult {
+  const arrived = ponyArrives(before, result.state);
+  return { state: arrived.state, message: [result.message, arrived.message].filter(Boolean).join(' ') };
 }
 
 const move: ActionHandler<'move'> = (state, action) => {
@@ -375,13 +398,12 @@ const move: ActionHandler<'move'> = (state, action) => {
     ? { ...state.player, x: crossed.x, y: crossed.y }
     : { ...state.player, x: Math.max(0, Math.min(BALANCE.mapWidth - 1, rawX)), y: Math.max(0, Math.min(BALANCE.mapHeight - 1, rawY)) };
   const moved = settleChickens(pickUpKeepsake({ ...state, ...(crossed ? { area: crossed.area } : {}), player }));
-  if (moved.area === 'homestead' && !moved.progress.homesteadFound) {
-    return { state: { ...moved, progress: { ...moved.progress, homesteadFound: true } }, message: 'You found an abandoned homestead.' };
-  }
-  return quarryFoundOnArrival(moved);
+  const startled = { ...moved };
+  startlePony(startled);
+  return withPonyArrival(state, walkedArrival(startled));
 };
 
-const cross: ActionHandler<'cross'> = state => {
+const crossOver: ActionHandler<'cross'> = state => {
   if (state.area === 'camp') {
     const west = near(state.player.x, state.player.y, CAMP_EXIT.x, CAMP_EXIT.y, 0.5);
     const east = near(state.player.x, state.player.y, CAMP_HOMESTEAD_EXIT.x, CAMP_HOMESTEAD_EXIT.y, 0.5);
@@ -391,10 +413,19 @@ const cross: ActionHandler<'cross'> = state => {
     return { state: { ...state, area: 'homestead', player: { ...state.player, x: 0.5, y: CAMP_HOMESTEAD_EXIT.y },
       progress: { ...state.progress, homesteadFound: true } }, message: state.progress.homesteadFound ? '' : 'You found an abandoned homestead.' };
   }
+  if (state.area === 'hills') {
+    if (!near(state.player.x, state.player.y, HILLS_EXIT.x, HILLS_EXIT.y, 0.5)) return refuse(state, 'Walk to the path down.');
+    return { state: { ...state, area: 'quarry', player: { ...state.player, x: 0.5, y: HILLS_EXIT.y } }, message: '' };
+  }
+  if (state.area === 'quarry' && hillsPathOpen(state) && near(state.player.x, state.player.y, QUARRY_HILLS_EXIT.x, QUARRY_HILLS_EXIT.y, 0.5)) {
+    return hillsFoundOnArrival({ ...state, area: 'hills', player: { ...state.player, x: BALANCE.mapWidth - 1.5, y: QUARRY_HILLS_EXIT.y } });
+  }
   const exit = state.area === 'quarry' ? QUARRY_EXIT : HOMESTEAD_EXIT;
-  if (!near(state.player.x, state.player.y, exit.x, exit.y, 0.5)) return refuse(state, 'Walk to the path home.');
+  if (!near(state.player.x, state.player.y, exit.x, exit.y, 0.5)) return refuse(state, state.area === 'quarry' && hillsPathOpen(state) ? 'Walk to the end of a path to cross.' : 'Walk to the path home.');
   return { state: { ...state, area: 'camp', player: { ...state.player, x: state.area === 'quarry' ? 0.5 : BALANCE.mapWidth - 1.5, y: exit.y } }, message: '' };
 };
+
+const cross: ActionHandler<'cross'> = (state, action) => withPonyArrival(state, crossOver(state, action));
 
 type Supply = keyof GameState['inventory'];
 // Berries and forage go into the food store.
@@ -546,15 +577,16 @@ const digQuarry: ActionHandler<'digQuarry'> = state => {
   if (!firstReady && !secondReady) return refuse(state, 'The quarry face is worked out until morning.');
   if (isExhausted(state)) return refuse(state, TOO_TIRED_MESSAGE);
   if (freeSpaces(state) < spaceFor('stone')) return refuse(state, FULL_BAG_MESSAGE);
+  const stones = Math.min(state.progress.workshop.ironPickaxe ? 2 : 1, Math.floor(freeSpaces(state) / spaceFor('stone')));
   return {
     state: advanceTime({
       ...state,
       player: tire(state, BALANCE.digEnergyCost),
-      inventory: { ...state.inventory, stone: state.inventory.stone + 1 },
+      inventory: { ...state.inventory, stone: state.inventory.stone + stones },
       quarryReadyDay: firstReady ? state.day + 1 : state.quarryReadyDay,
       mineReadyDay: !firstReady && secondReady ? state.day + 1 : state.mineReadyDay
     }, workSeconds(state, BALANCE.digSeconds), 'working'),
-    message: 'Broke a good stone from the quarry face.'
+    message: stones === 2 ? 'Broke two good stones from the quarry face.' : 'Broke a good stone from the quarry face.'
   };
 };
 
@@ -706,27 +738,62 @@ const takeFood: ActionHandler<'takeFood'> = (state, action) => {
   return { state: { ...state, inventory: { ...state.inventory, food: moved.to }, larder: moved.from }, message: `Took 1 ${foodWord(action.item, 1)} from the larder.` };
 };
 
-const dropStone: ActionHandler<'dropStone'> = state => {
-  if (state.inventory.stone < 1) return refuse(state, 'You have no stone to set down.');
+const digOre: ActionHandler<'digOre'> = state => {
+  const blocker = digOreBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  if (isExhausted(state)) return refuse(state, TOO_TIRED_MESSAGE);
+  if (freeSpaces(state) < spaceFor('ore')) return refuse(state, FULL_BAG_MESSAGE);
+  const first = state.progress.oreFoundDay === null;
+  return {
+    state: advanceTime({
+      ...state,
+      player: tire(state, BALANCE.digEnergyCost),
+      inventory: { ...state.inventory, ore: state.inventory.ore + 1 },
+      progress: first ? { ...state.progress, oreFoundDay: state.day } : state.progress,
+      outcrop: { day: state.day, dug: BALANCE.outcropPerDay - outcropLeft(state) + 1 }
+    }, workSeconds(state, BALANCE.digSeconds), 'working'),
+    message: first ? OUTCROP_MESSAGES.first : OUTCROP_MESSAGES.more
+  };
+};
+
+/** Sets a stone or an ore down, joining a pile of the same thing nearby. */
+function setDown(state: GameState, item: 'stone' | 'ore'): GameState {
   const { x, y } = state.player;
-  const nearby = state.stonePiles.find(pile => pile.area === state.area && Math.hypot(pile.x - x, pile.y - y) <= BALANCE.pileMergeRadius);
+  const nearby = state.stonePiles.find(pile => pile.item === item && pile.area === state.area && Math.hypot(pile.x - x, pile.y - y) <= BALANCE.pileMergeRadius);
   const stonePiles = nearby
     ? state.stonePiles.map(pile => pile === nearby ? { ...pile, count: pile.count + 1 } : pile)
-    : [...state.stonePiles, { id: `pile-${state.area}-${state.day}-${Math.round(x * 10)}-${Math.round(y * 10)}`, x, y, count: 1, area: state.area }];
-  return { state: { ...state, inventory: { ...state.inventory, stone: state.inventory.stone - 1 }, stonePiles }, message: 'Set down one stone.' };
+    : [...state.stonePiles, { id: `${item === 'ore' ? 'ore-' : ''}pile-${state.area}-${state.day}-${Math.round(x * 10)}-${Math.round(y * 10)}`, x, y, count: 1, area: state.area, item }];
+  return { ...state, inventory: { ...state.inventory, [item]: state.inventory[item] - 1 }, stonePiles };
+}
+
+const offerPony: ActionHandler<'offerPony'> = state => {
+  const blocker = ponyOfferBlocker(state);
+  const offered = blocker ? null : offerToPony(state);
+  if (!offered) return refuse(state, blocker ?? 'The pony would take an apple or vegetables.');
+  return { state: advanceTime(offered.state, workSeconds(state, BALANCE.gatherSeconds), 'working'), message: offered.message };
+};
+
+const dropOre: ActionHandler<'dropOre'> = state => {
+  if (state.inventory.ore < 1) return refuse(state, 'You have no ore to set down.');
+  return { state: setDown(state, 'ore'), message: 'Set down one ore.' };
+};
+
+const dropStone: ActionHandler<'dropStone'> = state => {
+  if (state.inventory.stone < 1) return refuse(state, 'You have no stone to set down.');
+  return { state: setDown(state, 'stone'), message: 'Set down one stone.' };
 };
 
 const pickUpStone: ActionHandler<'pickUpStone'> = (state, action) => {
   const pile = state.stonePiles.find(item => item.id === action.pileId && item.area === state.area);
   if (!pile) return refuse(state, 'There is no stone pile within reach.');
   if (!near(state.player.x, state.player.y, pile.x, pile.y)) return refuse(state, 'Move closer to the stones.');
-  if (freeSpaces(state) < spaceFor('stone')) return refuse(state, FULL_BAG_MESSAGE);
+  if (freeSpaces(state) < spaceFor(pile.item)) return refuse(state, FULL_BAG_MESSAGE);
   const stonePiles = state.stonePiles
     .map(item => item === pile ? { ...item, count: item.count - 1 } : item)
     .filter(item => item.count > 0);
   return {
-    state: advanceTime({ ...state, inventory: { ...state.inventory, stone: state.inventory.stone + 1 }, stonePiles }, BALANCE.pickUpSeconds, 'resting'),
-    message: 'Picked up a stone.'
+    state: advanceTime({ ...state, inventory: { ...state.inventory, [pile.item]: state.inventory[pile.item] + 1 }, stonePiles }, BALANCE.pickUpSeconds, 'resting'),
+    message: pile.item === 'ore' ? 'Picked up the ore.' : 'Picked up a stone.'
   };
 };
 
@@ -1285,7 +1352,10 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
   if (blocker) return refuse(state, blocker);
   const workshop = { ...state.progress.workshop, [action.upgrade]: true };
   return {
-    state: payAndBuild(state, WORKSHOP_UPGRADES[action.upgrade].cost, { progress: { ...state.progress, workshop } }),
+    state: payAndBuild(spendOre(state, WORKSHOP_UPGRADES[action.upgrade].cost.ore ?? 0), WORKSHOP_UPGRADES[action.upgrade].cost, {
+      progress: { ...state.progress, workshop },
+      ...(action.upgrade === 'horseshoes' ? { pony: { ...state.pony, shod: state.day } } : {})
+    }),
     message: UPGRADE_MESSAGES[action.upgrade]
   };
 };
@@ -1295,7 +1365,7 @@ const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   nameAnimal,
   shearFlock,
   weave,
-  move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, buildMine, chopTree, markClearing, clearGround, visitSite,
+  move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, digOre, dropOre, offerPony, buildMine, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, dropPineNeedles, pickUpStone, burnFiber, burnPineNeedles, eat, eatTrailFood, prepareTrailFood,
   cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, rest, sleep, befriend, meetChickens, leadChickens, takeEgg, gatherApples, plantPip, pickOrchardApple, searchShed, craftPillow, craftCloak,
   makeFishingLine, fish

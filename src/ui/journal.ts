@@ -1,4 +1,4 @@
-import { homesteadPathOpen, pathOpen } from '../game/areas';
+import { hillsPathOpen, homesteadPathOpen, pathOpen } from '../game/areas';
 import { SITES, type AreaId, type GameState, type SiteId } from '../game/state';
 
 interface JournalLocation {
@@ -37,6 +37,15 @@ const REGION_DEFINITIONS = [{
   routeOpen: homesteadPathOpen,
   visibleFromLookout: false,
   visited: (state: GameState) => state.progress.homesteadFound
+}, {
+  id: 'hills' as const,
+  direction: 'Past the quarry',
+  label: 'The hills',
+  resources: ['Ore'],
+  features: ['Rocky outcrop', 'Wild pony'],
+  routeOpen: hillsPathOpen,
+  visibleFromLookout: false,
+  visited: (state: GameState) => state.progress.hillsFound
 }];
 
 function regionSummaries(state: GameState): RegionSummary[] {

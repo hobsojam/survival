@@ -3,11 +3,11 @@ import { dayHash } from './wildlife';
 
 // The names the player gives the animals that share the camp. Names are for reading: nothing here changes how the game plays.
 
-export type NameTarget = { kind: 'friend'; animal: Friend } | { kind: 'sheep'; index: number } | { kind: 'chicken'; index: number };
+export type NameTarget = { kind: 'friend'; animal: Friend } | { kind: 'sheep'; index: number } | { kind: 'chicken'; index: number } | { kind: 'pony' };
 
 export type Names = GameState['names'];
 
-export const emptyNames = (): Names => ({ bird: null, fox: null, wolf: null, sheep: [null, null, null], chickens: [null, null, null] });
+export const emptyNames = (): Names => ({ bird: null, fox: null, wolf: null, pony: null, sheep: [null, null, null], chickens: [null, null, null] });
 
 const friendIsHere = ({ companion }: GameState, animal: Friend): boolean => companion.friends[animal] !== null || companion.friend === animal;
 
@@ -18,11 +18,13 @@ export function cleanName(raw: string): string | null {
 }
 
 function isHere(state: GameState, target: NameTarget): boolean {
+  if (target.kind === 'pony') return state.pony.won !== null;
   if (target.kind === 'friend') return friendIsHere(state, target.animal);
   return target.kind === 'sheep' ? state.sheep.arrived : state.chickens.rescued;
 }
 
 export function nameOf({ names }: GameState, target: NameTarget): string | null {
+  if (target.kind === 'pony') return names.pony;
   if (target.kind === 'friend') return names[target.animal];
   return (target.kind === 'sheep' ? names.sheep : names.chickens)[target.index] ?? null;
 }
@@ -38,6 +40,7 @@ export function nameBlocker(state: GameState, target: NameTarget, raw: string): 
 /** The state with this animal called `name`. */
 export function named(state: GameState, target: NameTarget, name: string): GameState {
   const { names } = state;
+  if (target.kind === 'pony') return { ...state, names: { ...names, pony: name } };
   const placed = (flock: (string | null)[], index: number) => flock.map((old, i) => (i === index ? name : old));
   if (target.kind === 'friend') return { ...state, names: { ...names, [target.animal]: name } };
   if (target.kind === 'sheep') return { ...state, names: { ...names, sheep: placed(names.sheep, target.index) } };
@@ -48,7 +51,7 @@ export function named(state: GameState, target: NameTarget, name: string): GameS
 export const friendCalled = (state: GameState, animal: Friend, fallback: string): string => state.names[animal] ?? fallback;
 
 export const anyNamed = ({ names }: GameState): boolean =>
-  [names.bird, names.fox, names.wolf, ...names.sheep, ...names.chickens].some(name => name !== null);
+  [names.bird, names.fox, names.wolf, names.pony, ...names.sheep, ...names.chickens].some(name => name !== null);
 
 const NOTE_CHANCE = 0.1;
 
@@ -57,11 +60,13 @@ const NOTES = {
   chicken: ['{name} had opinions about the coop this morning.', '{name} followed you about for a bit, in case you were food.', '{name} got out, looked around, and got back in.'],
   bird: ['{name} was singing before it was properly light.', '{name} was waiting on the woodpile this morning.', '{name} has found a new favourite branch.'],
   fox: ['{name} watched you work for a while, then pretended not to.', '{name} slept on your boots.', '{name} came home with a leaf stuck to one ear.'],
+  pony: ['{name} was at the grass by the fire again.', '{name} stood and let you scratch the shaggy bit.', '{name} looked up when you came out, and went back to grazing.'],
   wolf: ['{name} was up before you, watching the trees.', '{name} leaned on your leg this morning, and neither of you mentioned it.', '{name} yawned at the sunrise.']
 } as const;
 
 const fellows = ({ names }: GameState): { name: string; kind: keyof typeof NOTES }[] => [
   ...(['bird', 'fox', 'wolf'] as const).flatMap(animal => { const name = names[animal]; return name ? [{ name, kind: animal }] : []; }),
+  ...(names.pony ? [{ name: names.pony, kind: 'pony' as const }] : []),
   ...names.sheep.flatMap(name => (name ? [{ name, kind: 'sheep' as const }] : [])),
   ...names.chickens.flatMap(name => (name ? [{ name, kind: 'chicken' as const }] : []))
 ];
@@ -94,6 +99,9 @@ export function rosterLine(names: readonly (string | null)[]): string {
   if (given.length === 1) return `${given[0]} lives here.`;
   return `${given.slice(0, -1).join(', ')} and ${given.at(-1)} live here.`;
 }
+
+/** Whether the pony has just been won over, between two states of the same game. */
+export const newlyWon = (before: GameState, after: GameState): boolean => before.pony.won === null && after.pony.won !== null;
 
 /** The animal that has just stayed, between two states of the same game. */
 export function newlyStayed(before: GameState, after: GameState): Friend | null {

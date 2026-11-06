@@ -3,6 +3,7 @@ import { nameOf, type NameTarget } from '../game/names';
 import type { Friend, GameState } from '../game/state';
 import { worldX, worldY } from './art';
 import type { CompanionPose } from './companionPose';
+import type { PonyPose } from './ponyPose';
 import { pickTapTarget } from './tapTarget';
 import { sceneVisuals } from './visuals';
 
@@ -12,7 +13,7 @@ import { sceneVisuals } from './visuals';
 export type DrawnFriend = CompanionPose & { animal: Friend };
 
 /** What only the running scene knows: its friends as last drawn, how long the survivor has stood still, and whether a replay is ignoring input. */
-export interface TapScene { friends: readonly DrawnFriend[]; stillSeconds: number; replaying: boolean }
+export interface TapScene { friends: readonly DrawnFriend[]; stillSeconds: number; replaying: boolean; pony?: PonyPose | null }
 const NO_SCENE: TapScene = { friends: [], stillSeconds: 0, replaying: false };
 /** Friends trail a walking survivor, so one only counts as tapped once the survivor has stopped and it has settled. */
 const SETTLED_SECONDS = 0.5;
@@ -49,13 +50,18 @@ function drawnFriends(friends: readonly DrawnFriend[]): Painted[] {
   });
 }
 
+function drawnPony({ x, y, frame: texture, facing }: PonyPose): Painted {
+  const [sprite, frame] = texture.split(':');
+  return { target: { kind: 'pony' }, sprite, frame, x: Math.round(worldX(x)), y: Math.round(worldY(y)), depth: worldY(y), facing };
+}
+
 /** The unnamed animal drawn under a tap, in tile units, or null. Anything else that can be tapped at that spot wins. */
 export function unnamedAnimalAt(state: GameState, timeMs: number, x: number, y: number, scene: TapScene = NO_SCENE): NameTarget | null {
   if (scene.replaying || state.area !== 'camp' || pickTapTarget(state, x, y).kind !== 'ground') return null;
   const flock = drawnFlock(state, timeMs).filter(animal => animal.target.kind === 'sheep' || state.chickens.rescued);
   const pixelX = worldX(x);
   const pixelY = worldY(y);
-  const under = [...flock, ...(scene.stillSeconds > SETTLED_SECONDS ? drawnFriends(scene.friends) : [])]
+  const under = [...flock, ...(scene.stillSeconds > SETTLED_SECONDS ? [...drawnFriends(scene.friends), ...(scene.pony ? [drawnPony(scene.pony)] : [])] : [])]
     .filter(animal => nameOf(state, animal.target) === null && onPicture(animal, pixelX, pixelY))
     .sort((a, b) => b.depth - a.depth);
   return under[0]?.target ?? null;

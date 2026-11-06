@@ -8,16 +8,16 @@ import { emptyFood } from '../src/game/food';
 describe('build buttons', () => {
   it('locks the hearth until the cold night is weathered', () => {
     const state = createGame();
-    state.inventory = { wood: 9, fiber: 0, stone: 3, food: emptyFood() };
+    state.inventory = { wood: 9, fiber: 0, stone: 3, ore: 0, food: emptyFood() };
     expect(buildStatus(state, 'hearth')).toBe('locked');
-    state.progress = { nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false, axeCrafted: false, quarryFound: false, homesteadFound: false, pickaxeCrafted: false, mineBuilt: false, potCrafted: false, packWoven: false, fishingLine: false, workshop: { saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false, shears: false },
+    state.progress = { nextStormDay: null, hearthUnlocked: true, lookoutRepaired: false, axeCrafted: false, quarryFound: false, homesteadFound: false, hillsFound: false, oreFoundDay: null, pickaxeCrafted: false, mineBuilt: false, potCrafted: false, packWoven: false, fishingLine: false, workshop: { saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false, shears: false, forge: false, horseshoes: false, ironPickaxe: false },
       discoveries: { basket: false, spring: false, cairn: false } };
     expect(buildStatus(state, 'hearth')).toBe('ready');
   });
 
   it('blocks the bed until there is a shelter', () => {
     const state = createGame();
-    state.inventory = { wood: 6, fiber: 2, stone: 0, food: emptyFood() };
+    state.inventory = { wood: 6, fiber: 2, stone: 0, ore: 0, food: emptyFood() };
     expect(buildStatus(state, 'bed')).toBe('needsShelter');
     state.structures.shelter = true;
     expect(buildStatus(state, 'bed')).toBe('ready');
@@ -58,7 +58,7 @@ describe('camp actions', () => {
 describe('pickaxe blocker', () => {
   it('names what is missing and clears when crafting is possible', () => {
     const state = createGame();
-    state.inventory = { wood: 2, fiber: 1, stone: 2, food: emptyFood() };
+    state.inventory = { wood: 2, fiber: 1, stone: 2, ore: 0, food: emptyFood() };
     expect(pickaxeBlocker(state)).toBe('Find the quarry first.');
     state.progress.quarryFound = true;
     expect(pickaxeBlocker(state)).toBe('Build a toolshed first.');

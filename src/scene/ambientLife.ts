@@ -15,6 +15,13 @@ import {
   BUTTERFLY_COUNT, QUARRY_BIRD_HOMES, SWALLOW_COUNT, butterfliesOut, butterflyAt, swallowAt, swallowsOut,
   LEAF_HOMES, RABBIT_FLEE_RADIUS, RABBIT_HOMES, WOLF_SPOTS, darkness, eyesAt, fireflyFrame, fireflyGlow, fireflyOffset, foxAt, foxFrame, leafAt, rabbitAt, rabbitCount, wolfCount, wolfWatch, type Point
 } from './ambient';
+import { rabbitHomes } from '../game/wildlife';
+import { ponyPoseFor, type PonyPose } from './ponyPose';
+
+/** Tiles a second the pony's picture walks: a shade quicker than the survivor, so it keeps up. */
+const PONY_SPEED = 4.2;
+/** Closer than this and it has arrived. */
+const PONY_SETTLE = 0.15;
 
 type BirdFlightKind = 'flee' | 'return' | 'forage' | 'home';
 interface Motion { from: Point; to: Point; elapsed: number; duration: number }
@@ -82,6 +89,13 @@ export class AmbientLife {
   private readonly eyes: Phaser.GameObjects.Image[];
   private readonly wolfEyes: Phaser.GameObjects.Image[];
   private readonly rabbits: Rabbit[];
+  private rabbitArea: GameState['area'] = 'camp';
+  private readonly pony: Phaser.GameObjects.Image;
+  private ponyPlace: Point | null = null;
+  private ponyArea: GameState['area'] = 'camp';
+  private ponyMoving = false;
+  /** The pony as last drawn, for a tap to land on. */
+  ponyDrawn: PonyPose | null = null;
   /** Eases toward how strongly the wolves press in, so their eyes fade rather than blink out. */
   private wolfPresence = 0;
   private readonly friends: Record<Friend, Phaser.GameObjects.Image>;
@@ -113,6 +127,7 @@ export class AmbientLife {
     this.swallows = Array.from({ length: SWALLOW_COUNT }, () => sprite(scene, 'swallow', 'fly0'));
     this.butterflies = Array.from({ length: BUTTERFLY_COUNT }, () => sprite(scene, 'butterfly', 'flap0'));
     this.fox = sprite(scene, 'fox', 'trot0');
+    this.pony = sprite(scene, 'pony', 'stand');
     this.fireflies = FIREFLY_HOMES.map(() => sprite(scene, 'firefly', 'glow0', LIGHT_DEPTH));
     this.leaves = LEAF_HOMES.map(() => sprite(scene, 'leaf', 'fall0'));
     this.eyes = EYE_SPOTS.map(() => sprite(scene, 'eyes', 'open', LIGHT_DEPTH));
@@ -134,8 +149,11 @@ export class AmbientLife {
     }
     this.updateWolves(state, dark, seconds, timeMs);
     this.updateFriend(state, seconds, timeMs);
+    this.updatePony(state, seconds, timeMs);
     if (state.area !== 'camp') {
-      for (const image of [...this.birds.map(bird => bird.image), this.fox, ...this.fireflies, ...this.leaves, ...this.rabbits.map(rabbit => rabbit.image)]) image.setVisible(false);
+      for (const image of [...this.birds.map(bird => bird.image), this.fox, ...this.fireflies, ...this.leaves]) image.setVisible(false);
+      if (state.area === 'hills') this.updateRabbits(state, dark, seconds, timeMs);
+      else for (const rabbit of this.rabbits) rabbit.image.setVisible(false);
       return;
     }
     this.updateCampLife(state, dark, seconds, timeMs);
@@ -143,9 +161,7 @@ export class AmbientLife {
 
   /** The camp's seasonal animals and effects stay hidden while the survivor is in another area. */
   private updateCampLife(state: GameState, dark: number, seconds: number, timeMs: number): void {
-    // Rabbits are out on spring days.
-    const rabbitsOut = isSpring(state.day) && dark < 0.3;
-    for (const rabbit of this.rabbits) this.updateRabbit(rabbit, state, rabbitsOut && rabbit.index < rabbitCount(state.day), seconds, timeMs);
+    this.updateRabbits(state, dark, seconds, timeMs);
     if (!this.started) this.start(dark, timeMs);
     // The birds leave for the winter.
     if (isWinter(state.day)) for (const bird of this.birds) bird.image.setVisible(false);
@@ -361,17 +377,52 @@ export class AmbientLife {
     });
   }
 
+  /** The pony's picture walks along to where its pose says it is, and snaps there when the survivor changes area. */
+  private updatePony(state: GameState, seconds: number, timeMs: number): void {
+    const moving = this.ponyMoving;
+    const pose = ponyPoseFor(state, timeMs, this.facing, moving);
+    if (!pose) {
+      this.ponyDrawn = null;
+      this.pony.setVisible(false);
+      this.ponyPlace = null;
+      return;
+    }
+    const place = this.ponyArea === state.area && this.ponyPlace ? this.ponyPlace : { x: pose.x, y: pose.y };
+    this.ponyArea = state.area;
+    const gap = Math.hypot(pose.x - place.x, pose.y - place.y);
+    const step = Math.min(gap, PONY_SPEED * seconds);
+    const x = gap > 0 ? place.x + (pose.x - place.x) / gap * step : place.x;
+    const y = gap > 0 ? place.y + (pose.y - place.y) / gap * step : place.y;
+    this.ponyMoving = gap > PONY_SETTLE;
+    this.ponyPlace = { x, y };
+    // A walking wild pony shows walking legs, though its pose is grazing.
+    const walking = this.ponyMoving && pose.frame.startsWith('pony:graze') ? `pony:walk${Math.floor(timeMs / 180) % 2}` : pose.frame;
+    const facing = gap > PONY_SETTLE ? (pose.x < place.x ? -1 : 1) : pose.facing;
+    this.ponyDrawn = { x, y, frame: walking, facing };
+    this.show(this.pony, x, y, walking, facing);
+  }
+
+  /** Rabbits are out on spring days, in the meadow and on the hills. A run begun in one place doesn't carry to the other. */
+  private updateRabbits(state: GameState, dark: number, seconds: number, timeMs: number): void {
+    if (state.area !== this.rabbitArea) {
+      this.rabbitArea = state.area;
+      for (const rabbit of this.rabbits) Object.assign(rabbit, { run: null, hiddenSeconds: 0, away: false });
+    }
+    const rabbitsOut = isSpring(state.day) && dark < 0.3;
+    for (const rabbit of this.rabbits) this.updateRabbit(rabbit, state, rabbitsOut && rabbit.index < rabbitCount(state.day), seconds, timeMs);
+  }
+
   /** A rabbit hops about near home, bolts from the survivor, hides, and comes back once they have gone. */
   private updateRabbit(rabbit: Rabbit, state: GameState, out: boolean, seconds: number, timeMs: number): void {
     const { image } = rabbit;
     const player = state.player;
-    if (!out && !rabbit.run && !this.startRabbitDuskRun(rabbit, timeMs)) return;
+    if (!out && !rabbit.run && !this.startRabbitDuskRun(rabbit, state, timeMs)) return;
     if (rabbit.run) {
       this.advanceRabbitRun(rabbit, rabbit.run, seconds);
       return;
     }
-    if (rabbit.away && !this.returnRabbit(rabbit, player, seconds)) return;
-    const pose = rabbitAt(rabbit.index, timeMs);
+    if (rabbit.away && !this.returnRabbit(rabbit, state, seconds)) return;
+    const pose = rabbitAt(rabbit.index, timeMs, rabbitHomes(state.area));
     const away = Math.hypot(pose.x - player.x, pose.y - player.y);
     if (away < RABBIT_FLEE_RADIUS) {
       const dx = away > 0 ? (pose.x - player.x) / away : 1;
@@ -383,9 +434,9 @@ export class AmbientLife {
   }
 
   /** At dusk a visible rabbit hops away from home; one already hidden stays hidden. */
-  private startRabbitDuskRun(rabbit: Rabbit, timeMs: number): boolean {
+  private startRabbitDuskRun(rabbit: Rabbit, state: GameState, timeMs: number): boolean {
     if (!rabbit.image.visible || rabbit.away) { rabbit.image.setVisible(false); return false; }
-    const pose = rabbitAt(rabbit.index, timeMs);
+    const pose = rabbitAt(rabbit.index, timeMs, rabbitHomes(state.area));
     const dx = pose.x >= BALANCE.campX ? 1 : -1;
     rabbit.run = { from: pose, to: { x: pose.x + dx * 4, y: pose.y + 1 }, elapsed: 0, duration: RABBIT_RUN_SECONDS };
     return true;
@@ -401,9 +452,9 @@ export class AmbientLife {
   }
 
   /** Let a hidden rabbit reappear only after its rest and after the survivor moves away. */
-  private returnRabbit(rabbit: Rabbit, player: Point, seconds: number): boolean {
+  private returnRabbit(rabbit: Rabbit, { area, player }: GameState, seconds: number): boolean {
     rabbit.hiddenSeconds = Math.max(0, rabbit.hiddenSeconds - seconds);
-    const home = RABBIT_HOMES[rabbit.index];
+    const home = rabbitHomes(area)[rabbit.index];
     if (rabbit.hiddenSeconds > 0 || Math.hypot(home.x - player.x, home.y - player.y) <= RABBIT_RETURN_DISTANCE) {
       rabbit.image.setVisible(false);
       return false;

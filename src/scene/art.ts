@@ -14,7 +14,7 @@ export const worldY = (y: number) => (y + 0.5) * TILE;
 /** Draws the terrain for the state's current terrain key and returns every object it added. */
 export function drawTerrain(scene: Phaser.Scene, state: GameState): Phaser.GameObjects.GameObject[] {
   const key = terrainKey(state);
-  const camp = key !== 'quarry';
+  const camp = key !== 'quarry' && key !== 'quarry-hills-open' && key !== 'hills';
   const map = buildMap(camp ? state.nodes : [], key, season(state.day), state.clearing);
   const canvas = document.createElement('canvas');
   canvas.width = BALANCE.mapWidth * TILE;

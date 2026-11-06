@@ -3,6 +3,7 @@ import type { PaletteKey } from './palette';
 import { BALANCE } from '../game/state';
 import { CLEARING_STEPS, STEP_IDS, clearingKey, clearingReach, type StepId } from '../game/clearing';
 import { CAMP_OPEN_PATHS, CAMP_PATHS, mixHash, pathDistance, type PathRoute } from '../scene/mapGeometry';
+import { hillFold, hillRockDepth } from '../scene/hillsGeometry';
 import { FACE_HEIGHT, FLOOR_EDGE_IN, FLOOR_EDGE_OUT, faceBottom, floorDepth, quarryGroundAt, trackDistance, trackEdgeOut, trackHalfWidth, type QuarryGround } from '../scene/quarryGeometry';
 
 type Grid = string[][];
@@ -258,6 +259,51 @@ export function quarryGroundTile(x: number, y: number): string {
 }
 // Every quarry tile is made up front so they are registered as textures with the rest.
 for (let y = 0; y < BALANCE.mapHeight; y++) for (let x = 0; x < BALANCE.mapWidth; x++) quarryGroundTile(x, y);
+
+const hillLegend: Record<string, PaletteKey> = { a: 'grass1', b: 'grass2', c: 'grass3', d: 'grass4', r: 'stone1', s: 'stone2', t: 'stone3', u: 'stone4' };
+const hillSprites = new Map<string, string>();
+/** The hills' grain repeats, so most of the open slope can share a few tiles. */
+const HILL_GRAIN = 48;
+const hillRoll = (px: number, py: number, salt: number): number => roll(px % HILL_GRAIN, py % HILL_GRAIN, salt);
+
+/** A pixel of hill grass: the fold's light, dithered between neighbouring greens so slopes melt into each other. */
+function hillGrassPixel(px: number, py: number): string {
+  const fold = hillFold(centre(px), centre(py));
+  const n = hillRoll(px, py, 73);
+  if (n < 3) return fold > 0 ? 'd' : 'b';
+  const lift = fold + (hillRoll(px, py, 75) - 50) / 160;
+  if (lift > 0.35) return 'c';
+  if (lift > -0.35) return hillRoll(px, py, 77) < (lift + 0.35) * 143 ? 'c' : 'b';
+  return lift < -0.75 && hillRoll(px, py, 79) < 45 ? 'a' : 'b';
+}
+
+function hillRockPixel(px: number, py: number): string {
+  const n = hillRoll(Math.floor(px / 3), Math.floor(py / 2), 81);
+  if (n < 7) return 'r';
+  if (n < 82) return 's';
+  return n < 98 ? 't' : 'u';
+}
+
+/** The hills' ground tile at (x, y), cut pixel by pixel from the folds and the rock. Its grass goes to snow with the rest in winter. */
+export function hillGroundTile(x: number, y: number): string {
+  const g = blank(16, 16);
+  for (let py = 0; py < 16; py++) for (let px = 0; px < 16; px++) {
+    const wx = x * 16 + px;
+    const wy = y * 16 + py;
+    const depth = hillRockDepth(centre(wx), centre(wy));
+    const rock = depth < 0.88 || (depth < 1 && hillRoll(wx, wy, 83) < (1 - depth) * 830);
+    g[py][px] = rock ? hillRockPixel(wx, wy) : hillGrassPixel(wx, wy);
+  }
+  const shape = g.map(row => row.join('')).join('/');
+  let name = hillSprites.get(shape);
+  if (!name) {
+    name = `hillTile${hillSprites.size}`;
+    addTerrainSprite(name, sprite(g, hillLegend));
+    hillSprites.set(shape, name);
+  }
+  return name;
+}
+for (let y = 0; y < BALANCE.mapHeight; y++) for (let x = 0; x < BALANCE.mapWidth; x++) hillGroundTile(x, y);
 
 const decalLegend = { a: 'grass1', b: 'grass3', c: 'grass4', d: 'flower0', e: 'flower1', f: 'flower2', g: 'flower3', h: 'flower4', i: 'stone1', j: 'stone2', k: 'stone3', l: 'stone4', m: 'wood0', n: 'wood2', o: 'wood3', p: 'earth1', q: 'earth3', r: 'leaf2', s: 'leaf4', t: 'shadow', u: 'stone0' } as const;
 function addDecal(name: string, draw: (g: Grid) => void, w = 8, h = 8): void {

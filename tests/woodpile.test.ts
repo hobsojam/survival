@@ -147,7 +147,7 @@ describe('using stored wood', () => {
 
   it('counts for the lookout, the cooking pot and clearing the ground', () => {
     const lookout = { ...stocked(0, 4), progress: { ...createGame().progress, hearthUnlocked: true },
-      player: { ...createGame().player, x: LOOKOUT.x, y: LOOKOUT.y + 1 }, inventory: { wood: 0, fiber: 2, stone: 2, food: createGame().inventory.food } };
+      player: { ...createGame().player, x: LOOKOUT.x, y: LOOKOUT.y + 1 }, inventory: { wood: 0, fiber: 2, stone: 2, ore: 0, food: createGame().inventory.food } };
     expect(lookoutRepairBlocker(lookout)).toBeNull();
     expect(lookoutRepairBlocker({ ...lookout, storedWood: 3 })).toBe('Need 4 wood to repair the lookout.');
 

@@ -6,6 +6,7 @@ const FRIEND_WORDS: Record<Friend, string> = { bird: 'The little bird', fox: 'Th
 
 /** What the naming box says about the animal it's asking about. */
 export function namePromptCopy(target: NameTarget): { title: string } {
+  if (target.kind === 'pony') return { title: 'What will you call the pony?' };
   if (target.kind === 'friend') return { title: `${FRIEND_WORDS[target.animal]} has stayed. What will you call it?` };
   return { title: `What will you call this ${target.kind === 'sheep' ? 'sheep' : 'hen'}?` };
 }

@@ -252,7 +252,7 @@ describe('local save', () => {
   it('round-trips loose piles, the stone pile and stored stone', () => {
     const storage = new MemoryStorage();
     const state = createGame();
-    state.stonePiles = [{ id: 'pile-1-50-50', x: 5, y: 5, count: 3, area: 'camp' }];
+    state.stonePiles = [{ id: 'pile-1-50-50', x: 5, y: 5, count: 3, area: 'camp', item: 'stone' }];
     state.structures.stonePile = true;
     state.storedStone = 4;
     expect(saveGame(storage, state)).toEqual({ ok: true });
@@ -270,7 +270,7 @@ describe('local save', () => {
     state.progress.pickaxeCrafted = true;
     state.quarryReadyDay = 3;
     state.rubbleReadyDay = 5;
-    state.stonePiles = [{ id: 'pile-2-12-12', x: 12, y: 12, count: 2, area: 'quarry' }];
+    state.stonePiles = [{ id: 'pile-2-12-12', x: 12, y: 12, count: 2, area: 'quarry', item: 'stone' }];
     expect(saveGame(storage, state)).toEqual({ ok: true });
     expect(loadGame(storage)).toEqual({ kind: 'loaded', state });
   });
@@ -355,9 +355,9 @@ describe('local save', () => {
 
   it('rejects bad loose piles and stored stone', () => {
     const variants: ((state: ReturnType<typeof createGame>) => void)[] = [
-      state => { state.stonePiles = [{ id: 'p', x: 5, y: 5, count: 0, area: 'camp' }]; },
-      state => { state.stonePiles = [{ id: 'p', x: BALANCE.mapWidth + 1, y: 5, count: 1, area: 'camp' }]; },
-      state => { state.stonePiles = [{ id: 'p', x: 5, y: 5, count: 1.5, area: 'camp' }]; },
+      state => { state.stonePiles = [{ id: 'p', x: 5, y: 5, count: 0, area: 'camp', item: 'stone' }]; },
+      state => { state.stonePiles = [{ id: 'p', x: BALANCE.mapWidth + 1, y: 5, count: 1, area: 'camp', item: 'stone' }]; },
+      state => { state.stonePiles = [{ id: 'p', x: 5, y: 5, count: 1.5, area: 'camp', item: 'stone' }]; },
       state => { state.structures.stonePile = true; state.storedStone = 13; },
       state => { state.storedStone = 1; },
       state => { state.structures.stonePile = true; state.storedStone = 0.5; }

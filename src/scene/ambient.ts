@@ -139,11 +139,11 @@ const RABBIT_CYCLE = 6;
 export const rabbitCount = (day: number): number => 2 + Math.floor(hash(day + 31) * 2);
 
 /** One rabbit's 6 s round: it sits for 2 s, nibbles for 2 s, then hops to the next of four spots near home. */
-export function rabbitAt(index: number, timeMs: number): { x: number; y: number; frame: string; facing: 1 | -1 } {
+export function rabbitAt(index: number, timeMs: number, homes: readonly Point[] = RABBIT_HOMES): { x: number; y: number; frame: string; facing: 1 | -1 } {
   const seconds = timeMs / 1000 + index * 1.9;
   const cycle = Math.floor(seconds / RABBIT_CYCLE);
   const phase = seconds - cycle * RABBIT_CYCLE;
-  const home = RABBIT_HOMES[index];
+  const home = homes[index];
   const from = RABBIT_SPOTS[cycle % 4];
   const to = RABBIT_SPOTS[(cycle + 1) % 4];
   const facing = to.x < from.x ? -1 : 1;

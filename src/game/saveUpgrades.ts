@@ -1,5 +1,6 @@
 import { emptyField } from './field';
 import { emptyOrchard } from './orchard';
+import { emptyPony } from './pony';
 
 // Bringing an older save up to date as it loads. Every change to the saved shape bumps SAVE_VERSION by one and adds
 // the step that upgrades a save from the version before: SAVE_UPGRADES[23] turns a version 23 save into version 24.
@@ -7,7 +8,7 @@ import { emptyOrchard } from './orchard';
 // anything the player had. Loading runs every step a save needs, in order, then validates the result as usual.
 
 /** The saved shape's version. Bump it by one with every change to the shape, and add its upgrade step below. */
-export const SAVE_VERSION = 36;
+export const SAVE_VERSION = 37;
 
 /** The oldest save that can still be brought up to date: earlier formats were never upgraded and don't load. */
 export const OLDEST_UPGRADABLE_VERSION = 23;
@@ -137,6 +138,16 @@ export const SAVE_UPGRADES: Readonly<Record<number, SaveUpgrade>> = {
   35: old => {
     const state = old as Upgradable & { structures: Upgradable };
     return { ...state, structures: { ...state.structures, orchard: false }, orchard: emptyOrchard() };
+  },
+  // Version 37: the hills, ore, the forge and the pony. An older camp has none of them, and any piles it left are stone.
+  36: old => {
+    const state = old as Upgradable & { inventory: Upgradable; progress: Upgradable & { workshop: Upgradable }; names: Upgradable; stonePiles: Upgradable[] };
+    return { ...state,
+      inventory: { ...state.inventory, ore: 0 },
+      progress: { ...state.progress, hillsFound: false, oreFoundDay: null, workshop: { ...state.progress.workshop, forge: false, horseshoes: false, ironPickaxe: false } },
+      names: { ...state.names, pony: null },
+      stonePiles: state.stonePiles.map(pile => ({ ...pile, item: 'stone' })),
+      storedOre: 0, outcrop: { day: 0, dug: 0 }, pony: emptyPony() };
   }
 };
 
