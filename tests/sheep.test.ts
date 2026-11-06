@@ -321,11 +321,15 @@ describe('the journal', () => {
     expect(recordJournal(before, applyAction(before, action).state, action).state.journal.map(entry => entry.id)).not.toContain('shearing');
   });
 
-  it('leaves no blank for it until the pen stands', () => {
+  it('leaves no blank for it until the pen stands and there are shears', () => {
     const base = createGame();
     const spring = { ...base, day: 21 };
     const without = journalPageView(spring, 2);
-    const withPen = journalPageView({ ...spring, structures: { ...spring.structures, sheepPen: true } }, 2);
-    expect(withPen.blanks).toBe(without.blanks + 1);
+    const penned = { ...spring, structures: { ...spring.structures, sheepPen: true } };
+    expect(journalPageView(penned, 2).blanks).toBe(without.blanks);
+    const shears = { ...penned, progress: { ...penned.progress, workshop: { ...penned.progress.workshop, shears: true } } };
+    expect(journalPageView(shears, 2).blanks).toBe(without.blanks + 1);
+    const noPen = { ...spring, progress: shears.progress };
+    expect(journalPageView(noPen, 2).blanks).toBe(without.blanks);
   });
 });

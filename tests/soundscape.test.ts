@@ -254,3 +254,20 @@ describe('ambient sounds over time', () => {
     expect(context.created).toEqual(created);
   });
 });
+
+describe('up on the hills', () => {
+  it("can't hear the camp's fire, however close the survivor stands to the same spot on the map", () => {
+    const { sound, fire } = setup();
+    sound.start();
+    sound.update(world({ area: 'hills', fireFuel: 300 }));
+    expect(fire()).toBe(0);
+  });
+
+  it("can't hear the wolves at camp either", () => {
+    const { sound, wolves } = setup();
+    sound.start();
+    const weathered = { ...createGame().progress, hearthUnlocked: true, nextStormDay: null };
+    sound.update(world({ area: 'hills', day: 12, timeOfDay: nightStart(12) + 10, fireFuel: 0, progress: weathered }));
+    expect(wolves()).toBe(0);
+  });
+});

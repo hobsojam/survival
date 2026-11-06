@@ -21,7 +21,7 @@ import { forecastFireCheck, logsForColdNight } from '../game/forecast';
 import type { LoadResult } from '../game/save';
 import { CLEARING_STEPS, STEP_IDS, clearGroundBlocker, markBlocker, nextStep, roomLine, stepDepth, stepGround, stepWhere, type Side } from '../game/clearing';
 import { KEEPSAKES_NEEDED, cloakBlocker, keepsakeStock, pillowBlocker } from '../game/companion';
-import { DISHES, DISH_ORDER, dishBlocker, foodWord, ingredientList, potBlocker, type DishId } from '../game/cooking';
+import { DISHES, DISH_ORDER, cookBlocker, dishBlocker, foodWord, ingredientList, potBlocker, type DishId } from '../game/cooking';
 import { fishingLineBlocker } from '../game/fishing';
 import { DECORATION_COSTS, decorationBlocker, type DecorationChoice } from '../game/rules';
 
@@ -398,6 +398,12 @@ export interface DishView { dish: Exclude<DishId, 'berries'>; name: string; icon
 
 /** Dishes offered only while their one ingredient is in reach: a fish, a rabbit, and a loaf from flour. */
 const OFFERED_WHEN_HELD: Partial<Record<DishId, FoodItem>> = { fish: 'fish', rabbit: 'rabbit', loaf: 'flour', omelette: 'egg', bakedApple: 'apple', eggOnBread: 'egg' };
+
+/** The camp panel's toasted berry: greyed out, saying why, when it can't be cooked. */
+export function cookBerryView(state: GameState): { disabled: boolean; title: string } {
+  const blocker = cookBlocker(state);
+  return { disabled: Boolean(blocker), title: blocker ?? 'Toast a berry by the fire.' };
+}
 
 /** The camp panel's dishes beyond a toasted berry: a fish whenever there is one, a loaf whenever there is flour, and the pot dishes once the pot is made. Each says why it can't be cooked yet. */
 export function nightDishesView(state: GameState): DishView[] {

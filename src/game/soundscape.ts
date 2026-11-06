@@ -16,6 +16,9 @@ function birdAmbienceVolume(state: GameState, isNight: boolean, inQuarry: boolea
   return 0.48;
 }
 
+/** Beyond the camp's earshot: the quarry and the hills hear nothing of its fire or the wolves around it. */
+const outOfEarshot = (state: { area?: string }): boolean => state.area === 'quarry' || state.area === 'hills';
+
 export type SoundCue = 'gather' | 'build' | 'wolfChorus';
 
 /** The browser's audio, or nothing where there is none. */
@@ -185,9 +188,9 @@ export class Soundscape {
     if (inQuarry) quarryVolume = isNight ? 0.72 : 0.48;
     this.setGain(this.birds, birdVolume);
     this.setGain(this.crickets, cricketVolume);
-    this.setGain(this.fire, !inQuarry && this.state.fireFuel > 0 ? campVolume * 0.55 : 0);
+    this.setGain(this.fire, !outOfEarshot(this.state) && this.state.fireFuel > 0 ? campVolume * 0.55 : 0);
     this.setGain(this.quarry, quarryVolume);
-    this.setGain(this.wolves, !inQuarry && wolvesClose(this.state) ? 0.5 : 0);
+    this.setGain(this.wolves, !outOfEarshot(this.state) && wolvesClose(this.state) ? 0.5 : 0);
     this.setGain(this.rain, isRaining(this.state) ? 0.35 : 0);
   }
 
@@ -285,7 +288,7 @@ export class Soundscape {
 
   private scheduleFire(): void {
     this.fireTimer = globalThis.setTimeout(() => {
-      if (this.state?.area !== 'quarry' && this.state?.area !== 'hills' && this.state?.fireFuel && this.fire && this.context?.state === 'running') this.playCrackle();
+      if (this.state && !outOfEarshot(this.state) && this.state.fireFuel && this.fire && this.context?.state === 'running') this.playCrackle();
       this.scheduleFire();
     }, 120 + Math.random() * 380);
   }
@@ -354,7 +357,7 @@ export class Soundscape {
 
   private scheduleHowl(): void {
     this.howlTimer = globalThis.setTimeout(() => {
-      if (this.state && this.state.area !== 'quarry' && wolvesClose(this.state)) this.playHowl();
+      if (this.state && !outOfEarshot(this.state) && wolvesClose(this.state)) this.playHowl();
       this.scheduleHowl();
     }, 12000 + Math.random() * 12000);
   }

@@ -24,6 +24,13 @@ describe('the year journal pages', () => {
     expect(view.blanks).toBe(4);
   });
 
+  it('keeps the shearing off the page until there are shears to do it with', () => {
+    const penned = { ...on(25), structures: { ...on(25).structures, sheepPen: true } };
+    const before = journalPageView(penned, currentPage(25)).blanks;
+    const shears = { ...penned, progress: { ...penned.progress, workshop: { ...penned.progress.workshop, shears: true } } };
+    expect(journalPageView(shears, currentPage(25)).blanks).toBe(before + 1);
+  });
+
   it('leafs back no further than the first page and no further forward than today', () => {
     const state = on(45);
     expect(journalPageView(state, 0).hasPrevious).toBe(false);
