@@ -150,6 +150,7 @@ export class GameScene extends Phaser.Scene {
 
   /** E uses whatever is in reach, as a tap on it would. */
   private pressUse(): void {
+    if (this.doorFading()) return;
     const action = useKeyAction(this.state);
     if (action) this.perform(action);
     else {
@@ -159,6 +160,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private pressChop(): void {
+    if (this.doorFading()) return;
     const tree = closestTree(this.state);
     if (tree) this.perform({ type: 'chopTree', treeId: tree.id });
     else {
@@ -214,7 +216,7 @@ export class GameScene extends Phaser.Scene {
 
   perform(requested: GameAction, announce = true): void {
     // The sidebar's buttons still click while the game is paused; nothing should happen.
-    if (this.scene.isPaused() || this.nightWatch.running || this.doorFade.running(this.time.now)) return;
+    if (this.scene.isPaused() || this.nightWatch.running || this.doorFading()) return;
     // A visit to the frozen spring with a line is a go at fishing, and fishing needs a roll of chance.
     // The keep's door means whatever it means as the survivor reaches it.
     const action = withKeepDoor(this.state, withFishing(this.state, requested, Math.random()));
@@ -252,6 +254,10 @@ export class GameScene extends Phaser.Scene {
       camera.startFollow(this.playerSprite, true, 0.09, 0.09);
       camera.centerOn(this.playerSprite.x, this.playerSprite.y);
     }
+  }
+
+  private doorFading(): boolean {
+    return this.doorFade.running(this.time.now);
   }
 
   private carryOut(action: GameAction, announce: boolean): void {
@@ -327,6 +333,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   visitNearestSite(): void {
+    if (this.doorFading()) return;
     const site = closestSite(this.state);
     if (site) this.perform({ type: 'visitSite', siteId: site.id });
     else {
@@ -354,7 +361,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleTap(pixelX: number, pixelY: number): void {
-    if (!this.tapGate() || this.doorFade.running(this.time.now)) return;
+    if (!this.tapGate() || this.doorFading()) return;
     const animal = this.unnamedAnimalUnder(pixelX, pixelY);
     if (animal) {
       this.walkTarget = undefined;

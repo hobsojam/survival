@@ -3,7 +3,8 @@ import { box, define, dot, type Grid } from './sheepSprites';
 import type { SpriteDef } from './sprites';
 
 // The stone keep as it rises, a picture for every four stones laid: footings in the grass, walls to head height with an
-// empty doorway, then taller walls with window slits and scaffolding, and at last the battlements with the scaffolding down.
+// empty doorway, then taller walls with window slits and scaffolding, then the battlements. One last picture, for the
+// last stone alone, takes the scaffolding down.
 
 const legend: Record<string, PaletteKey> = {
   a: 'stone0', b: 'stone1', c: 'stone2', d: 'stone3', e: 'stone4', k: 'shadow',
@@ -19,7 +20,7 @@ const BASE = 98;
 const CENTRE = 32;
 const FOOTINGS_DEEP = 22;
 /** How high the walls stand at each step, in pixels. */
-const WALL_HEIGHT = [0, 4, 8, 14, 20, 26, 32, 40, 48, 56, 64, 72, 80, 84, 90, 94];
+const WALL_HEIGHT = [0, 4, 8, 14, 20, 26, 32, 40, 48, 56, 64, 72, 80, 84, 90, 94, 94];
 const LAST_STEP = WALL_HEIGHT.length - 1;
 const HEAD_HEIGHT_STEP = 6;
 const FIRST_SCAFFOLD_STEP = 3;

@@ -14,6 +14,7 @@ import { keepFrame, sceneVisuals } from '../src/scene/visuals';
 import { STEP_IDS, placeBranches } from '../src/game/clearing';
 import { KEEP_DOOR_AT, KEEP_SITE, KEEP_STONES, hangDoorBlocker, inKeep, keepNews, layStoneBlocker, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor, type KeepState } from '../src/game/keep';
 import { HILLS_EXIT, OUTCROP_SITE } from '../src/game/hills';
+import { coldNightMessage, dawnEffect } from '../src/game/coldNight';
 import { isAtHome } from '../src/game/home';
 import { alarmAfter } from '../src/game/companion';
 import { isWarmRestHere } from '../src/game/sickness';
@@ -334,6 +335,25 @@ describe('a night in the keep', () => {
     expect(state.sickness.cared).toBe(1);
   });
 
+  it('is as safe as the house on a cold night still to come, but does not count as weathering it', () => {
+    const before = inFinishedKeep({ fireFuel: 0, player: { energy: 60 }, progress: { ...byKeep().progress, nextStormDay: 5, hearthUnlocked: false } });
+    const action = { type: 'sleep' } as const;
+    const { state } = sleep(before);
+    expect(state.player.energy).toBe(100);
+    expect(state.timeOfDay).toBeLessThan(1);
+    expect(state.progress.hearthUnlocked).toBe(false);
+    expect(state.progress.nextStormDay).toBe(5 + BALANCE.coldNightRetryDays);
+    expect(coldNightMessage(before, state)).toBe(`You slept through the cold night in the keep. Another comes on day ${state.progress.nextStormDay}.`);
+    expect(dawnEffect(before, state)).toBeNull();
+    expect(recordJournal(before, state, action).state.journal.some(entry => entry.id === 'coldFront')).toBe(false);
+  });
+
+  it('never calls a night in the keep sleeping out without a fire', () => {
+    const before = inFinishedKeep({ day: 32, fireFuel: 0 });
+    const action = { type: 'sleep' } as const;
+    expect(recordJournal(before, sleep(before).state, action).state.journal.some(entry => entry.id === 'warmSleep')).toBe(false);
+  });
+
   it('does not count as home', () => {
     const before = inFinishedKeep();
     expect(isAtHome(before)).toBe(false);
@@ -342,9 +362,11 @@ describe('a night in the keep', () => {
   });
 
   it('leaves camp as a night out would', () => {
-    const before = inFinishedKeep({ fireFuel: 40 });
+    const before = inFinishedKeep({ fireFuel: 400 });
     const slept = sleep(before).state;
-    const out = advanceTime(away(before), 400 - NIGHT, 'resting');
+    const out = advanceTime(away(before), BALANCE.daySeconds - NIGHT, 'resting');
+    expect(slept.fireFuel).toBeGreaterThan(0);
+    expect(slept.fireFuel).toBeLessThan(400);
     expect(slept.fireFuel).toBe(out.fireFuel);
     expect(slept.fireplaceFuel).toBe(out.fireplaceFuel);
     expect(slept.storedWood).toBe(out.storedWood);
@@ -442,14 +464,14 @@ describe('the keep on the map', () => {
     expect(keepFrame(byKeep({ day: WINTER }))).toBe('keep:0s');
   });
 
-  it.each([[1, 'keep:1'], [4, 'keep:1'], [5, 'keep:2'], [24, 'keep:6'], [25, 'keep:7d'], [60, 'keep:15d']])('stones %i draw frame %s', (stones, frame) => {
+  it.each([[1, 'keep:1'], [4, 'keep:1'], [5, 'keep:2'], [24, 'keep:6'], [25, 'keep:7d'], [56, 'keep:14d'], [57, 'keep:15d'], [59, 'keep:15d'], [60, 'keep:16d']])('stones %i draw frame %s', (stones, frame) => {
     expect(keepFrame(stage(stones, { day: AUTUMN }))).toBe(frame);
   });
 
   it('adds the door at 24 stones and snow in winter', () => {
     expect(keepFrame(stage(24, { keep: { ...raised(24), door: true } }))).toBe('keep:6d');
     expect(keepFrame(stage(24, { day: WINTER }))).toBe('keep:6s');
-    expect(keepFrame(stage(60, { day: WINTER }))).toBe('keep:15ds');
+    expect(keepFrame(stage(60, { day: WINTER }))).toBe('keep:16ds');
   });
 
   it('has a frame for every state the keep can be in', () => {
@@ -471,7 +493,9 @@ describe('the keep on the map', () => {
 
   it('takes the scaffolding down with the last stone', () => {
     const wood = (frame: string): number => sprites.keep.frames[frame].join('').replaceAll(/[^tu]/g, '').length;
-    expect(wood('14d')).toBeGreaterThan(wood('15d') + 20);
+    expect(wood('15d')).toBeGreaterThan(20);
+    expect(wood('16d')).toBe(0);
+    expect(keepFrame(stage(59))).not.toBe(keepFrame(stage(60)));
   });
 
   it('keeps the same picture size, with its foot at the door', () => {
@@ -534,10 +558,16 @@ describe('the keep on the map', () => {
     expect(hasArrived(byKeep({ hinges: true, keep: raised(60), player: { x: KEEP_SITE.x + 2, y: KEEP_SITE.y } }), target)).toBe(true);
   });
 
-  it('only the footings themselves take a tap while the walls are low', () => {
-    expect(pickTapTarget(stage(4), KEEP_SITE.x, KEEP_SITE.y - 5).kind).toBe('ground');
-    expect(pickTapTarget(stage(4), KEEP_SITE.x, KEEP_SITE.y).kind).toBe('keepSite');
-    expect(pickTapTarget(stage(12), KEEP_SITE.x, KEEP_SITE.y - 2).kind).toBe('keepSite');
+  it.each([[0, 'keepSite'], [4, 'keepSite'], [12, 'keepSite'], [24, 'keepHang']])('leaves the grass behind %i stones to walk on', (stones, kind) => {
+    const place = stones === 24 ? stage(24, { keep: raised(24) }) : stage(stones);
+    expect(pickTapTarget(place, KEEP_SITE.x + 0.5, KEEP_SITE.y - 6).kind).toBe('ground');
+    expect(pickTapTarget(place, KEEP_SITE.x + 0.5, KEEP_SITE.y - 3.5).kind).toBe('ground');
+    expect(pickTapTarget(place, KEEP_SITE.x, KEEP_SITE.y).kind).toBe(kind);
+  });
+
+  it('takes a tap anywhere on the walls as they stand', () => {
+    expect(pickTapTarget(stage(24), KEEP_SITE.x + 1.5, KEEP_SITE.y - 2).kind).toBe('keepHang');
+    expect(pickTapTarget(stage(44), KEEP_SITE.x + 1.5, KEEP_SITE.y - 3.5).kind).toBe('keepSite');
   });
 
   it('draws the pony beside the keep at night, and beside the survivor by day', () => {

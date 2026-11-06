@@ -341,6 +341,8 @@ function dawn(next: GameState, home: boolean): void {
     return;
   }
   next.progress = { ...next.progress, nextStormDay: next.day + BALANCE.coldNightRetryDays - 1, hearthUnlocked: false };
+  // Safe in the keep, a night away from the fire costs nothing; the camp's test simply comes again.
+  if (inKeep(next)) return;
   next.player.energy = Math.min(next.player.energy, BALANCE.coldNightFailureEnergy);
   next.timeOfDay = BALANCE.coldNightFailureMorningLoss;
 }

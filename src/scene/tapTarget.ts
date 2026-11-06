@@ -6,8 +6,8 @@ import { sprites } from '../art/sprites';
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, hillsPathOpen, pathOpen } from '../game/areas';
 import { wildPonyAt } from '../game/pony';
 import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, outcropLeft } from '../game/hills';
-import { KEEP_SITE, keepFinished, keepNeedsDoor, keepOpen } from '../game/keep';
-import { keepStep } from './visuals';
+import { KEEP_SITE, keepFinished, keepNeedsDoor } from '../game/keep';
+import { keepFrame } from './visuals';
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
 import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
 import { ORCHARD_SPOTS, spotAction, treeStage } from '../game/orchard';
@@ -53,13 +53,16 @@ export function nextWalk(_current: TapTarget | undefined, event: WalkEvent): Tap
 }
 
 /** How far a tap is from a target, in tiles. Anywhere on tall art (trees, the lookout) counts as within the hit radius. */
-function tapDistance(target: TapTarget, sprite: string | undefined, x: number, y: number): number {
+function tapDistance(target: TapTarget, sprite: string | undefined, x: number, y: number, frame?: string): number {
   const fromTile = distance(target.x, target.y, x, y);
   if (!sprite) return fromTile;
-  const { size, anchor } = sprites[sprite];
+  const { size, anchor, frames } = sprites[sprite];
   const left = target.x - anchor[0] / TILE_PIXELS;
+  // A picture that doesn't fill its canvas counts only from its own top row, so the grass above low walls stays grass.
+  const firstRow = frame ? Math.max(0, frames[frame].findIndex(row => /[^.]/.test(row))) : 0;
+  const artTop = target.y - (anchor[1] - firstRow) / TILE_PIXELS;
   const top = target.y - anchor[1] / TILE_PIXELS;
-  const onArt = x >= left && x <= left + size[0] / TILE_PIXELS && y >= top && y <= top + size[1] / TILE_PIXELS;
+  const onArt = x >= left && x <= left + size[0] / TILE_PIXELS && y >= artTop && y <= top + size[1] / TILE_PIXELS;
   // On the art, rank by distance from its middle so a pile at a tree's foot still wins a tap on itself.
   if (!onArt) return fromTile;
   const fromMiddle = distance(left + size[0] / TILE_PIXELS / 2, top + size[1] / TILE_PIXELS / 2, x, y);
@@ -76,21 +79,21 @@ function orchardTargets(state: GameState): { target: TapTarget; sprite?: string 
   });
 }
 
-/** The keep's one spot: what it asks for now. The tower can be tapped anywhere on it once it has walls; the low footings only at their foot. */
-function keepTargets(state: GameState): { target: TapTarget; sprite?: string }[] {
-  if (!keepOpen(state)) return [];
+/** The keep's one spot: what it asks for now. It can be tapped anywhere on the picture as it stands. */
+function keepTargets(state: GameState): { target: TapTarget; sprite?: string; frame?: string }[] {
+  const shown = keepFrame(state);
+  if (!shown) return [];
   let kind: 'keepSite' | 'keepHang' | 'keepDoor' = 'keepSite';
   if (keepFinished(state)) kind = 'keepDoor';
   else if (keepNeedsDoor(state)) kind = 'keepHang';
-  const target: TapTarget = { kind, ...KEEP_SITE };
-  return keepStep(state.keep.stones) >= 3 ? [{ target, sprite: 'keep' }] : [{ target }];
+  return [{ target: { kind, ...KEEP_SITE }, sprite: 'keep', frame: shown.split(':')[1] }];
 }
 
 /** The closest interactive thing near the tap, or the tapped ground. */
 export function pickTapTarget(state: GameState, x: number, y: number): TapTarget {
   const piles = state.stonePiles.filter(pile => pile.area === state.area)
     .map(pile => ({ target: { kind: 'pile' as const, id: pile.id, x: pile.x, y: pile.y } }));
-  let candidates: { target: TapTarget; sprite?: string }[];
+  let candidates: { target: TapTarget; sprite?: string; frame?: string }[];
   if (state.area === 'quarry') {
     candidates = [...piles,
       { target: { kind: 'quarry', x: QUARRY_SITE.x, y: QUARRY_SITE.y }, sprite: 'quarry' },
@@ -125,7 +128,7 @@ export function pickTapTarget(state: GameState, x: number, y: number): TapTarget
     ];
   }
   const hit = candidates
-    .map(({ target, sprite }) => ({ target, away: tapDistance(target, sprite, x, y) }))
+    .map(({ target, sprite, frame }) => ({ target, away: tapDistance(target, sprite, x, y, frame) }))
     .filter(({ away }) => away <= TAP_HIT_RADIUS)
     .sort((a, b) => a.away - b.away)[0];
   return hit?.target ?? { kind: 'ground', x: clamp(x, BALANCE.mapWidth - 1), y: clamp(y, BALANCE.mapHeight - 1) };

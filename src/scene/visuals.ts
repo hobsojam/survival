@@ -11,7 +11,7 @@ import { rainWindow } from '../game/rain';
 import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 import { OUTCROP_SITE, outcropLeft } from '../game/hills';
-import { KEEP_SITE, keepFinished, keepOpen } from '../game/keep';
+import { KEEP_SITE, KEEP_STONES, keepFinished, keepOpen } from '../game/keep';
 import { markedTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
 import { fireplaceBurning, woodStoreCapacity } from '../game/home';
@@ -39,8 +39,8 @@ export interface SceneVisual {
   depth: number;
 }
 
-/** Which picture of the keep this many stones show: a new one every four. */
-export const keepStep = (stones: number): number => Math.ceil(stones / 4);
+/** Which picture of the keep this many stones show: a new one every four, and one more for the last stone, when the scaffolding comes down. */
+export const keepStep = (stones: number): number => Math.ceil(stones / 4) + (stones >= KEEP_STONES ? 1 : 0);
 
 /** The keep's picture as things stand, or null before the forge stands and there is nothing to see on the hills. */
 export function keepFrame(state: GameState): string | null {

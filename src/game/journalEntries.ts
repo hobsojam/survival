@@ -1,3 +1,4 @@
+import { inKeep } from './keep';
 import { duskLength, nightStart, season, seasonMessage, yearOf, type Season } from './calendar';
 import { defaultDish, type DishId } from './cooking';
 import { keepsakeStock } from './companion';
@@ -171,7 +172,7 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   leaves: m => onAfter(m, awake(m) && m.before.timeOfDay >= 30 && isInClearing(m.after) && daylight(m.after)),
   fox: m => onAfter(m, awake(m) && isInClearing(m.after) && atDusk(m.after)),
   coldFront: m => {
-    if (isColdNight(m.before) && !isColdNight(m.after)) return { day: m.before.day, variant: m.after.progress.hearthUnlocked ? 0 : 1, silent: true };
+    if (isColdNight(m.before) && !isColdNight(m.after)) return inKeep(m.before) ? null : { day: m.before.day, variant: m.after.progress.hearthUnlocked ? 0 : 1, silent: true };
     // Once the cold night is long weathered, any autumn night kept warm at home fills its place in later years.
     const weathered = m.before.progress.hearthUnlocked && m.before.progress.nextStormDay === null;
     return dawn(m) && weathered && isAtHome(m.before) && fuelLeft(m.before) > 0 ? { day: m.before.day, variant: 2 } : null;
@@ -197,7 +198,7 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   twoHandfuls: m => onBefore(m, m.action?.type === 'gather' && berries(m.after) - berries(m.before) === 2),
   goldEvening: m => onAfter(m, awake(m) && isInClearing(m.after) && m.before.day === m.after.day
     && daylight(m.before) && !daylight(m.after)),
-  warmSleep: m => onBefore(m, acted(m, 'sleep') && !livesInHouse(m.before) && warmFuel(m.after) === 0),
+  warmSleep: m => onBefore(m, acted(m, 'sleep') && !livesInHouse(m.before) && !inKeep(m.before) && warmFuel(m.after) === 0),
   lookoutEvening: m => onAfter(m, awake(m) && m.after.progress.lookoutRepaired && m.after.area === 'camp'
     && within(m.after, LOOKOUT, 2) && atDusk(m.after)),
   hazelnuts: m => onBefore(m, gathered(m, 'hazelnut')),
