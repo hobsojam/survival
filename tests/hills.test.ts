@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { hillsPathOpen, QUARRY_EXIT } from '../src/game/areas';
 import { STEP_IDS, placeBranches } from '../src/game/clearing';
 import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, availableOre, spendOre } from '../src/game/hills';
-import { emptyPony, type PonyState } from '../src/game/pony';
+import { emptyPony, hillsNews, type PonyState } from '../src/game/pony';
+import { journalEntry, recordJournal } from '../src/game/journalEntries';
+import { newsBetween } from '../src/game/news';
+import { JOURNAL_ICONS } from '../src/art/journalIcons';
+import { journalPageView } from '../src/ui/yearJournal';
 import { FULL_BAG_MESSAGE, applyAction, carriedCount, freeSpaces } from '../src/game/rules';
 import { TOO_TIRED_MESSAGE } from '../src/game/needs';
 import { settleStores } from '../src/game/stores';
@@ -441,5 +445,81 @@ describe('how the hills look', () => {
     expect(Math.hypot(onSlope.x - HILL_RABBIT_HOMES[0].x, onSlope.y - HILL_RABBIT_HOMES[0].y)).toBeLessThan(1);
     expect(onSlope.frame).toMatch(/^rabbit:/);
     expect(rabbitAt(1, 500)).toEqual(rabbitAt(1, 500, RABBIT_HOMES));
+  });
+});
+
+describe('the hills in the journal', () => {
+  const up = (day: number) => ({ ...at(onHills(), 'hills', 20, 10), day, timeOfDay: 30 });
+  const LINES = [
+    [2, 'hillsAutumn', 'The bracken has gone rusty up on the hills.'],
+    [12, 'hillsWinter', 'Snow on the hills.'],
+    [22, 'hillsSpring', 'Gorse in flower on the hills.'],
+    [32, 'hillsSummer', 'Heather out on the hills.']
+  ] as const;
+
+  it.each(LINES)('on day %i writes %s', (day, id, line) => {
+    const before = up(day);
+    const { state } = recordJournal(before, applyAction(before, { type: 'move', dx: 0.1, dy: 0 }).state, { type: 'move', dx: 0.1, dy: 0 });
+    expect(state.journal.map(entry => entry.id)).toContain(id);
+    expect(journalEntry(id)?.lines).toEqual([line]);
+    expect(JOURNAL_ICONS[id]).toBeDefined();
+  });
+
+  it('writes nothing in the dark or down at the quarry', () => {
+    const dark = { ...up(2), timeOfDay: BALANCE.daySeconds - 1 };
+    expect(recordJournal(dark, { ...dark, player: { ...dark.player, x: 20.1 } }, { type: 'move', dx: 0.1, dy: 0 }).state.journal.map(entry => entry.id)).not.toContain('hillsAutumn');
+    const quarry = at(up(2), 'quarry', 20, 10);
+    expect(recordJournal(quarry, { ...quarry, player: { ...quarry.player, x: 20.1 } }, { type: 'move', dx: 0.1, dy: 0 }).state.journal.map(entry => entry.id)).not.toContain('hillsAutumn');
+  });
+
+  const onPage = (state: GameState, page: number) => journalPageView(state, page).entries.map(entry => entry.line);
+
+  it('adds a waiting line to every page once the hills are found, and none before', () => {
+    const unfound = foundQuarry({ day: 32 });
+    const found = onHills({ day: 32 });
+    for (const page of [0, 1, 2, 3]) {
+      expect(journalPageView(found, page).blanks).toBe(journalPageView(unfound, page).blanks + 1);
+    }
+  });
+
+  it('keeps a written line on its page', () => {
+    const before = up(2);
+    const { state } = recordJournal(before, applyAction(before, { type: 'move', dx: 0.1, dy: 0 }).state, { type: 'move', dx: 0.1, dy: 0 });
+    expect(onPage(state, 0)).toContain('The bracken has gone rusty up on the hills.');
+  });
+});
+
+describe('morning notes from the hills', () => {
+  const dawn = (changes: Partial<GameState>): [GameState, GameState] => {
+    const before = foundQuarry({ day: 5, ...changes });
+    return [before, { ...before, day: 6 }];
+  };
+
+  it('come the morning after the first ore', () => {
+    const [before, after] = dawn({ progress: { ...foundQuarry().progress, hillsFound: true, oreFoundDay: 5 } });
+    expect(hillsNews(before, after)).toEqual(['You could make something of that ore, with a forge at the workshop.']);
+    expect(newsBetween(before, after)).toContain('You could make something of that ore, with a forge at the workshop.');
+  });
+
+  it('come the morning after the pony is won', () => {
+    const [before, after] = dawn({ pony: { ...emptyPony(), trust: 4, won: 5 } });
+    expect(hillsNews(before, after)).toEqual(['The pony was grazing near you this morning.']);
+  });
+
+  it('come the morning after shoeing, using its name', () => {
+    const [before, after] = dawn({ pony: { ...emptyPony(), trust: 4, won: 1, home: true, shod: 5 }, names: { ...game.names, pony: 'Maud' } });
+    expect(hillsNews(before, after)).toEqual(['Maud stood easy in the new shoes this morning.']);
+  });
+
+  it('use the plain word when it has no name', () => {
+    const [before, after] = dawn({ pony: { ...emptyPony(), trust: 4, won: 1, home: true, shod: 5 } });
+    expect(hillsNews(before, after)).toEqual(['The pony stood easy in the new shoes this morning.']);
+  });
+
+  it('come once each', () => {
+    const [before, after] = dawn({ pony: { ...emptyPony(), trust: 4, won: 5, shod: 5 }, progress: { ...foundQuarry().progress, hillsFound: true, oreFoundDay: 5 } });
+    expect(hillsNews(before, after)).toHaveLength(3);
+    expect(hillsNews(after, { ...after, day: 7 })).toEqual([]);
+    expect(hillsNews(before, before)).toEqual([]);
   });
 });

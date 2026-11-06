@@ -105,3 +105,14 @@ export function ponyArrives(before: GameState, after: GameState): { state: GameS
   if (after.area === 'hills' && pony.shod !== null && isWinter(after.day)) return { state: after, message: "The pony won't go up in the snow. It waits at the foot of the path." };
   return { state: after, message: '' };
 }
+
+/** The mornings after the hills' firsts: the first ore, the pony won over and its shoes. Each is worked out from the saved day, so it comes once. */
+export function hillsNews(before: GameState, after: GameState): string[] {
+  if (after.day <= before.day) return [];
+  const pony = after.names.pony ?? 'The pony';
+  const notes: string[] = [];
+  if (after.progress.oreFoundDay === before.day) notes.push('You could make something of that ore, with a forge at the workshop.');
+  if (after.pony.won === before.day) notes.push(`${pony} was grazing near you this morning.`);
+  if (after.pony.shod === before.day) notes.push(`${pony} stood easy in the new shoes this morning.`);
+  return notes;
+}

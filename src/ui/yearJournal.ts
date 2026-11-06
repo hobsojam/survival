@@ -31,6 +31,8 @@ const WAITS_ON: Partial<Record<JournalId, StructureId>> = {
 
 const NAMED_MOMENTS: ReadonlySet<JournalId> = new Set<JournalId>(['namedAutumn', 'namedWinter', 'namedSpring', 'namedSummer']);
 
+const HILLS_MOMENTS: ReadonlySet<JournalId> = new Set<JournalId>(['hillsAutumn', 'hillsWinter', 'hillsSpring', 'hillsSummer']);
+
 const KEEPSAKE_MOMENTS: ReadonlySet<JournalId> = new Set<JournalId>(['autumnKeepsake', 'winterKeepsake', 'springKeepsake', 'summerKeepsake']);
 
 /** One season's page of the year journal; pages before the first or after today show the nearest real one. */
@@ -46,6 +48,8 @@ export function journalPageView(state: GameState, page: number): JournalPageView
     if (KEEPSAKE_MOMENTS.has(entry.id)) return keepsakesToCome(state) || state.journal.some(item => item.year === year && item.id === entry.id);
     // A named line waits on a name, and a page that has one keeps it.
     if (NAMED_MOMENTS.has(entry.id)) return anyNamed(state) || state.journal.some(item => item.year === year && item.id === entry.id);
+    // A line about the hills waits on them being found, and a page that has one keeps it.
+    if (HILLS_MOMENTS.has(entry.id)) return state.progress.hillsFound || state.journal.some(item => item.year === year && item.id === entry.id);
     const building = WAITS_ON[entry.id];
     return !building || state.structures[building];
   });

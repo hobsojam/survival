@@ -1,4 +1,5 @@
 import { orchardNews } from './orchard';
+import { hillsNews } from './pony';
 import { daysLeftInSeason, season, seasonMessage } from './calendar';
 import { rainMessage } from './rain';
 import { heatMessage } from './rules';
@@ -28,5 +29,5 @@ const morningNote = (before: GameState, after: GameState): string[] => {
 
 export function newsBetween(before: GameState, after: GameState): string[] {
   return [coldNightWarning(before, after), rainMessage(before, after), heatMessage(before, after), wolfMessage(before, after), spoilMessage(before, after), witheredMessage(before, after), seasonMessage(before.day, after.day), fieldNews(before, after), bakeryNews(before, after), lateAutumnMessage(before, after), fallingIllMessage(before, after), sickDayMessage(before, after)]
-    .filter((text): text is string => text !== null).concat(companionNews(before, after), sheepNews(before, after), orchardNews(before, after), morningNote(before, after));
+    .filter((text): text is string => text !== null).concat(companionNews(before, after), sheepNews(before, after), orchardNews(before, after), hillsNews(before, after), morningNote(before, after));
 }

@@ -23,7 +23,17 @@ const namedIcon = (accent: PaletteKey, top: readonly [string, string]): JournalI
   rows: [...top, '..........', '.k.k......', '.k.k.k....', '..KKK.....', '.KKKKK....', '.KKKKK....', '..KKK.....', '..........']
 });
 
+/** A low hill with a little of its season showing, in the marks of its own top rows. */
+const hillIcon = (slope: PaletteKey, mark: PaletteKey, top: readonly [string, string, string]): JournalIcon => ({
+  legend: { s: slope, t: mark },
+  rows: ['..........', ...top, '.ssssss...', 'ssssssssss', 'ssssssssss', 'ssssssssss', 'ssssssssss', '..........']
+});
+
 export const JOURNAL_ICONS: Record<JournalId, JournalIcon> = {
+  hillsAutumn: hillIcon('fox1', 'fox3', ['.t.....t..', 'tt.t..tt.t', '.t..t..t..']),
+  hillsWinter: hillIcon('frost', 'paper', ['...tt.....', '..tttt....', '.tttttt...']),
+  hillsSpring: hillIcon('leaf2', 'flower1', ['..........', '..t...tt..', '.ttt.tttt.']),
+  hillsSummer: hillIcon('leaf2', 'flower3', ['..........', '.t.t.t.t..', 'tttttttttt']),
   namedAutumn: namedIcon('fire2', ['.......xx.', '........x.']),
   namedWinter: namedIcon('frost', ['.......x.x', '........x.']),
   namedSpring: namedIcon('leaf3', ['........x.', '.......xx.']),
