@@ -33,3 +33,9 @@ describe('the frost', () => {
     expect(css).toContain('.keep-view .game-frame::after { opacity: 0; transition: none; }');
   });
 });
+
+describe('messages on a phone', () => {
+  it('are not hidden wholesale over the view, so a save failure can still be seen', () => {
+    expect(styles.replace(/\s+/g, ' ')).not.toContain('.keep-view .message.toast');
+  });
+});

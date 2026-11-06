@@ -90,12 +90,12 @@ export class GameScene extends Phaser.Scene {
     // The phone viewport can be set before the scene boots, so take the size the game already has.
     this.lighting = new SceneLighting(this, this.scale.gameSize.width, this.scale.gameSize.height);
     const { width, height } = this.scale.gameSize;
-    // Well over the size of the screen, since the view from the keep pulls the camera back and a rotated phone is wider.
+    // Well over the size of the screen, since a rotated phone is wider.
     this.fadeCover = this.add.rectangle(width / 2, height / 2, BALANCE.mapWidth * TILE * 6, BALANCE.mapWidth * TILE * 6, 0x000000)
       .setScrollFactor(0).setDepth(WEATHER_DEPTH + 2).setVisible(false);
     this.keepView = new KeepViewLayer(this);
     this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,T,P,C,G,Z,L,O,X,V') as Record<string, Phaser.Input.Keyboard.Key>;
-    this.input.keyboard!.on('keydown', (event: KeyboardEvent) => this.keyComesDown(event));
+    this.listenForComingDown();
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       const over = this.unnamedAnimalUnder(pointer.worldX, pointer.worldY);
       this.game.canvas.style.cursor = over ? 'pointer' : '';
@@ -266,6 +266,10 @@ export class GameScene extends Phaser.Scene {
   /** Whether the view from the top of the keep is up. */
   viewing(): boolean {
     return this.viewShown;
+  }
+
+  private listenForComingDown(): void {
+    this.input.keyboard!.on('keydown', (event: KeyboardEvent) => this.keyComesDown(event));
   }
 
   /** A plain key meant for the game comes down from the view. Esc still pauses. */

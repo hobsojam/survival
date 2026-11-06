@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Season } from '../src/game/calendar';
-import { APPLE_COLOR, SAIL_COLOR, movingRects, pictureFit, stillRects, viewLine, type PictureRect } from '../src/scene/keepViewArt';
+import { APPLE_COLOR, CLIFF_SHADES, SAIL_COLOR, movingRects, pictureFit, stillRects, viewLine, type PictureRect } from '../src/scene/keepViewArt';
 import type { CampView } from '../src/scene/keepViewCamp';
 
 const SEASONS: readonly Season[] = ['autumn', 'winter', 'spring', 'summer'];
@@ -67,6 +67,32 @@ describe('the picture', () => {
     const roof = added(stillRects('winter', { ...wide, workshop: true }), stillRects('winter', wide)).find(rect => rect.h === 1)!.color;
     const sheep = added(movingRects('winter', { ...wide, sheep: 1 }, 0), movingRects('winter', wide, 0))[0].color;
     for (const color of [roof, sheep, SAIL_COLOR]) expect(luminance(color) - luminance(clearing)).toBeGreaterThan(0.08);
+  });
+
+  it('snow lies on the well in winter, like the other roofs', () => {
+    const fresh = (season: Season): string[] => added(stillRects(season, { ...bare, well: true }), stillRects(season, bare)).map(rect => rect.color);
+    const snowRoof = added(stillRects('winter', { ...bare, workshop: true }), stillRects('winter', bare)).find(rect => rect.h === 1)!.color;
+    expect(fresh('winter')).toContain(snowRoof);
+    expect(fresh('summer')).not.toContain(snowRoof);
+  });
+
+  it('only a tree old enough to blossom is pink in spring', () => {
+    const colors = (stage: 'sprout' | 'sapling' | 'young'): string[] => added(stillRects('spring', { ...bare, orchard: [{ stage, apples: false }] }), stillRects('spring', bare)).map(rect => rect.color);
+    const blossom = colors('young')[0];
+    expect(colors('sprout')).not.toContain(blossom);
+    expect(colors('sapling')).not.toContain(blossom);
+  });
+
+  it('the quarry cliff has a broken, lopsided top rather than a neat roof', () => {
+    const tops = new Map<number, number>();
+    for (const rect of stillRects('summer', bare)) {
+      if (!CLIFF_SHADES.includes(rect.color)) continue;
+      for (let x = rect.x; x < rect.x + rect.w; x++) tops.set(x, Math.min(tops.get(x) ?? Infinity, rect.y));
+    }
+    const skyline = [...tops.entries()].sort(([a], [b]) => a - b).map(([, y]) => y);
+    expect(new Set(skyline).size).toBeGreaterThanOrEqual(6);
+    expect(skyline).not.toEqual([...skyline].reverse());
+    expect(skyline.indexOf(Math.min(...skyline))).toBeLessThan(skyline.length / 2 - 4);
   });
 
   it('each stage of a tree looks different', () => {

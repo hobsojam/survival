@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import type Phaser from 'phaser';
 import { season, type Season } from '../game/calendar';
 import type { GameState } from '../game/state';
 import { PICTURE_HEIGHT, PICTURE_WIDTH, movingRects, pictureFit, stillRects, viewLine, type PictureRect } from './keepViewArt';

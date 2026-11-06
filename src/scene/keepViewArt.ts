@@ -9,6 +9,7 @@ export const PICTURE_WIDTH = 320;
 export const PICTURE_HEIGHT = 200;
 export const SAIL_COLOR = '#f0ece0';
 export const APPLE_COLOR = '#c8352a';
+export const CLIFF_SHADES: readonly string[] = ['#8d8a82', '#74716a', '#9c9990'];
 
 export interface PictureRect { x: number; y: number; w: number; h: number; color: string }
 
@@ -22,6 +23,8 @@ interface SeasonLook {
   /** What lies on roofs and wall tops, in the one season anything does. */
   snow: string | null;
   leaf: string;
+  /** A tree too young to blossom, where that differs from the leaf colour. */
+  shoot?: string;
   grain: string;
   /** What drifts down across the picture, and how much of it. */
   falling: { color: string; count: number } | null;
@@ -30,7 +33,7 @@ interface SeasonLook {
 const LOOKS: Record<Season, SeasonLook> = {
   autumn: { sky: ['#9fb9c9', '#c6cfc4', '#e6d3ac'], far: '#8a97a0', woods: ['#b5652a', '#c98a2e', '#8f4a24', '#3f5a3c'], woodsShade: '#3e3524', hills: ['#9a7a3c', '#8a5a2c', '#a8864a'], ground: '#8f9a55', snow: null, leaf: '#7f8f3a', grain: '#d4b24a', falling: { color: '#d08a30', count: 12 } },
   winter: { sky: ['#aab8c6', '#c6ced6', '#dde0e0'], far: '#b4bfca', woods: ['#7d6f60', '#8c7f70', '#6a5f53', '#3f5548'], woodsShade: '#59606a', hills: ['#e8edf0', '#d6dee6', '#f4f6f6'], ground: '#c3d0dc', snow: '#f4f6f6', leaf: '#6a5f53', grain: '#d6dee6', falling: { color: '#ffffff', count: 45 } },
-  spring: { sky: ['#8fc0dc', '#b8dae4', '#e2ecd8'], far: '#8fa8ad', woods: ['#6d9c48', '#86b354', '#527f3e', '#3a6444'], woodsShade: '#2f4a30', hills: ['#7f9a4a', '#d9b92e', '#8fa856'], ground: '#8fbb5a', snow: null, leaf: '#e6c8d4', grain: '#7fa64a', falling: { color: '#f2d5e0', count: 12 } },
+  spring: { sky: ['#8fc0dc', '#b8dae4', '#e2ecd8'], far: '#8fa8ad', woods: ['#6d9c48', '#86b354', '#527f3e', '#3a6444'], woodsShade: '#2f4a30', hills: ['#7f9a4a', '#d9b92e', '#8fa856'], ground: '#8fbb5a', snow: null, leaf: '#e6c8d4', shoot: '#7fae4a', grain: '#7fa64a', falling: { color: '#f2d5e0', count: 12 } },
   summer: { sky: ['#6fb0dc', '#a2d0e6', '#e8e6c8'], far: '#7d9aa8', woods: ['#3f7a3a', '#55913f', '#2f6432', '#2c5438'], woodsShade: '#233f26', hills: ['#7f5f8f', '#94709f', '#6d8a48'], ground: '#7aa648', snow: null, leaf: '#4f8f3f', grain: '#c9b447', falling: null }
 };
 
@@ -87,11 +90,11 @@ function paintOrchard(p: Painter, look: SeasonLook, orchard: NonNullable<CampVie
     const x = CAMP_X - 28 + (i % 3) * 4;
     const y = CAMP_Y - 4 + (i > 2 ? 3 : 0);
     if (tree.stage === 'sprout') {
-      p.rect(x + 1, y + 2, 1, 1, look.leaf);
+      p.rect(x + 1, y + 2, 1, 1, look.shoot ?? look.leaf);
       return;
     }
     if (tree.stage === 'sapling') {
-      p.rect(x + 1, y + 1, 2, 2, look.leaf);
+      p.rect(x + 1, y + 1, 2, 2, look.shoot ?? look.leaf);
       return;
     }
     const grown = tree.stage === 'grown';
@@ -121,7 +124,7 @@ function paintCamp(p: Painter, look: SeasonLook, camp: CampView): void {
   }
   if (camp.well) {
     p.rect(cx - 20, cy - 3, 3, 2, '#8d8d86');
-    p.rect(cx - 20, cy - 4, 3, 1, '#50391f');
+    p.rect(cx - 20, cy - 4, 3, 1, roofOf('#50391f'));
   }
   if (camp.workshop) {
     p.rect(cx + 14, cy + 2, 6, 3, '#7a5c36');
@@ -145,12 +148,21 @@ function paintCamp(p: Painter, look: SeasonLook, camp: CampView): void {
   }
 }
 
+/** A worked rock face, highest toward its left, with a jagged top, a few ledges and spoil at its foot. */
 function paintCliff(p: Painter, look: SeasonLook): void {
-  for (let i = 0; i < 16; i++) {
-    const inset = Math.abs(i - 8) * 1.4;
-    p.rect(214 + i * 3, 110 + inset, 3, 28 - inset, i % 3 ? '#8d8a82' : '#74716a');
+  for (let x = 206; x < 270; x += 2) {
+    const slope = x < 224 ? (224 - x) * 0.9 : (x - 224) * 0.35;
+    const top = 110 + slope + Math.floor(noise(x) * 5);
+    p.rect(x, top, 2, 138 - top, CLIFF_SHADES[Math.floor(noise(x * 3) * CLIFF_SHADES.length)]);
+    if (look.snow) p.rect(x, top, 2, 2, look.snow);
   }
-  p.rect(222, 126, 30, 12, look.snow ? '#e8edf0' : '#a8a292');
+  for (let i = 0; i < 7; i++) {
+    p.rect(214 + noise(i + 40) * 36, 119 + i * 2, 5 + noise(i + 60) * 8, 1, '#5f5c56');
+  }
+  const spoil = look.snow ?? '#a8a292';
+  for (let i = 0; i < 14; i++) {
+    p.rect(210 + noise(i + 80) * 50, 132 + noise(i + 90) * 6, 3 + noise(i + 100) * 5, 2, spoil);
+  }
 }
 
 function paintHills(p: Painter, look: SeasonLook): void {

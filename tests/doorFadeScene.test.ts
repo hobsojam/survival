@@ -42,7 +42,7 @@ function chainable(extra: Record<string, unknown> = {}): Record<string, unknown>
 
 interface SceneInside {
   state: GameState; pendingDoor?: unknown; viewShown: boolean; doorFade: DoorFade; time: { now: number }; walkTarget?: unknown; tapGate: () => boolean; scene: { isPaused(): boolean };
-  updateDoorFade(now: number): void; handleTap(x: number, y: number): void; syncPlayerSprite(moving: boolean): void; keyComesDown(event: Parameters<typeof comesDownKey>[0]): void; say(...messages: (string | null)[]): void;
+  updateDoorFade(now: number): void; handleTap(x: number, y: number): void; syncPlayerSprite(moving: boolean): void; keyComesDown(event: Parameters<typeof comesDownKey>[0]): void; listenForComingDown(): void; say(...messages: (string | null)[]): void;
   perform: GameScene['perform']; update: GameScene['update']; viewing: GameScene['viewing']; resizeViewport: GameScene['resizeViewport'];
 }
 
@@ -251,6 +251,36 @@ describe('what the picture keeps back until the player comes down', () => {
     scene.updateDoorFade(SETTLED + 650);
     expect(said).toEqual(['Written in your journal: x']);
   });
+});
+
+it('holds the real journal notice from a first climb until the player comes down', () => {
+  const inside = sceneAt(atDoor());
+  const noop = () => undefined;
+  Object.assign(inside.scene, {
+    carryOut: Object.getPrototypeOf(inside.scene).carryOut, showDawn: noop, showActionDone: noop, noteBerryPicked: noop, askName: noop,
+    needsAlert: () => null, onStateChange: noop, paintObjects: noop
+  });
+  inside.scene.perform({ type: 'enterKeep' });
+  inside.scene.updateDoorFade(1400);
+  expect(inside.scene.state.timeOfDay).toBeCloseTo(40 + BALANCE.stargazeSeconds);
+  expect(inside.said).toEqual([]);
+  inside.scene.time.now = SETTLED;
+  inside.scene.handleTap(0, 0);
+  inside.scene.updateDoorFade(SETTLED + 650);
+  expect(inside.said).toHaveLength(1);
+  expect(inside.said[0]).toContain('Written in your journal: From the top of the keep, the woods have all turned.');
+  expect(inside.said[0]).not.toContain('You climb to the top');
+});
+
+it('listens for key presses to come down', () => {
+  const { scene } = lookingOut();
+  const heard: Record<string, (event: { key: string; repeat: boolean }) => void> = {};
+  Object.assign(scene, { input: { keyboard: { on: (name: string, handler: (event: { key: string; repeat: boolean }) => void) => { heard[name] = handler; } } } });
+  scene.listenForComingDown();
+  scene.time.now = SETTLED;
+  heard.keydown({ key: 'e', repeat: false });
+  scene.updateDoorFade(SETTLED + 650);
+  expect(scene.viewing()).toBe(false);
 });
 
 it('never moves the camera for a night', () => {

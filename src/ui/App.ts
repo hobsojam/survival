@@ -259,7 +259,11 @@ export class App {
       this.soundscape.update(next);
       this.render();
       const viewing = this.scene?.viewing() ?? false;
-      if (viewing && !this.root.classList.contains('keep-view')) this.revealGameFrame();
+      if (viewing && !this.root.classList.contains('keep-view')) {
+        this.revealGameFrame();
+        // A line from before the climb shouldn't sit over the picture. Anything new, such as a failed save, still shows.
+        this.root.querySelector('#message')?.classList.remove('toast');
+      }
       this.root.classList.toggle('keep-view', viewing);
       if (!previous.ending && next.ending) this.endStory(next, cause === 'action');
       if (cause === 'action' && !previous.progress.lookoutRepaired && next.progress.lookoutRepaired) {
