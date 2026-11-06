@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>The view from the keep: rough mockup</title>
+<style>
+  body { margin: 0; background: #1b1a17; color: #e8e2d0; font: 15px/1.45 system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; padding: 18px; }
+  h2 { margin: 0 0 2px; font-weight: 600; }
+  p.sub { margin: 0 0 12px; color: #a9a290; max-width: 960px; text-align: center; }
+  .frame { position: relative; width: min(960px, 96vw); aspect-ratio: 8 / 5; border: 3px solid #3a362c; }
+  canvas { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+  .line { position: absolute; left: 0; right: 0; bottom: 3%; text-align: center; font-family: Georgia, serif; font-style: italic; color: #fbf4df; text-shadow: 0 1px 3px #000, 0 0 8px #000; font-size: clamp(13px, 2vw, 19px); }
+  .controls { display: flex; flex-wrap: wrap; gap: 18px; margin: 14px 0 6px; justify-content: center; }
+  .group { display: flex; gap: 4px; align-items: center; }
+  .group span { color: #a9a290; margin-right: 4px; }
+  button { background: #2c2a23; color: #e8e2d0; border: 1px solid #4a4538; padding: 6px 11px; border-radius: 4px; cursor: pointer; font: inherit; }
+  button.on { background: #7a5c2e; border-color: #b58c4c; }
+  .note { color: #a9a290; font-size: 13px; max-width: 960px; text-align: center; }
+</style>
+</head>
+<body>
+<h2>The view from the keep</h2>
+<p class="sub">Rough mockup, not final art. The in-game version would be drawn in the game's own pixel style. Try the buttons to see the seasons and a young camp against a grown one.</p>
+<div class="frame">
+  <canvas id="c" width="320" height="200"></canvas>
+  <div class="line" id="line"></div>
+</div>
+<div class="controls">
+  <div class="group" id="seasons"><span>Season</span></div>
+  <div class="group" id="camps"><span>Camp</span></div>
+</div>
+<p class="note">No labels, markers or buttons in the real thing: only the picture and the journal line, until you tap to come down.</p>
+
+<script>
+const ctx = document.getElementById('c').getContext('2d');
+const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
+const noise = (i) => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+
+const SEASONS = {
+  autumn: { sky: ['#9fb9c9', '#c6cfc4', '#e6d3ac'], far: '#8a97a0', woods: ['#b5652a', '#c98a2e', '#8f4a24', '#3f5a3c'], dark: '#3e3524', hill: ['#9a7a3c', '#8a5a2c', '#a8864a'], ground: '#8f9a55', line: 'From the top of the keep, the woods have all turned.' },
+  winter: { sky: ['#aab8c6', '#c6ced6', '#dde0e0'], far: '#b4bfca', woods: ['#7d6f60', '#8c7f70', '#6a5f53', '#3f5548'], dark: '#59606a', hill: ['#e8edf0', '#d6dee6', '#f4f6f6'], ground: '#eef2f4', line: 'Snow as far as I can see from the top of the keep.', snow: true },
+  spring: { sky: ['#8fc0dc', '#b8dae4', '#e2ecd8'], far: '#8fa8ad', woods: ['#6d9c48', '#86b354', '#527f3e', '#3a6444'], dark: '#2f4a30', hill: ['#7f9a4a', '#d9b92e', '#8fa856'], ground: '#8fbb5a', line: 'From the top of the keep, the gorse is out all the way down.' },
+  summer: { sky: ['#6fb0dc', '#a2d0e6', '#e8e6c8'], far: '#7d9aa8', woods: ['#3f7a3a', '#55913f', '#2f6432', '#2c5438'], dark: '#233f26', hill: ['#7f5f8f', '#94709f', '#6d8a48'], ground: '#7aa648', line: 'Heather as far as I can see from the top of the keep.' },
+};
+const CAMPS = {
+  young: { label: 'Young', r: 15 },
+  grown: { label: 'Grown', r: 24, house: 1, beds: 1, well: 1, shop: 1, field: 1 },
+  full:  { label: 'Everything', r: 30, house: 1, beds: 1, well: 1, shop: 1, field: 1, mill: 1, bakery: 1, sheep: 1, orchard: 1 },
+};
+let season = 'autumn', camp = 'full', t = 0;
+
+function ridge(y, amp, step, color, seed) {
+  for (let x = 0; x < 320; x++) {
+    const h = Math.sin((x + seed) / step) * amp + Math.sin((x + seed * 3) / (step / 2.7)) * amp * 0.4;
+    R(x, y + h, 1, 200 - y - h, color);
+  }
+}
+
+function tree(x, y, s, c, dark) {
+  R(x - s, y - s, s * 2 + 1, s + 1, c);
+  R(x - s + 1, y - s - 1, s * 2 - 1, 1, c);
+  R(x - s, y, s * 2 + 1, 1, dark);
+}
+
+function drawCamp(s, c) {
+  const cx = 118, cy = 101;
+  // The clearing grows with the camp.
+  for (let dy = -9; dy <= 9; dy++) {
+    const w = Math.sqrt(Math.max(0, 1 - (dy * dy) / 81)) * c.r;
+    R(cx - w, cy + dy, w * 2, 1, s.ground);
+  }
+  // Shelter or woodshed, and fire.
+  R(cx + 8, cy - 1, 5, 3, '#6e5233'); R(cx + 7, cy - 2, 7, 1, s.snow ? '#f4f6f6' : '#50391f');
+  if (!c.house) {
+    R(cx - 1, cy + 3, 2, 1, '#e8932e');
+    const f = Math.floor(t / 2) % 3;
+    R(cx - 1 + (f === 1 ? 1 : 0), cy - 1 - f, 1, 2, '#cfcac0');
+  }
+  if (c.field) {
+    for (let i = 0; i < 4; i++) R(cx - 6 + i * 4, cy + 6, 3, 2, s.snow ? '#d6dee6' : season === 'autumn' ? '#d4b24a' : season === 'summer' ? '#c9b447' : '#7fa64a');
+  }
+  if (c.beds) { R(cx - 18, cy + 2, 3, 2, '#54391f'); R(cx - 14, cy + 2, 3, 2, '#54391f'); }
+  if (c.well) { R(cx - 20, cy - 3, 3, 2, '#8d8d86'); R(cx - 20, cy - 4, 3, 1, '#50391f'); }
+  if (c.shop) { R(cx + 14, cy + 2, 6, 3, '#7a5c36'); R(cx + 13, cy + 1, 8, 1, s.snow ? '#f4f6f6' : '#5c4023'); }
+  if (c.house) {
+    R(cx - 5, cy - 6, 9, 5, '#8a6840');
+    R(cx - 6, cy - 7, 11, 1, s.snow ? '#f4f6f6' : '#5a3a22');
+    R(cx - 5, cy - 8, 9, 1, s.snow ? '#f4f6f6' : '#5a3a22');
+    R(cx + 2, cy - 11, 2, 3, '#77756e');
+    R(cx - 2, cy - 3, 2, 2, '#f0c460');
+    // Smoke drifts up from the chimney.
+    for (let i = 0; i < 6; i++) {
+      const p = (t / 6 + i * 2) % 12;
+      R(cx + 2 + Math.sin(p / 2) * 1.6 + p / 3, cy - 12 - p * 1.5, p > 7 ? 2 : 1, 1, '#d8d4ca');
+    }
+  }
+  if (c.bakery) { R(cx - 13, cy - 9, 5, 3, '#a07a4c'); R(cx - 14, cy - 10, 7, 1, s.snow ? '#f4f6f6' : '#7a4a2a'); }
+  if (c.orchard) {
+    const leaf = season === 'autumn' ? '#7f8f3a' : season === 'winter' ? '#6a5f53' : season === 'spring' ? '#e6c8d4' : '#4f8f3f';
+    for (let i = 0; i < 6; i++) {
+      const x = cx - 28 + (i % 3) * 4, y = cy - 4 + (i > 2 ? 3 : 0);
+      R(x, y, 3, 2, leaf); R(x + 1, y + 2, 1, 1, '#4a3520');
+      if (season === 'autumn') R(x + 1, y, 1, 1, '#c8352a');
+    }
+  }
+  if (c.mill) {
+    const mx = cx + 4, my = cy + 13;
+    R(mx - 2, my - 8, 5, 9, '#c9c1ab'); R(mx - 1, my - 10, 3, 2, s.snow ? '#f4f6f6' : '#5a3a22');
+    const a = t / 12;
+    for (let k = 0; k < 4; k++) {
+      const ang = a + k * Math.PI / 2;
+      for (let d = 1; d <= 6; d++) R(mx + Math.cos(ang) * d, my - 7 + Math.sin(ang) * d, 1, 1, '#f0ece0');
+    }
+  }
+  if (c.sheep) {
+    for (let i = 0; i < 3; i++) {
+      const sx = cx + 22 + i * 3 + Math.sin(t / 40 + i * 2) * 1.5, sy = cy - 6 + (i === 1 ? 2 : 0);
+      R(sx, sy, 2, 2, '#f6f3ea'); R(sx, sy + 2, 1, 1, '#3a342c');
+    }
+  }
+}
+
+function draw() {
+  const s = SEASONS[season], c = CAMPS[camp];
+  // Sky in bands, as the game's pixel gradients are.
+  const bands = 5;
+  s.sky.forEach((col, i) => R(0, i * 24, 320, 26, col));
+  for (let i = 0; i < 2; i++) for (let b = 0; b < bands; b++) {
+    if ((b + i) % 2) for (let x = 0; x < 320; x += 2) R(x + (b % 2), (i + 1) * 24 - 2 + b % 2, 1, 1, s.sky[i + 1]);
+  }
+  // Clouds drift slowly.
+  for (let i = 0; i < 4; i++) {
+    const x = ((i * 97 + t / 9) % 380) - 40, y = 10 + i * 9;
+    R(x, y, 26 + i * 4, 3, '#f4f2e8'); R(x + 5, y - 2, 14, 2, '#f4f2e8');
+  }
+  ridge(60, 6, 34, s.far, 11);
+  ridge(70, 4, 22, s.woods[3], 57);
+  // The woods: rows of trees getting bigger as they come nearer.
+  for (let row = 0; row < 9; row++) {
+    const y = 78 + row * 7, size = 2 + Math.floor(row / 2);
+    for (let i = 0; i < 44; i++) {
+      const x = (i * 8 + noise(row * 50 + i) * 10) % 330 - 5;
+      const col = s.woods[Math.floor(noise(row * 13 + i * 7) * 4)];
+      tree(x, y + noise(i + row) * 4, size, col, s.dark);
+    }
+  }
+  drawCamp(s, c);
+  // The quarry cliff, cut grey into the woods.
+  for (let i = 0; i < 16; i++) {
+    R(214 + i * 3, 110 + Math.abs(i - 8) * 1.4, 3, 28 - Math.abs(i - 8) * 1.4, i % 3 ? '#8d8a82' : '#74716a');
+  }
+  R(222, 126, 30, 12, s.snow ? '#e8edf0' : '#a8a292');
+  // The hills fall away towards the viewer.
+  ridge(140, 5, 48, s.hill[0], 3);
+  for (let i = 0; i < 300; i++) {
+    const x = noise(i) * 320, y = 142 + noise(i * 3) * 36;
+    R(x, y, 2 + (i % 3), 1, s.hill[1 + (i % 2)]);
+  }
+  // The worn path home: from the foot of the keep, past the quarry, into the trees.
+  const path = s.snow ? '#c6ced6' : '#b7a57c';
+  for (let d = 0; d < 80; d++) {
+    const p = d / 80, x = 165 + Math.sin(p * 5) * 32 * (1 - p) + p * 55, y = 178 - p * 42, w = 4 - p * 3;
+    R(x, y, Math.max(1, w), 1, path);
+  }
+  // The battlements you are leaning on.
+  const stone = s.snow ? '#8b8f92' : '#77736a', stoneLit = s.snow ? '#a5a9ac' : '#928d81', shade = '#4e4b44';
+  R(0, 183, 320, 17, stone);
+  for (let x = 0; x < 320; x += 32) {
+    R(x + 4, 170, 22, 14, stone); R(x + 4, 170, 22, 2, s.snow ? '#f6f8f8' : stoneLit);
+    R(x + 24, 172, 2, 12, shade);
+    R(x + 9, 176, 7, 1, shade); R(x + 13, 180, 8, 1, shade);
+  }
+  R(0, 183, 320, 2, s.snow ? '#f6f8f8' : stoneLit);
+  for (let row = 0; row < 3; row++) for (let x = (row % 2) * 12; x < 320; x += 24) R(x, 188 + row * 5, 12, 1, shade);
+  // Falling snow, drifting leaves or petals.
+  if (season !== 'summer') {
+    const fleck = season === 'winter' ? '#ffffff' : season === 'autumn' ? '#d08a30' : '#f2d5e0';
+    const count = season === 'winter' ? 45 : 12;
+    for (let i = 0; i < count; i++) {
+      const x = (noise(i) * 340 + t / 3 + Math.sin(t / 15 + i) * 4) % 320, y = (noise(i * 2) * 200 + t * (0.5 + noise(i) * 0.5)) % 200;
+      R(x, y, 1, 1, fleck);
+    }
+  }
+  document.getElementById('line').textContent = s.line;
+}
+
+function buttons(el, items, get, set) {
+  Object.entries(items).forEach(([k, label]) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.onclick = () => { set(k); render(); };
+    b.dataset.k = k;
+    el.appendChild(b);
+  });
+  el.refresh = () => [...el.querySelectorAll('button')].forEach(b => b.classList.toggle('on', b.dataset.k === get()));
+}
+const se = document.getElementById('seasons'), ca = document.getElementById('camps');
+buttons(se, { autumn: 'Autumn', winter: 'Winter', spring: 'Spring', summer: 'Summer' }, () => season, v => season = v);
+buttons(ca, { young: 'Young', grown: 'Grown', full: 'Everything' }, () => camp, v => camp = v);
+function render() { se.refresh(); ca.refresh(); draw(); }
+render();
+setInterval(() => { t++; draw(); }, 125);
+</script>
+</body>
+</html>
