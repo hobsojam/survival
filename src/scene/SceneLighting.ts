@@ -22,7 +22,7 @@ export class SceneLighting {
     this.layer.resize(width, height, false);
   }
 
-  /** No lighting at all: the layer is fixed to the screen, so it can't follow the camera when the view from the keep pulls back. */
+  /** No lighting at all, for the view from the keep, which has its own daylight. */
   hide(): void {
     this.layer.setVisible(false);
   }

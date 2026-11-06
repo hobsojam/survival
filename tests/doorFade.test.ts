@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { STEP_IDS, placeBranches } from '../src/game/clearing';
 import { KEEP_SITE } from '../src/game/keep';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
-import { DOOR_FADE_MS, DoorFade, doorFadeFor, viewZoom } from '../src/scene/doorFade';
+import { DOOR_FADE_MS, DoorFade, VIEW_INPUT_DELAY_MS, doorFadeFor } from '../src/scene/doorFade';
 
 const game = createGame();
 const placed = placeBranches(game.nodes, [...STEP_IDS]);
@@ -32,19 +32,6 @@ describe('when the door fades', () => {
   });
 });
 
-describe('the view from the top', () => {
-  const map = { width: 640, height: 480 };
-  it('pulls back to fill the frame, leaving nothing blank', () => {
-    expect(viewZoom(480, 300, map.width, map.height)).toBeCloseTo(0.75);
-    const zoom = viewZoom(195, 339, map.width, map.height);
-    expect(zoom * map.height).toBeGreaterThanOrEqual(339);
-    expect(zoom).toBeCloseTo(339 / 480);
-  });
-  it('never zooms in', () => {
-    expect(viewZoom(1000, 800, map.width, map.height)).toBe(1);
-  });
-});
-
 describe('the fade', () => {
   const started = (kind: 'sleep' | 'view', at = 1000): DoorFade => {
     const fade = new DoorFade();
@@ -57,11 +44,10 @@ describe('the fade', () => {
     expect([fade.running(0), fade.alpha(0), fade.hold(0), fade.viewing(0)]).toEqual([false, 0, false, false]);
   });
 
-  it('lasts as long as it should', () => {
-    expect(DOOR_FADE_MS).toEqual({ sleep: 1200, view: 2600 });
+  it('lasts as long as it should for a night', () => {
+    expect(DOOR_FADE_MS).toEqual({ sleep: 1200 });
     expect(started('sleep').running(1000 + 1199)).toBe(true);
     expect(started('sleep').running(1000 + 1200)).toBe(false);
-    expect(started('view').running(1000 + 2599)).toBe(true);
   });
 
   it('goes black, holds, comes back and ends', () => {
@@ -80,23 +66,77 @@ describe('the fade', () => {
     for (const at of [0, 400, 800, 1100]) expect(fade.viewing(1000 + at)).toBe(false);
   });
 
-  it('shows the view between two dips to black', () => {
+  it('opens the view out of black', () => {
     const fade = started('view');
     expect(fade.alpha(1000 + 349)).toBeGreaterThan(0.9);
     expect(fade.viewing(1000 + 349)).toBe(false);
     expect(fade.alpha(1000 + 350)).toBe(1);
     expect(fade.viewing(1000 + 350)).toBe(true);
-    expect(fade.alpha(1000 + 1000)).toBe(0);
-    expect(fade.viewing(1000 + 2200)).toBe(true);
-    expect(fade.alpha(1000 + 2249)).toBeGreaterThan(0.9);
-    expect(fade.viewing(1000 + 2250)).toBe(false);
-    expect(fade.alpha(1000 + 2600)).toBe(0);
+    expect(fade.alpha(1000 + 650)).toBe(0);
   });
 
-  it('is over however late it is asked', () => {
-    for (const kind of ['sleep', 'view'] as const) {
-      const fade = started(kind);
-      expect([fade.running(1e9), fade.alpha(1e9), fade.hold(1e9), fade.viewing(1e9)]).toEqual([false, 0, false, false]);
-    }
+  it('keeps the view open until the player comes down', () => {
+    const fade = started('view', 0);
+    expect(fade.running(1e9)).toBe(true);
+    expect(fade.viewing(1e9)).toBe(true);
+    expect(fade.alpha(1e9)).toBe(0);
+  });
+
+  it('refuses to come down during the first second of the picture', () => {
+    const fade = started('view', 0);
+    expect(VIEW_INPUT_DELAY_MS).toBe(1000);
+    expect(fade.comeDown(350 + 999)).toBe(false);
+    expect(fade.running(1e9)).toBe(true);
+    expect(fade.comeDown(350 + 1000)).toBe(true);
+  });
+
+  it('comes down through black and ends', () => {
+    const fade = started('view', 0);
+    fade.comeDown(5000);
+    expect(fade.alpha(5150)).toBeCloseTo(0.5);
+    expect(fade.viewing(5299)).toBe(true);
+    expect(fade.alpha(5300)).toBe(1);
+    expect(fade.viewing(5300)).toBe(false);
+    expect(fade.hold(5300)).toBe(false);
+    expect(fade.alpha(5475)).toBeCloseTo(0.5);
+    expect(fade.running(5649)).toBe(true);
+    expect(fade.running(5650)).toBe(false);
+    expect(fade.alpha(5650)).toBe(0);
+  });
+
+  it('ignores a second press while coming down', () => {
+    const fade = started('view', 0);
+    fade.comeDown(5000);
+    expect(fade.comeDown(5100)).toBe(false);
+    expect(fade.running(5650)).toBe(false);
+  });
+
+  it('starts fresh the next time, after coming down', () => {
+    const fade = started('view', 0);
+    fade.comeDown(5000);
+    fade.begin('view', 9000);
+    expect(fade.running(1e9)).toBe(true);
+  });
+
+  it('does not come down from a night', () => {
+    const fade = started('sleep', 0);
+    expect(fade.comeDown(600)).toBe(false);
+  });
+
+  it('holds the clock for the whole view, and not for a night', () => {
+    const view = started('view', 0);
+    expect(view.holdsClock(0)).toBe(true);
+    expect(view.holdsClock(1e6)).toBe(true);
+    view.comeDown(1e6);
+    expect(view.holdsClock(1e6 + 500)).toBe(true);
+    expect(view.holdsClock(1e6 + 650)).toBe(false);
+    const night = started('sleep', 0);
+    expect(night.holdsClock(0)).toBe(false);
+    expect(night.holdsClock(600)).toBe(false);
+  });
+
+  it('a night is over however late it is asked', () => {
+    const fade = started('sleep');
+    expect([fade.running(1e9), fade.alpha(1e9), fade.hold(1e9), fade.viewing(1e9)]).toEqual([false, 0, false, false]);
   });
 });
