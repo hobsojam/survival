@@ -1,6 +1,6 @@
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isSummer, isWinter, nightStart, yearOf } from './calendar';
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, hillsPathOpen, pathOpen } from './areas';
-import { HILLS_EXIT, HILLS_FOUND_MESSAGE, OUTCROP_MESSAGES, QUARRY_HILLS_EXIT, digOreBlocker, outcropLeft } from './hills';
+import { HILLS_EXIT, HILLS_FOUND_MESSAGE, OUTCROP_MESSAGES, QUARRY_HILLS_EXIT, digOreBlocker, outcropLeft, spendOre } from './hills';
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
@@ -561,15 +561,16 @@ const digQuarry: ActionHandler<'digQuarry'> = state => {
   if (!firstReady && !secondReady) return refuse(state, 'The quarry face is worked out until morning.');
   if (isExhausted(state)) return refuse(state, TOO_TIRED_MESSAGE);
   if (freeSpaces(state) < spaceFor('stone')) return refuse(state, FULL_BAG_MESSAGE);
+  const stones = Math.min(state.progress.workshop.ironPickaxe ? 2 : 1, Math.floor(freeSpaces(state) / spaceFor('stone')));
   return {
     state: advanceTime({
       ...state,
       player: tire(state, BALANCE.digEnergyCost),
-      inventory: { ...state.inventory, stone: state.inventory.stone + 1 },
+      inventory: { ...state.inventory, stone: state.inventory.stone + stones },
       quarryReadyDay: firstReady ? state.day + 1 : state.quarryReadyDay,
       mineReadyDay: !firstReady && secondReady ? state.day + 1 : state.mineReadyDay
     }, workSeconds(state, BALANCE.digSeconds), 'working'),
-    message: 'Broke a good stone from the quarry face.'
+    message: stones === 2 ? 'Broke two good stones from the quarry face.' : 'Broke a good stone from the quarry face.'
   };
 };
 
@@ -1328,7 +1329,10 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
   if (blocker) return refuse(state, blocker);
   const workshop = { ...state.progress.workshop, [action.upgrade]: true };
   return {
-    state: payAndBuild(state, WORKSHOP_UPGRADES[action.upgrade].cost, { progress: { ...state.progress, workshop } }),
+    state: payAndBuild(spendOre(state, WORKSHOP_UPGRADES[action.upgrade].cost.ore ?? 0), WORKSHOP_UPGRADES[action.upgrade].cost, {
+      progress: { ...state.progress, workshop },
+      ...(action.upgrade === 'horseshoes' ? { pony: { ...state.pony, shod: state.day } } : {})
+    }),
     message: UPGRADE_MESSAGES[action.upgrade]
   };
 };

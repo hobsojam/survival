@@ -202,6 +202,10 @@ function addFieldStrips(state: GameState, add: AddVisual, x: number, y: number):
   state.field.strips.forEach((strip, index) => add(`field-strip-${index}`, `fieldStrip:${stripStage(strip, state.day)}`, x + FIELD_STRIP_OFFSETS[index], y));
 }
 
+/** Where the forge's lean-to stands, from the fire: built against the workshop's east side. */
+export const FORGE_SPOT = { dx: 9.75, dy: -1 } as const;
+const FORGE_GLOW_MS = 300;
+
 /** Where the handcart parks, from the fire: just below the workshop, on the same cleared ground. */
 export const CART_SPOT = { dx: 7.5, dy: 1.5 } as const;
 
@@ -306,6 +310,7 @@ function addBuildableStructures(state: GameState, add: AddVisual, x: number, y: 
   }
   addSheep(state, add, timeMs);
   if (state.sheep.woven.rug && structures.house) add('rug', 'rug:still', x - 0.5, y - 5.6, GROUND_DECAL_DEPTH);
+  if (state.progress.workshop.forge) add('forge', `forge:${Math.floor(timeMs / FORGE_GLOW_MS) % 2 === 0 ? 'a' : 'b'}`, x + FORGE_SPOT.dx, y + FORGE_SPOT.dy);
   if (state.progress.workshop.handcart && !groundBlocker(state, 'workshop')) {
     add('handcart', `handcart:${stockFrame(state.cartWood)}`, x + CART_SPOT.dx, y + CART_SPOT.dy);
   }

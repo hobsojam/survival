@@ -1,9 +1,11 @@
+import { availableOre } from './hills';
 import { availableFiber, availableStone, availableWood, isInClearing } from './camp';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { BALANCE, type GameState } from './state';
 
-// The workshop on the east far ground, and the three upgrades made there once each: a saw that doubles the wood from
-// felling, a handcart that catches felled wood, and bed tools that keep a dry vegetable bed alive a day longer.
+// The workshop on the east far ground, and the upgrades made there once each: a saw that doubles the wood from felling,
+// a handcart that catches felled wood, bed tools that keep a dry vegetable bed alive a day longer, and the like. A forge
+// added to it works the ore from the hills, into horseshoes for the pony and an iron pickaxe.
 
 export type UpgradeId = 'saw' | 'handcart' | 'bedTools' | 'harvestTools' | 'quern' | 'shears' | 'forge' | 'horseshoes' | 'ironPickaxe';
 
@@ -35,7 +37,7 @@ export const UPGRADE_MESSAGES: Record<UpgradeId, string> = {
 
 /** "3 wood and 3 stone", or "8 wood, 2 fiber, and 1 stone": the cost's parts, leaving out any it doesn't need. */
 export function costPhrase(cost: Cost): string {
-  const parts = (['wood', 'fiber', 'stone'] as const).filter(key => cost[key] > 0).map(key => `${cost[key]} ${key}`);
+  const parts = (['wood', 'fiber', 'stone', 'ore'] as const).filter(key => (cost[key] ?? 0) > 0).map(key => `${cost[key]} ${key}`);
   if (parts.length < 3) return parts.join(' and ');
   return `${parts.slice(0, -1).join(', ')}, and ${parts.at(-1)}`;
 }
@@ -49,9 +51,13 @@ export function upgradeBlocker(state: GameState, id: UpgradeId): string | null {
   if (id === 'harvestTools' && !state.structures.field) return 'Build the field first.';
   if (id === 'quern' && !state.structures.granary) return 'Build the granary first.';
   if (id === 'shears' && !state.structures.sheepPen) return 'Build the sheep pen first.';
+  if (id === 'forge' && state.progress.oreFoundDay === null) return 'Find some ore first.';
+  if ((id === 'horseshoes' || id === 'ironPickaxe') && !state.progress.workshop.forge) return 'Add a forge to the workshop first.';
+  if (id === 'horseshoes' && state.pony.won === null) return 'You have no pony to shoe.';
+  if (id === 'ironPickaxe' && !state.progress.pickaxeCrafted) return 'Craft a pickaxe first.';
   if (!isInClearing(state)) return 'Return to camp to work at the workshop.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
-  if (availableWood(state) < cost.wood || availableFiber(state) < cost.fiber || availableStone(state) < cost.stone) {
+  if (availableWood(state) < cost.wood || availableFiber(state) < cost.fiber || availableStone(state) < cost.stone || availableOre(state) < (cost.ore ?? 0)) {
     return `Need ${costPhrase(cost)} for the ${name}.`;
   }
   return null;
