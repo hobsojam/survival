@@ -1,3 +1,4 @@
+import { ORCHARD_SPOTS } from '../game/orchard';
 import type { PaletteKey } from './palette';
 import { box, define, dot, oval, type Grid } from './sheepSprites';
 import type { SpriteDef } from './sprites';
@@ -6,6 +7,8 @@ import type { SpriteDef } from './sprites';
 
 const WIDE = 88;
 const TALL = 104;
+/** Where the plot's middle stands, in tiles, as `CAMP_STRUCTURES` places it. */
+const PLOT_MIDDLE = { x: 4.75, y: 10.75 };
 
 function plot(g: Grid): void {
   for (const y of [1, TALL - 3]) box(g, 0, y, WIDE, 1, 'b');
@@ -16,6 +19,12 @@ function plot(g: Grid): void {
   };
   for (let x = 0; x <= WIDE - 3; x += 17) { post(x, 0); post(x, TALL - 4); }
   for (let y = 0; y <= TALL - 4; y += 17) { post(0, y); post(WIDE - 4, y); }
+  for (const spot of ORCHARD_SPOTS) {
+    const x = WIDE / 2 + (spot.x - PLOT_MIDDLE.x) * 16;
+    const y = TALL / 2 + (spot.y - PLOT_MIDDLE.y) * 16;
+    oval(g, x, y, 5, 3, 'a');
+    oval(g, x, y, 3, 2, 'b');
+  }
 }
 
 function plotSite(g: Grid): void {
@@ -33,13 +42,14 @@ const MID = 17;
 const COLOURS: Record<string, PaletteKey> = {
   s: 'shadow', a: 'wood0', b: 'wood1', c: 'wood2', d: 'wood3', v: 'canvas1',
   g: 'leaf1', h: 'leaf2', i: 'leaf3', j: 'leaf4',
-  o: 'fire2', y: 'fire3', u: 'fire1', r: 'fire1', w: 'flower2', p: 'flower3', f: 'frost'
+  o: 'crown1', t: 'crown2', u: 'crown3', y: 'berry3', r: 'berry2', w: 'flower2', p: 'flower3', f: 'frost'
 };
 
 type Leaves = { dark: string; mid: string; light: string; dots?: string; dots2?: string };
 const GREEN: Leaves = { dark: 'g', mid: 'h', light: 'i' };
 const BLOSSOM: Leaves = { dark: 'h', mid: 'i', light: 'j', dots: 'w', dots2: 'p' };
-const TURNING: Leaves = { dark: 'u', mid: 'o', light: 'y' };
+// The palette turns these with the seasons, as it does the wild broadleaf trees.
+const TURNING: Leaves = { dark: 'o', mid: 't', light: 'u' };
 
 function ground(g: Grid, width: number): void {
   oval(g, MID, FOOT - 0.5, width, 1.6, 's');
@@ -64,12 +74,16 @@ function crown(g: Grid, cy: number, rx: number, ry: number, leaves: Leaves): voi
   }
 }
 
-function branches(g: Grid, top: number, reach: number, snow: boolean): void {
-  for (let i = 0; i < reach; i++) {
-    const rise = Math.round(i * 0.75);
-    for (const [side, start] of [[-1, top + 6], [1, top + 3]] as const) dot(g, MID + side * (i + 1), start - rise, 'b');
-    if (i % 2 === 0) { dot(g, MID - i - 1, top + 1 - rise, 'a'); dot(g, MID + i + 1, top - 2 - rise, 'a'); }
-    if (snow) { dot(g, MID - i - 1, top + 5 - rise, 'f'); dot(g, MID + i + 1, top + 2 - rise, 'f'); }
+/** Bare limbs growing up and out of the trunk, with a twig and a little snow lying on each. */
+function branches(g: Grid, top: number, reach: number): void {
+  box(g, MID, top, 1, 6, 'b');
+  for (const [side, start] of [[-1, top + 6], [1, top + 3]] as const) {
+    for (let i = 0; i < reach; i++) {
+      const x = MID + side * (i + 1);
+      const y = start - Math.round(i * 0.75);
+      dot(g, x, y, 'b');
+      dot(g, x, y - 1, i % 2 === 0 ? 'a' : 'f');
+    }
   }
 }
 
@@ -99,7 +113,7 @@ function young(g: Grid, leaves: Leaves | null): void {
   ground(g, 8);
   trunk(g, 2, FOOT - 16);
   if (leaves) crown(g, FOOT - 21, 9, 9, leaves);
-  else branches(g, FOOT - 20, 7, true);
+  else branches(g, FOOT - 20, 7);
 }
 
 function grown(g: Grid, leaves: Leaves | null, apples = false): void {
@@ -107,7 +121,8 @@ function grown(g: Grid, leaves: Leaves | null, apples = false): void {
   trunk(g, 4, FOOT - 22);
   dot(g, MID - 3, FOOT - 1, 'b'); dot(g, MID + 2, FOOT - 1, 'b');
   if (!leaves) {
-    branches(g, FOOT - 30, 14, true);
+    box(g, MID - 2, FOOT - 26, 4, 5, 'b');
+    branches(g, FOOT - 30, 14);
     return;
   }
   crown(g, FOOT - 31, 16, 15, leaves);
@@ -133,6 +148,6 @@ export const orchardSprites: Record<string, SpriteDef> = {
     grownBlossom: g => grown(g, BLOSSOM),
     grownGreen: g => grown(g, GREEN),
     grownAutumn: g => grown(g, TURNING),
-    grownFruit: g => grown(g, GREEN, true)
+    grownFruit: g => grown(g, TURNING, true)
   }, [MID, FOOT], COLOURS)
 };

@@ -623,7 +623,7 @@ const clearGround: ActionHandler<'clearGround'> = state => {
   const nodes = state.nodes.map((node, index) => ({ ...node, x: placed[index].x, y: placed[index].y }));
   return {
     state: payAndBuild(state, CLEARING_STEPS[step].cost, { nodes, clearing: { cleared, marked: null, felled: [] } }),
-    message: `${capitalised(stepGround(step))} is open now.${roomLine(step, state.structures, id => Object.hasOwn(BUILDINGS, id))}`
+    message: `${capitalised(stepGround(step))} is open now.${roomLine(step, state.structures, id => Object.hasOwn(BUILDINGS, id) && buildStatus(state, id as StructureId) !== 'locked')}`
   };
 };
 

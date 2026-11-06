@@ -736,7 +736,7 @@ function clearingSideView(state: GameState, side: Side): ClearingSideView {
   const name = capitalised(side);
   if (!step) return { side, label: `${name} · cleared`, detail: '', disabled: true, done: true, chosen: false };
   const { trees, cost } = CLEARING_STEPS[step];
-  const room = roomLine(step, state.structures, id => Object.hasOwn(BUILDINGS, id));
+  const room = roomLine(step, state.structures, id => Object.hasOwn(BUILDINGS, id) && buildStatus(state, id as StructureId) !== 'locked');
   const price = cost.stone > 0
     ? `${trees.length} trees, then ${cost.wood} wood, ${cost.fiber} fiber and ${cost.stone} stone`
     : `${trees.length} trees, then ${cost.wood} wood and ${cost.fiber} fiber`;

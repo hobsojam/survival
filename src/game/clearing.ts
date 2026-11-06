@@ -316,9 +316,10 @@ function buildingName(id: string): string {
   return id.replace(/([A-Z])/g, ' $1').toLowerCase();
 }
 
-/** "a larder", or, for a building named in the plural, just "vegetable beds". */
+/** "a larder" or "an orchard", or, for a building named in the plural, just "vegetable beds". */
 function withArticle(name: string): string {
-  return name.endsWith('s') ? name : `a ${name}`;
+  if (name.endsWith('s')) return name;
+  return /^[aeiou]/.test(name) ? `an ${name}` : `a ${name}`;
 }
 
 /** The sentence about what a cleared step makes room for, leading space included, or nothing if it is built or has none. */

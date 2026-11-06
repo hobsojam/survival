@@ -4,7 +4,7 @@ import { isAtCamp, isInClearing, mineBlocker, sleepBlocker, type GameAction } fr
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
 import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
-import { nearestSpot, spotAction, treeBears, treeStage } from '../game/orchard';
+import { ORCHARD_SPOTS, nearestSpot, spotAction, treeBears, treeStage } from '../game/orchard';
 import { choppableTrees, isClearingStump } from '../game/clearing';
 import { sitePrompt } from '../game/sitePrompt';
 import { offerFor, offerPrompt } from '../game/companion';
@@ -71,6 +71,17 @@ function gatherChoice(state: GameState, found: Gatherable): Choice {
   }
 }
 
+/** Standing closer to an orchard spot than to anything to gather or search, the spot goes first. */
+function orchardComesFirst(state: GameState, found: Gatherable | undefined): boolean {
+  const spot = nearestSpot(state);
+  if (spot === null) return false;
+  const away = (place: { x: number; y: number }): number => Math.hypot(state.player.x - place.x, state.player.y - place.y);
+  const toGather = found?.kind === 'node' ? found.node : found?.kind === 'pile' ? found.pile : null;
+  const site = closestSite(state);
+  const nearest = away(ORCHARD_SPOTS[spot]);
+  return (!toGather || away(toGather) > nearest) && (!site || away(site) > nearest);
+}
+
 /** Everything in reach at camp, in the order E would use it: gathering, then the lookout, a place or a tree, then an offering. */
 function campChoices(state: GameState): Choice[] {
   const found = closestGatherable(state);
@@ -81,7 +92,10 @@ function campChoices(state: GameState): Choice[] {
   const coop: Choice | null = state.chickens.rescued && within(state, COOP_SITE)
     ? { label: state.chickens.eggs ? `Collect egg (×${state.chickens.eggs})` : 'Coop · no eggs yet',
       ...(state.chickens.eggs ? { action: { type: 'takeEgg' as const } } : {}) } : null;
-  return [found ? gatherChoice(state, found) : null, nearby, coop, orchardChoice(state), offer].filter((choice): choice is Choice => choice !== null);
+  const gather = found ? gatherChoice(state, found) : null;
+  const orchard = orchardChoice(state);
+  const inOrder = orchardComesFirst(state, found) ? [orchard, gather, nearby, coop, offer] : [gather, nearby, coop, orchard, offer];
+  return inOrder.filter((choice): choice is Choice => choice !== null);
 }
 
 function homesteadChoices(state: GameState): Choice[] {

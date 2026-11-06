@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CLEARING_STEPS, STEP_IDS, inClearedPatch, placeBranches, previousStep, stepGround, stepWhere, type StepId } from '../src/game/clearing';
+import { CLEARING_STEPS, STEP_IDS, inClearedPatch, placeBranches, previousStep, roomLine, stepGround, stepWhere, type StepId } from '../src/game/clearing';
 import { addFood } from '../src/game/food';
 import { recordJournal } from '../src/game/journalEntries';
 import { newsBetween } from '../src/game/news';
@@ -11,10 +11,10 @@ import { upgradeSave } from '../src/game/saveUpgrades';
 import { BUILDINGS, SITES, createGame, type GameState } from '../src/game/state';
 import { unnamedAnimalAt } from '../src/scene/animalTap';
 import { buildMap } from '../src/scene/map';
-import { orchardChoice } from '../src/scene/prompts';
+import { orchardChoice, useKeyAction } from '../src/scene/prompts';
 import { pickTapTarget, targetAction } from '../src/scene/tapTarget';
 import { sceneVisuals } from '../src/scene/visuals';
-import { pipsLine } from '../src/ui/panels';
+import { clearingView, pipsLine } from '../src/ui/panels';
 import { journalPageView } from '../src/ui/yearJournal';
 
 const game = createGame();
@@ -533,5 +533,94 @@ describe('the prompt in the orchard', () => {
 describe('the pips in the bag', () => {
   it.each([[0, ''], [1, '1 apple pip'], [2, '2 apple pips']])('with %i says %j', (pips, line) => {
     expect(pipsLine(orchardCamp({ pips }))).toBe(line);
+  });
+});
+
+describe('saying there is room', () => {
+  it('uses the right word before a vowel', () => {
+    expect(roomLine('west-outer', {}, () => true)).toBe(" There's room for an orchard now.");
+    expect(roomLine('north-near', {}, () => true)).toBe(" There's room for a larder now.");
+  });
+
+  const felled = (found: boolean): GameState => ({
+    ...orchardCamp({}, { structures: { ...game.structures, shelter: true } }),
+    player: { ...game.player, x: 20, y: 16 },
+    clearing: { cleared: STEP_IDS.filter(id => id !== 'west-outer'), marked: 'west-outer', felled: [0, 1, 2] },
+    inventory: { ...game.inventory, wood: 8, fiber: 4, stone: 2 },
+    progress: { ...game.progress, homesteadFound: found, nextStormDay: null, hearthUnlocked: true, axeCrafted: true }
+  });
+  const clear = (found: boolean) => applyAction(felled(found), { type: 'clearGround' }).message;
+
+  it('names the orchard after clearing once the homestead is found', () => {
+    expect(clear(true)).toContain("There's room for an orchard now.");
+  });
+
+  it('keeps the orchard quiet until the homestead is found, as the build list does', () => {
+    expect(clear(false)).not.toContain('orchard');
+    const side = (found: boolean) => clearingView({ ...felled(found), clearing: { cleared: STEP_IDS.filter(id => id !== 'west-outer'), marked: null, felled: [] } }).sides.find(view => view.side === 'west')!;
+    expect(side(false).detail).not.toContain('orchard');
+    expect(side(true).detail).toContain('an orchard');
+  });
+});
+
+describe('E at a spot, with the real camp around it', () => {
+  const on = (x: number, y: number, orchard: Partial<OrchardState> = { pips: 1 }) => orchardCamp(orchard, { player: { ...game.player, x, y } });
+
+  it('plants at the spot the survivor is standing on, though a bush and a branch are in reach', () => {
+    expect(useKeyAction(on(7, 10))).toEqual({ type: 'plantPip', spot: 2 });
+    expect(useKeyAction(on(5, 13))).toEqual({ type: 'plantPip', spot: 4 });
+  });
+
+  it('still picks the bush when standing closer to it', () => {
+    expect(useKeyAction(on(8.4, 10))).toMatchObject({ type: 'gather', nodeId: 'berry-6' });
+  });
+
+  it('still searches the basket when standing closer to it', () => {
+    expect(useKeyAction(on(7.4, 8.4))).toEqual({ type: 'visitSite', siteId: 'basket' });
+  });
+
+  it('falls through to the bush when the spot has nothing to offer', () => {
+    expect(useKeyAction(on(7, 10, {}))).toMatchObject({ type: 'gather', nodeId: 'berry-6' });
+  });
+});
+
+describe('the art of the plot and trees', () => {
+  const { frames, legend } = sprites.orchardTree;
+
+  it('marks each of the six spots on the built plot', () => {
+    const plot = sceneVisuals(orchardCamp(), 0).find(visual => visual.id === 'orchard')!;
+    const { frames: plotFrames, anchor } = sprites.orchard;
+    for (const spot of ORCHARD_SPOTS) {
+      const column = (spot.x + 0.5) * 16 - plot.x + anchor[0];
+      const row = (spot.y + 0.5) * 16 - plot.y + anchor[1];
+      expect(plotFrames.built[row]?.[column], `${spot.x},${spot.y}`).not.toBe('.');
+    }
+  });
+
+  it.each(['youngBare', 'grownBare'])('joins every branch of %s to its trunk', frame => {
+    const rows = frames[frame];
+    const solid = (x: number, y: number) => rows[y]?.[x] !== undefined && rows[y][x] !== '.' && legend[rows[y][x]] !== 'shadow';
+    const seen = new Set<string>();
+    const toVisit: [number, number][] = [[17, 47]];
+    while (toVisit.length) {
+      const [x, y] = toVisit.pop()!;
+      if (!solid(x, y) || seen.has(`${x},${y}`)) continue;
+      seen.add(`${x},${y}`);
+      for (const dx of [-1, 0, 1]) for (const dy of [-1, 0, 1]) toVisit.push([x + dx, y + dy]);
+    }
+    let painted = 0;
+    rows.forEach((row, y) => [...row].forEach((_, x) => { if (solid(x, y)) painted++; }));
+    expect(seen.size).toBe(painted);
+  });
+
+  it('turns with the woods in autumn, and keeps its colour when picked', () => {
+    const keys = (frame: string) => new Set([...frames[frame].join('')].map(cell => legend[cell]));
+    expect(keys('grownAutumn').has('crown2')).toBe(true);
+    expect(keys('grownAutumn').has('fire2')).toBe(false);
+    expect(keys('grownFruit').has('berry2')).toBe(true);
+    const fruit = frames.grownFruit.join('');
+    const changed = [...frames.grownAutumn.join('')].filter((cell, i) => cell !== fruit[i]).length;
+    expect(changed).toBeGreaterThan(0);
+    expect(changed).toBeLessThanOrEqual(44);
   });
 });
