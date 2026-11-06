@@ -13,8 +13,8 @@ export const oval = (g: Grid, cx: number, cy: number, rx: number, ry: number, c:
   for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++)
     if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1) dot(g, x, y, c);
 };
-export function define(width: number, height: number, painters: Record<string, (g: Grid) => void>, anchor: [number, number]): SpriteDef {
-  return { size: [width, height], anchor, legend, frames: Object.fromEntries(Object.entries(painters).map(([name, paint]) => {
+export function define(width: number, height: number, painters: Record<string, (g: Grid) => void>, anchor: [number, number], colours: Record<string, PaletteKey> = legend): SpriteDef {
+  return { size: [width, height], anchor, legend: colours, frames: Object.fromEntries(Object.entries(painters).map(([name, paint]) => {
     const g = blank(width, height); paint(g); return [name, g.map(row => row.join(''))];
   })) };
 }

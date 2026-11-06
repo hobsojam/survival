@@ -3,12 +3,18 @@ import { CLEARING_STEPS, STEP_IDS, inClearedPatch, placeBranches, previousStep, 
 import { addFood } from '../src/game/food';
 import { recordJournal } from '../src/game/journalEntries';
 import { newsBetween } from '../src/game/news';
-import { ORCHARD_SPOTS, autumnsPassed, emptyOrchard, nearestSpot, orchardNews, spotAction, treeBears, treeRipe, treeStage, treesPlanted, type OrchardState } from '../src/game/orchard';
+import { sprites } from '../src/art/sprites';
+import { ORCHARD_SPOTS, autumnsPassed, emptyOrchard, nearestSpot, orchardNews, spotAction, treeBears, treeFrame, treeRipe, treeStage, treesPlanted, type OrchardState } from '../src/game/orchard';
 import { applyAction, buildStatus, type GameAction } from '../src/game/rules';
 import { saveGame } from '../src/game/save';
 import { upgradeSave } from '../src/game/saveUpgrades';
 import { BUILDINGS, SITES, createGame, type GameState } from '../src/game/state';
+import { unnamedAnimalAt } from '../src/scene/animalTap';
 import { buildMap } from '../src/scene/map';
+import { orchardChoice } from '../src/scene/prompts';
+import { pickTapTarget, targetAction } from '../src/scene/tapTarget';
+import { sceneVisuals } from '../src/scene/visuals';
+import { pipsLine } from '../src/ui/panels';
 import { journalPageView } from '../src/ui/yearJournal';
 
 const game = createGame();
@@ -404,5 +410,128 @@ describe('the journal line', () => {
   it('stays off the page until the orchard stands', () => {
     const blanks = (state: GameState) => journalPageView(state, 0).blanks;
     expect(blanks(orchardCamp({}, { day: 5 }))).toBe(blanks(orchardCamp({}, { day: 5, structures: { ...game.structures, shelter: true } })) + 1);
+  });
+});
+
+describe('how a tree looks', () => {
+  const planted = { plantedDay: 1, ripeDay: 1 };
+
+  it.each([
+    [5, 'sprout'], [51, 'saplingBare'], [71, 'sapling'],
+    [91, 'youngBare'], [101, 'youngBlossom'], [111, 'youngGreen'], [81, 'youngAutumn'],
+    [131, 'grownBare'], [141, 'grownBlossom'], [151, 'grownGreen'], [121, 'grownFruit']
+  ])('on day %i it is drawn as %s', (day, frame) => {
+    expect(treeFrame(planted, day)).toBe(frame);
+  });
+
+  it('shows no apples just after a picking', () => {
+    expect(treeFrame({ plantedDay: 1, ripeDay: 124 }, 121)).toBe('grownAutumn');
+  });
+
+  it('has art for every frame, and each age looks different', () => {
+    const { frames } = sprites.orchardTree;
+    const all = ['sprout', 'saplingBare', 'sapling', 'youngBare', 'youngBlossom', 'youngGreen', 'youngAutumn', 'grownBare', 'grownBlossom', 'grownGreen', 'grownAutumn', 'grownFruit'];
+    for (const frame of all) expect(frames[frame], frame).toBeDefined();
+    expect(new Set(all.map(frame => frames[frame].join())).size).toBe(all.length);
+    const painted = (frame: string) => frames[frame].join('').replaceAll('.', '').length;
+    expect(painted('sprout')).toBeLessThan(painted('sapling'));
+    expect(painted('sapling')).toBeLessThan(painted('youngGreen'));
+    expect(painted('youngGreen')).toBeLessThan(painted('grownGreen'));
+  });
+});
+
+describe('the orchard on the map', () => {
+  const visuals = (state: GameState) => sceneVisuals(state, 0);
+
+  it('lies flat as a ground decal once built, under the survivor and trees', () => {
+    const plot = visuals(orchardCamp()).find(visual => visual.id === 'orchard')!;
+    expect(plot.texture).toBe('orchard:built');
+    expect(plot.depth).toBeLessThan(0);
+  });
+
+  it('draws a tree for each one planted, and nothing on an empty spot', () => {
+    const state = orchardCamp({ trees: [null, { plantedDay: 1, ripeDay: 1 }, null, null, null, null] });
+    const trees = visuals(state).filter(visual => visual.id.startsWith('orchard-tree-'));
+    expect(trees.map(tree => [tree.id, tree.texture])).toEqual([['orchard-tree-1', 'orchardTree:sapling']]);
+  });
+
+  it('sorts trees by how far down the plot they stand', () => {
+    const state = orchardCamp({ trees: treesOf(6) });
+    const depth = (index: number) => visuals(state).find(visual => visual.id === `orchard-tree-${index}`)!.depth;
+    expect(depth(4)).toBeGreaterThan(depth(1));
+  });
+
+  it('shows only the marked site before the build, and nothing before the homestead is found', () => {
+    const unbuilt = { ...game.structures, shelter: true };
+    expect(visuals(orchardCamp({}, { structures: unbuilt })).find(visual => visual.id === 'orchard')?.texture).toBe('orchardSite:still');
+    expect(visuals(orchardCamp({}, { structures: unbuilt, progress: { ...game.progress, homesteadFound: false } })).find(visual => visual.id === 'orchard')).toBeUndefined();
+  });
+});
+
+describe('tapping in the orchard', () => {
+  const tap = (state: GameState, spot: number) => pickTapTarget(state, ORCHARD_SPOTS[spot].x, ORCHARD_SPOTS[spot].y);
+
+  it('finds the spot tapped', () => {
+    expect(tap(orchardCamp(), 4)).toMatchObject({ kind: 'orchard', spot: 4, x: 5, y: 13 });
+  });
+
+  it('plants an empty spot with a pip, from anywhere', () => {
+    expect(targetAction(tap(orchardCamp({ pips: 1 }), 4))).toEqual({ type: 'plantPip', spot: 4 });
+  });
+
+  it('picks a ripe tree', () => {
+    expect(targetAction(tap(orchardCamp({ trees: treesOf(1) }, { day: 121 }), 0))).toEqual({ type: 'pickOrchardApple', spot: 0 });
+  });
+
+  it('counts a tap on a grown tree\'s branches as the tree', () => {
+    const state = orchardCamp({ trees: [null, null, null, treesOf(1)[0], null, null] }, { day: 121 });
+    expect(pickTapTarget(state, 3, 11.4)).toMatchObject({ kind: 'orchard', spot: 3 });
+  });
+
+  it('only walks to a tree with nothing to offer', () => {
+    const target = tap(orchardCamp({ trees: treesOf(1) }, { day: 141 }), 0);
+    expect(target.kind).toBe('orchard');
+    expect(targetAction(target)).toBeNull();
+  });
+
+  it('only walks to an empty spot with no pip', () => {
+    expect(targetAction(tap(orchardCamp(), 0))).toBeNull();
+  });
+
+  it('is ground with no orchard', () => {
+    expect(tap(orchardCamp({}, { structures: game.structures }), 0).kind).toBe('ground');
+  });
+
+  it('never asks a name for a tap on a tree', () => {
+    const state = orchardCamp({ trees: treesOf(1) }, { sheep: { ...game.sheep, arrived: true, fluff: 40, fedUntil: 1 } });
+    expect(unnamedAnimalAt(state, 0, ORCHARD_SPOTS[0].x, ORCHARD_SPOTS[0].y)).toBeNull();
+  });
+});
+
+describe('the prompt in the orchard', () => {
+  const at = (day: number, orchard: Partial<OrchardState>) => orchardCamp(orchard, { day, player: { ...game.player, x: 3, y: 10 } });
+  const waiting = [{ plantedDay: 1, ripeDay: 122 }, null, null, null, null, null];
+  const young = [{ plantedDay: 41, ripeDay: 41 }, null, null, null, null, null];
+
+  it.each([
+    ['Pick apples', at(121, { trees: treesOf(1) }), { type: 'pickOrchardApple', spot: 0 }],
+    ['Plant a pip', at(62, { pips: 1 }), { type: 'plantPip', spot: 0 }],
+    ['Apple tree · no ripe apples yet', at(121, { trees: waiting }), undefined],
+    ['Apple tree · apples come in autumn', at(141, { trees: treesOf(1) }), undefined],
+    ['Young apple tree · not bearing yet', at(62, { trees: young }), undefined],
+    ['Orchard spot · the ground is frozen', at(55, { pips: 1 }), undefined],
+    ['Orchard spot · no pips', at(62, {}), undefined]
+  ])('says %s', (label, state, action) => {
+    expect(orchardChoice(state)).toEqual(action ? { label, action } : { label });
+  });
+
+  it('says nothing away from the plot', () => {
+    expect(orchardChoice(orchardCamp({}, { player: { ...game.player, x: 20, y: 16 } }))).toBeNull();
+  });
+});
+
+describe('the pips in the bag', () => {
+  it.each([[0, ''], [1, '1 apple pip'], [2, '2 apple pips']])('with %i says %j', (pips, line) => {
+    expect(pipsLine(orchardCamp({ pips }))).toBe(line);
   });
 });

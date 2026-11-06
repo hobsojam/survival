@@ -14,6 +14,7 @@ import { markedTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
 import { fireplaceBurning, woodStoreCapacity } from '../game/home';
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
+import { ORCHARD_SPOTS, treeFrame } from '../game/orchard';
 import { sheepStage, type SheepStage } from '../game/sheep';
 import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
 import type { StockLevel } from '../art/phase3Sprites';
@@ -282,6 +283,13 @@ function addBuildableStructures(state: GameState, add: AddVisual, x: number, y: 
     if (id === 'orchard' && !state.progress.homesteadFound) continue;
     if (id === 'vegetableBeds' && structures.vegetableBeds) {
       addVegetableBeds(state, add, x + dx, y + dy);
+      continue;
+    }
+    if (id === 'orchard' && structures.orchard) {
+      add('orchard', 'orchard:built', x + dx, y + dy, GROUND_DECAL_DEPTH);
+      state.orchard.trees.forEach((tree, spot) => {
+        if (tree) add(`orchard-tree-${spot}`, `orchardTree:${treeFrame(tree, state.day)}`, ORCHARD_SPOTS[spot].x, ORCHARD_SPOTS[spot].y);
+      });
       continue;
     }
     if (id === 'field' && structures.field) {

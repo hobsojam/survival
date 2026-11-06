@@ -1,4 +1,4 @@
-import { season, yearOf } from './calendar';
+import { season, yearOf, type Season } from './calendar';
 import { freeSpaces } from './camp';
 import type { GameAction } from './rules';
 import { BALANCE, type GameState } from './state';
@@ -92,4 +92,17 @@ export function orchardNews(before: GameState, after: GameState): string[] {
   if (days.length === 0) return [];
   const oldest = Math.min(...days);
   return autumnsPassed(oldest, before.day) < 3 && autumnsPassed(oldest, after.day) >= 3 ? ['There are apples on your own tree this morning.'] : [];
+}
+
+const FRAMES: Record<Exclude<TreeStage, 'sprout'>, Record<Season, string>> = {
+  sapling: { autumn: 'sapling', winter: 'saplingBare', spring: 'sapling', summer: 'sapling' },
+  young: { autumn: 'youngAutumn', winter: 'youngBare', spring: 'youngBlossom', summer: 'youngGreen' },
+  grown: { autumn: 'grownAutumn', winter: 'grownBare', spring: 'grownBlossom', summer: 'grownGreen' }
+};
+
+/** The picture for a tree today: its age and the season, with apples on it once ripe. */
+export function treeFrame(tree: OrchardTree, day: number): string {
+  const stage = treeStage(tree, day);
+  if (stage === 'sprout') return 'sprout';
+  return treeRipe(tree, day) ? 'grownFruit' : FRAMES[stage][season(day)];
 }

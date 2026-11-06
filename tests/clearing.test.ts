@@ -138,7 +138,7 @@ describe('clearing steps', () => {
 });
 
 describe('the outer ground', () => {
-  it('opens a third step on the north, east and south sides only', () => {
+  it('opens a third step on every side', () => {
     expect(STEP_IDS).toEqual(['north-near', 'north-far', 'north-outer', 'east-near', 'east-far', 'east-outer', 'south-near', 'south-far', 'south-outer', 'west-near', 'west-far', 'west-outer']);
     expect(previousStep('north-outer')).toBe('north-far');
     expect(previousStep('south-far')).toBe('south-near');

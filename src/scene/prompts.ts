@@ -4,6 +4,7 @@ import { isAtCamp, isInClearing, mineBlocker, sleepBlocker, type GameAction } fr
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
 import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
+import { nearestSpot, spotAction, treeBears, treeStage } from '../game/orchard';
 import { choppableTrees, isClearingStump } from '../game/clearing';
 import { sitePrompt } from '../game/sitePrompt';
 import { offerFor, offerPrompt } from '../game/companion';
@@ -22,7 +23,7 @@ export const KEY_ACTIONS: readonly [string, GameAction][] = [
 const ACTION_POSES: Partial<Record<GameAction['type'], SurvivorAction>> = {
   gather: 'gather', rest: 'rest', cook: 'cook', stargaze: 'stargaze',
   chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', fish: 'gather',
-  gatherApples: 'gather', searchShed: 'gather', takeEgg: 'gather'
+  gatherApples: 'gather', plantPip: 'gather', pickOrchardApple: 'gather', searchShed: 'gather', takeEgg: 'gather'
 };
 
 /** The survivor's pose for an action that changed the game, if it has one. */
@@ -37,6 +38,22 @@ const GATHER_PROMPTS: Record<ResourceKind, string> = {
 
 /** One thing within reach: what the prompt calls it, and what E (like a tap) would do with it, if anything. */
 interface Choice { label: string; action?: GameAction }
+
+const spotLabel = (state: GameState, spot: number, action: GameAction | null): string => {
+  const tree = state.orchard.trees[spot];
+  if (action) return tree ? 'Pick apples' : 'Plant a pip';
+  if (!tree) return isWinter(state.day) ? 'Orchard spot · the ground is frozen' : 'Orchard spot · no pips';
+  if (treeStage(tree, state.day) !== 'grown') return 'Young apple tree · not bearing yet';
+  return treeBears(tree, state.day) ? 'Apple tree · no ripe apples yet' : 'Apple tree · apples come in autumn';
+};
+
+/** The orchard spot within reach, and what it offers, if the orchard stands. */
+export function orchardChoice(state: GameState): Choice | null {
+  const spot = nearestSpot(state);
+  if (spot === null) return null;
+  const action = spotAction(state, spot);
+  return action ? { label: spotLabel(state, spot, action), action } : { label: spotLabel(state, spot, action) };
+}
 
 /** Gathering what is in reach; at the quarry face, digging it. */
 function gatherChoice(state: GameState, found: Gatherable): Choice {
@@ -64,7 +81,7 @@ function campChoices(state: GameState): Choice[] {
   const coop: Choice | null = state.chickens.rescued && within(state, COOP_SITE)
     ? { label: state.chickens.eggs ? `Collect egg (×${state.chickens.eggs})` : 'Coop · no eggs yet',
       ...(state.chickens.eggs ? { action: { type: 'takeEgg' as const } } : {}) } : null;
-  return [found ? gatherChoice(state, found) : null, nearby, coop, offer].filter((choice): choice is Choice => choice !== null);
+  return [found ? gatherChoice(state, found) : null, nearby, coop, orchardChoice(state), offer].filter((choice): choice is Choice => choice !== null);
 }
 
 function homesteadChoices(state: GameState): Choice[] {

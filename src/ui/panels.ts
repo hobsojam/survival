@@ -196,6 +196,13 @@ export function sheepPanelView(state: GameState): { shown: boolean; status: stri
   };
 }
 
+/** The saved pips, for the Bag panel; nothing until there are some. */
+export function pipsLine(state: GameState): string {
+  const { pips } = state.orchard;
+  if (pips === 0) return '';
+  return pips === 1 ? '1 apple pip' : `${pips} apple pips`;
+}
+
 export interface LoomItemView { id: WovenId; name: string; cost: string; disabled: boolean; hint: string }
 
 const LOOM_NAMES: Record<WovenId, string> = { blanket: 'Wool blanket', jumper: 'Warm jumper', rug: 'Rug' };
