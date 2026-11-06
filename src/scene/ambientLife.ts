@@ -16,6 +16,12 @@ import {
   LEAF_HOMES, RABBIT_FLEE_RADIUS, RABBIT_HOMES, WOLF_SPOTS, darkness, eyesAt, fireflyFrame, fireflyGlow, fireflyOffset, foxAt, foxFrame, leafAt, rabbitAt, rabbitCount, wolfCount, wolfWatch, type Point
 } from './ambient';
 import { rabbitHomes } from '../game/wildlife';
+import { ponyPoseFor, type PonyPose } from './ponyPose';
+
+/** Tiles a second the pony's picture walks: a shade quicker than the survivor, so it keeps up. */
+const PONY_SPEED = 4.2;
+/** Closer than this and it has arrived. */
+const PONY_SETTLE = 0.15;
 
 type BirdFlightKind = 'flee' | 'return' | 'forage' | 'home';
 interface Motion { from: Point; to: Point; elapsed: number; duration: number }
@@ -84,6 +90,12 @@ export class AmbientLife {
   private readonly wolfEyes: Phaser.GameObjects.Image[];
   private readonly rabbits: Rabbit[];
   private rabbitArea: GameState['area'] = 'camp';
+  private readonly pony: Phaser.GameObjects.Image;
+  private ponyPlace: Point | null = null;
+  private ponyArea: GameState['area'] = 'camp';
+  private ponyMoving = false;
+  /** The pony as last drawn, for a tap to land on. */
+  ponyDrawn: PonyPose | null = null;
   /** Eases toward how strongly the wolves press in, so their eyes fade rather than blink out. */
   private wolfPresence = 0;
   private readonly friends: Record<Friend, Phaser.GameObjects.Image>;
@@ -115,6 +127,7 @@ export class AmbientLife {
     this.swallows = Array.from({ length: SWALLOW_COUNT }, () => sprite(scene, 'swallow', 'fly0'));
     this.butterflies = Array.from({ length: BUTTERFLY_COUNT }, () => sprite(scene, 'butterfly', 'flap0'));
     this.fox = sprite(scene, 'fox', 'trot0');
+    this.pony = sprite(scene, 'pony', 'stand');
     this.fireflies = FIREFLY_HOMES.map(() => sprite(scene, 'firefly', 'glow0', LIGHT_DEPTH));
     this.leaves = LEAF_HOMES.map(() => sprite(scene, 'leaf', 'fall0'));
     this.eyes = EYE_SPOTS.map(() => sprite(scene, 'eyes', 'open', LIGHT_DEPTH));
@@ -136,6 +149,7 @@ export class AmbientLife {
     }
     this.updateWolves(state, dark, seconds, timeMs);
     this.updateFriend(state, seconds, timeMs);
+    this.updatePony(state, seconds, timeMs);
     if (state.area !== 'camp') {
       for (const image of [...this.birds.map(bird => bird.image), this.fox, ...this.fireflies, ...this.leaves]) image.setVisible(false);
       if (state.area === 'hills') this.updateRabbits(state, dark, seconds, timeMs);
@@ -361,6 +375,31 @@ export class AmbientLife {
       image.setTexture(`eyes:${eyes.frame}`).setPosition(Math.round(worldX(eyes.x)), Math.round(worldY(eyes.y)))
         .setAlpha(eyes.alpha).setVisible(true);
     });
+  }
+
+  /** The pony's picture walks along to where its pose says it is, and snaps there when the survivor changes area. */
+  private updatePony(state: GameState, seconds: number, timeMs: number): void {
+    const moving = this.ponyMoving;
+    const pose = ponyPoseFor(state, timeMs, this.facing, moving);
+    if (!pose) {
+      this.ponyDrawn = null;
+      this.pony.setVisible(false);
+      this.ponyPlace = null;
+      return;
+    }
+    const place = this.ponyArea === state.area && this.ponyPlace ? this.ponyPlace : { x: pose.x, y: pose.y };
+    this.ponyArea = state.area;
+    const gap = Math.hypot(pose.x - place.x, pose.y - place.y);
+    const step = Math.min(gap, PONY_SPEED * seconds);
+    const x = gap > 0 ? place.x + (pose.x - place.x) / gap * step : place.x;
+    const y = gap > 0 ? place.y + (pose.y - place.y) / gap * step : place.y;
+    this.ponyMoving = gap > PONY_SETTLE;
+    this.ponyPlace = { x, y };
+    // A walking wild pony shows walking legs, though its pose is grazing.
+    const walking = this.ponyMoving && pose.frame.startsWith('pony:graze') ? `pony:walk${Math.floor(timeMs / 180) % 2}` : pose.frame;
+    const facing = gap > PONY_SETTLE ? (pose.x < place.x ? -1 : 1) : pose.facing;
+    this.ponyDrawn = { x, y, frame: walking, facing };
+    this.show(this.pony, x, y, walking, facing);
   }
 
   /** Rabbits are out on spring days, in the meadow and on the hills. A run begun in one place doesn't carry to the other. */

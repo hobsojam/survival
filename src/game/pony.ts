@@ -24,8 +24,8 @@ export interface PonyState {
 
 export const emptyPony = (): PonyState => ({ trust: 0, lastOffer: null, won: null, home: false, shod: null, spot: 0, toldHooves: false });
 
-/** Where the wild pony grazes, near the top of the hills. */
-export const PONY_SPOTS = [{ x: 14, y: 9 }, { x: 20, y: 7 }, { x: 24, y: 11 }, { x: 17, y: 13 }] as const;
+/** Where the wild pony grazes, on the grass near the top of the hills. */
+export const PONY_SPOTS = [{ x: 22, y: 9 }, { x: 21, y: 4 }, { x: 26, y: 7 }, { x: 16, y: 16 }] as const;
 
 /** Nearer than this and the wild pony ambles off, without costing the day's offer. */
 export const SPOOK_RADIUS = 1.5;

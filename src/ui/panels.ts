@@ -178,7 +178,7 @@ function flockStatus({ sheep }: GameState): string {
 
 /** The friends with names, for the field journal. */
 export function friendRosterView({ names }: GameState): { shown: boolean; text: string } {
-  const text = rosterLine([names.bird, names.fox, names.wolf]);
+  const text = rosterLine([names.bird, names.fox, names.wolf, names.pony]);
   return { shown: text !== '', text };
 }
 

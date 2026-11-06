@@ -170,7 +170,80 @@ const SEASON_LOOKS = (spring: TreeLook, summer: TreeLook, autumn: TreeLook, stoo
 
 const plant = (paint: (g: Grid) => void): SpriteDef => define(16, 16, { still: paint }, [8, 12], hillLegend);
 
+const ponyLegend: Record<string, PaletteKey> = {
+  a: 'bird0', b: 'bird1', c: 'bird2', d: 'bird3', e: 'bird4', m: 'hair1', n: 'hair2', i: 'ink', s: 'stone3',
+  p: 'canvas1', q: 'canvas2', r: 'canvas3', t: 'wood1', k: 'shadow'
+};
+const PONY_W = 28;
+const PONY_H = 26;
+const PONY_FOOT = 23;
+const PONY_MIDDLE = 14;
+
+/** A small, shaggy, round-bellied pony, side on and facing right; `step` moves its legs, and `load` adds its packs and shoes. */
+function ponyBody(g: Grid, { head, step, load }: { head: 'up' | 'down0' | 'down1'; step: 0 | 1 | null; load: boolean }): void {
+  oval(g, PONY_MIDDLE, PONY_FOOT + 1, 11, 2, 'k');
+  // Four short legs, the near pair drawn last.
+  const legs: [number, 0 | 1, string][] = [[7, 0, 'b'], [17, 1, 'b'], [10, 1, 'c'], [20, 0, 'c']];
+  for (const [x, pair, colour] of legs) {
+    const lift = step !== null && pair === step ? 1 : 0;
+    const swing = step === null ? 0 : (pair === step ? 1 : -1);
+    box(g, x + swing, 15, 3, PONY_FOOT - 15 - lift, colour);
+    box(g, x + swing, PONY_FOOT - 1 - lift, 3, 1, load ? 's' : 'i');
+    if (load) box(g, x + swing, PONY_FOOT - 2 - lift, 3, 1, 'i');
+  }
+  // A round body, with feathering hanging off the belly.
+  oval(g, 14, 12, 10, 6, 'b');
+  oval(g, 14, 11, 9, 5, 'c');
+  oval(g, 13, 9, 7, 2.5, 'd');
+  for (const x of [7, 9, 12, 14, 17, 19]) dot(g, x, 18, 'b');
+  // A thick tail.
+  box(g, 3, 9, 2, 8, 'm');
+  box(g, 2, 11, 2, 8, 'm');
+  dot(g, 3, 19, 'n');
+  if (head === 'up') {
+    box(g, 20, 5, 4, 7, 'c');
+    oval(g, 24, 5, 3.5, 2.5, 'c');
+    box(g, 25, 5, 3, 3, 'd');
+    dot(g, 27, 7, 'i');
+    dot(g, 24, 4, 'i');
+    box(g, 22, 1, 2, 2, 'b');
+    box(g, 18, 3, 3, 9, 'm');
+    box(g, 21, 2, 3, 3, 'm');
+    dot(g, 25, 3, 'n');
+  } else {
+    const nose = head === 'down0' ? 0 : 1;
+    box(g, 21, 9, 4, 6, 'c');
+    oval(g, 25, 16 + nose, 2.5, 3, 'c');
+    box(g, 25, 18 + nose, 2, 2, 'd');
+    dot(g, 26, 15 + nose, 'i');
+    box(g, 19, 7, 3, 8, 'm');
+    box(g, 22, 8, 2, 7, 'm');
+    box(g, 24, 13 + nose, 2, 1, 'b');
+  }
+  if (!load) return;
+  // Two packs across its back, on a strap.
+  box(g, 5, 5, 16, 4, 'q');
+  box(g, 5, 5, 16, 1, 'r');
+  box(g, 5, 8, 16, 1, 'p');
+  box(g, 7, 9, 7, 6, 'q');
+  box(g, 7, 9, 7, 1, 'r');
+  box(g, 7, 14, 7, 1, 'p');
+  box(g, 15, 2, 5, 3, 'p');
+  box(g, 15, 2, 5, 1, 'r');
+  box(g, 15, 5, 1, 11, 't');
+}
+
 export const hillsSprites: Record<string, SpriteDef> = {
+  pony: define(PONY_W, PONY_H, {
+    stand: g => ponyBody(g, { head: 'up', step: null, load: false }),
+    walk0: g => ponyBody(g, { head: 'up', step: 0, load: false }),
+    walk1: g => ponyBody(g, { head: 'up', step: 1, load: false }),
+    graze0: g => ponyBody(g, { head: 'down0', step: null, load: false }),
+    graze1: g => ponyBody(g, { head: 'down1', step: null, load: false }),
+    loadStand: g => ponyBody(g, { head: 'up', step: null, load: true }),
+    loadWalk0: g => ponyBody(g, { head: 'up', step: 0, load: true }),
+    loadWalk1: g => ponyBody(g, { head: 'up', step: 1, load: true })
+  }, [PONY_MIDDLE, PONY_FOOT], ponyLegend),
   hillHeather: plant(g => heather(g, false)),
   hillHeatherBloom: plant(g => heather(g, true)),
   hillGorse: plant(g => gorse(g, false)),

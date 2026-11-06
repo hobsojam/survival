@@ -19,7 +19,7 @@ import { ENDING_FADE_MS } from '../ui/ending';
 import { SceneEffects } from './SceneEffects';
 import { SceneLighting } from './SceneLighting';
 import { NightWatch } from './sleepReplay';
-import { newlyStayed, type NameTarget } from '../game/names';
+import { newlyStayed, newlyWon, type NameTarget } from '../game/names';
 import { unnamedAnimalAt } from './animalTap';
 import { hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from './tapTarget';
 import { palette } from '../art/palette';
@@ -220,6 +220,7 @@ export class GameScene extends Phaser.Scene {
     const message = coldNightMessage(before, this.state) ?? (announce ? result.message : '');
     this.say(message, ...newsBetween(before, this.state), ...written.messages, this.needsAlert());
     if (stayed) this.askName({ kind: 'friend', animal: stayed });
+    if (newlyWon(before, this.state)) this.askName({ kind: 'pony' });
     if (announce) {
       this.onStateChange(this.state, 'action');
       if (this.playerSprite) this.paintObjects();
@@ -252,7 +253,7 @@ export class GameScene extends Phaser.Scene {
   getState(): GameState { return this.state; }
 
   private unnamedAnimalUnder(pixelX: number, pixelY: number): NameTarget | null {
-    return unnamedAnimalAt(this.state, this.time.now, pixelX / TILE - 0.5, pixelY / TILE - 0.5, { friends: this.ambient.friendsDrawn, stillSeconds: this.ambient.stillSeconds, replaying: this.nightWatch.running });
+    return unnamedAnimalAt(this.state, this.time.now, pixelX / TILE - 0.5, pixelY / TILE - 0.5, { pony: this.ambient.ponyDrawn, friends: this.ambient.friendsDrawn, stillSeconds: this.ambient.stillSeconds, replaying: this.nightWatch.running });
   }
 
   setNameAsker(ask: (target: NameTarget) => void): void {

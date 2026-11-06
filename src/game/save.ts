@@ -391,7 +391,7 @@ function validNames({ names, sheep, chickens, companion }: SaveShape): boolean {
   const flock = (places: unknown, here: boolean): boolean => Array.isArray(places) && places.length === 3 && places.every(ok) && (here || places.every(name => name === null));
   const friendsOk = (['bird', 'fox', 'wolf'] as const).every(animal => ok(names[animal])
     && (names[animal] === null || (companion.friends as ObjectValue)[animal] !== null || companion.friend === animal));
-  return friendsOk && flock(names.sheep, sheep.arrived === true) && flock(names.chickens, chickens.rescued === true);
+  return friendsOk && ok(names.pony) && flock(names.sheep, sheep.arrived === true) && flock(names.chickens, chickens.rescued === true);
 }
 
 /** Sheep need their pen; a shearing needs sheep and shears; the loom follows a shearing, and each woven item its loom and what it goes with. */
