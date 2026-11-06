@@ -3,7 +3,8 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type SiteId, typ
 import { GameScene } from '../scene/GameScene';
 import { canvasLayout, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
-import { cookBlocker, decorationBlocker, type DecorationChoice, sleepBlocker, stargazeBlocker } from '../game/rules';
+import type { GameAction } from '../game/rules';
+import { decorationBlocker, type DecorationChoice, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { nextStep, type Side } from '../game/clearing';
 import { offerBlocker } from '../game/companion';
 import { defaultDish, type DishId } from '../game/cooking';
@@ -21,7 +22,7 @@ import { browserDownloadDoc, downloadText } from './download';
 import { showBuildList, showCampStores } from './showPanels';
 import type { WovenId } from '../game/sheep';
 import { NameDialog, wireNameDialog } from './nameDialog';
-import { supplyCount, axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, decorationMarkup, decorationButtonView, DECORATION_CHOICES, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, chickenCoopPanelView, friendRosterView, sheepPanelView, loomPanelView, pipsLine, loomItemMarkup, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
+import { cookBerryView, supplyCount, axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, decorationMarkup, decorationButtonView, DECORATION_CHOICES, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, chickenCoopPanelView, friendRosterView, sheepPanelView, loomPanelView, pipsLine, loomItemMarkup, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
 import type { UpgradeId } from '../game/workshop';
 import { Soundscape } from '../game/soundscape';
 import { isAtHome } from '../game/home';
@@ -144,9 +145,7 @@ export class App {
           this.scene?.perform(dish ? { type, dish } : { type });
         } else if (type === 'eat') {
           this.scene?.perform(item ? { type, item } : { type });
-        } else if (type === 'feedSheep' || type === 'shearFlock' || type === 'dropOre') {
-          this.scene?.perform({ type });
-        } else this.scene?.perform({ type });
+        } else this.scene?.perform({ type } as GameAction);
       });
     });
     this.root.addEventListener('click', event => {
@@ -578,7 +577,13 @@ export class App {
 
   private renderNight(): void {
     this.setText('night-hint', nightHint(this.state));
-    this.root.querySelector('#cook-button')?.classList.toggle('ready', !cookBlocker(this.state));
+    const cookBerry = this.root.querySelector<HTMLButtonElement>('#cook-button');
+    if (cookBerry) {
+      const view = cookBerryView(this.state);
+      cookBerry.disabled = view.disabled;
+      cookBerry.title = view.title;
+      cookBerry.classList.toggle('ready', !view.disabled);
+    }
     this.root.querySelector('#stargaze-button')?.classList.toggle('ready', !stargazeBlocker(this.state));
     const offerHidden = Boolean(offerBlocker(this.state));
     this.root.querySelectorAll<HTMLButtonElement>('#offer-button, #dock-offer').forEach(button => { button.hidden = offerHidden; });

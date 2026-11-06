@@ -9,6 +9,7 @@ import { advanceLiveTime, applyAction, type GameAction } from '../game/rules';
 import { TILE, worldX, worldY, drawTerrain } from './art';
 import { shownTerrainKey } from './map';
 import { sceneVisuals, playerVisualDepth, WEATHER_DEPTH } from './visuals';
+import { SheepWalk } from './sheepWalk';
 import { sprites } from '../art/sprites';
 import { AmbientLife } from './ambientLife';
 import { registerSpriteTextures } from '../art/textures';
@@ -59,6 +60,7 @@ export class GameScene extends Phaser.Scene {
   private fadeCover!: Phaser.GameObjects.Rectangle;
   /** Going in at the keep's door: it happens once the screen is black, so morning doesn't show before the fade does. */
   private pendingDoor?: GameAction;
+  private readonly sheepWalk = new SheepWalk();
   private viewShown = false;
 
   constructor(state: GameState, onStateChange: (state: GameState, cause: 'action' | 'tick') => void, onFeedback: (message: string) => void, onSound: (cue: SoundCue) => void = () => undefined) {
@@ -406,7 +408,7 @@ export class GameScene extends Phaser.Scene {
 
   private paintObjects(): void {
     const shown = new Set<string>();
-    for (const visual of sceneVisuals(this.state, this.time.now, this.gatheredBerry)) {
+    for (const visual of this.sheepWalk.apply(sceneVisuals(this.state, this.time.now, this.gatheredBerry), this.time.now)) {
       shown.add(visual.id);
       let image = this.objects.get(visual.id);
       const [name] = visual.texture.split(':');

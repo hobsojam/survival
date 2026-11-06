@@ -3,6 +3,7 @@ import { nightStart } from '../src/game/calendar';
 import { BALANCE, LOOKOUT, SITES, createGame, type GameState } from '../src/game/state';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { markedTrees } from '../src/game/clearing';
+import { QUARRY_HILLS_EXIT } from '../src/game/hills';
 import { KEY_ACTIONS, actionEffect, actionPose, closestSite, closestTree, gatherSpot, promptFor, useKeyAction } from '../src/scene/prompts';
 import { stock } from './stock';
 import { addFood, emptyFood } from '../src/game/food';
@@ -181,6 +182,8 @@ describe('quarry prompts', () => {
 
   it('points east at the way home and otherwise shows movement help', () => {
     expect(promptFor(quarry(QUARRY_EXIT.x - 0.5, QUARRY_EXIT.y))).toBe('Walk east to return to camp');
+    const farEnd = quarry(QUARRY_HILLS_EXIT.x + 0.5, QUARRY_HILLS_EXIT.y);
+    expect(promptFor({ ...farEnd, progress: { ...farEnd.progress, quarryFound: true } })).toBe('Walk west to the hills');
     expect(promptFor(quarry(30, 3))).toBe('WASD / arrows  Move');
   });
 

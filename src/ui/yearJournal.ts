@@ -59,6 +59,8 @@ export function journalPageView(state: GameState, page: number): JournalPageView
     // A view from the top waits on the keep being finished; the line for finishing it is never a blank, since it only happens once.
     if (KEEP_VIEW_MOMENTS.has(entry.id)) return keepFinished(state) || onPage;
     if (KEEP_FINISHED_MOMENTS.has(entry.id)) return onPage;
+    // Nothing can be sheared without shears, and a shorn flock always has them.
+    if (entry.id === 'shearing' && !state.progress.workshop.shears) return false;
     const building = WAITS_ON[entry.id];
     return !building || state.structures[building];
   });

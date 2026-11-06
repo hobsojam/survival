@@ -1,9 +1,9 @@
 import { isWinter, nightStart } from '../game/calendar';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceKind, type SiteId, type TreeNode } from '../game/state';
 import { isAtCamp, isInClearing, mineBlocker, sleepBlocker, type GameAction } from '../game/rules';
-import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
+import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, hillsPathOpen, pathOpen } from '../game/areas';
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
-import { HILLS_EXIT, OUTCROP_SITE, outcropNote } from '../game/hills';
+import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, outcropNote } from '../game/hills';
 import { KEEP_DOOR_WOOD, KEEP_SITE, KEEP_STONES, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor } from '../game/keep';
 import { ponyNote, ponyOfferLabel } from '../game/pony';
 import { availableWood } from '../game/wood';
@@ -308,6 +308,7 @@ function quarryPrompt(state: GameState): string {
     return `Quarry · worked out until morning${mineStatus(state)}`;
   }
   if (within(state, QUARRY_EXIT)) return 'Walk east to return to camp';
+  if (hillsPathOpen(state) && within(state, QUARRY_HILLS_EXIT)) return 'Walk west to the hills';
   return 'WASD / arrows  Move';
 }
 

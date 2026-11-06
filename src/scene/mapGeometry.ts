@@ -22,11 +22,11 @@ export const CAMP_BOTH_OPEN_PATHS: readonly PathRoute[] = [...CAMP_OPEN_PATHS, .
 
 /** In the quarry, a worn track runs from the floor through the east edge to the way home. */
 export const QUARRY_PATHS: readonly PathRoute[] = [[19, 14, QUARRY_EXIT.x, QUARRY_EXIT.y], [QUARRY_EXIT.x, QUARRY_EXIT.y, QUARRY_EXIT.x + 1, QUARRY_EXIT.y]];
-/** The old homestead's entrance reaches an open yard from the west edge. */
 /** The way on from the quarry floor to the hills, leaving by the west edge. */
 export const QUARRY_HILLS_PATHS: readonly PathRoute[] = [[QUARRY_HILLS_EXIT.x - 1, QUARRY_HILLS_EXIT.y, QUARRY_HILLS_EXIT.x, QUARRY_HILLS_EXIT.y], [QUARRY_HILLS_EXIT.x, QUARRY_HILLS_EXIT.y, 10, 18], [10, 18, 19, 17]];
 /** The path up the hills from their east edge to the outcrop, with a short way up to the keep's door. */
 export const HILLS_PATHS: readonly PathRoute[] = [[HILLS_EXIT.x + 1, HILLS_EXIT.y, HILLS_EXIT.x, HILLS_EXIT.y], [HILLS_EXIT.x, HILLS_EXIT.y, 26, 13], [26, 13, 12, 9], [KEEP_SITE.x, KEEP_SITE.y + 1, KEEP_SITE.x, KEEP_SITE.y]];
+/** The old homestead's entrance reaches an open yard from the west edge. */
 export const HOMESTEAD_PATHS: readonly PathRoute[] = [[HOMESTEAD_EXIT.x - 1, HOMESTEAD_EXIT.y, 19, 15], [19, 15, 24, 15]];
 
 /** Signposts beside each end of the west path: one at the quarry pointing home, one at camp pointing to the quarry. */

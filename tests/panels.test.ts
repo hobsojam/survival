@@ -8,6 +8,7 @@ import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from
 import { CLEARING_STEPS } from '../src/game/clearing';
 import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, campStoresView, chickenCoopPanelView, friendRosterView, loomItemMarkup, loomPanelView, sheepPanelView, cloakView, foodLaidByDays, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
 import { dishBlocker } from '../src/game/cooking';
+import { cookBerryView } from '../src/ui/panels';
 import { addFood, emptyFood } from '../src/game/food';
 import { stock } from './stock';
 import { QUARRY_SITE } from '../src/game/areas';
@@ -863,5 +864,19 @@ describe('the quiet list of names', () => {
   it('lists only the friends with names', () => {
     expect(friendRosterView(named({}))).toEqual({ shown: false, text: '' });
     expect(friendRosterView(named({ fox: 'Rusty', bird: 'Pip' }))).toEqual({ shown: true, text: 'Pip and Rusty live here.' });
+  });
+});
+
+describe('cooking a berry', () => {
+  const lit = { ...createGame(), fireFuel: 100 };
+
+  it('greys the button out and says why when there are no berries', () => {
+    const none = { ...lit, inventory: { ...lit.inventory, food: emptyFood() } };
+    expect(cookBerryView(none)).toEqual({ disabled: true, title: 'Gather a berry to cook.' });
+  });
+
+  it('offers it once there is a berry and a fire', () => {
+    const berry = { ...lit, inventory: { ...lit.inventory, food: addFood(emptyFood(), 'berry', 1, 1) } };
+    expect(cookBerryView(berry)).toEqual({ disabled: false, title: 'Toast a berry by the fire.' });
   });
 });
