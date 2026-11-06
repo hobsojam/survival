@@ -8,12 +8,16 @@ import { TOO_TIRED_MESSAGE } from '../src/game/needs';
 import { settleStores } from '../src/game/stores';
 import { sprites } from '../src/art/sprites';
 import { useKeyAction } from '../src/scene/prompts';
-import { sceneVisuals } from '../src/scene/visuals';
+import { HILL_TREES, sceneVisuals } from '../src/scene/visuals';
 import { bagView, campStoresView } from '../src/ui/panels';
 import { saveGame } from '../src/game/save';
 import { SAVE_VERSION, upgradeSave } from '../src/game/saveUpgrades';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
-import { terrainKey } from '../src/scene/map';
+import { HILL_RABBIT_HOMES, RABBIT_HOMES, rabbitHomes } from '../src/game/wildlife';
+import { rabbitAt } from '../src/scene/ambient';
+import { buildMap, terrainKey } from '../src/scene/map';
+import { hillRockAt } from '../src/scene/hillsGeometry';
+import { HILLS_PATHS, pathDistance } from '../src/scene/mapGeometry';
 import { closestGatherable, pickTapTarget, targetAction } from '../src/scene/tapTarget';
 
 const game = createGame();
@@ -358,5 +362,84 @@ describe('reaching the outcrop', () => {
     expect(texture({ ...atOutcrop(), outcrop: { day: 1, dug: 3 } })).toBe('outcrop:spent');
     expect(texture({ ...atOutcrop(), day: 2, outcrop: { day: 1, dug: 3 } })).toBe('outcrop:ready');
     expect(sprites.outcrop.frames.ready).toBeDefined();
+  });
+});
+
+describe('how the hills look', () => {
+  const SEASONS = ['autumn', 'winter', 'spring', 'summer'] as const;
+  const map = (time: typeof SEASONS[number]) => buildMap([], 'hills', time);
+  const signature = (time: typeof SEASONS[number]) => JSON.stringify([map(time).ground, map(time).decorations]);
+
+  it('shows a different hillside in each season', () => {
+    expect(new Set(SEASONS.map(signature)).size).toBe(4);
+  });
+
+  it('flowers in the right season', () => {
+    const plants = (time: typeof SEASONS[number]) => new Set(map(time).decorations.map(item => item.sprite));
+    expect(plants('spring')).toContain('hillGorseBloom');
+    expect(plants('summer')).toContain('hillHeatherBloom');
+    expect(plants('autumn')).toContain('hillBrackenRust');
+    expect(plants('summer')).not.toContain('hillGorseBloom');
+    expect(plants('winter').size).toBe(0);
+  });
+
+  it('every sprite it asks for exists', () => {
+    for (const time of SEASONS) {
+      const { ground, decorations, pathTiles } = map(time);
+      for (const name of [...new Set(ground.flat()), ...decorations.map(item => item.sprite)]) expect(sprites[name]?.frames.still, name).toBeDefined();
+      expect(pathTiles.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('has bare rock only near the top', () => {
+    const spots = Array.from({ length: 30 }, (_, y) => Array.from({ length: 40 }, (_, x) => ({ x, y }))).flat();
+    const rocks = spots.filter(({ x, y }) => hillRockAt(x, y));
+    expect(rocks.length).toBeGreaterThan(20);
+    for (const { x, y } of rocks) expect(Math.hypot(x - OUTCROP_SITE.x, y - OUTCROP_SITE.y)).toBeLessThan(10);
+    expect(hillRockAt(OUTCROP_SITE.x, OUTCROP_SITE.y)).toBe(true);
+  });
+
+  it('keeps plants off the rock', () => {
+    for (const item of map('summer').decorations) expect(hillRockAt(item.x, item.y)).toBe(false);
+  });
+
+  it('keeps a clear walk from the exit to the outcrop', () => {
+    for (const time of SEASONS) for (const item of map(time).decorations) expect(pathDistance(item.x + 0.5, item.y + 0.5, HILLS_PATHS), item.sprite).toBeGreaterThanOrEqual(1);
+    for (const tree of HILL_TREES) expect(pathDistance(tree.x + 0.5, tree.y + 0.5, HILLS_PATHS)).toBeGreaterThanOrEqual(1.5);
+  });
+
+  it('grows trees only low down', () => {
+    expect(HILL_TREES.length).toBeGreaterThanOrEqual(3);
+    for (const tree of HILL_TREES) expect(tree.x).toBeGreaterThanOrEqual(28);
+  });
+
+  it('shows each tree by season', () => {
+    const frames = (day: number) => sceneVisuals({ ...onHills(), day }, 0).filter(visual => visual.id.startsWith('hill-tree-')).map(visual => visual.texture.split(':')[1]);
+    expect(frames(12).every(frame => frame === 'snow')).toBe(true);
+    expect(new Set([2, 12, 22, 32].map(day => frames(day)[0])).size).toBe(4);
+    for (const visual of sceneVisuals(onHills(), 0).filter(item => item.id.startsWith('hill-tree-'))) {
+      const [name, frame] = visual.texture.split(':');
+      expect(sprites[name].frames[frame]).toBeDefined();
+    }
+  });
+
+  it('lets nothing on the hillside be gathered but ore', () => {
+    const state = atOutcrop();
+    for (const item of map('summer').decorations) {
+      expect(['ground', 'outcrop', 'crossing']).toContain(pickTapTarget(state, item.x, item.y).kind);
+      const standing = at(state, 'hills', item.x, item.y);
+      expect(['outcrop', undefined]).toContain(closestGatherable(standing)?.kind);
+    }
+    for (const tree of HILL_TREES) expect(pickTapTarget(state, tree.x, tree.y).kind).toBe('ground');
+  });
+
+  it('reuses the meadow rabbits', () => {
+    expect(rabbitHomes('hills')).toBe(HILL_RABBIT_HOMES);
+    expect(rabbitHomes('camp')).toBe(RABBIT_HOMES);
+    expect(HILL_RABBIT_HOMES).toHaveLength(RABBIT_HOMES.length);
+    const onSlope = rabbitAt(0, 0, HILL_RABBIT_HOMES);
+    expect(Math.hypot(onSlope.x - HILL_RABBIT_HOMES[0].x, onSlope.y - HILL_RABBIT_HOMES[0].y)).toBeLessThan(1);
+    expect(onSlope.frame).toMatch(/^rabbit:/);
+    expect(rabbitAt(1, 500)).toEqual(rabbitAt(1, 500, RABBIT_HOMES));
   });
 });

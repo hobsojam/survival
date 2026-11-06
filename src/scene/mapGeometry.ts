@@ -31,6 +31,7 @@ export const HOMESTEAD_PATHS: readonly PathRoute[] = [[HOMESTEAD_EXIT.x - 1, HOM
 /** Signposts beside each end of the west path: one at the quarry pointing home, one at camp pointing to the quarry. */
 export const QUARRY_SIGN = { x: QUARRY_EXIT.x - 2, y: QUARRY_EXIT.y - 2 } as const;
 export const CAMP_SIGN = { x: CAMP_EXIT.x + 2, y: CAMP_EXIT.y - 2 } as const;
+export const HILLS_SIGN = { x: HILLS_EXIT.x - 2, y: HILLS_EXIT.y + 2 } as const;
 export const HOMESTEAD_SIGN = { x: HOMESTEAD_EXIT.x + 2, y: HOMESTEAD_EXIT.y - 2 } as const;
 
 export function segmentDistance(x: number, y: number, [fromX, fromY, toX, toY]: PathRoute): number {

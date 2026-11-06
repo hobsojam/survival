@@ -1,9 +1,10 @@
 import { BALANCE, type GameState, type ResourceKind, type ResourceNode } from '../game/state';
 import { season, type Season } from '../game/calendar';
 import { QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, hillsPathOpen, homesteadPathOpen, pathOpen } from '../game/areas';
-import { clearingTile, pathTile, quarryGroundTile, terrainSprites } from '../art/terrain';
+import { clearingTile, hillGroundTile, pathTile, quarryGroundTile, terrainSprites } from '../art/terrain';
+import { hillRockAt } from './hillsGeometry';
 import { CLEARING_STEPS, STEP_IDS, clearingKey, clearingReach, inClearedPatch, type ClearingState, type StepId } from '../game/clearing';
-import { CAMP_BOTH_OPEN_PATHS, CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_HOMESTEAD_PATHS, CAMP_OPEN_PATHS, CAMP_PATHS, CAMP_SIGN, HOMESTEAD_PATHS, HOMESTEAD_SIGN, QUARRY_PATHS, QUARRY_HILLS_PATHS, HILLS_PATHS, QUARRY_SIGN, mixHash, pathDistance, type PathRoute } from './mapGeometry';
+import { CAMP_BOTH_OPEN_PATHS, CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_HOMESTEAD_PATHS, CAMP_OPEN_PATHS, CAMP_PATHS, CAMP_SIGN, HOMESTEAD_PATHS, HOMESTEAD_SIGN, QUARRY_PATHS, QUARRY_HILLS_PATHS, HILLS_PATHS, HILLS_SIGN, QUARRY_SIGN, mixHash, pathDistance, type PathRoute } from './mapGeometry';
 import { FACE_HEIGHT, QUARRY_MEADOWS, faceBottom, floorDepth } from './quarryGeometry';
 
 export interface MapItem { x: number; y: number; sprite: string }
@@ -220,18 +221,32 @@ function quarryDetail(x: number, y: number): string {
   return `pebbles${detail % 2}`;
 }
 
-/** The hills, for now plain grass; their look comes from the season. */
-function buildHillsMap(_time: Season): TerrainMap {
+/** The plant a tile grows this season, if any: heather on the high ground, gorse on the shoulders, and bracken lower down. Snow lies over them all. */
+function hillPlant(x: number, y: number, time: Season): string | undefined {
+  if (time === 'winter' || hash(x, y, 42) % 3 !== 0) return undefined;
+  const pick = hash(x, y, 43) % 10 + (y - 15) / 3 + (x - 20) / 6;
+  if (pick < 4) return time === 'summer' ? 'hillHeatherBloom' : 'hillHeather';
+  if (pick < 7) return time === 'spring' ? 'hillGorseBloom' : 'hillGorse';
+  if (time === 'autumn') return 'hillBrackenRust';
+  return time === 'summer' ? 'hillBracken' : undefined;
+}
+
+/** The hills: open rolling grass, rock showing near the top, and plants that change with the season. Nothing here is gathered. */
+function buildHillsMap(time: Season): TerrainMap {
   const map = emptyMap();
   for (let y = 0; y < BALANCE.mapHeight; y++) {
     const row: string[] = [];
     for (let x = 0; x < BALANCE.mapWidth; x++) {
-      row.push(`grass${hash(x, y) % 4}`);
+      row.push(hillGroundTile(x, y));
       const path = pathTile(x, y, HILLS_PATHS);
       if (path) map.pathTiles.push({ x, y, sprite: path });
+      const sprite = hillRockAt(x, y) || pathDistance(x + .5, y + .5, HILLS_PATHS) < 1.7 || nearSign(x, y, HILLS_SIGN) ? undefined : hillPlant(x, y, time);
+      // A little off the tile's middle, so the plants don't stand in rows.
+      if (sprite) map.decorations.push({ x: x + (hash(x, y, 46) % 5 - 2) / 5, y: y + (hash(x, y, 47) % 5 - 2) / 5, sprite });
     }
     map.ground.push(row);
   }
+  map.signs = [{ ...HILLS_SIGN, sprite: 'signpostCamp' }];
   return map;
 }
 
