@@ -3,11 +3,13 @@ import { sleepBlocker, type GameAction } from '../game/rules';
 import type { GameState } from '../game/state';
 
 // Going in at the keep's door is a short fade: to black, the night or the climb happens while nothing can be seen, and back.
-// Nothing about it is saved, so a reload part-way starts clean, and it always ends, however late it is asked.
+// A climb stays open on the view until the player comes down. Nothing about it is saved, so a reload part-way starts clean.
 
 export type DoorFadeKind = 'sleep' | 'view';
 
-export const DOOR_FADE_MS: Record<DoorFadeKind, number> = { sleep: 1200, view: 2600 };
+export const DOOR_FADE_MS = { sleep: 1200 };
+/** How long the view ignores input once it starts to open, so the tap or key that went in can't close it. */
+export const VIEW_INPUT_DELAY_MS = 1000;
 
 const TO_BLACK_MS = 350;
 const SLEEP_BLACK_MS = 300;
@@ -21,52 +23,84 @@ export function doorFadeFor(action: GameAction, before: GameState): DoorFadeKind
   return null;
 }
 
-/** How far the view from the top pulls back: as far as it can while the map still fills the frame, and never closer than usual. */
-export function viewZoom(viewWidth: number, viewHeight: number, mapWidth: number, mapHeight: number): number {
-  return Math.min(1, Math.max(viewWidth / mapWidth, viewHeight / mapHeight));
+export interface KeyPress {
+  key: string;
+  repeat: boolean;
+  ctrlKey?: boolean;
+  altKey?: boolean;
+  metaKey?: boolean;
+  target?: unknown;
+}
+
+const PAGE_CONTROLS = 'button,a,input,select,textarea';
+
+/**
+ * Whether a key press means "come down" from the view. Only a plain key meant for the game does: a screenshot, Alt-Tab,
+ * the volume or tabbing through the page mustn't cost the player their view, and a key held from the door isn't a new press.
+ */
+export function comesDownKey(event: KeyPress): boolean {
+  if (event.repeat || event.ctrlKey || event.altKey || event.metaKey) return false;
+  const target = event.target as { closest?: (selector: string) => unknown } | null | undefined;
+  if (target?.closest?.(PAGE_CONTROLS)) return false;
+  return event.key.length === 1 || event.key === 'Enter' || event.key.startsWith('Arrow');
 }
 
 export class DoorFade {
   private kind: DoorFadeKind = 'sleep';
   private startedAt: number | null = null;
+  /** When the player came down from the view, if they have. */
+  private closingAt: number | null = null;
 
   begin(kind: DoorFadeKind, nowMs: number): void {
     this.kind = kind;
     this.startedAt = nowMs;
-  }
-
-  private elapsed(nowMs: number): number | null {
-    if (this.startedAt === null) return null;
-    const elapsed = nowMs - this.startedAt;
-    return elapsed < DOOR_FADE_MS[this.kind] ? elapsed : null;
+    this.closingAt = null;
   }
 
   running(nowMs: number): boolean {
-    return this.elapsed(nowMs) !== null;
+    if (this.startedAt === null) return false;
+    if (this.kind === 'sleep') return nowMs - this.startedAt < DOOR_FADE_MS.sleep;
+    return this.closingAt === null || nowMs - this.closingAt < VIEW_DIP_MS + TO_BLACK_MS;
   }
 
   /** How dark the screen is, from 0 to 1. */
   alpha(nowMs: number): number {
-    const elapsed = this.elapsed(nowMs);
-    if (elapsed === null) return 0;
-    const total = DOOR_FADE_MS[this.kind];
+    if (!this.running(nowMs)) return 0;
+    const elapsed = nowMs - this.startedAt!;
     if (elapsed < TO_BLACK_MS) return elapsed / TO_BLACK_MS;
-    if (this.kind === 'sleep') return elapsed < TO_BLACK_MS + SLEEP_BLACK_MS ? 1 : (total - elapsed) / (total - TO_BLACK_MS - SLEEP_BLACK_MS);
-    if (elapsed < TO_BLACK_MS + VIEW_DIP_MS) return 1 - (elapsed - TO_BLACK_MS) / VIEW_DIP_MS;
-    const closing = total - TO_BLACK_MS - VIEW_DIP_MS;
-    if (elapsed < closing) return 0;
-    if (elapsed < total - TO_BLACK_MS) return (elapsed - closing) / VIEW_DIP_MS;
-    return (total - elapsed) / TO_BLACK_MS;
+    if (this.kind === 'sleep') {
+      const total = DOOR_FADE_MS.sleep;
+      return elapsed < TO_BLACK_MS + SLEEP_BLACK_MS ? 1 : (total - elapsed) / (total - TO_BLACK_MS - SLEEP_BLACK_MS);
+    }
+    if (this.closingAt !== null) {
+      const closing = nowMs - this.closingAt;
+      return closing < VIEW_DIP_MS ? closing / VIEW_DIP_MS : 1 - (closing - VIEW_DIP_MS) / TO_BLACK_MS;
+    }
+    return elapsed < TO_BLACK_MS + VIEW_DIP_MS ? 1 - (elapsed - TO_BLACK_MS) / VIEW_DIP_MS : 0;
   }
 
   /** Whether the first dip to black is over: the moment the night or the climb has happened by. */
   hold(nowMs: number): boolean {
-    const elapsed = this.elapsed(nowMs);
-    return elapsed !== null && elapsed >= TO_BLACK_MS && (this.kind === 'sleep' ? elapsed < TO_BLACK_MS + SLEEP_BLACK_MS : elapsed < DOOR_FADE_MS.view - TO_BLACK_MS);
+    if (!this.running(nowMs) || nowMs - this.startedAt! < TO_BLACK_MS) return false;
+    if (this.kind === 'sleep') return nowMs - this.startedAt! < TO_BLACK_MS + SLEEP_BLACK_MS;
+    return this.closingAt === null || nowMs - this.closingAt < VIEW_DIP_MS;
   }
 
-  /** Whether the camera should be showing the view from the top. */
+  /** Whether the view from the top should be showing. */
   viewing(nowMs: number): boolean {
     return this.kind === 'view' && this.hold(nowMs);
+  }
+
+  /** Starts back down from the view, if it's been up long enough and isn't already closing. Returns whether it did. */
+  comeDown(nowMs: number): boolean {
+    if (this.kind !== 'view' || this.startedAt === null || this.closingAt !== null) return false;
+    if (nowMs - this.startedAt < TO_BLACK_MS + VIEW_INPUT_DELAY_MS) return false;
+    this.closingAt = nowMs;
+    return true;
+  }
+
+  /** Time stands still from going up until the player is back down, so looking costs nothing. */
+  holdsClock(nowMs: number): boolean {
+    return this.kind === 'view' && this.running(nowMs);
   }
 }

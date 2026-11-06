@@ -11,6 +11,7 @@ import { defaultDish, type DishId } from '../game/cooking';
 import { foodCount, type FoodItem } from '../game/food';
 import { dayPillView, renderDayPill, renderYearWheel, yearWheelView, type CalendarRoot } from './calendarView';
 import { isLowMeter } from '../game/needs';
+import { revealFrame } from './keepViewFrame';
 import { gateTap, nextOpenTab, wireSidebarTabs, type DockTab } from './dock';
 import { createPause, wirePause, type PauseControl } from './pause';
 import { journalView } from './journal';
@@ -257,6 +258,13 @@ export class App {
       this.state = next;
       this.soundscape.update(next);
       this.render();
+      const viewing = this.scene?.viewing() ?? false;
+      if (viewing && !this.root.classList.contains('keep-view')) {
+        this.revealGameFrame();
+        // A line from before the climb shouldn't sit over the picture. Anything new, such as a failed save, still shows.
+        this.root.querySelector('#message')?.classList.remove('toast');
+      }
+      this.root.classList.toggle('keep-view', viewing);
       if (!previous.ending && next.ending) this.endStory(next, cause === 'action');
       if (cause === 'action' && !previous.progress.lookoutRepaired && next.progress.lookoutRepaired) {
         this.root.querySelector('#lookout-ending')?.classList.remove('hidden');
@@ -297,6 +305,7 @@ export class App {
       if (this.game.scale.gameSize.width !== viewport.width || this.game.scale.gameSize.height !== viewport.height) {
         this.game.scale.setGameSize(viewport.width, viewport.height);
         this.scene?.resizeViewport(viewport.width, viewport.height);
+        if (this.scene?.viewing()) this.revealGameFrame();
       }
       if (this.game.scale.zoom !== scale) this.game.scale.setZoom(scale);
       else this.game.scale.refresh();
@@ -721,6 +730,11 @@ export class App {
     if (!button) return;
     button.disabled = disabled;
     button.classList.toggle('ready', !disabled);
+  }
+
+  private revealGameFrame(): void {
+    const frame = this.root.querySelector<HTMLElement>('.game-frame');
+    if (frame) revealFrame(frame, window.innerHeight);
   }
 
   private renderBuild(): void {

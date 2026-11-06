@@ -387,11 +387,12 @@ describe('the door and the top', () => {
     const { state, message } = climb(before);
     expect(state.player.energy).toBe(before.player.energy);
     expect(state.timeOfDay).toBeCloseTo(40 + BALANCE.stargazeSeconds);
-    expect(message).toBe('You climb to the top and look out over the hills for a while.');
+    expect(message).toBe('');
   });
 
   it('climbs however tired the survivor is', () => {
-    expect(climb(inFinishedKeep({ player: { energy: 0 } })).message).toContain('You climb to the top');
+    const before = inFinishedKeep({ player: { energy: 0 } });
+    expect(climb(before).state.timeOfDay).toBeCloseTo(before.timeOfDay + BALANCE.stargazeSeconds);
   });
 
   it('refuses to climb an unfinished keep, at night or from afar', () => {
@@ -415,8 +416,10 @@ describe('the door and the top', () => {
   });
 
   it('runs the same thing as the door means', () => {
-    const day = applyAction(inFinishedKeep(), { type: 'enterKeep' });
-    expect(day.message).toContain('You climb to the top');
+    const before = inFinishedKeep();
+    const day = applyAction(before, { type: 'enterKeep' });
+    expect(day.state.timeOfDay).toBeCloseTo(before.timeOfDay + BALANCE.stargazeSeconds);
+    expect(day.state.day).toBe(before.day);
     const night = applyAction(inFinishedKeep({ timeOfDay: NIGHT }), { type: 'enterKeep' });
     expect(night.state.day).toBe(6);
   });

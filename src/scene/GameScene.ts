@@ -1,5 +1,5 @@
 import { withFishing } from '../game/fishing';
-import { KEEP_SITE, withKeepDoor } from '../game/keep';
+import { withKeepDoor } from '../game/keep';
 import Phaser from 'phaser';
 import { BALANCE, type GameState } from '../game/state';
 import { newsBetween } from '../game/news';
@@ -21,7 +21,8 @@ import { ENDING_FADE_MS } from '../ui/ending';
 import { SceneEffects } from './SceneEffects';
 import { SceneLighting } from './SceneLighting';
 import { NightWatch } from './sleepReplay';
-import { DoorFade, doorFadeFor, viewZoom } from './doorFade';
+import { DoorFade, comesDownKey, doorFadeFor, type KeyPress } from './doorFade';
+import { KeepViewLayer } from './KeepViewLayer';
 import { newlyStayed, newlyWon, type NameTarget } from '../game/names';
 import { unnamedAnimalAt } from './animalTap';
 import { hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from './tapTarget';
@@ -62,6 +63,9 @@ export class GameScene extends Phaser.Scene {
   private pendingDoor?: GameAction;
   private readonly sheepWalk = new SheepWalk();
   private viewShown = false;
+  private keepView!: KeepViewLayer;
+  /** What's waiting to be said until the player has come down: only the season's line sits on the view. */
+  private heldNotices: string[] = [];
 
   constructor(state: GameState, onStateChange: (state: GameState, cause: 'action' | 'tick') => void, onFeedback: (message: string) => void, onSound: (cue: SoundCue) => void = () => undefined) {
     super({ key: 'GameScene' });
@@ -86,10 +90,12 @@ export class GameScene extends Phaser.Scene {
     // The phone viewport can be set before the scene boots, so take the size the game already has.
     this.lighting = new SceneLighting(this, this.scale.gameSize.width, this.scale.gameSize.height);
     const { width, height } = this.scale.gameSize;
-    // Well over the size of the screen, since the view from the keep pulls the camera back and a rotated phone is wider.
+    // Well over the size of the screen, since a rotated phone is wider.
     this.fadeCover = this.add.rectangle(width / 2, height / 2, BALANCE.mapWidth * TILE * 6, BALANCE.mapWidth * TILE * 6, 0x000000)
       .setScrollFactor(0).setDepth(WEATHER_DEPTH + 2).setVisible(false);
+    this.keepView = new KeepViewLayer(this);
     this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,T,P,C,G,Z,L,O,X,V') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.listenForComingDown();
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       const over = this.unnamedAnimalUnder(pointer.worldX, pointer.worldY);
       this.game.canvas.style.cursor = over ? 'pointer' : '';
@@ -113,14 +119,17 @@ export class GameScene extends Phaser.Scene {
     const beforeTick = this.state;
     // While a sleep plays out, the replay sets the clock instead of the tick.
     // From going in at the keep's door until it has happened, the clock waits, so night or dawn can't get there first.
-    const written = this.nightWatch.tick(this.time.now, () => (this.pendingDoor ? { state: this.state, messages: [] } : recordJournal(beforeTick, advanceLiveTime(this.state, dt))));
+    const written = this.nightWatch.tick(this.time.now, () => (this.pendingDoor || this.doorFade.holdsClock(this.time.now) ? { state: this.state, messages: [] } : recordJournal(beforeTick, advanceLiveTime(this.state, dt))));
     this.state = written.state;
     this.reportWeather(beforeTick, this.state, written.messages);
     this.syncPlayerSprite(walking || tapWalking);
     this.paintObjects();
     this.ambient.update(this.state, dt, this.time.now);
     this.effects.update(this.state, this.time.now);
-    if (this.viewShown) this.lighting.hide();
+    if (this.viewShown) {
+      this.lighting.hide();
+      this.keepView.update(this.time.now);
+    }
     else this.lighting.update(this.state, this.time.now, this.nightWatch.sunriseAgeMs(this.time.now));
     this.hudElapsed += delta;
     if (this.hudElapsed >= 250) {
@@ -242,21 +251,30 @@ export class GameScene extends Phaser.Scene {
     }
     const running = this.doorFade.running(now);
     this.fadeCover.setVisible(running).setAlpha(this.doorFade.alpha(now));
+    if (!running && this.heldNotices.length) {
+      this.onFeedback(this.heldNotices.join(' '));
+      this.heldNotices = [];
+    }
     this.playerSprite.setVisible(!running);
     const viewing = this.doorFade.viewing(now);
     if (viewing === this.viewShown) return;
     this.viewShown = viewing;
-    const camera = this.cameras.main;
-    if (viewing) {
-      const mapHeight = BALANCE.mapHeight * TILE;
-      camera.stopFollow();
-      camera.setZoom(viewZoom(camera.width, camera.height, BALANCE.mapWidth * TILE, mapHeight));
-      camera.centerOn(worldX(KEEP_SITE.x), mapHeight / 2);
-    } else {
-      camera.setZoom(1);
-      camera.startFollow(this.playerSprite, true, 0.09, 0.09);
-      camera.centerOn(this.playerSprite.x, this.playerSprite.y);
-    }
+    if (viewing) this.keepView.show(this.state, this.scale.gameSize.width, this.scale.gameSize.height);
+    else this.keepView.hide();
+  }
+
+  /** Whether the view from the top of the keep is up. */
+  viewing(): boolean {
+    return this.viewShown;
+  }
+
+  private listenForComingDown(): void {
+    this.input.keyboard!.on('keydown', (event: KeyboardEvent) => this.keyComesDown(event));
+  }
+
+  /** A plain key meant for the game comes down from the view. Esc still pauses. */
+  private keyComesDown(event: KeyPress): void {
+    if (this.viewShown && comesDownKey(event) && !this.scene.isPaused()) this.doorFade.comeDown(this.time.now);
   }
 
   private doorFading(): boolean {
@@ -347,6 +365,7 @@ export class GameScene extends Phaser.Scene {
 
   resizeViewport(width: number, height: number): void {
     if (this.lighting) this.lighting.resize(width, height);
+    this.keepView?.resize(width, height);
   }
 
   /** Swaps the terrain when the area, the west path or the season changes; a new season repaints every sprite first. */
@@ -364,7 +383,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleTap(pixelX: number, pixelY: number): void {
-    if (!this.tapGate() || this.doorFading()) return;
+    if (!this.tapGate()) return;
+    if (this.viewShown && !this.scene.isPaused()) this.doorFade.comeDown(this.time.now);
+    if (this.doorFading()) return;
     const animal = this.unnamedAnimalUnder(pixelX, pixelY);
     if (animal) {
       this.walkTarget = undefined;
@@ -439,7 +460,9 @@ export class GameScene extends Phaser.Scene {
 
   private say(...messages: (string | null)[]): void {
     const text = messages.filter(Boolean).join(' ');
-    if (text) this.onFeedback(text);
+    if (!text) return;
+    if (this.doorFade.holdsClock(this.time.now)) this.heldNotices.push(text);
+    else this.onFeedback(text);
   }
 
   private showDawn(before: GameState, after: GameState): void {
