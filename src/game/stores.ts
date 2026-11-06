@@ -15,13 +15,15 @@ export function settleStores(state: GameState): GameState {
   const cart = Math.max(0, Math.min(state.cartWood, woodRoom - wood));
   const fiber = structures.fibreStack ? Math.max(0, Math.min(inventory.fiber, BALANCE.fibreStackCapacity - state.storedFiber)) : 0;
   const stone = structures.stonePile ? Math.max(0, Math.min(inventory.stone, BALANCE.stonePileCapacity - state.storedStone)) : 0;
-  if (wood + cart + fiber + stone === 0) return state;
+  const ore = state.progress.workshop.forge ? Math.max(0, Math.min(inventory.ore, BALANCE.forgeOreCapacity - state.storedOre)) : 0;
+  if (wood + cart + fiber + stone + ore === 0) return state;
   return {
     ...state,
-    inventory: { ...inventory, wood: inventory.wood - wood, fiber: inventory.fiber - fiber, stone: inventory.stone - stone },
+    inventory: { ...inventory, wood: inventory.wood - wood, fiber: inventory.fiber - fiber, stone: inventory.stone - stone, ore: inventory.ore - ore },
     cartWood: state.cartWood - cart,
     storedWood: state.storedWood + wood + cart,
     storedFiber: state.storedFiber + fiber,
-    storedStone: state.storedStone + stone
+    storedStone: state.storedStone + stone,
+    storedOre: state.storedOre + ore
   };
 }

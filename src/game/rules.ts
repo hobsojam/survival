@@ -1,6 +1,6 @@
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isSummer, isWinter, nightStart, yearOf } from './calendar';
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, hillsPathOpen, pathOpen } from './areas';
-import { HILLS_EXIT, HILLS_FOUND_MESSAGE, QUARRY_HILLS_EXIT } from './hills';
+import { HILLS_EXIT, HILLS_FOUND_MESSAGE, OUTCROP_MESSAGES, QUARRY_HILLS_EXIT, digOreBlocker, outcropLeft } from './hills';
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
@@ -58,7 +58,7 @@ export type GameAction =
   | { type: 'storeFood'; item: FoodItem }
   | { type: 'takeFood'; item: FoodItem }
   | { type: 'cook'; dish?: DishId }
-  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'buildMine' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' | 'meetChickens' | 'leadChickens' | 'takeEgg' | 'gatherApples' | 'searchShed' }
+  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'digOre' | 'dropOre' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'buildMine' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' | 'meetChickens' | 'leadChickens' | 'takeEgg' | 'gatherApples' | 'searchShed' }
   | { type: 'pickUpStone'; pileId: string }
   | { type: 'plantPip'; spot: number }
   | { type: 'pickOrchardApple'; spot: number }
@@ -721,27 +721,55 @@ const takeFood: ActionHandler<'takeFood'> = (state, action) => {
   return { state: { ...state, inventory: { ...state.inventory, food: moved.to }, larder: moved.from }, message: `Took 1 ${foodWord(action.item, 1)} from the larder.` };
 };
 
-const dropStone: ActionHandler<'dropStone'> = state => {
-  if (state.inventory.stone < 1) return refuse(state, 'You have no stone to set down.');
+const digOre: ActionHandler<'digOre'> = state => {
+  const blocker = digOreBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  if (isExhausted(state)) return refuse(state, TOO_TIRED_MESSAGE);
+  if (freeSpaces(state) < spaceFor('ore')) return refuse(state, FULL_BAG_MESSAGE);
+  const first = state.progress.oreFoundDay === null;
+  return {
+    state: advanceTime({
+      ...state,
+      player: tire(state, BALANCE.digEnergyCost),
+      inventory: { ...state.inventory, ore: state.inventory.ore + 1 },
+      progress: first ? { ...state.progress, oreFoundDay: state.day } : state.progress,
+      outcrop: { day: state.day, dug: BALANCE.outcropPerDay - outcropLeft(state) + 1 }
+    }, workSeconds(state, BALANCE.digSeconds), 'working'),
+    message: first ? OUTCROP_MESSAGES.first : OUTCROP_MESSAGES.more
+  };
+};
+
+/** Sets a stone or an ore down, joining a pile of the same thing nearby. */
+function setDown(state: GameState, item: 'stone' | 'ore'): GameState {
   const { x, y } = state.player;
-  const nearby = state.stonePiles.find(pile => pile.item === 'stone' && pile.area === state.area && Math.hypot(pile.x - x, pile.y - y) <= BALANCE.pileMergeRadius);
+  const nearby = state.stonePiles.find(pile => pile.item === item && pile.area === state.area && Math.hypot(pile.x - x, pile.y - y) <= BALANCE.pileMergeRadius);
   const stonePiles = nearby
     ? state.stonePiles.map(pile => pile === nearby ? { ...pile, count: pile.count + 1 } : pile)
-    : [...state.stonePiles, { id: `pile-${state.area}-${state.day}-${Math.round(x * 10)}-${Math.round(y * 10)}`, x, y, count: 1, area: state.area, item: 'stone' as const }];
-  return { state: { ...state, inventory: { ...state.inventory, stone: state.inventory.stone - 1 }, stonePiles }, message: 'Set down one stone.' };
+    : [...state.stonePiles, { id: `${item === 'ore' ? 'ore-' : ''}pile-${state.area}-${state.day}-${Math.round(x * 10)}-${Math.round(y * 10)}`, x, y, count: 1, area: state.area, item }];
+  return { ...state, inventory: { ...state.inventory, [item]: state.inventory[item] - 1 }, stonePiles };
+}
+
+const dropOre: ActionHandler<'dropOre'> = state => {
+  if (state.inventory.ore < 1) return refuse(state, 'You have no ore to set down.');
+  return { state: setDown(state, 'ore'), message: 'Set down one ore.' };
+};
+
+const dropStone: ActionHandler<'dropStone'> = state => {
+  if (state.inventory.stone < 1) return refuse(state, 'You have no stone to set down.');
+  return { state: setDown(state, 'stone'), message: 'Set down one stone.' };
 };
 
 const pickUpStone: ActionHandler<'pickUpStone'> = (state, action) => {
   const pile = state.stonePiles.find(item => item.id === action.pileId && item.area === state.area);
   if (!pile) return refuse(state, 'There is no stone pile within reach.');
   if (!near(state.player.x, state.player.y, pile.x, pile.y)) return refuse(state, 'Move closer to the stones.');
-  if (freeSpaces(state) < spaceFor('stone')) return refuse(state, FULL_BAG_MESSAGE);
+  if (freeSpaces(state) < spaceFor(pile.item)) return refuse(state, FULL_BAG_MESSAGE);
   const stonePiles = state.stonePiles
     .map(item => item === pile ? { ...item, count: item.count - 1 } : item)
     .filter(item => item.count > 0);
   return {
-    state: advanceTime({ ...state, inventory: { ...state.inventory, stone: state.inventory.stone + 1 }, stonePiles }, BALANCE.pickUpSeconds, 'resting'),
-    message: 'Picked up a stone.'
+    state: advanceTime({ ...state, inventory: { ...state.inventory, [pile.item]: state.inventory[pile.item] + 1 }, stonePiles }, BALANCE.pickUpSeconds, 'resting'),
+    message: pile.item === 'ore' ? 'Picked up the ore.' : 'Picked up a stone.'
   };
 };
 
@@ -1310,7 +1338,7 @@ const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   nameAnimal,
   shearFlock,
   weave,
-  move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, buildMine, chopTree, markClearing, clearGround, visitSite,
+  move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, digOre, dropOre, buildMine, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, dropPineNeedles, pickUpStone, burnFiber, burnPineNeedles, eat, eatTrailFood, prepareTrailFood,
   cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, rest, sleep, befriend, meetChickens, leadChickens, takeEgg, gatherApples, plantPip, pickOrchardApple, searchShed, craftPillow, craftCloak,
   makeFishingLine, fish

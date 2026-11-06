@@ -13,6 +13,7 @@ import { BED_CROPS, bedSoil, bedStage, drawWaterBlocker, harvestBedBlocker, sowB
 import { workSeconds } from '../game/needs';
 import { hasWoodStore, livesInHouse, woodStoreCapacity } from '../game/home';
 import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, mineBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
+import { availableOre } from '../game/hills';
 import { WORKSHOP_UPGRADES, upgradeBlocker, type UpgradeId } from '../game/workshop';
 import { logsInStore } from '../game/wood';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
@@ -562,7 +563,7 @@ export function bagFoodMarkup(): string {
 export const EATABLE_FOODS = ['berry', 'trailFood', ...BAG_FOODS.filter(cell => cell.eat).map(cell => cell.item)] as const satisfies readonly FoodItem[];
 export type EatableFood = (typeof EATABLE_FOODS)[number];
 
-export interface BagView { foods: Record<BagFood, { count: number; shown: boolean; note: string }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; spacesLabel: string; packHint: string; prepareReady: boolean; prepareHint: string; storedAtCamp: string; woodAtCamp: string; fiberAtCamp: string; fire: string }
+export interface BagView { oreAtForge: string; oreShown: boolean; foods: Record<BagFood, { count: number; shown: boolean; note: string }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; spacesLabel: string; packHint: string; prepareReady: boolean; prepareHint: string; storedAtCamp: string; woodAtCamp: string; fiberAtCamp: string; fire: string }
 
 export function bagView(state: GameState): BagView {
   const prepareBlocker = trailFoodBlocker(state);
@@ -590,6 +591,8 @@ export function bagView(state: GameState): BagView {
     prepareReady: !prepareBlocker,
     prepareHint: prepareBlocker ?? `1 berry · ${workSeconds(state, BALANCE.trailFoodSeconds)} seconds · 1 ration`,
     storedAtCamp: pile ? `+${state.storedStone} at camp` : '',
+    oreAtForge: state.progress.workshop.forge ? `+${state.storedOre} at the forge` : '',
+    oreShown: availableOre(state) > 0 || state.inventory.ore > 0,
     // The handcart's load counts as wood at camp even before there is a woodpile to unload it onto.
     woodAtCamp: woodStore || state.progress.workshop.handcart ? `+${logsInStore(state)} at camp` : '',
     fiberAtCamp: state.structures.fibreStack ? `+${state.storedFiber} at camp` : '',
@@ -633,7 +636,7 @@ export function larderMarkup(): string {
   return `<div id="larder-controls" class="stone-pile-controls larder-controls" hidden><span id="larder-stored">Stored food 0/${BALANCE.larderCapacity}</span>${rows}</div>`;
 }
 
-export type CampStoreId = 'wood' | 'fiber' | 'stone' | 'cart';
+export type CampStoreId = 'wood' | 'fiber' | 'stone' | 'ore' | 'cart';
 export interface CampStoresView { shown: boolean; lines: { id: CampStoreId; text: string; shown: boolean }[] }
 
 export function campStoresView(state: GameState): CampStoresView {
@@ -643,6 +646,7 @@ export function campStoresView(state: GameState): CampStoresView {
     { id: 'wood', text: `Wood ${state.storedWood}/${woodStoreCapacity(state)}`, shown: hasWoodStore(state) },
     { id: 'fiber', text: `Fiber ${state.storedFiber}/${BALANCE.fibreStackCapacity}`, shown: structures.fibreStack },
     { id: 'stone', text: `Stone ${state.storedStone}/${BALANCE.stonePileCapacity}`, shown: structures.stonePile },
+    { id: 'ore', text: `Ore ${state.storedOre}/${BALANCE.forgeOreCapacity}`, shown: state.progress.workshop.forge },
     { id: 'cart', text: `Cart ${state.cartWood}/${BALANCE.handcartCapacity}`, shown: handcart }
   ];
   return { shown: structures.larder || lines.some(line => line.shown), lines };
@@ -657,7 +661,7 @@ export function buildListMarkup(): string {
   }).join('');
 }
 
-const CAMP_STORE_IDS: readonly CampStoreId[] = ['wood', 'fiber', 'stone', 'cart'];
+const CAMP_STORE_IDS: readonly CampStoreId[] = ['wood', 'fiber', 'stone', 'ore', 'cart'];
 
 /** The Camp stores panel, hidden until a store exists, with a hidden line per store and the larder's controls. */
 export function campStoresMarkup(): string {

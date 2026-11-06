@@ -10,6 +10,7 @@ import { wolfTracksShown } from '../game/wolves';
 import { rainWindow } from '../game/rain';
 import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
+import { OUTCROP_SITE, outcropLeft } from '../game/hills';
 import { markedTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
 import { fireplaceBurning, woodStoreCapacity } from '../game/home';
@@ -58,6 +59,11 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     }
     add('quarry', quarryTexture, QUARRY_SITE.x, QUARRY_SITE.y);
     add('rubble', state.rubbleReadyDay <= state.day ? 'rubble:ready' : 'rubble:gathered', RUBBLE_SITE.x, RUBBLE_SITE.y);
+    addPiles(state, visuals, add);
+    return visuals;
+  }
+  if (state.area === 'hills') {
+    add('outcrop', `outcrop:${outcropLeft(state) > 0 ? 'ready' : 'spent'}`, OUTCROP_SITE.x, OUTCROP_SITE.y);
     addPiles(state, visuals, add);
     return visuals;
   }
@@ -132,7 +138,7 @@ function addSheep(state: GameState, add: AddVisual, timeMs: number): void {
 function addPiles(state: GameState, visuals: SceneVisual[], add: AddVisual): void {
   for (const pile of state.stonePiles) {
     if (pile.area !== state.area) continue;
-    add(pile.id, `looseStones:${pileSize(pile.count)}`, pile.x, pile.y);
+    add(pile.id, `${pile.item === 'ore' ? 'orePile' : 'looseStones'}:${pileSize(pile.count)}`, pile.x, pile.y);
     if (pile.count < 2) continue;
     const base = visuals.at(-1)!;
     visuals.push({ id: `${pile.id}-count`, texture: `pileCount:${pileCountFrame(pile.count)}`, x: base.x, y: base.y - 14, depth: base.depth + 0.5 });

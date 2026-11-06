@@ -114,6 +114,7 @@ export class App {
                 <div><span class="supply-icon food">●</span><strong id="food-count">0</strong><small>Food</small><small id="berry-line" class="supply-note"></small><button type="button" class="supply-action" data-action="eat" data-item="berry" data-supply="food" aria-label="Eat one berry">Eat</button></div>
                 <div><span class="supply-icon fiber">≋</span><strong id="fiber-count">0</strong><small>Fiber</small><small id="fiber-stored" class="supply-note"></small><button type="button" class="supply-action" data-action="burnFiber" data-supply="fiber" aria-label="Burn one fiber">Burn</button></div>
                 <div><span class="supply-icon stone">◆</span><strong id="stone-count">0</strong><small>Stone</small><small id="stone-stored" class="supply-note"></small><button type="button" class="supply-action" data-action="dropStone" data-supply="stone" aria-label="Drop one stone">Drop</button></div>
+                <div id="ore-supply" hidden><span class="supply-icon stone">◆</span><strong id="ore-count">0</strong><small>Ore</small><small id="ore-stored" class="supply-note"></small><button type="button" class="supply-action" data-action="dropOre" data-supply="ore" aria-label="Drop one ore">Drop</button></div>
                 <div><span class="supply-icon ration">◇</span><strong id="ration-count">0</strong><small>Rations</small><button type="button" class="supply-action" data-action="eatTrailFood" data-supply="trailFood" aria-label="Eat one trail ration">Eat</button></div>
                 <div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small id="space-label">Carried</small></div>${bagFoodMarkup()}
               </div><p class="keepsake-line" id="bag-pips" hidden></p><p class="keepsake-line" id="pack-hint" hidden></p><p class="keepsake-line" id="keepsake-line" hidden></p><div class="fire-status" id="fire-status">The fire is unlit</div></section>
@@ -143,7 +144,7 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'feedSheep' | 'shearFlock' | 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'buildMine' | 'craftPot' | 'craftPack' | 'makeFishingLine' | 'clearGround' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'storeFood' | 'takeFood' | 'drawWater' | 'grindGrain' | 'millGrain' | 'takeLoaf' | 'takeHoney' | 'takeEgg';
+        const type = button.dataset.action as 'dropOre' | 'feedSheep' | 'shearFlock' | 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'buildMine' | 'craftPot' | 'craftPack' | 'makeFishingLine' | 'clearGround' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'storeFood' | 'takeFood' | 'drawWater' | 'grindGrain' | 'millGrain' | 'takeLoaf' | 'takeHoney' | 'takeEgg';
         const item = button.dataset.item as FoodItem | undefined;
         const dish = button.dataset.dish as DishId | undefined;
         if (type === 'storeFood') {
@@ -154,7 +155,7 @@ export class App {
           this.scene?.perform(dish ? { type, dish } : { type });
         } else if (type === 'eat') {
           this.scene?.perform(item ? { type, item } : { type });
-        } else if (type === 'feedSheep' || type === 'shearFlock') {
+        } else if (type === 'feedSheep' || type === 'shearFlock' || type === 'dropOre') {
           this.scene?.perform({ type });
         } else this.scene?.perform({ type });
       });
@@ -447,6 +448,9 @@ export class App {
     this.setText('berry-line', bag.berries);
     this.setText('fiber-count', String(inventory.fiber));
     this.setText('stone-count', String(inventory.stone));
+    this.setText('ore-count', String(inventory.ore));
+    this.setText('ore-stored', bag.oreAtForge);
+    (this.root.querySelector('#ore-supply') as HTMLElement).hidden = !bag.oreShown;
     this.setText('ration-count', String(foodCount(inventory.food, 'trailFood')));
     for (const { item } of BAG_FOODS) {
       const cell = this.root.querySelector<HTMLElement>(`[data-food="${item}"]`);

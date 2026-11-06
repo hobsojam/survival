@@ -1,14 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { hillsPathOpen, QUARRY_EXIT } from '../src/game/areas';
 import { STEP_IDS, placeBranches } from '../src/game/clearing';
-import { HILLS_EXIT, QUARRY_HILLS_EXIT } from '../src/game/hills';
+import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, availableOre, spendOre } from '../src/game/hills';
 import { emptyPony, type PonyState } from '../src/game/pony';
-import { applyAction } from '../src/game/rules';
+import { FULL_BAG_MESSAGE, applyAction, carriedCount, freeSpaces } from '../src/game/rules';
+import { TOO_TIRED_MESSAGE } from '../src/game/needs';
+import { settleStores } from '../src/game/stores';
+import { sprites } from '../src/art/sprites';
+import { useKeyAction } from '../src/scene/prompts';
+import { sceneVisuals } from '../src/scene/visuals';
+import { bagView, campStoresView } from '../src/ui/panels';
 import { saveGame } from '../src/game/save';
 import { SAVE_VERSION, upgradeSave } from '../src/game/saveUpgrades';
-import { createGame, type GameState } from '../src/game/state';
+import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { terrainKey } from '../src/scene/map';
-import { pickTapTarget } from '../src/scene/tapTarget';
+import { closestGatherable, pickTapTarget, targetAction } from '../src/scene/tapTarget';
 
 const game = createGame();
 const fakeStorage = (): Storage => {
@@ -179,5 +185,178 @@ describe('saves the hills can really reach', () => {
     ['more digs than the outcrop gives', foundQuarry({ outcrop: { day: 1, dug: 4 } })]
   ])('refuses %s', (_, state) => {
     expect(saves(state)).toBe(false);
+  });
+});
+
+/** At the outcrop with the pickaxe and an empty bag. */
+const atOutcrop = (changes: Partial<GameState> = {}): GameState => {
+  const base = onHills({ structures: { ...foundQuarry().structures, toolshed: true } });
+  return at({ ...base, progress: { ...base.progress, pickaxeCrafted: true }, ...changes }, 'hills', OUTCROP_SITE.x + 1, OUTCROP_SITE.y);
+};
+const dig = (state: GameState) => applyAction(state, { type: 'digOre' });
+
+describe('digging ore', () => {
+  it('gives one ore, for the same time and energy as the quarry', () => {
+    const before = atOutcrop();
+    const { state } = dig(before);
+    expect(state.inventory.ore).toBe(1);
+    expect(state.player.energy).toBeLessThan(before.player.energy);
+    expect(state.timeOfDay - before.timeOfDay).toBeCloseTo(BALANCE.digSeconds);
+  });
+
+  it('says the first time that it has no use yet, and marks the day', () => {
+    const { state, message } = dig(atOutcrop());
+    expect(message).toBe('You chip out a heavy lump of ore. There is nothing to do with it yet.');
+    expect(state.progress.oreFoundDay).toBe(state.day);
+  });
+
+  it('uses a plainer line afterwards', () => {
+    const first = dig(atOutcrop()).state;
+    const second = dig(first);
+    expect(second.message).toBe('You chip out a lump of ore.');
+    expect(second.state.progress.oreFoundDay).toBe(first.progress.oreFoundDay);
+  });
+
+  it('gives three a day, then waits for morning', () => {
+    let state = atOutcrop({ inventory: { ...game.inventory } });
+    state = { ...state, progress: { ...state.progress, packWoven: true } };
+    for (let i = 0; i < 3; i++) state = dig(state).state;
+    expect(state.inventory.ore).toBe(3);
+    const spent = dig(state);
+    expect(spent.message).toBe('The outcrop is worked out until morning.');
+    expect(spent.state.inventory.ore).toBe(3);
+    expect(dig({ ...state, day: state.day + 1 }).state.inventory.ore).toBe(4);
+  });
+
+  it('needs the pickaxe', () => {
+    const state = atOutcrop();
+    expect(dig({ ...state, progress: { ...state.progress, pickaxeCrafted: false } }).message).toBe('You need a pickaxe to work the outcrop.');
+  });
+
+  it('needs you to be there', () => {
+    expect(dig(at(atOutcrop(), 'hills', 30, 25)).message).toBe('Move closer to the outcrop.');
+    expect(dig(at(atOutcrop(), 'quarry', OUTCROP_SITE.x, OUTCROP_SITE.y)).message).toBe('Move closer to the outcrop.');
+  });
+
+  it('needs two free spaces', () => {
+    const { message, state } = dig(atOutcrop({ inventory: { ...game.inventory, wood: 7 } }));
+    expect(message).toBe(FULL_BAG_MESSAGE);
+    expect(state.inventory.ore).toBe(0);
+  });
+
+  it('refuses when exhausted', () => {
+    const tired = atOutcrop();
+    expect(dig({ ...tired, player: { ...tired.player, energy: 0 } }).message).toBe(TOO_TIRED_MESSAGE);
+  });
+});
+
+describe('carrying ore', () => {
+  const carrying = (ore: number, changes: Partial<GameState> = {}): GameState => {
+    const base = atOutcrop(changes);
+    return { ...base, inventory: { ...base.inventory, ore }, progress: { ...base.progress, oreFoundDay: 1 } };
+  };
+
+  it('weighs the same as stone', () => {
+    expect(carriedCount(carrying(3))).toBe(6);
+    expect(freeSpaces(carrying(3))).toBe(2);
+  });
+
+  it('can be dropped and picked up again with nothing lost, even with the bag full', () => {
+    const full = carrying(4);
+    expect(freeSpaces(full)).toBe(0);
+    const { state, message } = applyAction(full, { type: 'dropOre' });
+    expect(message).toBe('Set down one ore.');
+    expect(state.inventory.ore).toBe(3);
+    expect(state.stonePiles).toEqual([expect.objectContaining({ count: 1, area: 'hills', item: 'ore' })]);
+    const back = applyAction(state, { type: 'pickUpStone', pileId: state.stonePiles[0].id });
+    expect(back.message).toBe('Picked up the ore.');
+    expect(back.state.inventory.ore).toBe(4);
+    expect(back.state.inventory.stone).toBe(0);
+    expect(back.state.stonePiles).toEqual([]);
+    expect(saves(state)).toBe(true);
+  });
+
+  it('refuses to drop ore it does not have', () => {
+    const state = carrying(0);
+    expect(applyAction(state, { type: 'dropOre' }).message).toBe('You have no ore to set down.');
+  });
+
+  it('keeps ore and stone in separate piles at the same spot', () => {
+    const start = carrying(1);
+    const bag = { ...start, inventory: { ...start.inventory, stone: 1 } };
+    const stone = applyAction(bag, { type: 'dropStone' }).state;
+    const both = applyAction(stone, { type: 'dropOre' }).state;
+    expect(both.stonePiles.map(pile => pile.item).sort()).toEqual(['ore', 'stone']);
+    const stonePile = both.stonePiles.find(pile => pile.item === 'stone')!;
+    expect(applyAction(both, { type: 'pickUpStone', pileId: stonePile.id }).state.inventory.stone).toBe(1);
+  });
+
+  it('draws an ore pile differently, and names it in the prompt', () => {
+    const dropped = applyAction(carrying(1), { type: 'dropOre' }).state;
+    const pile = dropped.stonePiles[0];
+    expect(sceneVisuals(dropped, 0).find(visual => visual.id === pile.id)?.texture).toMatch(/^orePile:/);
+    const found = closestGatherable(dropped);
+    expect(found?.kind).toBe('pile');
+    expect(useKeyAction(at(dropped, 'hills', pile.x, pile.y))).toEqual({ type: 'pickUpStone', pileId: pile.id });
+  });
+
+  const camped = (ore: number, storedOre: number, forge: boolean): GameState => {
+    const base = foundQuarry();
+    return { ...at(base, 'camp', BALANCE.campX + 1, BALANCE.campY), inventory: { ...base.inventory, ore }, storedOre,
+      structures: { ...base.structures, toolshed: true, workshop: forge },
+      progress: { ...base.progress, hillsFound: true, oreFoundDay: 1, workshop: { ...base.progress.workshop, forge } } };
+  };
+
+  it('stays in the bag before there is a forge', () => {
+    expect(settleStores(camped(3, 0, false)).inventory.ore).toBe(3);
+  });
+
+  it('moves to the forge in the clearing, up to twelve', () => {
+    const settled = settleStores(camped(3, 11, true));
+    expect([settled.storedOre, settled.inventory.ore]).toEqual([12, 2]);
+  });
+
+  it('does not move outside the clearing', () => {
+    expect(settleStores(at(camped(3, 0, true), 'hills', 20, 10)).inventory.ore).toBe(3);
+  });
+
+  it('counts the forge and the bag together, spending the bag first', () => {
+    const state = camped(1, 2, true);
+    expect(availableOre(state)).toBe(3);
+    const spent = spendOre(state, 2);
+    expect([spent.inventory.ore, spent.storedOre]).toEqual([0, 1]);
+  });
+
+  it('shows in the bag and at the forge', () => {
+    const state = camped(1, 2, true);
+    expect(bagView(state).oreAtForge).toBe('+2 at the forge');
+    expect(bagView(camped(1, 0, false)).oreAtForge).toBe('');
+    expect(campStoresView(state).lines).toContainEqual({ id: 'ore', text: 'Ore 2/12', shown: true });
+    expect(campStoresView(camped(1, 0, false)).lines).toContainEqual({ id: 'ore', text: 'Ore 0/12', shown: false });
+  });
+});
+
+describe('reaching the outcrop', () => {
+  it('E and a tap dig there', () => {
+    const state = atOutcrop();
+    expect(closestGatherable(state)).toEqual({ kind: 'outcrop' });
+    expect(useKeyAction(state)).toEqual({ type: 'digOre' });
+    const target = pickTapTarget(state, OUTCROP_SITE.x, OUTCROP_SITE.y);
+    expect(target.kind).toBe('outcrop');
+    expect(targetAction(target)).toEqual({ type: 'digOre' });
+  });
+
+  it('E leaves it alone once it is worked out', () => {
+    const state = { ...atOutcrop(), outcrop: { day: 1, dug: 3 } };
+    expect(closestGatherable(state)).toBeUndefined();
+    expect(useKeyAction(state)).toBeUndefined();
+  });
+
+  it('draws the outcrop by what is left', () => {
+    const texture = (state: GameState) => sceneVisuals(state, 0).find(visual => visual.id === 'outcrop')?.texture;
+    expect(texture(atOutcrop())).toBe('outcrop:ready');
+    expect(texture({ ...atOutcrop(), outcrop: { day: 1, dug: 3 } })).toBe('outcrop:spent');
+    expect(texture({ ...atOutcrop(), day: 2, outcrop: { day: 1, dug: 3 } })).toBe('outcrop:ready');
+    expect(sprites.outcrop.frames.ready).toBeDefined();
   });
 });

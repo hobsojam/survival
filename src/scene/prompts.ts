@@ -3,6 +3,7 @@ import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceKind, type SiteId
 import { isAtCamp, isInClearing, mineBlocker, sleepBlocker, type GameAction } from '../game/rules';
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
+import { HILLS_EXIT, OUTCROP_SITE } from '../game/hills';
 import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
 import { ORCHARD_SPOTS, nearestSpot, spotAction, treeBears, treeStage } from '../game/orchard';
 import { choppableTrees, isClearingStump } from '../game/clearing';
@@ -22,7 +23,7 @@ export const KEY_ACTIONS: readonly [string, GameAction][] = [
 
 const ACTION_POSES: Partial<Record<GameAction['type'], SurvivorAction>> = {
   gather: 'gather', rest: 'rest', cook: 'cook', stargaze: 'stargaze',
-  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', fish: 'gather',
+  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', digOre: 'gather', fish: 'gather',
   gatherApples: 'gather', plantPip: 'gather', pickOrchardApple: 'gather', searchShed: 'gather', takeEgg: 'gather'
 };
 
@@ -63,8 +64,11 @@ function gatherChoice(state: GameState, found: Gatherable): Choice {
       const bare = found.node.kind === 'berry' && isWinter(state.day);
       return { label: bare ? 'Search the bare bush' : GATHER_PROMPTS[found.node.kind], action: { type: 'gather', nodeId: found.node.id } };
     }
-    case 'pile': return { label: `Pick up stone (×${found.pile.count})`, action: { type: 'pickUpStone', pileId: found.pile.id } };
+    case 'pile': return { label: `Pick up ${found.pile.item} (×${found.pile.count})`, action: { type: 'pickUpStone', pileId: found.pile.id } };
     case 'rubble': return { label: 'Gather rubble', action: { type: 'gatherRubble' } };
+    case 'outcrop': return state.progress.pickaxeCrafted
+      ? { label: 'Dig the outcrop', action: { type: 'digOre' } }
+      : { label: 'Rust-red rock · craft a pickaxe at the toolshed' };
     default: return state.progress.pickaxeCrafted
       ? { label: 'Dig the quarry', action: { type: 'digQuarry' } }
       : { label: 'Quarry · craft a pickaxe at the toolshed' };
@@ -123,6 +127,7 @@ export function useKeyAction(state: GameState): GameAction | undefined {
   let choices: Choice[];
   if (state.area === 'quarry') choices = quarryChoices(state);
   else if (state.area === 'homestead') choices = homesteadChoices(state);
+  else if (state.area === 'hills') choices = hillsChoices(state);
   else choices = campChoices(state);
   return choices.find(choice => choice.action)?.action ?? (isAtHome(state) ? { type: 'rest' } : undefined);
 }
@@ -130,6 +135,7 @@ export function useKeyAction(state: GameState): GameAction | undefined {
 /** The scene effect an action that changed the game plays, and where: dust off the quarry face, or steam or a star by the survivor. */
 export function actionEffect(action: GameAction, after: GameState): { kind: 'dust' | 'cook' | 'stargaze'; x: number; y: number } | undefined {
   if (action.type === 'digQuarry') return { kind: 'dust', ...QUARRY_SITE };
+  if (action.type === 'digOre') return { kind: 'dust', ...OUTCROP_SITE };
   if (action.type === 'cook' || action.type === 'stargaze') return { kind: action.type, x: after.player.x, y: after.player.y };
   return undefined;
 }
@@ -173,6 +179,7 @@ export function closestSite(state: GameState): { id: SiteId; name: string; x: nu
 /** The hint line under the game: what the keys would do here, now. */
 export function promptFor(state: GameState): string {
   if (state.area === 'quarry') return quarryPrompt(state);
+  if (state.area === 'hills') return hillsPrompt(state);
   if (state.area === 'homestead') {
     const labels = choiceLabels(homesteadChoices(state));
     if (labels.length) return labels.join(' · ');
@@ -237,6 +244,18 @@ function housePrompt(state: GameState): string {
 }
 
 /** Everything in reach in the quarry area: a loose pile first, then the rubble or the quarry face. */
+function hillsChoices(state: GameState): Choice[] {
+  const found = closestGatherable(state);
+  return found ? [gatherChoice(state, found)] : [];
+}
+
+function hillsPrompt(state: GameState): string {
+  const labels = choiceLabels(hillsChoices(state));
+  if (labels.length) return labels.join(' · ');
+  if (within(state, HILLS_EXIT)) return 'Walk east to go back down';
+  return 'WASD / arrows  Move';
+}
+
 function quarryChoices(state: GameState): Choice[] {
   const found = closestGatherable(state);
   if (!found && within(state, QUARRY_SITE) && !mineBlocker(state)) return [{ label: 'Build timber mine', action: { type: 'buildMine' } }];

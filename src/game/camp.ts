@@ -14,13 +14,13 @@ export function isAtCamp(state: GameState): boolean {
 
 /** Bag spaces one of this supply takes; stone is heavy, and each piece of food takes one. */
 export function spaceFor(resource: keyof GameState['inventory']): number {
-  return resource === 'stone' ? BALANCE.stoneSpaces : 1;
+  return resource === 'stone' || resource === 'ore' ? BALANCE.stoneSpaces : 1;
 }
 
 /** Bag spaces in use, counting stone at its weight. */
 export function carriedCount(state: GameState): number {
-  const { wood, fiber, stone, food } = state.inventory;
-  return wood + fiber + stone * BALANCE.stoneSpaces + storeTotal(food);
+  const { wood, fiber, stone, ore, food } = state.inventory;
+  return wood + fiber + (stone + ore) * BALANCE.stoneSpaces + storeTotal(food);
 }
 
 export function bagCapacity(state: GameState): number {
