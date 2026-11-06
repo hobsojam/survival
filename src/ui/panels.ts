@@ -12,7 +12,7 @@ import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { BED_CROPS, bedSoil, bedStage, drawWaterBlocker, harvestBedBlocker, sowBedBlocker, type BedSoil, type BedStage } from '../game/beds';
 import { workSeconds } from '../game/needs';
 import { hasWoodStore, livesInHouse, woodStoreCapacity } from '../game/home';
-import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, mineBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
+import { availableFiber, availableWood, isAtCamp, axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, mineBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
 import { availableOre } from '../game/hills';
 import { ponyWith } from '../game/pony';
 import { WORKSHOP_UPGRADES, upgradeBlocker, type UpgradeId } from '../game/workshop';
@@ -293,6 +293,19 @@ export interface WorkshopView {
   shown: boolean;
   rows: Record<UpgradeId, ActionPanelView & { shown: boolean }>;
 }
+
+/** What each Burn or Drop button spends, as a count in the bag; Eat buttons follow the bag view instead. */
+const SUPPLY_COUNTS: Record<string, (inventory: GameState['inventory']) => number> = {
+  wood: inventory => inventory.wood,
+  fiber: inventory => inventory.fiber,
+  stone: inventory => inventory.stone,
+  ore: inventory => inventory.ore,
+  pineNeedles: inventory => inventory.food.pineNeedles
+};
+/** Burn reaches the woodpile and the fibre stack at camp; everything else follows the bag. */
+const AT_CAMP_COUNTS: Record<string, (state: GameState) => number> = { wood: availableWood, fiber: availableFiber };
+export const supplyCount = (state: GameState, supply: string): number =>
+  (isAtCamp(state) ? AT_CAMP_COUNTS[supply]?.(state) : undefined) ?? SUPPLY_COUNTS[supply]?.(state.inventory) ?? 0;
 
 /** The workshop panel, once it stands: each upgrade with its cost or why it can't be made. */
 export function workshopView(state: GameState): WorkshopView {

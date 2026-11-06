@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import APP_SOURCE from '../src/ui/App.ts?raw';
 import { hillsPathOpen, QUARRY_EXIT } from '../src/game/areas';
 import { STEP_IDS, placeBranches } from '../src/game/clearing';
 import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, availableOre, spendOre } from '../src/game/hills';
-import { emptyPony, hillsNews, type PonyState } from '../src/game/pony';
+import { PONY_SPOTS, emptyPony, hillsNews, type PonyState } from '../src/game/pony';
 import { journalEntry, recordJournal } from '../src/game/journalEntries';
 import { newsBetween } from '../src/game/news';
 import { JOURNAL_ICONS } from '../src/art/journalIcons';
@@ -11,9 +12,9 @@ import { FULL_BAG_MESSAGE, applyAction, carriedCount, freeSpaces } from '../src/
 import { TOO_TIRED_MESSAGE } from '../src/game/needs';
 import { settleStores } from '../src/game/stores';
 import { sprites } from '../src/art/sprites';
-import { useKeyAction } from '../src/scene/prompts';
+import { lineToSay, promptFor, useKeyAction } from '../src/scene/prompts';
 import { HILL_TREES, sceneVisuals } from '../src/scene/visuals';
-import { bagView, campStoresView } from '../src/ui/panels';
+import { bagView, campStoresView, supplyCount } from '../src/ui/panels';
 import { saveGame } from '../src/game/save';
 import { SAVE_VERSION, upgradeSave } from '../src/game/saveUpgrades';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
@@ -521,5 +522,69 @@ describe('morning notes from the hills', () => {
     expect(hillsNews(before, after)).toHaveLength(3);
     expect(hillsNews(after, { ...after, day: 7 })).toEqual([]);
     expect(hillsNews(before, before)).toEqual([]);
+  });
+});
+
+describe('what the player is told on the way', () => {
+  const walkCost = { type: 'move', dx: 0.1, dy: 0 } as const;
+
+  it('says the line for a walk across an area edge, though a step usually says nothing', () => {
+    const before = at(foundQuarry(), 'quarry', 0.2, 15);
+    const after = at(onHills(), 'hills', 38.5, 15);
+    expect(lineToSay(before, after, 'You came out on the hills.', false)).toBe('You came out on the hills.');
+  });
+
+  it('keeps a step within an area quiet, and says what a pressed action says', () => {
+    const before = onHills();
+    const after = { ...before, player: { ...before.player, x: before.player.x + walkCost.dx } };
+    expect(lineToSay(before, after, 'A step.', false)).toBe('');
+    expect(lineToSay(before, after, 'A pressed line.', true)).toBe('A pressed line.');
+  });
+
+  const byPony = (changes: Partial<GameState> = {}) => at(onHills({ timeOfDay: 40, ...changes }), 'hills', PONY_SPOTS[0].x - 2.5, PONY_SPOTS[0].y);
+
+  it('names what the pony wants when there is nothing to offer', () => {
+    expect(promptFor(byPony())).toBe('Pony · would take an apple or vegetables');
+  });
+
+  it('says the pony has had its offer today', () => {
+    const state = byPony({ day: 5 });
+    const offered = { ...state, pony: { ...state.pony, lastOffer: 5 }, inventory: { ...state.inventory, food: { ...state.inventory.food, vegetables: 2 } } };
+    expect(promptFor(offered)).toBe('Pony · has had its offer today');
+  });
+
+  it('says nothing about a pony out of reach or already won over', () => {
+    expect(promptFor(at(onHills({ timeOfDay: 40 }), 'hills', 30, 25))).not.toContain('Pony');
+    const won = byPony();
+    expect(promptFor({ ...won, pony: { ...won.pony, trust: 4, won: 1 } })).not.toContain('Pony');
+  });
+
+  it('says the outcrop is worked out until morning', () => {
+    const state = at(onHills({ timeOfDay: 40, day: 5 }), 'hills', OUTCROP_SITE.x + 1, OUTCROP_SITE.y + 1);
+    const dugOut = { ...state, progress: { ...state.progress, pickaxeCrafted: true }, outcrop: { day: 5, dug: BALANCE.outcropPerDay } };
+    expect(promptFor(dugOut)).toContain('Outcrop · worked out until morning');
+  });
+
+  it('still says what the outcrop needs before there is a pickaxe', () => {
+    const state = at(onHills({ timeOfDay: 40 }), 'hills', OUTCROP_SITE.x + 1, OUTCROP_SITE.y + 1);
+    const noPick = { ...state, progress: { ...state.progress, pickaxeCrafted: false } };
+    expect(promptFor(noPick)).toBe('Rust-red rock · craft a pickaxe at the toolshed');
+  });
+});
+
+describe('the bag buttons', () => {
+  it('lets ore be dropped while there is ore in the bag', () => {
+    const state = onHills();
+    expect(supplyCount({ ...state, inventory: { ...state.inventory, ore: 3 } }, 'ore')).toBe(3);
+    expect(supplyCount(state, 'ore')).toBe(0);
+  });
+
+  it('counts every supply a button in the page spends', () => {
+    // Eat buttons also carry a data-supply, but follow the bag view instead of a count.
+    const supplies = [...new Set([...APP_SOURCE.matchAll(/data-supply="(\w+)"/g)].map(match => match[1]))].filter(supply => supply !== 'food' && supply !== 'trailFood');
+    expect(supplies).toContain('ore');
+    const state = onHills();
+    const full = { ...state, inventory: { ...state.inventory, wood: 1, fiber: 1, stone: 1, ore: 1, food: { ...state.inventory.food, pineNeedles: 1 } } };
+    for (const supply of supplies) expect(supplyCount(full, supply), supply).toBeGreaterThan(0);
   });
 });

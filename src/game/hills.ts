@@ -32,6 +32,11 @@ export function spendOre(state: GameState, amount: number): GameState {
 }
 
 /** Why the outcrop can't be dug, or null. The bag and tiredness are checked with the other digging in the rules. */
+/** What the prompt says at an outcrop with nothing left today; null while there's ore to dig. */
+export function outcropNote(state: GameState): string | null {
+  return outcropLeft(state) > 0 ? null : 'Outcrop · worked out until morning';
+}
+
 export function digOreBlocker(state: GameState): string | null {
   if (!state.progress.pickaxeCrafted) return 'You need a pickaxe to work the outcrop.';
   if (state.area !== 'hills' || Math.hypot(state.player.x - OUTCROP_SITE.x, state.player.y - OUTCROP_SITE.y) > BALANCE.interactionRadius) return 'Move closer to the outcrop.';

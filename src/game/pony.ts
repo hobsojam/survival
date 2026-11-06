@@ -64,6 +64,15 @@ export function ponyOfferLabel(state: GameState): string | null {
   return ponyFood(state) === 'apple' ? 'Offer the pony an apple' : 'Offer the pony vegetables';
 }
 
+/** Why the wild pony in reach can't be offered anything now, for the prompt; null if it can, or if it isn't in reach. */
+export function ponyNote(state: GameState): string | null {
+  if (state.pony.won !== null || state.area !== 'hills') return null;
+  const pony = wildPonyAt(state);
+  if (!pony || distanceFrom(state, pony) > OFFER_RANGE) return null;
+  if (state.pony.lastOffer === state.day) return 'Pony · has had its offer today';
+  return ponyFood(state) ? null : 'Pony · would take an apple or vegetables';
+}
+
 /** Gives the pony its offer and counts it; the fourth wins it over. Time passes in the caller. */
 export function offerToPony(state: GameState): { state: GameState; message: string } | null {
   const item = ponyFood(state);

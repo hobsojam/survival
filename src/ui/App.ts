@@ -3,7 +3,7 @@ import { BALANCE, BUILDINGS, SITES, createGame, type GameState, type SiteId, typ
 import { GameScene } from '../scene/GameScene';
 import { canvasLayout, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../scene/pixelScale';
 import { autosaveDelayMs, loadGame, saveGame, type LoadResult } from '../game/save';
-import { availableFiber, availableWood, cookBlocker, decorationBlocker, type DecorationChoice, isAtCamp, sleepBlocker, stargazeBlocker } from '../game/rules';
+import { cookBlocker, decorationBlocker, type DecorationChoice, sleepBlocker, stargazeBlocker } from '../game/rules';
 import { nextStep, type Side } from '../game/clearing';
 import { offerBlocker } from '../game/companion';
 import { defaultDish, type DishId } from '../game/cooking';
@@ -21,23 +21,12 @@ import { browserDownloadDoc, downloadText } from './download';
 import { showBuildList, showCampStores } from './showPanels';
 import type { WovenId } from '../game/sheep';
 import { NameDialog, wireNameDialog } from './nameDialog';
-import { axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, decorationMarkup, decorationButtonView, DECORATION_CHOICES, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, chickenCoopPanelView, friendRosterView, sheepPanelView, loomPanelView, pipsLine, loomItemMarkup, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
+import { supplyCount, axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, decorationMarkup, decorationButtonView, DECORATION_CHOICES, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, chickenCoopPanelView, friendRosterView, sheepPanelView, loomPanelView, pipsLine, loomItemMarkup, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, type ActionPanelView } from './panels';
 import type { UpgradeId } from '../game/workshop';
 import { Soundscape } from '../game/soundscape';
 import { isAtHome } from '../game/home';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
-/** What each Burn or Drop button spends, as a count in the bag; Eat buttons follow the bag view instead. */
-const SUPPLY_COUNTS: Record<string, (inventory: GameState['inventory']) => number> = {
-  wood: inventory => inventory.wood,
-  fiber: inventory => inventory.fiber,
-  stone: inventory => inventory.stone,
-  pineNeedles: inventory => inventory.food.pineNeedles
-};
-/** Burn reaches the woodpile and the fibre stack at camp; everything else follows the bag. */
-const AT_CAMP_COUNTS: Record<string, (state: GameState) => number> = { wood: availableWood, fiber: availableFiber };
-const supplyCount = (state: GameState, supply: string): number =>
-  (isAtCamp(state) ? AT_CAMP_COUNTS[supply]?.(state) : undefined) ?? SUPPLY_COUNTS[supply]?.(state.inventory) ?? 0;
 
 export class App {
   private state: GameState;

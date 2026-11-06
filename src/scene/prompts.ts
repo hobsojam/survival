@@ -3,8 +3,8 @@ import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceKind, type SiteId
 import { isAtCamp, isInClearing, mineBlocker, sleepBlocker, type GameAction } from '../game/rules';
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
-import { HILLS_EXIT, OUTCROP_SITE } from '../game/hills';
-import { ponyOfferLabel } from '../game/pony';
+import { HILLS_EXIT, OUTCROP_SITE, outcropNote } from '../game/hills';
+import { ponyNote, ponyOfferLabel } from '../game/pony';
 import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
 import { ORCHARD_SPOTS, nearestSpot, spotAction, treeBears, treeStage } from '../game/orchard';
 import { choppableTrees, isClearingStump } from '../game/clearing';
@@ -244,11 +244,23 @@ function housePrompt(state: GameState): string {
   return night ? 'At the campfire · Watch the stars · Feed the fire' : 'At the campfire · Feed the fire · Click an upgrade to build';
 }
 
+/** A pressed action says its line. A step says nothing, unless it crossed into another area: that's a line the player has to hear. */
+export function lineToSay(before: GameState, after: GameState, message: string, announce: boolean): string {
+  return announce || before.area !== after.area ? message : '';
+}
+
 /** Everything in reach in the quarry area: a loose pile first, then the rubble or the quarry face. */
 function hillsChoices(state: GameState): Choice[] {
   const found = closestGatherable(state);
   const offer = ponyOfferLabel(state);
-  return [...(found ? [gatherChoice(state, found)] : []), ...(offer ? [{ label: offer, action: { type: 'offerPony' as const } }] : [])];
+  const note = ponyNote(state);
+  const outcrop = !found && within(state, OUTCROP_SITE) ? outcropNote(state) : null;
+  return [
+    ...(found ? [gatherChoice(state, found)] : []),
+    ...(outcrop ? [{ label: outcrop }] : []),
+    ...(offer ? [{ label: offer, action: { type: 'offerPony' as const } }] : []),
+    ...(note ? [{ label: note }] : [])
+  ];
 }
 
 function hillsPrompt(state: GameState): string {
