@@ -4,6 +4,7 @@ import { isAtCamp, isInClearing, mineBlocker, sleepBlocker, type GameAction } fr
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
 import { HILLS_EXIT, OUTCROP_SITE } from '../game/hills';
+import { ponyOfferLabel } from '../game/pony';
 import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
 import { ORCHARD_SPOTS, nearestSpot, spotAction, treeBears, treeStage } from '../game/orchard';
 import { choppableTrees, isClearingStump } from '../game/clearing';
@@ -23,7 +24,7 @@ export const KEY_ACTIONS: readonly [string, GameAction][] = [
 
 const ACTION_POSES: Partial<Record<GameAction['type'], SurvivorAction>> = {
   gather: 'gather', rest: 'rest', cook: 'cook', stargaze: 'stargaze',
-  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', digOre: 'gather', fish: 'gather',
+  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', digOre: 'gather', offerPony: 'gather', fish: 'gather',
   gatherApples: 'gather', plantPip: 'gather', pickOrchardApple: 'gather', searchShed: 'gather', takeEgg: 'gather'
 };
 
@@ -246,7 +247,8 @@ function housePrompt(state: GameState): string {
 /** Everything in reach in the quarry area: a loose pile first, then the rubble or the quarry face. */
 function hillsChoices(state: GameState): Choice[] {
   const found = closestGatherable(state);
-  return found ? [gatherChoice(state, found)] : [];
+  const offer = ponyOfferLabel(state);
+  return [...(found ? [gatherChoice(state, found)] : []), ...(offer ? [{ label: offer, action: { type: 'offerPony' as const } }] : [])];
 }
 
 function hillsPrompt(state: GameState): string {

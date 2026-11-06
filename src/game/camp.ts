@@ -1,4 +1,5 @@
 import { storeTotal } from './food';
+import { ponyWith } from './pony';
 import { BALANCE, type GameState } from './state';
 
 export { isInClearing } from './clearing';
@@ -23,8 +24,13 @@ export function carriedCount(state: GameState): number {
   return wood + fiber + (stone + ore) * BALANCE.stoneSpaces + storeTotal(food);
 }
 
+/** What the bag holds when the pony is with the survivor; a bag over its limit while the pony is elsewhere is a real one. */
+export function fullCapacity(state: GameState): number {
+  return (state.progress.packWoven ? BALANCE.packCapacity : BALANCE.baseCapacity) + (state.pony.shod === null ? 0 : BALANCE.ponySpaces);
+}
+
 export function bagCapacity(state: GameState): number {
-  return state.progress.packWoven ? BALANCE.packCapacity : BALANCE.baseCapacity;
+  return (state.progress.packWoven ? BALANCE.packCapacity : BALANCE.baseCapacity) + (ponyWith(state) ? BALANCE.ponySpaces : 0);
 }
 
 export function freeSpaces(state: GameState): number {

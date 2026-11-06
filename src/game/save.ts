@@ -1,7 +1,8 @@
 import { cleanName } from './names';
 import { PONY_SPOTS } from './pony';
 import { BALANCE, BUILDINGS, SITES, createGame, foodStoreCapacity, type GameState, type StructureId } from './state';
-import { bagCapacity, carriedCount } from './rules';
+import { fullCapacity } from './camp';
+import { carriedCount } from './rules';
 import { season, yearOf } from './calendar';
 import { journalEntry, journalSeason, type JournalId } from './journalEntries';
 import type { ClearingState, StepId } from './clearing';
@@ -449,7 +450,7 @@ function validHills({ progress, structures, area, inventory, storedOre, outcrop,
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
   const checks = [validHills, validClock, validSurvivor, validProgress, validDecorations, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validBeehive, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validChickens, validSickness, validSheep, validNames, validOrchard];
-  return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
+  return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= fullCapacity(value as unknown as GameState);
 }
 
 function errorText(error: unknown): string {

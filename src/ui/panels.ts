@@ -14,6 +14,7 @@ import { workSeconds } from '../game/needs';
 import { hasWoodStore, livesInHouse, woodStoreCapacity } from '../game/home';
 import { axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, mineBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
 import { availableOre } from '../game/hills';
+import { ponyWith } from '../game/pony';
 import { WORKSHOP_UPGRADES, upgradeBlocker, type UpgradeId } from '../game/workshop';
 import { logsInStore } from '../game/wood';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
@@ -586,7 +587,7 @@ export function bagView(state: GameState): BagView {
     eatable,
     berries: `Berries ${foodCount(state.inventory.food, 'berry')}${softNote('berry')}`,
     spaces: `${carriedCount(state)}/${bagCapacity(state)}`,
-    spacesLabel: state.progress.packWoven ? 'Carried · woven pack' : 'Carried',
+    spacesLabel: ['Carried', ...(state.progress.packWoven ? ['woven pack'] : []), ...(ponyWith(state) ? ['the pony'] : [])].join(' · '),
     packHint: state.progress.packWoven ? '' : `Weave a pack at the toolshed to carry ${BALANCE.packCapacity}.`,
     prepareReady: !prepareBlocker,
     prepareHint: prepareBlocker ?? `1 berry · ${workSeconds(state, BALANCE.trailFoodSeconds)} seconds · 1 ration`,

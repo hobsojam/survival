@@ -1,5 +1,6 @@
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isSummer, isWinter, nightStart, yearOf } from './calendar';
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, hillsPathOpen, pathOpen } from './areas';
+import { offerToPony, ponyArrives, ponyOfferBlocker, startlePony } from './pony';
 import { HILLS_EXIT, HILLS_FOUND_MESSAGE, OUTCROP_MESSAGES, QUARRY_HILLS_EXIT, digOreBlocker, outcropLeft, spendOre } from './hills';
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { isRaining } from './rain';
@@ -58,7 +59,7 @@ export type GameAction =
   | { type: 'storeFood'; item: FoodItem }
   | { type: 'takeFood'; item: FoodItem }
   | { type: 'cook'; dish?: DishId }
-  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'digOre' | 'dropOre' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'buildMine' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' | 'meetChickens' | 'leadChickens' | 'takeEgg' | 'gatherApples' | 'searchShed' }
+  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'digOre' | 'dropOre' | 'offerPony' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'buildMine' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' | 'meetChickens' | 'leadChickens' | 'takeEgg' | 'gatherApples' | 'searchShed' }
   | { type: 'pickUpStone'; pileId: string }
   | { type: 'plantPip'; spot: number }
   | { type: 'pickOrchardApple'; spot: number }
@@ -244,6 +245,7 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
     remaining -= step;
     wolfVisit(next);
     startleFox(next);
+    startlePony(next);
     if (next.timeOfDay >= BALANCE.daySeconds - 0.000001) dawn(next, home);
   }
   return next;
@@ -373,6 +375,20 @@ function quarryFoundOnArrival(moved: GameState): ActionResult {
   return { state: moved, message: '' };
 }
 
+function walkedArrival(moved: GameState): ActionResult {
+  if (moved.area === 'homestead' && !moved.progress.homesteadFound) {
+    return { state: { ...moved, progress: { ...moved.progress, homesteadFound: true } }, message: 'You found an abandoned homestead.' };
+  }
+  if (moved.area === 'hills') return hillsFoundOnArrival(moved);
+  return quarryFoundOnArrival(moved);
+}
+
+/** Adds what changing area means for the pony to whatever the crossing itself said. */
+function withPonyArrival(before: GameState, result: ActionResult): ActionResult {
+  const arrived = ponyArrives(before, result.state);
+  return { state: arrived.state, message: [result.message, arrived.message].filter(Boolean).join(' ') };
+}
+
 const move: ActionHandler<'move'> = (state, action) => {
   const factor = movementFactor(state);
   const rawX = state.player.x + action.dx * factor;
@@ -382,14 +398,12 @@ const move: ActionHandler<'move'> = (state, action) => {
     ? { ...state.player, x: crossed.x, y: crossed.y }
     : { ...state.player, x: Math.max(0, Math.min(BALANCE.mapWidth - 1, rawX)), y: Math.max(0, Math.min(BALANCE.mapHeight - 1, rawY)) };
   const moved = settleChickens(pickUpKeepsake({ ...state, ...(crossed ? { area: crossed.area } : {}), player }));
-  if (moved.area === 'homestead' && !moved.progress.homesteadFound) {
-    return { state: { ...moved, progress: { ...moved.progress, homesteadFound: true } }, message: 'You found an abandoned homestead.' };
-  }
-  if (moved.area === 'hills') return hillsFoundOnArrival(moved);
-  return quarryFoundOnArrival(moved);
+  const startled = { ...moved };
+  startlePony(startled);
+  return withPonyArrival(state, walkedArrival(startled));
 };
 
-const cross: ActionHandler<'cross'> = state => {
+const crossOver: ActionHandler<'cross'> = state => {
   if (state.area === 'camp') {
     const west = near(state.player.x, state.player.y, CAMP_EXIT.x, CAMP_EXIT.y, 0.5);
     const east = near(state.player.x, state.player.y, CAMP_HOMESTEAD_EXIT.x, CAMP_HOMESTEAD_EXIT.y, 0.5);
@@ -410,6 +424,8 @@ const cross: ActionHandler<'cross'> = state => {
   if (!near(state.player.x, state.player.y, exit.x, exit.y, 0.5)) return refuse(state, state.area === 'quarry' && hillsPathOpen(state) ? 'Walk to the end of a path to cross.' : 'Walk to the path home.');
   return { state: { ...state, area: 'camp', player: { ...state.player, x: state.area === 'quarry' ? 0.5 : BALANCE.mapWidth - 1.5, y: exit.y } }, message: '' };
 };
+
+const cross: ActionHandler<'cross'> = (state, action) => withPonyArrival(state, crossOver(state, action));
 
 type Supply = keyof GameState['inventory'];
 // Berries and forage go into the food store.
@@ -749,6 +765,13 @@ function setDown(state: GameState, item: 'stone' | 'ore'): GameState {
     : [...state.stonePiles, { id: `${item === 'ore' ? 'ore-' : ''}pile-${state.area}-${state.day}-${Math.round(x * 10)}-${Math.round(y * 10)}`, x, y, count: 1, area: state.area, item }];
   return { ...state, inventory: { ...state.inventory, [item]: state.inventory[item] - 1 }, stonePiles };
 }
+
+const offerPony: ActionHandler<'offerPony'> = state => {
+  const blocker = ponyOfferBlocker(state);
+  const offered = blocker ? null : offerToPony(state);
+  if (!offered) return refuse(state, blocker ?? 'The pony would take an apple or vegetables.');
+  return { state: advanceTime(offered.state, workSeconds(state, BALANCE.gatherSeconds), 'working'), message: offered.message };
+};
 
 const dropOre: ActionHandler<'dropOre'> = state => {
   if (state.inventory.ore < 1) return refuse(state, 'You have no ore to set down.');
@@ -1342,7 +1365,7 @@ const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   nameAnimal,
   shearFlock,
   weave,
-  move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, digOre, dropOre, buildMine, chopTree, markClearing, clearGround, visitSite,
+  move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, digOre, dropOre, offerPony, buildMine, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, dropPineNeedles, pickUpStone, burnFiber, burnPineNeedles, eat, eatTrailFood, prepareTrailFood,
   cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, rest, sleep, befriend, meetChickens, leadChickens, takeEgg, gatherApples, plantPip, pickOrchardApple, searchShed, craftPillow, craftCloak,
   makeFishingLine, fish
