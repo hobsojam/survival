@@ -16,6 +16,7 @@ import { WORKSHOP_UPGRADES, type UpgradeId } from './workshop';
 import { FIELD_STRIPS, ripeDay } from './field';
 import { ORCHARD_SPOTS } from './orchard';
 
+import { KEEP_DOOR_AT, KEEP_STONES } from './keep';
 import { SAVE_VERSION, upgradeSave } from './saveUpgrades';
 
 export { SAVE_VERSION };
@@ -446,10 +447,23 @@ function validHills({ progress, structures, area, inventory, storedOre, outcrop,
   return names.pony === null || won !== null;
 }
 
+/** The keep's stones come after the forge, its door after the hinges and 24 stones, and its days after what they mark. */
+function validKeep({ keep, progress, day }: SaveShape): boolean {
+  if (!object(keep) || !object(progress.workshop) || !bool(keep.door) || !count(keep.stones) || keep.stones > KEEP_STONES) return false;
+  const { stones, door, startedDay, finishedDay } = keep;
+  const dayOk = (value: unknown): boolean => value === null || (whole(value) && value >= 1 && value <= (day as number));
+  if (!dayOk(startedDay) || !dayOk(finishedDay)) return false;
+  if ((startedDay !== null) !== (stones > 0) || (finishedDay !== null) !== (stones === KEEP_STONES)) return false;
+  const made = progress.workshop;
+  if ((stones > 0 || made.hinges) && !made.forge) return false;
+  if (door && (made.hinges !== true || stones < KEEP_DOOR_AT)) return false;
+  return door || stones <= KEEP_DOOR_AT;
+}
+
 /** Checks a version 24 save, with the survivor's sickness and whether their story has ended, and: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, the workshop and its handcart, shelter upgrades, garden plots, vegetable beds, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validHills, validClock, validSurvivor, validProgress, validDecorations, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validBeehive, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validChickens, validSickness, validSheep, validNames, validOrchard];
+  const checks = [validHills, validKeep, validClock, validSurvivor, validProgress, validDecorations, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validBeehive, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validChickens, validSickness, validSheep, validNames, validOrchard];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= fullCapacity(value as unknown as GameState);
 }
 

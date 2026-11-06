@@ -19,6 +19,7 @@ import { BED_CROPS, bedsDawn, drawWaterBlocker, emptyBed, harvestBedBlocker, nee
 import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
 import { logsInStore } from './wood';
 import { settleStores } from './stores';
+import { KEEP_DOOR_WOOD, hangDoorBlocker, layStoneBlocker, stoneLine, withStoneLaid } from './keep';
 import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, cartSpace, countWord, fellingWood, upgradeBlocker, type UpgradeId } from './workshop';
 import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishingSecondsFor, validRoll } from './fishing';
 import { ENDED_MESSAGE, GAVE_OUT_MESSAGE, judgeSickDay, markWarmMeal, markWarmRest, sicknessTick } from './sickness';
@@ -59,7 +60,7 @@ export type GameAction =
   | { type: 'storeFood'; item: FoodItem }
   | { type: 'takeFood'; item: FoodItem }
   | { type: 'cook'; dish?: DishId }
-  | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'digOre' | 'dropOre' | 'offerPony' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'buildMine' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' | 'meetChickens' | 'leadChickens' | 'takeEgg' | 'gatherApples' | 'searchShed' }
+  | { type: 'layStone' | 'hangDoor' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'digOre' | 'dropOre' | 'offerPony' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'buildMine' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' | 'meetChickens' | 'leadChickens' | 'takeEgg' | 'gatherApples' | 'searchShed' }
   | { type: 'pickUpStone'; pileId: string }
   | { type: 'plantPip'; spot: number }
   | { type: 'pickOrchardApple'; spot: number }
@@ -1360,6 +1361,27 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
   };
 };
 
+const layStone: ActionHandler<'layStone'> = state => {
+  const blocker = layStoneBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  const keep = withStoneLaid(state.keep, state.day);
+  return {
+    state: advanceTime({ ...state, player: tire(state, BALANCE.digEnergyCost / 2), inventory: { ...state.inventory, stone: state.inventory.stone - 1 }, keep },
+      workSeconds(state, BALANCE.digSeconds / 2), 'working'),
+    message: stoneLine(keep.stones)
+  };
+};
+
+const hangDoor: ActionHandler<'hangDoor'> = state => {
+  const blocker = hangDoorBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  return {
+    state: advanceTime({ ...spendWood(state, KEEP_DOOR_WOOD), player: tire(state, BALANCE.digEnergyCost), keep: { ...state.keep, door: true } },
+      workSeconds(state, BALANCE.digSeconds), 'working'),
+    message: 'You hang the door.'
+  };
+};
+
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   feedSheep,
   nameAnimal,
@@ -1367,7 +1389,7 @@ const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   weave,
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, digOre, dropOre, offerPony, buildMine, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, dropPineNeedles, pickUpStone, burnFiber, burnPineNeedles, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, rest, sleep, befriend, meetChickens, leadChickens, takeEgg, gatherApples, plantPip, pickOrchardApple, searchShed, craftPillow, craftCloak,
+  cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, layStone, hangDoor, rest, sleep, befriend, meetChickens, leadChickens, takeEgg, gatherApples, plantPip, pickOrchardApple, searchShed, craftPillow, craftCloak,
   makeFishingLine, fish
 };
 
