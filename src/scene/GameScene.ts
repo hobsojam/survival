@@ -110,7 +110,8 @@ export class GameScene extends Phaser.Scene {
     this.handleActionKeys();
     const beforeTick = this.state;
     // While a sleep plays out, the replay sets the clock instead of the tick.
-    const written = this.nightWatch.tick(this.time.now, () => recordJournal(beforeTick, advanceLiveTime(this.state, dt)));
+    // From going in at the keep's door until it has happened, the clock waits, so night or dawn can't get there first.
+    const written = this.nightWatch.tick(this.time.now, () => (this.pendingDoor ? { state: this.state, messages: [] } : recordJournal(beforeTick, advanceLiveTime(this.state, dt))));
     this.state = written.state;
     this.reportWeather(beforeTick, this.state, written.messages);
     this.syncPlayerSprite(walking || tapWalking);
@@ -183,7 +184,7 @@ export class GameScene extends Phaser.Scene {
     const nudge = effectPose(visual.effect, now);
     this.playerSprite.setPosition(Math.round(worldX(this.state.player.x)) + nudge.dx, Math.round(worldY(this.state.player.y)) + nudge.dy);
     this.playerSprite.setRotation(nudge.rotation);
-    if (visual.puff && puffDue(this.lastPuffMs, now)) {
+    if (visual.puff && !this.doorFading() && puffDue(this.lastPuffMs, now)) {
       this.lastPuffMs = now;
       this.letOutPuff(visual.puff);
     }

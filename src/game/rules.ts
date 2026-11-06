@@ -1,6 +1,6 @@
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isSummer, isWinter, nightStart, yearOf } from './calendar';
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, hillsPathOpen, pathOpen } from './areas';
-import { offerToPony, ponyArrives, ponyOfferBlocker, startlePony } from './pony';
+import { offerToPony, ponyArrives, ponyOfferBlocker, startlePony, ponyStaysAtKeep } from './pony';
 import { HILLS_EXIT, HILLS_FOUND_MESSAGE, OUTCROP_MESSAGES, QUARRY_HILLS_EXIT, digOreBlocker, outcropLeft, spendOre } from './hills';
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { isRaining } from './rain';
@@ -19,7 +19,7 @@ import { BED_CROPS, bedsDawn, drawWaterBlocker, emptyBed, harvestBedBlocker, nee
 import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
 import { logsInStore } from './wood';
 import { settleStores } from './stores';
-import { KEEP_DOOR_WOOD, climbKeepBlocker, hangDoorBlocker, inKeep, layStoneBlocker, stoneLine, withKeepDoor, withStoneLaid } from './keep';
+import { KEEP_DOOR_WOOD, climbKeepBlocker, hangDoorBlocker, inKeep, keepFinished, layStoneBlocker, stoneLine, withKeepDoor, withStoneLaid } from './keep';
 import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, cartSpace, countWord, fellingWood, upgradeBlocker, type UpgradeId } from './workshop';
 import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishingSecondsFor, validRoll } from './fishing';
 import { ENDED_MESSAGE, GAVE_OUT_MESSAGE, judgeSickDay, markWarmMeal, markWarmRest, sicknessTick } from './sickness';
@@ -133,6 +133,7 @@ export function movementFactor(state: GameState): number {
 export function sleepBlocker(state: GameState): string | null {
   if (state.timeOfDay < nightStart(state.day)) return 'You can sleep once night falls. Rest (R) for a short break.';
   if (inKeep(state)) return null;
+  if (state.area === 'hills' && keepFinished(state)) return 'Go to the keep door to sleep.';
   // In the house the bed is indoors, so home is the only thing asked for.
   if (livesInHouse(state)) return isAtHome(state) ? null : 'Go home to sleep.';
   if (!isAtCamp(state)) return 'Move closer to the fire to sleep.';
@@ -243,8 +244,10 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
     next.player.warmth = Math.max(0, Math.min(100, next.player.warmth + warmthChange(next, step, camp, home, coldNight)));
     next.fireFuel = Math.max(0, next.fireFuel - step * fireBurn(next, coldNight));
     tendFireplace(next, step, coldNight);
+    const dusk = next.timeOfDay < nightStart(next.day);
     next.timeOfDay += step;
     remaining -= step;
+    if (dusk && next.timeOfDay >= nightStart(next.day)) ponyStaysAtKeep(next);
     wolfVisit(next);
     startleFox(next);
     startlePony(next);

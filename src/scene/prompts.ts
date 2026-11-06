@@ -252,7 +252,6 @@ export function lineToSay(before: GameState, after: GameState, message: string, 
   return announce || before.area !== after.area ? message : '';
 }
 
-/** Everything in reach in the quarry area: a loose pile first, then the rubble or the quarry face. */
 /** The keep, when the survivor is at it: what it wants next, or what they can do with it once it is finished. */
 function keepChoice(state: GameState): Choice | null {
   if (!keepOpen(state) || !within(state, KEEP_SITE)) return null;
@@ -288,6 +287,7 @@ function hillsPrompt(state: GameState): string {
   return 'WASD / arrows  Move';
 }
 
+/** Everything in reach in the quarry area: a loose pile first, then the rubble or the quarry face. */
 function quarryChoices(state: GameState): Choice[] {
   const found = closestGatherable(state);
   if (!found && within(state, QUARRY_SITE) && !mineBlocker(state)) return [{ label: 'Build timber mine', action: { type: 'buildMine' } }];

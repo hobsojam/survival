@@ -20,10 +20,12 @@ export interface KeepState {
   startedDay: number | null;
   /** The day the last stone went on. */
   finishedDay: number | null;
+  /** The last night the shod pony stayed up here, having been with the survivor as it fell. */
+  ponyNight: number | null;
 }
 
 export function emptyKeep(): KeepState {
-  return { stones: 0, door: false, startedDay: null, finishedDay: null };
+  return { stones: 0, door: false, startedDay: null, finishedDay: null, ponyNight: null };
 }
 
 /** Whether the site is there to build on: it appears once the forge stands. */

@@ -22,12 +22,12 @@ export class SceneLighting {
     this.layer.resize(width, height, false);
   }
 
-  /** Draws the tint for the state; a sunrise that began sunriseAgeMs ago warms it for a few seconds. */
   /** No lighting at all: the layer is fixed to the screen, so it can't follow the camera when the view from the keep pulls back. */
   hide(): void {
     this.layer.setVisible(false);
   }
 
+  /** Draws the tint for the state; a sunrise that began sunriseAgeMs ago warms it for a few seconds. */
   update(state: GameState, timeMs: number, sunriseAgeMs: number): void {
     const tint = withSunrise(lightingTint(state), sunriseAgeMs);
     if (tint.alpha <= 0) {

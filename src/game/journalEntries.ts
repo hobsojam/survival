@@ -137,11 +137,13 @@ const atSpring = (m: Moment): boolean => ((m.action?.type === 'visitSite' && m.a
 /** A strip threshed that put grain into the granary, not into a granary already full. */
 const grainWentIn = (m: Moment): boolean => acted(m, 'threshStrip') && m.after.field.grain > m.before.field.grain;
 
-/** A feather or a tuft of fur just picked up by the fire, told by its own line. */
+/** The last stone just laid on the keep. */
 const keepJustFinished = (m: Moment): Noticed | null => onBefore(m, acted(m, 'layStone') && m.before.keep.finishedDay === null && m.after.keep.finishedDay !== null);
+/** A climb to the top of the keep. */
 const lookedOut = (m: Moment): Noticed | null => onBefore(m, acted(m, 'climbKeep'));
 const upOnHills = (m: Moment): Noticed | null => onAfter(m, awake(m) && m.after.area === 'hills' && daylight(m.after));
 
+/** A feather or a tuft of fur just picked up by the fire, told by its own line. */
 function keepsakeFound(m: Moment): Noticed | null {
   if (keepsakeStock(m.after, 'feather') > keepsakeStock(m.before, 'feather')) return { day: m.after.day, variant: 0 };
   return keepsakeStock(m.after, 'fur') > keepsakeStock(m.before, 'fur') ? { day: m.after.day, variant: 1 } : null;

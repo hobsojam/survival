@@ -97,18 +97,24 @@ export function startlePony(next: GameState): void {
   next.pony = { ...next.pony, spot };
 }
 
-/** Whether the shod pony is with the survivor now: it stays out of the snow on the hills, and goes home at nightfall unless the finished keep is there to stay by. */
+/** Whether the shod pony is with the survivor now: it stays out of the snow on the hills, and goes home at nightfall unless it stayed by the finished keep tonight. */
 export function ponyWith(state: GameState): boolean {
   if (state.pony.shod === null) return false;
   if (state.area === 'hills' && isWinter(state.day)) return false;
-  return !isNight(state) || state.area === 'camp' || (state.area === 'hills' && keepFinished(state));
+  return !isNight(state) || state.area === 'camp' || (state.area === 'hills' && state.keep.ponyNight === state.day);
+}
+
+/** Night falling on the survivor and the pony at the finished keep: it stays up there tonight instead of going home. Mutates advanceTime's working copy. */
+export function ponyStaysAtKeep(next: GameState): void {
+  if (next.pony.shod !== null && next.area === 'hills' && keepFinished(next) && !isWinter(next.day)) next.keep = { ...next.keep, ponyNight: next.day };
 }
 
 /** What changing area means for the pony: it can reach home, stay behind for want of shoes, or wait below the snow. */
 export function ponyArrives(before: GameState, after: GameState): { state: GameState; message: string } {
   const { pony } = after;
   if (before.area === after.area || pony.won === null) return { state: after, message: '' };
-  if (after.area === 'camp') return { state: pony.home ? after : { ...after, pony: { ...pony, home: true } }, message: '' };
+  // Back at camp it is home, wherever it spent the evening.
+  if (after.area === 'camp') return { state: { ...after, pony: { ...pony, home: true }, keep: { ...after.keep, ponyNight: null } }, message: '' };
   if (before.area === 'camp' && pony.shod === null && pony.home && !pony.toldHooves) {
     return { state: { ...after, pony: { ...pony, toldHooves: true } }, message: "The pony stops at the edge of camp. Its hooves can't take the stony path yet." };
   }

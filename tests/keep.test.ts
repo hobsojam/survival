@@ -13,7 +13,9 @@ import { hasArrived, pickTapTarget, targetAction } from '../src/scene/tapTarget'
 import { keepFrame, sceneVisuals } from '../src/scene/visuals';
 import { STEP_IDS, placeBranches } from '../src/game/clearing';
 import { KEEP_DOOR_AT, KEEP_SITE, KEEP_STONES, hangDoorBlocker, inKeep, keepNews, layStoneBlocker, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor, type KeepState } from '../src/game/keep';
-import { HILLS_EXIT, OUTCROP_SITE } from '../src/game/hills';
+import { QUARRY_EXIT } from '../src/game/areas';
+import { nightStart } from '../src/game/calendar';
+import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT } from '../src/game/hills';
 import { coldNightMessage, dawnEffect } from '../src/game/coldNight';
 import { isAtHome } from '../src/game/home';
 import { alarmAfter } from '../src/game/companion';
@@ -204,7 +206,7 @@ describe('saving the keep', () => {
     expect(SAVE_VERSION).toBe(38);
     expect(result.ok).toBe(true);
     const state = (result as { state: GameState }).state;
-    expect(state.keep).toEqual({ stones: 0, door: false, startedDay: null, finishedDay: null });
+    expect(state.keep).toEqual({ stones: 0, door: false, startedDay: null, finishedDay: null, ponyNight: null });
     expect(state.progress.workshop.hinges).toBe(false);
   });
 
@@ -223,6 +225,8 @@ describe('saving the keep', () => {
     ['a started day from the future', byKeep({ keep: { stones: 1, startedDay: 6 } })],
     ['60 stones with no finished day', byKeep({ hinges: true, keep: { ...raised(60), finishedDay: null } })],
     ['a finished day below 60 stones', byKeep({ hinges: true, keep: { ...raised(59), finishedDay: 1 } })],
+    ['a pony by an unfinished keep', byKeep({ hinges: true, keep: { ...raised(59), ponyNight: 1 } })],
+    ['a pony night from the future', byKeep({ hinges: true, keep: { ...raised(60), ponyNight: 6 } })],
     ['no keep at all', { ...byKeep(), keep: undefined as unknown as KeepState }]
   ])('refuses to save %s', (_name, state) => {
     expect(saves(state)).toBe(false);
@@ -277,7 +281,7 @@ describe('a night in the keep', () => {
   });
 
   it('refuses to sleep away from the door, or at an unfinished keep', () => {
-    expect(sleep(away(inFinishedKeep())).message).toBe('Move closer to the fire to sleep.');
+    expect(sleep(away(inFinishedKeep())).message).toBe('Go to the keep door to sleep.');
     expect(sleep(byKeep({ hinges: true, keep: raised(59), timeOfDay: NIGHT })).message).toBe('Move closer to the fire to sleep.');
   });
 
@@ -422,9 +426,13 @@ describe('the pony at the keep', () => {
   const NIGHT = 190;
   const shod = (state: GameState): GameState => ({ ...state, pony: { ...emptyPony(), trust: BALANCE.ponyTrustTarget, won: 1, home: true, shod: 1 }, progress: { ...state.progress, workshop: { ...state.progress.workshop, horseshoes: true } } });
   const finished = (changes: Changes = {}) => shod(byKeep({ hinges: true, keep: raised(60), timeOfDay: NIGHT, ...changes }));
+  const staying = (changes: Changes = {}) => finished({ keep: { ...raised(60), ponyNight: 5 }, ...changes });
 
-  it('keeps the shod pony on the hills overnight once the keep is finished', () => {
-    const state = finished();
+  it('keeps the shod pony on the hills overnight if it was there as night fell', () => {
+    const dusk = finished({ timeOfDay: nightStart(5) - 1 });
+    expect(dusk.keep.ponyNight).toBeNull();
+    const state = advanceTime(dusk, 2);
+    expect(state.keep.ponyNight).toBe(5);
     expect(ponyWith(state)).toBe(true);
     expect(bagCapacity(state)).toBe(BALANCE.packCapacity + BALANCE.ponySpaces);
     expect(ponyWith(applyAction(state, { type: 'sleep' }).state)).toBe(true);
@@ -435,11 +443,58 @@ describe('the pony at the keep', () => {
   });
 
   it('leaves the pony below the snow in winter, keep or no keep', () => {
-    expect(ponyWith(finished({ day: 12 }))).toBe(false);
+    const state = advanceTime(finished({ day: 12, timeOfDay: nightStart(12) - 1 }), 2);
+    expect(state.keep.ponyNight).toBeNull();
+    expect(ponyWith(state)).toBe(false);
+  });
+
+  it('does not stay for an unshod pony, or from off the hills', () => {
+    const unshod = byKeep({ hinges: true, keep: raised(60), timeOfDay: nightStart(5) - 1 });
+    expect(advanceTime(unshod, 2).keep.ponyNight).toBeNull();
+    const below = { ...finished({ timeOfDay: nightStart(5) - 1 }), area: 'quarry' as const };
+    expect(advanceTime(below, 2).keep.ponyNight).toBeNull();
+  });
+
+  it('does not fetch a pony that has gone home when the last stone goes on at night', () => {
+    const before = shod(byKeep({ hinges: true, keep: raised(59), timeOfDay: NIGHT }));
+    const { state } = applyAction(before, { type: 'layStone' });
+    expect(keepFinished(state)).toBe(true);
+    expect(ponyWith(state)).toBe(false);
+    expect(bagCapacity(state)).toBe(BALANCE.packCapacity);
+    expect(ponyPoseFor(state, 0, 1, false)).toBeNull();
+  });
+
+  it('does not fetch a pony that has gone home when the survivor comes back up at night', () => {
+    expect(ponyWith(finished())).toBe(false);
+    expect(ponyPoseFor(finished(), 0, 1, false)).toBeNull();
+  });
+
+  it('is still by the keep after a walk down to the quarry and back', () => {
+    const at = staying({ player: { ...HILLS_EXIT } });
+    const down = applyAction(at, { type: 'cross' }).state;
+    expect(ponyWith(down)).toBe(false);
+    const up = applyAction({ ...down, player: { ...down.player, ...QUARRY_HILLS_EXIT } }, { type: 'cross' }).state;
+    expect(up.area).toBe('hills');
+    expect(ponyWith(up)).toBe(true);
+  });
+
+  it('has gone home once the survivor has reached camp', () => {
+    const quarry = { ...staying(), area: 'quarry' as const, player: { ...game.player, ...QUARRY_EXIT } };
+    const { state } = applyAction(quarry, { type: 'cross' });
+    expect(state.area).toBe('camp');
+    expect(state.keep.ponyNight).toBeNull();
+  });
+
+  it('is with the survivor again in the morning, and saves its night', () => {
+    const state = staying();
+    expect(saves(state)).toBe(true);
+    const morning = applyAction(state, { type: 'sleep' }).state;
+    expect(morning.day).toBe(6);
+    expect(ponyWith(morning)).toBe(true);
   });
 
   it('loses its spaces on leaving the hills at night, and still saves over the limit', () => {
-    const at = finished({ player: { ...HILLS_EXIT }, inventory: { stone: 12 } });
+    const at = staying({ player: { ...HILLS_EXIT }, inventory: { stone: 12 } });
     expect(ponyWith(at)).toBe(true);
     const { state } = applyAction(at, { type: 'cross' });
     expect(state.area).toBe('quarry');
@@ -572,7 +627,7 @@ describe('the keep on the map', () => {
 
   it('draws the pony beside the keep at night, and beside the survivor by day', () => {
     const shod = (state: GameState): GameState => ({ ...state, pony: { ...emptyPony(), trust: BALANCE.ponyTrustTarget, won: 1, home: true, shod: 1 } });
-    const night = ponyPoseFor(shod(stage(60, { timeOfDay: NIGHT })), 0, 1, false);
+    const night = ponyPoseFor(shod(stage(60, { timeOfDay: NIGHT, keep: { ...raised(60), ponyNight: 5 } })), 0, 1, false);
     expect(night).toMatchObject({ ...KEEP_PONY, frame: 'pony:loadStand' });
     const day = ponyPoseFor(shod(stage(60, { timeOfDay: 40 })), 0, 1, false);
     expect(day?.x).toBeCloseTo(KEEP_SITE.x - 1.1);

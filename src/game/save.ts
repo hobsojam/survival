@@ -450,9 +450,9 @@ function validHills({ progress, structures, area, inventory, storedOre, outcrop,
 /** The keep's stones come after the forge, its door after the hinges and 24 stones, and its days after what they mark. */
 function validKeep({ keep, progress, day }: SaveShape): boolean {
   if (!object(keep) || !object(progress.workshop) || !bool(keep.door) || !count(keep.stones) || keep.stones > KEEP_STONES) return false;
-  const { stones, door, startedDay, finishedDay } = keep;
+  const { stones, door, startedDay, finishedDay, ponyNight } = keep;
   const dayOk = (value: unknown): boolean => value === null || (whole(value) && value >= 1 && value <= (day as number));
-  if (!dayOk(startedDay) || !dayOk(finishedDay)) return false;
+  if (!dayOk(startedDay) || !dayOk(finishedDay) || !dayOk(ponyNight) || (ponyNight !== null && stones !== KEEP_STONES)) return false;
   if ((startedDay !== null) !== (stones > 0) || (finishedDay !== null) !== (stones === KEEP_STONES)) return false;
   const made = progress.workshop;
   if ((stones > 0 || made.hinges) && !made.forge) return false;

@@ -291,7 +291,7 @@ Once the forge stands, a square of pegs and twine marks a place to build at the 
 - **At night** you sleep until morning. It's a full night's rest in a bed, as warm and safe as the house whatever the fires at camp are doing, and it takes no fuel. If you're sick, it counts as a warm rest. A wolf at the dark camp takes nothing from your bag while you're in the keep, and your bird won't wake you up here. Camp carries on as it does on any night you're out.
 - **By day** you climb to the top for a look over the hills, which costs no energy. It gives you nothing but a line in the journal.
 
-**The pony.** Once the keep is finished, a shod pony stays beside it overnight instead of going home, so you still have it and its spaces in the morning. In winter it still waits at the foot of the path.
+**The pony.** Once the keep is finished, a shod pony that's with you on the hills as night falls stays beside the keep overnight instead of going home, so you still have it and its spaces in the morning. In winter it still waits at the foot of the path.
 
 The keep has no cooking, resting spot or stores. Home is still home.
 

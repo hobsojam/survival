@@ -12,7 +12,7 @@ const atDoor = (changes: Partial<GameState> = {}, stones = 60): GameState => ({
   area: 'hills',
   player: { ...game.player, ...KEEP_SITE },
   progress: { ...game.progress, workshop: { ...game.progress.workshop, forge: true, hinges: true } },
-  keep: { stones, door: true, startedDay: 1, finishedDay: stones === 60 ? 1 : null },
+  keep: { stones, door: true, startedDay: 1, finishedDay: stones === 60 ? 1 : null, ponyNight: null },
   ...changes
 });
 

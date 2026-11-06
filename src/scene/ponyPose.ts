@@ -1,5 +1,4 @@
 import { isWinter, nightStart } from '../game/calendar';
-import { keepFinished } from '../game/keep';
 import { wildPonyAt, ponyWith } from '../game/pony';
 import type { GameState } from '../game/state';
 
@@ -35,6 +34,6 @@ export function ponyPoseFor(state: GameState, timeMs: number, facing: 1 | -1, mo
   if (pony.shod === null) return area === 'camp' ? homeNow : null;
   if (area === 'camp' && timeOfDay >= nightStart(day)) return { ...PONY_HOME, frame: 'pony:loadStand', facing: -1 };
   if (area === 'hills' && isWinter(day)) return null;
-  if (area === 'hills' && timeOfDay >= nightStart(day) && keepFinished(state)) return { ...KEEP_PONY, frame: 'pony:loadStand', facing: -1 };
+  if (area === 'hills' && timeOfDay >= nightStart(day) && state.keep.ponyNight === day) return { ...KEEP_PONY, frame: 'pony:loadStand', facing: -1 };
   return ponyWith(state) ? beside(state, timeMs, facing, moving, true) : null;
 }
