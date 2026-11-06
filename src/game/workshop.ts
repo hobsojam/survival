@@ -5,9 +5,9 @@ import { BALANCE, type GameState } from './state';
 // The workshop on the east far ground, and the three upgrades made there once each: a saw that doubles the wood from
 // felling, a handcart that catches felled wood, and bed tools that keep a dry vegetable bed alive a day longer.
 
-export type UpgradeId = 'saw' | 'handcart' | 'bedTools' | 'harvestTools' | 'quern' | 'shears';
+export type UpgradeId = 'saw' | 'handcart' | 'bedTools' | 'harvestTools' | 'quern' | 'shears' | 'forge' | 'horseshoes' | 'ironPickaxe';
 
-type Cost = { wood: number; fiber: number; stone: number };
+type Cost = { wood: number; fiber: number; stone: number; ore?: number };
 
 export const WORKSHOP_UPGRADES: Record<UpgradeId, { name: string; cost: Cost }> = {
   saw: { name: 'saw', cost: { wood: 3, fiber: 0, stone: 3 } },
@@ -15,7 +15,10 @@ export const WORKSHOP_UPGRADES: Record<UpgradeId, { name: string; cost: Cost }> 
   bedTools: { name: 'bed tools', cost: { wood: 3, fiber: 1, stone: 1 } },
   harvestTools: { name: 'sickle and flail', cost: { wood: 3, fiber: 1, stone: 2 } },
   quern: { name: 'hand quern', cost: { wood: 1, fiber: 0, stone: 4 } },
-  shears: { name: 'shears', cost: { wood: 1, fiber: 0, stone: 2 } }
+  shears: { name: 'shears', cost: { wood: 1, fiber: 0, stone: 2 } },
+  forge: { name: 'forge', cost: { wood: 2, fiber: 0, stone: 6 } },
+  horseshoes: { name: 'horseshoes', cost: { wood: 1, fiber: 0, stone: 0, ore: 2 } },
+  ironPickaxe: { name: 'iron pickaxe', cost: { wood: 1, fiber: 0, stone: 0, ore: 3 } }
 };
 
 export const UPGRADE_MESSAGES: Record<UpgradeId, string> = {
@@ -24,7 +27,10 @@ export const UPGRADE_MESSAGES: Record<UpgradeId, string> = {
   bedTools: 'You made a hoe and a watering can. A dry bed holds on a day longer before it withers.',
   harvestTools: 'You made a sickle and a flail. The grain can come in now.',
   quern: 'You made a hand quern. Grain can be ground into flour at the granary.',
-  shears: 'You made a pair of shears. The flock can be sheared in spring.'
+  shears: 'You made a pair of shears. The flock can be sheared in spring.',
+  forge: 'You added a forge to the workshop.',
+  horseshoes: 'You made a set of horseshoes, and the pony stands for them. It can come with you now.',
+  ironPickaxe: 'You made an iron pickaxe. The quarry face gives more for the work now.'
 };
 
 /** "3 wood and 3 stone", or "8 wood, 2 fiber, and 1 stone": the cost's parts, leaving out any it doesn't need. */

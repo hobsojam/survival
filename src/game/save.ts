@@ -1,4 +1,5 @@
 import { cleanName } from './names';
+import { PONY_SPOTS } from './pony';
 import { BALANCE, BUILDINGS, SITES, createGame, foodStoreCapacity, type GameState, type StructureId } from './state';
 import { bagCapacity, carriedCount } from './rules';
 import { season, yearOf } from './calendar';
@@ -52,8 +53,8 @@ function validFood(store: unknown, day: unknown): boolean {
 
 function validSurvivor({ player, inventory, area, day, cakeBonus }: SaveShape): boolean {
   return bool(cakeBonus) && onMap(player.x, player.y) && meter(player.energy) && meter(player.hunger) && meter(player.warmth)
-    && (['wood', 'fiber', 'stone'] as const).every(key => count(inventory[key])) && validFood(inventory.food, day)
-    && (area === 'camp' || area === 'quarry' || area === 'homestead');
+    && (['wood', 'fiber', 'stone', 'ore'] as const).every(key => count(inventory[key])) && validFood(inventory.food, day)
+    && (area === 'camp' || area === 'quarry' || area === 'homestead' || area === 'hills');
 }
 
 function validStructureDependencies(structures: ObjectValue): boolean {
@@ -245,7 +246,8 @@ function validWorld({ nodes, trees, stonePiles, day, clearing }: SaveShape): boo
       && readyBy(tree.readyDay, today + BALANCE.treeRegrowDays);
   });
   const pilesValid = stonePiles.every(pile => object(pile) && typeof pile.id === 'string' && onMap(pile.x, pile.y)
-    && whole(pile.count) && pile.count >= 1 && (pile.area === 'camp' || pile.area === 'quarry' || pile.area === 'homestead'));
+    && whole(pile.count) && pile.count >= 1 && (pile.area === 'camp' || pile.area === 'quarry' || pile.area === 'homestead' || pile.area === 'hills')
+    && (pile.item === 'stone' || pile.item === 'ore'));
   return nodesMatch && treesMatch && pilesValid;
 }
 
@@ -420,10 +422,33 @@ function validOrchard({ orchard, structures, progress, day }: SaveShape): boolea
   return progress.homesteadFound === true || (orchard.pips === 0 && structures.orchard !== true);
 }
 
+/** The hills follow the quarry; ore follows its finding; the forge follows the ore and the workshop; what it makes follows the forge; the pony is won by offers, and shod only with made horseshoes. */
+function validHills({ progress, structures, area, inventory, storedOre, outcrop, pony, names, stonePiles, day }: SaveShape): boolean {
+  if (!object(progress.workshop) || !object(outcrop) || !object(pony) || !object(names) || !bool(progress.hillsFound)) return false;
+  const made = progress.workshop;
+  const oreDay = progress.oreFoundDay;
+  const oreFound = oreDay !== null;
+  const dayOk = (value: unknown): boolean => value === null || (whole(value) && value >= 1 && value <= (day as number));
+  if (!dayOk(oreDay) || (progress.hillsFound && progress.quarryFound !== true) || (area === 'hills' && !progress.hillsFound) || (oreFound && !progress.hillsFound)) return false;
+  if (!count(storedOre) || storedOre > BALANCE.forgeOreCapacity || (storedOre > 0 && made.forge !== true)) return false;
+  if ((inventory.ore as number) > 0 && !oreFound) return false;
+  if ((stonePiles as ObjectValue[]).some(pile => pile.item === 'ore') && !oreFound) return false;
+  if (!count(outcrop.day) || !count(outcrop.dug) || outcrop.dug > BALANCE.outcropPerDay || outcrop.day > (day as number)) return false;
+  if (made.forge && (!oreFound || structures.workshop !== true)) return false;
+  if ((made.horseshoes || made.ironPickaxe) && !made.forge) return false;
+  if (made.ironPickaxe && progress.pickaxeCrafted !== true) return false;
+  const { trust, lastOffer, won, home, shod, spot, toldHooves } = pony;
+  if (!count(trust) || trust > BALANCE.ponyTrustTarget || !dayOk(lastOffer) || !dayOk(won) || !dayOk(shod) || !bool(home) || !bool(toldHooves)) return false;
+  if (!whole(spot) || spot < 0 || spot >= PONY_SPOTS.length) return false;
+  if ((won !== null) !== (trust === BALANCE.ponyTrustTarget) || (won === null && (home || toldHooves))) return false;
+  if ((shod !== null) !== (made.horseshoes === true) || (shod !== null && won === null)) return false;
+  return names.pony === null || won !== null;
+}
+
 /** Checks a version 24 save, with the survivor's sickness and whether their story has ended, and: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, the workshop and its handcart, shelter upgrades, garden plots, vegetable beds, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validClock, validSurvivor, validProgress, validDecorations, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validBeehive, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validChickens, validSickness, validSheep, validNames, validOrchard];
+  const checks = [validHills, validClock, validSurvivor, validProgress, validDecorations, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validBeehive, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validChickens, validSickness, validSheep, validNames, validOrchard];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= bagCapacity(value as unknown as GameState);
 }
 

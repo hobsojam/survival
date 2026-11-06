@@ -7,7 +7,7 @@ export type NameTarget = { kind: 'friend'; animal: Friend } | { kind: 'sheep'; i
 
 export type Names = GameState['names'];
 
-export const emptyNames = (): Names => ({ bird: null, fox: null, wolf: null, sheep: [null, null, null], chickens: [null, null, null] });
+export const emptyNames = (): Names => ({ bird: null, fox: null, wolf: null, pony: null, sheep: [null, null, null], chickens: [null, null, null] });
 
 const friendIsHere = ({ companion }: GameState, animal: Friend): boolean => companion.friends[animal] !== null || companion.friend === animal;
 

@@ -3,7 +3,8 @@ import { isAtCamp, type GameAction } from '../game/rules';
 import { choppableTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
 import { sprites } from '../art/sprites';
-import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
+import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, hillsPathOpen, pathOpen } from '../game/areas';
+import { HILLS_EXIT, QUARRY_HILLS_EXIT } from '../game/hills';
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
 import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
 import { ORCHARD_SPOTS, spotAction, treeStage } from '../game/orchard';
@@ -78,7 +79,10 @@ export function pickTapTarget(state: GameState, x: number, y: number): TapTarget
     candidates = [...piles,
       { target: { kind: 'quarry', x: QUARRY_SITE.x, y: QUARRY_SITE.y }, sprite: 'quarry' },
       { target: { kind: 'rubble', x: RUBBLE_SITE.x, y: RUBBLE_SITE.y } },
-      { target: { kind: 'crossing', x: QUARRY_EXIT.x, y: QUARRY_EXIT.y } }];
+      { target: { kind: 'crossing', x: QUARRY_EXIT.x, y: QUARRY_EXIT.y } },
+      ...(hillsPathOpen(state) ? [{ target: { kind: 'crossing' as const, ...QUARRY_HILLS_EXIT } }] : [])];
+  } else if (state.area === 'hills') {
+    candidates = [...piles, { target: { kind: 'crossing', ...HILLS_EXIT } }];
   } else if (state.area === 'homestead') {
     candidates = [...piles,
       { target: { kind: 'shed', ...HOMESTEAD_SHED } },

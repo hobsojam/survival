@@ -285,7 +285,7 @@ export class Soundscape {
 
   private scheduleFire(): void {
     this.fireTimer = globalThis.setTimeout(() => {
-      if (this.state?.area !== 'quarry' && this.state?.fireFuel && this.fire && this.context?.state === 'running') this.playCrackle();
+      if (this.state?.area !== 'quarry' && this.state?.area !== 'hills' && this.state?.fireFuel && this.fire && this.context?.state === 'running') this.playCrackle();
       this.scheduleFire();
     }, 120 + Math.random() * 380);
   }

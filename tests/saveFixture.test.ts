@@ -61,10 +61,10 @@ describe('the frozen version 23 save', () => {
     expect(state.day).toBe(was.day);
     expect(state.player).toEqual(was.player);
     // The upgrades add fish, rabbits, flour, bread, apples and eggs to the bag and the larder, and add nothing else to them.
-    expect(state.inventory).toEqual({ ...was.inventory, food: { ...was.inventory.food, fish: 0, rabbit: 0, flour: 0, bread: [], apple: [], egg: [] } });
+    expect(state.inventory).toEqual({ ...was.inventory, ore: 0, food: { ...was.inventory.food, fish: 0, rabbit: 0, flour: 0, bread: [], apple: [], egg: [] } });
     const built = (structures: GameState['structures']) => Object.entries(structures).filter(([, up]) => up).map(([id]) => id);
     expect(built(state.structures)).toEqual(expect.arrayContaining(built(was.structures)));
-    expect(state.progress.workshop).toEqual({ ...was.progress.workshop, harvestTools: false, quern: false, shears: false });
+    expect(state.progress.workshop).toEqual({ ...was.progress.workshop, harvestTools: false, quern: false, shears: false, forge: false, horseshoes: false, ironPickaxe: false });
     expect({ cartWood: state.cartWood, storedWood: state.storedWood, storedStone: state.storedStone, storedFiber: state.storedFiber })
       .toEqual({ cartWood: was.cartWood, storedWood: was.storedWood, storedStone: was.storedStone, storedFiber: was.storedFiber });
     expect(state.larder).toEqual({ ...was.larder, fish: 0, rabbit: 0, flour: 0, bread: [], apple: [], egg: [] });

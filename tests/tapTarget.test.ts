@@ -123,7 +123,7 @@ describe('loose stone piles', () => {
     const state = createGame();
     state.nodes = [];
     state.trees = [];
-    state.stonePiles = [{ id: 'pile-a', x: 5, y: 5, count: 2, area: 'camp' }];
+    state.stonePiles = [{ id: 'pile-a', x: 5, y: 5, count: 2, area: 'camp', item: 'stone' }];
     expect(pickTapTarget(state, 5.6, 5)).toMatchObject({ kind: 'pile', id: 'pile-a' });
   });
 
@@ -136,7 +136,7 @@ describe('loose stone piles', () => {
     const node = state.nodes[0];
     state.nodes = [node];
     node.x = 5; node.y = 5;
-    state.stonePiles = [{ id: 'pile-a', x: 6.5, y: 5, count: 1, area: 'camp' }];
+    state.stonePiles = [{ id: 'pile-a', x: 6.5, y: 5, count: 1, area: 'camp', item: 'stone' }];
     state.player.x = 6; state.player.y = 5;
     expect(closestGatherable(state)).toMatchObject({ kind: 'pile', pile: { id: 'pile-a' } });
     state.player.x = 5.4;
@@ -175,7 +175,7 @@ describe('the quarry area', () => {
     expect(pickTapTarget(state, SITES.spring.x, SITES.spring.y).kind).toBe('ground');
     expect(pickTapTarget(state, LOOKOUT.x, LOOKOUT.y).kind).toBe('ground');
     expect(pickTapTarget(state, BALANCE.campX, BALANCE.campY).kind).toBe('ground');
-    state.stonePiles = [{ id: 'camp-pile', x: 30, y: 20, count: 1, area: 'camp' }, { id: 'quarry-pile', x: 30, y: 25, count: 1, area: 'quarry' }];
+    state.stonePiles = [{ id: 'camp-pile', x: 30, y: 20, count: 1, area: 'camp', item: 'stone' }, { id: 'quarry-pile', x: 30, y: 25, count: 1, area: 'quarry', item: 'stone' }];
     expect(pickTapTarget(state, 30, 20).kind).toBe('ground');
     expect(pickTapTarget(state, 30, 25)).toMatchObject({ kind: 'pile', id: 'quarry-pile' });
   });
@@ -184,7 +184,7 @@ describe('the quarry area', () => {
     const state = createGame();
     state.nodes = [];
     state.trees = [];
-    state.stonePiles = [{ id: 'quarry-pile', x: 30, y: 25, count: 1, area: 'quarry' }];
+    state.stonePiles = [{ id: 'quarry-pile', x: 30, y: 25, count: 1, area: 'quarry', item: 'stone' }];
     expect(pickTapTarget(state, 30, 25).kind).toBe('ground');
     expect(pickTapTarget(state, QUARRY_SITE.x, QUARRY_SITE.y).kind).toBe('ground');
     expect(pickTapTarget(state, RUBBLE_SITE.x, RUBBLE_SITE.y).kind).toBe('ground');
@@ -253,9 +253,9 @@ describe('the quarry area', () => {
     const state = quarryState();
     const node = state.nodes[0];
     state.player.x = node.x; state.player.y = node.y;
-    state.stonePiles = [{ id: 'camp-pile', x: node.x, y: node.y, count: 1, area: 'camp' }];
+    state.stonePiles = [{ id: 'camp-pile', x: node.x, y: node.y, count: 1, area: 'camp', item: 'stone' }];
     expect(closestGatherable(state)).toBeUndefined();
-    state.stonePiles = [{ id: 'quarry-pile', x: node.x, y: node.y, count: 1, area: 'quarry' }];
+    state.stonePiles = [{ id: 'quarry-pile', x: node.x, y: node.y, count: 1, area: 'quarry', item: 'stone' }];
     expect(closestGatherable(state)).toMatchObject({ kind: 'pile', pile: { id: 'quarry-pile' } });
   });
 

@@ -270,18 +270,22 @@ const UPGRADE_COPY: Record<UpgradeId, { title: string; copy: string; made: strin
   bedTools: { title: 'Hoe and watering can', copy: 'A dry bed holds on a day longer before it withers.', made: 'A dry bed holds on a day longer before it withers.' },
   harvestTools: { title: 'Sickle and flail', copy: 'Cut and thresh the grain field.', made: 'Cut and thresh the grain field.' },
   quern: { title: 'Hand quern', copy: 'Grind the granary\'s grain into flour.', made: 'Grind the granary\'s grain into flour.' },
-  shears: { title: 'Shears', copy: 'Shear the flock once a year, in spring.', made: 'Shear the flock once a year, in spring.' }
+  shears: { title: 'Shears', copy: 'Shear the flock once a year, in spring.', made: 'Shear the flock once a year, in spring.' },
+  forge: { title: 'Forge', copy: 'Add a stone lean-to and an anvil, to work the ore from the hills.', made: 'Ore from the hills is kept at the forge.' },
+  horseshoes: { title: 'Horseshoes', copy: 'Shoe the pony, so it can come with you and carry a load.', made: 'The pony can come with you and carry a load.' },
+  ironPickaxe: { title: 'Iron pickaxe', copy: 'Each dig at the quarry face gives two stone.', made: 'Each dig at the quarry face gives two stone.' }
 };
 
 /** Whether an upgrade's row shows: the bed tools once there are beds, the harvest tools once there is a field, the quern once there is a granary. */
 const UPGRADE_SHOWN: Record<UpgradeId, (state: GameState) => boolean> = {
   saw: () => true, handcart: () => true, bedTools: state => state.structures.vegetableBeds,
-  harvestTools: state => state.structures.field, quern: state => state.structures.granary, shears: state => state.structures.sheepPen
+  harvestTools: state => state.structures.field, quern: state => state.structures.granary, shears: state => state.structures.sheepPen,
+  forge: state => state.progress.oreFoundDay !== null, horseshoes: state => state.progress.workshop.forge && state.pony.won !== null, ironPickaxe: state => state.progress.workshop.forge
 };
 
 /** "3 wood · 3 stone": an upgrade's cost, leaving out what it doesn't need. */
-const costLabel = (cost: Record<'wood' | 'fiber' | 'stone', number>): string =>
-  (['wood', 'fiber', 'stone'] as const).filter(key => cost[key] > 0).map(key => `${cost[key]} ${key}`).join(' · ');
+const costLabel = (cost: Record<'wood' | 'fiber' | 'stone', number> & { ore?: number }): string =>
+  (['wood', 'fiber', 'stone', 'ore'] as const).filter(key => (cost[key] ?? 0) > 0).map(key => `${cost[key]} ${key}`).join(' · ');
 
 export interface WorkshopView {
   shown: boolean;
@@ -297,7 +301,7 @@ export function workshopView(state: GameState): WorkshopView {
     const blocker = upgradeBlocker(state, id);
     return { shown, title, copy: blocker ?? copy, cost: costLabel(WORKSHOP_UPGRADES[id].cost), disabled: false, ready: !blocker };
   };
-  const rows = { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools'), harvestTools: row('harvestTools'), quern: row('quern'), shears: row('shears') };
+  const rows = { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools'), harvestTools: row('harvestTools'), quern: row('quern'), shears: row('shears'), forge: row('forge'), horseshoes: row('horseshoes'), ironPickaxe: row('ironPickaxe') };
   return { shown: state.structures.workshop && Object.values(rows).some(item => item.shown), rows };
 }
 

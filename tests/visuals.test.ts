@@ -249,7 +249,7 @@ describe('native-size scene art', () => {
 
   it('draws loose piles by count', () => {
     const state = createGame();
-    state.stonePiles = [{ id: 'p1', x: 5, y: 5, count: 1, area: 'camp' }, { id: 'p2', x: 8, y: 5, count: 2, area: 'camp' }, { id: 'p5', x: 11, y: 5, count: 5, area: 'camp' }];
+    state.stonePiles = [{ id: 'p1', x: 5, y: 5, count: 1, area: 'camp', item: 'stone' }, { id: 'p2', x: 8, y: 5, count: 2, area: 'camp', item: 'stone' }, { id: 'p5', x: 11, y: 5, count: 5, area: 'camp', item: 'stone' }];
     const visuals = sceneVisuals(state, 0);
     expect(visuals.find(item => item.id === 'p1')?.texture).toBe('looseStones:one');
     expect(visuals.find(item => item.id === 'p2')?.texture).toBe('looseStones:two');
@@ -259,7 +259,7 @@ describe('native-size scene art', () => {
 
   it('labels loose piles of two or more with their count above the stones', () => {
     const state = createGame();
-    state.stonePiles = [{ id: 'p1', x: 5, y: 5, count: 1, area: 'camp' }, { id: 'p3', x: 8, y: 5, count: 3, area: 'camp' }, { id: 'p12', x: 11, y: 5, count: 12, area: 'camp' }];
+    state.stonePiles = [{ id: 'p1', x: 5, y: 5, count: 1, area: 'camp', item: 'stone' }, { id: 'p3', x: 8, y: 5, count: 3, area: 'camp', item: 'stone' }, { id: 'p12', x: 11, y: 5, count: 12, area: 'camp', item: 'stone' }];
     const visuals = sceneVisuals(state, 0);
     expect(visuals.find(item => item.id === 'p1-count')).toBeUndefined();
     const label = visuals.find(item => item.id === 'p3-count')!;
@@ -359,7 +359,7 @@ describe('the quarry area', () => {
 
   it('the quarry area shows only its own things', () => {
     const state = quarryState();
-    state.stonePiles = [{ id: 'here', x: 14, y: 14, count: 1, area: 'quarry' }, { id: 'there', x: 5, y: 5, count: 1, area: 'camp' }];
+    state.stonePiles = [{ id: 'here', x: 14, y: 14, count: 1, area: 'quarry', item: 'stone' }, { id: 'there', x: 5, y: 5, count: 1, area: 'camp', item: 'stone' }];
     state.fireFuel = 40;
     state.timeOfDay = 200;
     const visuals = sceneVisuals(state, 0);
@@ -411,7 +411,7 @@ describe('the quarry area', () => {
 
   it('the camp view never shows quarry-area piles', () => {
     const state = createGame();
-    state.stonePiles = [{ id: 'here', x: 5, y: 5, count: 3, area: 'camp' }, { id: 'away', x: 8, y: 5, count: 3, area: 'quarry' }];
+    state.stonePiles = [{ id: 'here', x: 5, y: 5, count: 3, area: 'camp', item: 'stone' }, { id: 'away', x: 8, y: 5, count: 3, area: 'quarry', item: 'stone' }];
     const ids = sceneVisuals(state, 0).map(item => item.id);
     expect(ids).toEqual(expect.arrayContaining(['here', 'here-count']));
     expect(ids).not.toContain('away');

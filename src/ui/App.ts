@@ -348,6 +348,7 @@ export class App {
     let welcome = 'Welcome back to your camp.';
     if (area === 'quarry') welcome = 'Welcome back. You are out by the old quarry.';
     if (area === 'homestead') welcome = 'Welcome back. You are at the old homestead.';
+    if (area === 'hills') welcome = 'Welcome back. You are up on the hills.';
     this.setMessage(welcome);
     this.setText('save-status', 'Loaded locally');
   }

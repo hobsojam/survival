@@ -48,7 +48,7 @@ describe('the rules for a name', () => {
 
 describe('naming an animal', () => {
   it('starts with every animal unnamed', () => {
-    expect(game.names).toEqual({ bird: null, fox: null, wolf: null, sheep: [null, null, null], chickens: [null, null, null] });
+    expect(game.names).toEqual({ bird: null, fox: null, wolf: null, pony: null, sheep: [null, null, null], chickens: [null, null, null] });
     expect(anyNamed(game)).toBe(false);
   });
 

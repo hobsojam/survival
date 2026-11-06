@@ -12,13 +12,13 @@ describe('new game', () => {
     expect(game.player.x).toBeLessThan(40);
     expect(game.player.y).toBeGreaterThanOrEqual(0);
     expect(game.player.y).toBeLessThan(30);
-    expect(game.inventory).toEqual({ wood: 0, fiber: 0, stone: 0, food: emptyFood() });
+    expect(game.inventory).toEqual({ wood: 0, fiber: 0, stone: 0, ore: 0, food: emptyFood() });
     expect(game.structures).toEqual({ shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false,
       orchard: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, storehouse: false, woodpile: false, timberYard: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false, field: false, granary: false, windmill: false, bakery: false, beehive: false, birdhouse: false, sheepPen: false, loom: false, chickenCoop: false, foxDen: false, wolfHouse: false });
     expect(game.gardenPlots).toEqual(Array.from({ length: 3 }, () => ({ plantedYear: null, harvestedYear: null, harvestReady: false })));
     expect(BUILDINGS.dryingRack.cost).toEqual({ wood: 4, fiber: 0 });
     expect(BUILDINGS.windbreak.cost).toEqual({ wood: 5, fiber: 0 });
-    expect(game.progress).toEqual({ nextStormDay: 3, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false, quarryFound: false, pickaxeCrafted: false, mineBuilt: false, potCrafted: false, packWoven: false, fishingLine: false, homesteadFound: false, workshop: { saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false, shears: false },
+    expect(game.progress).toEqual({ nextStormDay: 3, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false, quarryFound: false, pickaxeCrafted: false, mineBuilt: false, potCrafted: false, packWoven: false, fishingLine: false, homesteadFound: false, hillsFound: false, oreFoundDay: null, workshop: { saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false, shears: false, forge: false, horseshoes: false, ironPickaxe: false },
       discoveries: { basket: false, spring: false, cairn: false } });
     expect(game.cakeBonus).toBe(false);
     expect(game.trees).toHaveLength(6);

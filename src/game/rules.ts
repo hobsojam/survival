@@ -1,5 +1,6 @@
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isSummer, isWinter, nightStart, yearOf } from './calendar';
-import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, pathOpen } from './areas';
+import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, hillsPathOpen, pathOpen } from './areas';
+import { HILLS_EXIT, HILLS_FOUND_MESSAGE, QUARRY_HILLS_EXIT } from './hills';
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
 import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
@@ -359,6 +360,12 @@ function payAndBuild(state: GameState, cost: { wood: number; fiber: number; ston
   }, workSeconds(state, seconds), 'working');
 }
 
+/** Coming out on the hills for the first time, whichever way the survivor crossed. */
+function hillsFoundOnArrival(moved: GameState): ActionResult {
+  if (moved.area !== 'hills' || moved.progress.hillsFound) return { state: moved, message: '' };
+  return { state: { ...moved, progress: { ...moved.progress, hillsFound: true } }, message: HILLS_FOUND_MESSAGE };
+}
+
 function quarryFoundOnArrival(moved: GameState): ActionResult {
   if (moved.area === 'quarry' && !moved.progress.quarryFound && near(moved.player.x, moved.player.y, QUARRY_SITE.x, QUARRY_SITE.y, 2)) {
     return { state: { ...moved, progress: { ...moved.progress, quarryFound: true } }, message: 'You found an old quarry. A pickaxe could work this stone.' };
@@ -378,6 +385,7 @@ const move: ActionHandler<'move'> = (state, action) => {
   if (moved.area === 'homestead' && !moved.progress.homesteadFound) {
     return { state: { ...moved, progress: { ...moved.progress, homesteadFound: true } }, message: 'You found an abandoned homestead.' };
   }
+  if (moved.area === 'hills') return hillsFoundOnArrival(moved);
   return quarryFoundOnArrival(moved);
 };
 
@@ -391,8 +399,15 @@ const cross: ActionHandler<'cross'> = state => {
     return { state: { ...state, area: 'homestead', player: { ...state.player, x: 0.5, y: CAMP_HOMESTEAD_EXIT.y },
       progress: { ...state.progress, homesteadFound: true } }, message: state.progress.homesteadFound ? '' : 'You found an abandoned homestead.' };
   }
+  if (state.area === 'hills') {
+    if (!near(state.player.x, state.player.y, HILLS_EXIT.x, HILLS_EXIT.y, 0.5)) return refuse(state, 'Walk to the path down.');
+    return { state: { ...state, area: 'quarry', player: { ...state.player, x: 0.5, y: HILLS_EXIT.y } }, message: '' };
+  }
+  if (state.area === 'quarry' && hillsPathOpen(state) && near(state.player.x, state.player.y, QUARRY_HILLS_EXIT.x, QUARRY_HILLS_EXIT.y, 0.5)) {
+    return hillsFoundOnArrival({ ...state, area: 'hills', player: { ...state.player, x: BALANCE.mapWidth - 1.5, y: QUARRY_HILLS_EXIT.y } });
+  }
   const exit = state.area === 'quarry' ? QUARRY_EXIT : HOMESTEAD_EXIT;
-  if (!near(state.player.x, state.player.y, exit.x, exit.y, 0.5)) return refuse(state, 'Walk to the path home.');
+  if (!near(state.player.x, state.player.y, exit.x, exit.y, 0.5)) return refuse(state, state.area === 'quarry' && hillsPathOpen(state) ? 'Walk to the end of a path to cross.' : 'Walk to the path home.');
   return { state: { ...state, area: 'camp', player: { ...state.player, x: state.area === 'quarry' ? 0.5 : BALANCE.mapWidth - 1.5, y: exit.y } }, message: '' };
 };
 
@@ -709,10 +724,10 @@ const takeFood: ActionHandler<'takeFood'> = (state, action) => {
 const dropStone: ActionHandler<'dropStone'> = state => {
   if (state.inventory.stone < 1) return refuse(state, 'You have no stone to set down.');
   const { x, y } = state.player;
-  const nearby = state.stonePiles.find(pile => pile.area === state.area && Math.hypot(pile.x - x, pile.y - y) <= BALANCE.pileMergeRadius);
+  const nearby = state.stonePiles.find(pile => pile.item === 'stone' && pile.area === state.area && Math.hypot(pile.x - x, pile.y - y) <= BALANCE.pileMergeRadius);
   const stonePiles = nearby
     ? state.stonePiles.map(pile => pile === nearby ? { ...pile, count: pile.count + 1 } : pile)
-    : [...state.stonePiles, { id: `pile-${state.area}-${state.day}-${Math.round(x * 10)}-${Math.round(y * 10)}`, x, y, count: 1, area: state.area }];
+    : [...state.stonePiles, { id: `pile-${state.area}-${state.day}-${Math.round(x * 10)}-${Math.round(y * 10)}`, x, y, count: 1, area: state.area, item: 'stone' as const }];
   return { state: { ...state, inventory: { ...state.inventory, stone: state.inventory.stone - 1 }, stonePiles }, message: 'Set down one stone.' };
 };
 
