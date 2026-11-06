@@ -1394,7 +1394,7 @@ const hangDoor: ActionHandler<'hangDoor'> = state => {
 const climbKeep = (state: GameState): ActionResult => {
   const blocker = climbKeepBlocker(state);
   if (blocker) return refuse(state, blocker);
-  return { state: advanceTime(state, BALANCE.stargazeSeconds, 'resting'), message: 'You climb to the top and look out over the hills for a while.' };
+  return { state: advanceTime(state, BALANCE.stargazeSeconds, 'resting'), message: '' };
 };
 
 const enterKeep = (state: GameState): ActionResult =>

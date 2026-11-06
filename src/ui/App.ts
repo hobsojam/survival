@@ -257,6 +257,7 @@ export class App {
       this.state = next;
       this.soundscape.update(next);
       this.render();
+      this.root.classList.toggle('keep-view', this.scene?.viewing() ?? false);
       if (!previous.ending && next.ending) this.endStory(next, cause === 'action');
       if (cause === 'action' && !previous.progress.lookoutRepaired && next.progress.lookoutRepaired) {
         this.root.querySelector('#lookout-ending')?.classList.remove('hidden');

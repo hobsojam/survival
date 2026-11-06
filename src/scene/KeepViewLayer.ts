@@ -43,7 +43,7 @@ export class KeepViewLayer {
     paint(still.getContext('2d')!, stillRects(now, camp));
     const texture = this.scene.textures.createCanvas(TEXTURE, PICTURE_WIDTH, PICTURE_HEIGHT)!;
     const image = this.scene.add.image(0, 0, TEXTURE).setOrigin(0).setScrollFactor(0).setDepth(WEATHER_DEPTH + 1);
-    const line = this.scene.add.text(0, 0, viewLine(now), { fontFamily: 'Georgia, serif', fontStyle: 'italic', fontSize: '11px', color: '#fbf4df', align: 'center' })
+    const line = this.scene.add.text(0, 0, viewLine(now), { fontFamily: 'Georgia, serif', fontSize: '11px', color: '#fbf4df', align: 'center' })
       .setOrigin(0.5, 1).setScrollFactor(0).setDepth(WEATHER_DEPTH + 1).setShadow(0, 1, '#000000', 3, false, true).setResolution(4);
     this.showing = { season: now, camp, still, texture, image, line, tick: -1 };
     this.resize(width, height);

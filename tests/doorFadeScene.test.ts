@@ -1,4 +1,4 @@
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { STEP_IDS, placeBranches } from '../src/game/clearing';
 import { nightStart } from '../src/game/calendar';
 import { KEEP_SITE } from '../src/game/keep';
@@ -42,7 +42,7 @@ function chainable(extra: Record<string, unknown> = {}): Record<string, unknown>
 
 interface SceneInside {
   state: GameState; pendingDoor?: unknown; viewShown: boolean; doorFade: DoorFade; time: { now: number }; walkTarget?: unknown; tapGate: () => boolean; scene: { isPaused(): boolean };
-  updateDoorFade(now: number): void; handleTap(x: number, y: number): void; syncPlayerSprite(moving: boolean): void; keyComesDown(event: { key: string; repeat: boolean }): void;
+  updateDoorFade(now: number): void; handleTap(x: number, y: number): void; syncPlayerSprite(moving: boolean): void; keyComesDown(event: { key: string; repeat: boolean }): void; say(...messages: (string | null)[]): void;
   perform: GameScene['perform']; update: GameScene['update']; viewing: GameScene['viewing']; resizeViewport: GameScene['resizeViewport'];
 }
 
@@ -55,7 +55,7 @@ function sceneAt(state: GameState) {
   const view = viewStub();
   const scene = Object.create(GameScene.prototype) as unknown as SceneInside;
   Object.assign(scene, {
-    state, said, doorFade: new DoorFade(), nightWatch: new NightWatch(), time: { now: 1000 }, viewShown: false, playerSprite: sprite, fadeCover: cover,
+    state, said, heldNotices: [], doorFade: new DoorFade(), nightWatch: new NightWatch(), time: { now: 1000 }, viewShown: false, playerSprite: sprite, fadeCover: cover,
     keepView: view, scale: { gameSize: { width: 480, height: 300 } }, lighting: { resize: () => undefined },
     cameras: { main: camera }, scene: { isPaused: () => false }, onFeedback: (line: string) => said.push(line), tapGate: () => true,
     unnamedAnimalUnder: () => null, showTapMarker: () => undefined,
@@ -193,6 +193,55 @@ it('climbing just before nightfall still shows the picture, and comes down into 
   inside.scene.updateDoorFade(SETTLED + 100 + 650);
   expect(inside.scene.viewing()).toBe(false);
   expect(inside.scene.state.timeOfDay).toBeGreaterThanOrEqual(nightStart(day));
+});
+
+describe('what the picture keeps back until the player comes down', () => {
+  const speaking = (state: GameState = atDoor()) => sceneAt(state);
+
+  it('holds the journal notice, and says it once, after coming down', () => {
+    const { scene, said } = speaking();
+    scene.doorFade.begin('view', 0);
+    scene.say('Written in your journal: x');
+    expect(said).toEqual([]);
+    scene.updateDoorFade(1400);
+    scene.doorFade.comeDown(2000);
+    scene.updateDoorFade(2000 + 649);
+    expect(said).toEqual([]);
+    scene.updateDoorFade(2000 + 650);
+    expect(said).toEqual(['Written in your journal: x']);
+    scene.updateDoorFade(2000 + 651);
+    expect(said).toHaveLength(1);
+  });
+
+  it('says several held notices together, in order', () => {
+    const { scene, said } = speaking();
+    scene.doorFade.begin('view', 0);
+    scene.say('First.', null);
+    scene.say('Second.');
+    scene.doorFade.comeDown(2000);
+    scene.updateDoorFade(2650);
+    expect(said).toEqual(['First. Second.']);
+  });
+
+  it('holds nothing when no view is up, or for a night', () => {
+    const { scene, said } = speaking();
+    scene.say('hello');
+    scene.doorFade.begin('sleep', 1000);
+    scene.say('goodnight');
+    expect(said).toEqual(['hello', 'goodnight']);
+  });
+
+  it('holds the notice from the climb itself, which comes as the picture opens', () => {
+    const { scene, said } = speaking();
+    Object.assign(scene, { carryOut: () => scene.say('Written in your journal: x') });
+    scene.perform({ type: 'enterKeep' });
+    scene.updateDoorFade(1400);
+    expect(said).toEqual([]);
+    scene.time.now = SETTLED;
+    scene.handleTap(0, 0);
+    scene.updateDoorFade(SETTLED + 650);
+    expect(said).toEqual(['Written in your journal: x']);
+  });
 });
 
 it('never moves the camera for a night', () => {

@@ -1,5 +1,5 @@
 import { withFishing } from '../game/fishing';
-import { KEEP_SITE, withKeepDoor } from '../game/keep';
+import { withKeepDoor } from '../game/keep';
 import Phaser from 'phaser';
 import { BALANCE, type GameState } from '../game/state';
 import { newsBetween } from '../game/news';
@@ -64,6 +64,8 @@ export class GameScene extends Phaser.Scene {
   private readonly sheepWalk = new SheepWalk();
   private viewShown = false;
   private keepView!: KeepViewLayer;
+  /** What's waiting to be said until the player has come down: only the season's line sits on the view. */
+  private heldNotices: string[] = [];
 
   constructor(state: GameState, onStateChange: (state: GameState, cause: 'action' | 'tick') => void, onFeedback: (message: string) => void, onSound: (cue: SoundCue) => void = () => undefined) {
     super({ key: 'GameScene' });
@@ -249,6 +251,10 @@ export class GameScene extends Phaser.Scene {
     }
     const running = this.doorFade.running(now);
     this.fadeCover.setVisible(running).setAlpha(this.doorFade.alpha(now));
+    if (!running && this.heldNotices.length) {
+      this.onFeedback(this.heldNotices.join(' '));
+      this.heldNotices = [];
+    }
     this.playerSprite.setVisible(!running);
     const viewing = this.doorFade.viewing(now);
     if (viewing === this.viewShown) return;
@@ -450,7 +456,9 @@ export class GameScene extends Phaser.Scene {
 
   private say(...messages: (string | null)[]): void {
     const text = messages.filter(Boolean).join(' ');
-    if (text) this.onFeedback(text);
+    if (!text) return;
+    if (this.doorFade.holdsClock(this.time.now)) this.heldNotices.push(text);
+    else this.onFeedback(text);
   }
 
   private showDawn(before: GameState, after: GameState): void {
