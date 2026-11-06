@@ -1,5 +1,6 @@
 import { isWinter, nightStart } from './calendar';
 import { availableFood, spendFood, type FoodItem } from './food';
+import { keepFinished } from './keep';
 import { BALANCE, type GameState } from './state';
 
 // The wild pony on the hills, won over slowly with apples or vegetables. Once it has its horseshoes it walks beside the
@@ -96,11 +97,11 @@ export function startlePony(next: GameState): void {
   next.pony = { ...next.pony, spot };
 }
 
-/** Whether the shod pony is with the survivor now: it stays out of the snow on the hills, and goes home at nightfall. */
+/** Whether the shod pony is with the survivor now: it stays out of the snow on the hills, and goes home at nightfall unless the finished keep is there to stay by. */
 export function ponyWith(state: GameState): boolean {
   if (state.pony.shod === null) return false;
   if (state.area === 'hills' && isWinter(state.day)) return false;
-  return !isNight(state) || state.area === 'camp';
+  return !isNight(state) || state.area === 'camp' || (state.area === 'hills' && keepFinished(state));
 }
 
 /** What changing area means for the pony: it can reach home, stay behind for want of shoes, or wait below the snow. */

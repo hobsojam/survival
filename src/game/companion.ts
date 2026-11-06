@@ -2,6 +2,7 @@ import { isWinter, nightStart } from './calendar';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { freeSpaces, isInClearing } from './camp';
 import { fuelLeft } from './home';
+import { inKeep } from './keep';
 import { addFood, availableFood, spendFood, type FoodItem } from './food';
 import { BALANCE, type Friend, type GameState } from './state';
 import { friendCalled } from './names';
@@ -222,7 +223,7 @@ export function companionNews(before: GameState, after: GameState): string[] {
 export function alarmAfter(state: GameState): number | null {
   const { alarmDay } = state.companion;
   const fuel = fuelLeft(state);
-  if (!hasFriend(state, 'bird') || !isWinter(state.day) || !night(state) || alarmDay === state.day || fuel <= 0) return null;
+  if (!hasFriend(state, 'bird') || !isWinter(state.day) || !night(state) || alarmDay === state.day || fuel <= 0 || inKeep(state)) return null;
   return Math.max(0, (fuel - BALANCE.alarmFuel) / BALANCE.coldNightFireBurn);
 }
 

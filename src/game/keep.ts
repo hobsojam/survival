@@ -1,3 +1,5 @@
+import { nightStart } from './calendar';
+import type { GameAction } from './rules';
 import { availableWood } from './wood';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { BALANCE, type GameState } from './state';
@@ -69,4 +71,19 @@ export const stoneLine = (stones: number): string => STONE_LINES[stones] ?? 'You
 export function withStoneLaid(keep: KeepState, day: number): KeepState {
   const stones = keep.stones + 1;
   return { ...keep, stones, startedDay: keep.startedDay ?? day, finishedDay: stones === KEEP_STONES ? day : null };
+}
+
+/** At the door of the finished keep. Worked out from where the survivor stands, so nothing about a night here is saved. */
+export const inKeep = (state: GameState): boolean => keepFinished(state) && byKeep(state);
+
+/** What going in at the door means now: to bed from nightfall on, otherwise up to the top. Read as the survivor arrives, not when they set off. */
+export function withKeepDoor(state: GameState, action: GameAction): GameAction {
+  if (action.type !== 'enterKeep') return action;
+  return { type: state.timeOfDay >= nightStart(state.day) ? 'sleep' : 'climbKeep' };
+}
+
+/** Why the survivor can't climb to the top right now, or null if they can. It costs nothing, so being tired doesn't stop them. */
+export function climbKeepBlocker(state: GameState): string | null {
+  if (!inKeep(state)) return 'Move closer to the keep door.';
+  return state.timeOfDay >= nightStart(state.day) ? 'It is too dark to see anything from the top.' : null;
 }

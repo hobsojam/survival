@@ -3,6 +3,7 @@ import { hasFriend } from './companion';
 import { friendCalled } from './names';
 import { takeFromBag } from './food';
 import { fuelLeft } from './home';
+import { inKeep } from './keep';
 import type { GameState, WolfTake } from './state';
 
 // Wolves come only on winter nights. A visit is saved as the day it happened and what was taken;
@@ -30,6 +31,10 @@ export function wolfVisit(next: GameState): void {
   if (!winterNight(next) || fuelLeft(next) > 0 || next.lastWolf?.day === next.day) return;
   if (hasFriend(next, 'wolf')) {
     next.lastWolf = { day: next.day, took: 'chased' };
+    return;
+  }
+  if (inKeep(next)) {
+    next.lastWolf = { day: next.day, took: 'nothing' };
     return;
   }
   const ration = takeFromBag(next, 'trailFood', 1);

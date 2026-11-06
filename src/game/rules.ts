@@ -19,7 +19,7 @@ import { BED_CROPS, bedsDawn, drawWaterBlocker, emptyBed, harvestBedBlocker, nee
 import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
 import { logsInStore } from './wood';
 import { settleStores } from './stores';
-import { KEEP_DOOR_WOOD, hangDoorBlocker, layStoneBlocker, stoneLine, withStoneLaid } from './keep';
+import { KEEP_DOOR_WOOD, climbKeepBlocker, hangDoorBlocker, inKeep, layStoneBlocker, stoneLine, withKeepDoor, withStoneLaid } from './keep';
 import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, cartSpace, countWord, fellingWood, upgradeBlocker, type UpgradeId } from './workshop';
 import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishingSecondsFor, validRoll } from './fishing';
 import { ENDED_MESSAGE, GAVE_OUT_MESSAGE, judgeSickDay, markWarmMeal, markWarmRest, sicknessTick } from './sickness';
@@ -60,7 +60,7 @@ export type GameAction =
   | { type: 'storeFood'; item: FoodItem }
   | { type: 'takeFood'; item: FoodItem }
   | { type: 'cook'; dish?: DishId }
-  | { type: 'layStone' | 'hangDoor' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'digOre' | 'dropOre' | 'offerPony' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'buildMine' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' | 'meetChickens' | 'leadChickens' | 'takeEgg' | 'gatherApples' | 'searchShed' }
+  | { type: 'layStone' | 'hangDoor' | 'climbKeep' | 'enterKeep' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'digOre' | 'dropOre' | 'offerPony' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'buildMine' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' | 'meetChickens' | 'leadChickens' | 'takeEgg' | 'gatherApples' | 'searchShed' }
   | { type: 'pickUpStone'; pileId: string }
   | { type: 'plantPip'; spot: number }
   | { type: 'pickOrchardApple'; spot: number }
@@ -132,6 +132,7 @@ export function movementFactor(state: GameState): number {
 /** Why the survivor can't sleep right now, or null if they can. */
 export function sleepBlocker(state: GameState): string | null {
   if (state.timeOfDay < nightStart(state.day)) return 'You can sleep once night falls. Rest (R) for a short break.';
+  if (inKeep(state)) return null;
   // In the house the bed is indoors, so home is the only thing asked for.
   if (livesInHouse(state)) return isAtHome(state) ? null : 'Go home to sleep.';
   if (!isAtCamp(state)) return 'Move closer to the fire to sleep.';
@@ -284,9 +285,11 @@ function fireBurn(state: GameState, coldNight: boolean): number {
  */
 function warmthChange(state: GameState, step: number, camp: boolean, home: boolean, coldNight: boolean): number {
   // The shelter keeps its roof as a woodshed, so rain at camp still finds cover under it.
-  const sheltered = (home && (state.structures.shelter || state.structures.house)) || (camp && state.structures.shelter);
+  const keep = inKeep(state);
+  const sheltered = keep || (home && (state.structures.shelter || state.structures.house)) || (camp && state.structures.shelter);
   if (state.timeOfDay < nightStart(state.day) && !(isRaining(state) && !sheltered)) return step / 10;
-  const lit = (home && fuelLeft(state) > 0) || (camp && state.fireFuel > 0);
+  // The keep's own fire lights itself and burns nothing the survivor has to bring.
+  const lit = keep || (home && fuelLeft(state) > 0) || (camp && state.fireFuel > 0);
   if (lit) return step / 2;
   let change = -step * warmthLossPerSecond(state, sheltered, coldNight);
   // The windbreak shelters the house too, so moving in never leaves the survivor colder.
@@ -1214,7 +1217,7 @@ const rest: ActionHandler<'rest'> = state => {
 /** Energy after a night's sleep: full in a bed, otherwise a good boost; hungry, half the boost and no more than the cap, which a pillow raises. */
 function sleptEnergy(state: GameState): number {
   const { energy } = state.player;
-  const rested = state.structures.bed ? 100 : Math.min(100, energy + BALANCE.sleepEnergyGain);
+  const rested = state.structures.bed || inKeep(state) ? 100 : Math.min(100, energy + BALANCE.sleepEnergyGain);
   if (!isHungry(state)) return rested;
   const cap = BALANCE.hungrySleepCap + (state.companion.pillow ? BALANCE.pillowEnergyGain : 0);
   return Math.max(energy, Math.min(cap, energy + (rested - energy) * BALANCE.hungryRecoveryFactor));
@@ -1225,6 +1228,7 @@ export const alarmMessage = (state: GameState): string => `${friendCalled(state,
 
 /** What the night did to the fire that keeps the survivor warm: in the house, the fireplace, which went out only if it burned and the store ran dry. */
 function fireDiedNote(before: GameState, after: GameState): string {
+  if (inKeep(before)) return '';
   if (livesInHouse(before)) {
     const burned = before.fireplaceFuel > 0 || logsInStore(after) < logsInStore(before);
     return burned && after.fireplaceFuel <= 0 && logsInStore(after) === 0 ? ' The fireplace went out in the night.' : '';
@@ -1232,7 +1236,7 @@ function fireDiedNote(before: GameState, after: GameState): string {
   return before.fireFuel > 0 && after.fireFuel <= 0 ? ' The fire burned out in the night.' : '';
 }
 
-const sleep: ActionHandler<'sleep'> = unmarked => {
+const sleep = (unmarked: GameState): ActionResult => {
   const blocked = sleepBlocker(unmarked);
   if (blocked) return refuse(unmarked, blocked);
   const state = markWarmRest(unmarked);
@@ -1382,6 +1386,15 @@ const hangDoor: ActionHandler<'hangDoor'> = state => {
   };
 };
 
+const climbKeep = (state: GameState): ActionResult => {
+  const blocker = climbKeepBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  return { state: advanceTime(state, BALANCE.stargazeSeconds, 'resting'), message: 'You climb to the top and look out over the hills for a while.' };
+};
+
+const enterKeep = (state: GameState): ActionResult =>
+  withKeepDoor(state, { type: 'enterKeep' }).type === 'sleep' ? sleep(state) : climbKeep(state);
+
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   feedSheep,
   nameAnimal,
@@ -1389,7 +1402,7 @@ const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   weave,
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, digOre, dropOre, offerPony, buildMine, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, dropPineNeedles, pickUpStone, burnFiber, burnPineNeedles, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, layStone, hangDoor, rest, sleep, befriend, meetChickens, leadChickens, takeEgg, gatherApples, plantPip, pickOrchardApple, searchShed, craftPillow, craftCloak,
+  cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, layStone, hangDoor, climbKeep, enterKeep, rest, sleep, befriend, meetChickens, leadChickens, takeEgg, gatherApples, plantPip, pickOrchardApple, searchShed, craftPillow, craftCloak,
   makeFishingLine, fish
 };
 
