@@ -122,7 +122,7 @@ describe('clearing steps', () => {
       'north-near': ['larder'], 'north-far': ['house', 'beehive'], 'north-outer': ['bakery'],
       'east-near': ['woodpile', 'fibreStack'], 'east-far': ['workshop'], 'east-outer': ['sheepPen'],
       'south-near': ['granary'], 'south-far': ['field'], 'south-outer': ['windmill'],
-      'west-near': ['vegetableBeds'], 'west-far': ['well']
+      'west-near': ['vegetableBeds'], 'west-far': ['well'], 'west-outer': ['orchard']
     });
   });
 
@@ -138,8 +138,8 @@ describe('clearing steps', () => {
 });
 
 describe('the outer ground', () => {
-  it('opens a third step on the north, east and south sides only', () => {
-    expect(STEP_IDS).toEqual(['north-near', 'north-far', 'north-outer', 'east-near', 'east-far', 'east-outer', 'south-near', 'south-far', 'south-outer', 'west-near', 'west-far']);
+  it('opens a third step on every side', () => {
+    expect(STEP_IDS).toEqual(['north-near', 'north-far', 'north-outer', 'east-near', 'east-far', 'east-outer', 'south-near', 'south-far', 'south-outer', 'west-near', 'west-far', 'west-outer']);
     expect(previousStep('north-outer')).toBe('north-far');
     expect(previousStep('south-far')).toBe('south-near');
     expect(previousStep('east-near')).toBeNull();

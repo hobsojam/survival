@@ -20,7 +20,7 @@ export type JournalId =
   | 'firstRain' | 'rabbits' | 'bushesFull' | 'stumpGrowing' | 'springRest'
   | 'fireflies' | 'twoHandfuls' | 'goldEvening' | 'warmSleep' | 'lookoutEvening'
   | 'hazelnuts' | 'pineTea' | 'salad' | 'wildHoney' | 'fireside' | 'grainIn' | 'winterBread'
-  | 'autumnGrain' | 'summerBread' | 'ovenBread' | 'shearing'
+  | 'autumnGrain' | 'summerBread' | 'ovenBread' | 'shearing' | 'orchardApple'
   | 'autumnKeepsake' | 'winterKeepsake' | 'springKeepsake' | 'summerKeepsake'
   | 'namedAutumn' | 'namedWinter' | 'namedSpring' | 'namedSummer';
 
@@ -37,6 +37,7 @@ interface PageEntry {
 export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
   autumn: [
     { id: 'leaves', lines: ['The first leaves came down over camp.'] },
+    { id: 'orchardApple', lines: ['Picked an apple from a tree I grew myself.'] },
     { id: 'fox', lines: ['A fox nosed around the berry bushes at dusk.'] },
     { id: 'coldFront', lines: ['The cold night came. I kept the fire through it.', 'The cold night came, and it got the better of me.',
       'A cold autumn night, and the fire kept me warm.'] },
@@ -187,6 +188,7 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   // The harvest is told on whichever page it lands: summer's last days, or the autumn after.
   grainIn: m => onBefore(m, grainWentIn(m)),
   shearing: shorn,
+  orchardApple: m => onBefore(m, acted(m, 'pickOrchardApple') && m.after.orchard !== m.before.orchard),
   autumnGrain: m => onBefore(m, grainWentIn(m)),
   // A loaf is told on summer's page or winter's, each with its own line.
   summerBread: m => onBefore(m, cooked(m, 'loaf')),

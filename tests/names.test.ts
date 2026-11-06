@@ -10,7 +10,7 @@ import { pillowView } from '../src/ui/panels';
 import { recordJournal } from '../src/game/journalEntries';
 import { loadGame, saveGame } from '../src/game/save';
 import { currentPage, journalPageView, renderJournalPage, type JournalNode } from '../src/ui/yearJournal';
-import { SAVE_VERSION, upgradeSave } from '../src/game/saveUpgrades';
+import { upgradeSave } from '../src/game/saveUpgrades';
 import { anyNamed, cleanName, friendCalled, nameBlocker, nameOf, named, namedNote, type NameTarget } from '../src/game/names';
 
 const fakeStorage = (): Storage => {
@@ -126,7 +126,6 @@ describe('saving names', () => {
   it('brings a version 34 save up with its friends and no names', () => {
     const { names: _names, ...old } = withFox();
     const upgraded = upgradeSave(34, old) as { ok: true; state: GameState };
-    expect(SAVE_VERSION).toBe(35);
     expect(upgraded.ok).toBe(true);
     expect(upgraded.state.names).toEqual(game.names);
     expect(upgraded.state.companion.friends.fox).toBe(1);

@@ -4,6 +4,7 @@ import { emptyFood, type FoodStore } from './foodStore';
 import type { Bed } from './beds';
 import type { UpgradeId } from './workshop';
 import { emptyField, type FieldState } from './field';
+import { emptyOrchard, type OrchardState } from './orchard';
 export type ResourceKind = 'branch' | 'berry' | 'fiber' | 'stone' | 'hazel' | 'pine' | 'greens' | 'honey' | 'wildGrain';
 
 export const BUILDINGS = {
@@ -28,6 +29,7 @@ export const BUILDINGS = {
   vegetableBeds: { name: 'Vegetable beds', description: 'Three raised beds for potatoes, beans and carrots', symbol: '▦', cost: { wood: 6, fiber: 2 }, prerequisite: null, ground: 'west-near' },
   well: { name: 'Well', description: 'Draw water for the beds and the pot', symbol: '◉', cost: { wood: 2, fiber: 0, stone: 6 }, prerequisite: 'vegetableBeds', ground: 'west-far' },
   sheepPen: { name: 'Sheep pen', description: 'A fenced meadow with a feed rack, up past the lookout', symbol: '▢', cost: { wood: 8, fiber: 4 }, prerequisite: 'field', ground: 'east-outer' },
+  orchard: { name: 'Orchard', description: 'A fenced plot for apple trees, north of the west path', symbol: '♣', cost: { wood: 6, fiber: 2 }, prerequisite: null, ground: 'west-outer' },
   loom: { name: 'Loom', description: 'Weave wool into something warm', symbol: '▥', cost: { wood: 8, fiber: 2, stone: 2 }, prerequisite: 'sheepPen', ground: 'east-far' },
   /** The survivor moves in the moment it is built, and the shelter becomes a woodshed. */
   house: { name: 'House', description: 'A home with a fireplace of its own', symbol: '⌂', cost: { wood: 12, fiber: 6, stone: 8 }, prerequisite: 'shelterFinished', alsoRequires: 'bed', ground: 'north-far' },
@@ -194,6 +196,7 @@ export interface GameState {
   chickens: { discovered: boolean; following: boolean; rescued: boolean; eggs: number; nextEggDay: number };
   /** The flock shares one fluff count; fedUntil is the last dawn their feed lasts, and wool waits in a basket at the pen. */
   /** What the player has called each animal; for reading only. */
+  orchard: OrchardState;
   names: { bird: string | null; fox: string | null; wolf: string | null; sheep: (string | null)[]; chickens: (string | null)[] };
   sheep: { arrived: boolean; fluff: number; fedUntil: number | null; lastShornYear: number | null; wool: number; woven: { blanket: boolean; jumper: boolean; rug: boolean } };
   homestead: { applesReadyDay: number; shedSearched: boolean };
@@ -235,6 +238,8 @@ export const BALANCE = {
   digEnergyCost: 8,
   eatHungerGain: 25,
   appleHunger: 20,
+  /** Dawns before an orchard tree has another apple, the same as the old homestead tree. */
+  orchardRipenDays: 3,
   /** Forage eaten raw; honey gives a little energy too. Roasted hazelnuts come from the cooking pot. */
   greensHunger: 15,
   hazelnutHunger: 15,
@@ -447,7 +452,7 @@ export function createGame(): GameState {
     fireFuel: 0,
     fireplaceFuel: 0,
     decorations: emptyDecorations(),
-    structures: { shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, storehouse: false, woodpile: false, timberYard: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false, field: false, granary: false, windmill: false, bakery: false, beehive: false, sheepPen: false, loom: false, chickenCoop: false, birdhouse: false, wolfHouse: false, foxDen: false },
+    structures: { orchard: false, shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, storehouse: false, woodpile: false, timberYard: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false, field: false, granary: false, windmill: false, bakery: false, beehive: false, sheepPen: false, loom: false, chickenCoop: false, birdhouse: false, wolfHouse: false, foxDen: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
       quarryFound: false, homesteadFound: false, pickaxeCrafted: false, mineBuilt: false, potCrafted: false, packWoven: false, fishingLine: false,
       workshop: { saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false, shears: false },
@@ -483,6 +488,7 @@ export function createGame(): GameState {
     },
     chickens: { discovered: false, following: false, rescued: false, eggs: 0, nextEggDay: 1 },
     sheep: { arrived: false, fluff: 0, fedUntil: null, lastShornYear: null, wool: 0, woven: { blanket: false, jumper: false, rug: false } },
+    orchard: emptyOrchard(),
     names: { bird: null, fox: null, wolf: null, sheep: [null, null, null], chickens: [null, null, null] },
     homestead: { applesReadyDay: 1, shedSearched: false },
     sickness: { starvedSeconds: 0, sick: false, sickFromDay: null, cared: 0, uncared: 0, ateWarm: false, restedWarm: false },

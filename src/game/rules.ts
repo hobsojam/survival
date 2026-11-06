@@ -4,7 +4,7 @@ import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSec
 import { isRaining } from './rain';
 import { wolfVisit } from './wolves';
 import { availableFiber, availableStone, availableWood, spendFiber, spendWood, bagCapacity, carriedCount, freeSpaces, isAtCamp, isInClearing, spaceFor } from './camp';
-import { POT_COST, cookBlocker, defaultDish, dishBlocker, foodWord, isPackedDish, packDish, potBlocker, serveDish, spendIngredients, type DishId } from './cooking';
+import { DISHES, POT_COST, cookBlocker, defaultDish, dishBlocker, foodWord, isPackedDish, packDish, potBlocker, serveDish, spendIngredients, type DishId } from './cooking';
 import { alarmAfter, cloakBlocker, companionDawn, hasFriend, startleFox, makeOffering, offerBlocker, pickUpKeepsake, pillowBlocker } from './companion';
 import { CLEARING_STEPS, choppableTrees, clearGroundBlocker, isClearingStump, markBlocker, placeBranches, roomLine, stepDepth, stepGround, stepWhere, type StepId } from './clearing';
 import { addFood, availableFood, eatEffect, foodCount, isFresh, quickEatItem, spendFood, spoil, storeTotal, type FoodItem, type FoodStore } from './food';
@@ -25,6 +25,7 @@ import { CHICKEN_SITE, chickensDawn, settleChickens, takeEggBlocker, takenEgg } 
 import { cleanName, friendCalled, nameBlocker, named, type NameTarget } from './names';
 import { fedSheep, feedBlocker, shearBlocker, sheepDawn, shornSheep, weaveBlocker, wovenState, type WovenId } from './sheep';
 import { appleBlocker, shedBlocker } from './homestead';
+import { pickTreeBlocker, plantBlocker, savePips } from './orchard';
 
 export type GameAction =
   | { type: 'gather'; nodeId: string }
@@ -58,6 +59,8 @@ export type GameAction =
   | { type: 'cook'; dish?: DishId }
   | { type: 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'buildMine' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' | 'meetChickens' | 'leadChickens' | 'takeEgg' | 'gatherApples' | 'searchShed' }
   | { type: 'pickUpStone'; pileId: string }
+  | { type: 'plantPip'; spot: number }
+  | { type: 'pickOrchardApple'; spot: number }
   | { type: 'makeFishingLine' }
   | { type: 'fish'; roll: number };
 
@@ -192,6 +195,7 @@ export function buildStatus(state: GameState, id: StructureId): BuildStatus {
   if (state.structures[id]) return 'built';
   if (id === 'chickenCoop' && !state.chickens.discovered) return 'locked';
   if (id === 'loom' && state.sheep.lastShornYear === null) return 'locked';
+  if (id === 'orchard' && !state.progress.homesteadFound) return 'locked';
   if ('friend' in definition && !hasFriend(state, definition.friend)) return 'locked';
   if (definition.prerequisite === 'coldNight' && !state.progress.hearthUnlocked) return 'locked';
   const missingPrerequisite = missingStructurePrerequisite(state, definition);
@@ -619,7 +623,7 @@ const clearGround: ActionHandler<'clearGround'> = state => {
   const nodes = state.nodes.map((node, index) => ({ ...node, x: placed[index].x, y: placed[index].y }));
   return {
     state: payAndBuild(state, CLEARING_STEPS[step].cost, { nodes, clearing: { cleared, marked: null, felled: [] } }),
-    message: `${capitalised(stepGround(step))} is open now.${roomLine(step, state.structures, id => Object.hasOwn(BUILDINGS, id))}`
+    message: `${capitalised(stepGround(step))} is open now.${roomLine(step, state.structures, id => Object.hasOwn(BUILDINGS, id) && buildStatus(state, id as StructureId) !== 'locked')}`
   };
 };
 
@@ -775,9 +779,10 @@ const eat: ActionHandler<'eat'> = (state, action) => {
   if (!item || !fed) return refuse(state, 'No food in your bag.');
   const { hunger, energy, message } = eatEffect(item);
   const { player } = fed;
+  const { state: kept, note } = savePips(fed, item === 'apple' ? 1 : 0);
   return {
-    state: { ...fed, player: { ...player, hunger: Math.min(100, player.hunger + hunger), energy: Math.min(100, player.energy + energy) } },
-    message
+    state: { ...kept, player: { ...player, hunger: Math.min(100, player.hunger + hunger), energy: Math.min(100, player.energy + energy) } },
+    message: message + note
   };
 };
 
@@ -803,7 +808,9 @@ const cook: ActionHandler<'cook'> = (state, action) => {
   // Roasted nuts and loaves are packed for later, not eaten, so only the other dishes are a warm meal. It counts toward
   // the day the cooking began, as a rest does, even if the cooking runs on past dawn.
   const packed = isPackedDish(dish) ? packDish(spent, dish) : markWarmMeal(packDish(spent, dish));
-  return serveDish(advanceTime(packed, BALANCE.cookSeconds, 'resting'), dish, state.structures.dryingRack);
+  const served = serveDish(advanceTime(packed, BALANCE.cookSeconds, 'resting'), dish, state.structures.dryingRack);
+  const { state: kept, note } = savePips(served.state, DISHES[dish].ingredients.apple ?? 0);
+  return { state: kept, message: served.message + note };
 };
 
 /** A honey cake's extra energy for this rest or sleep, if one was eaten. */
@@ -1045,6 +1052,7 @@ function buildBlocker(state: GameState, structureId: StructureId): string | null
   if (!definition) return 'That structure is unavailable.';
   if (structureId === 'chickenCoop' && !state.chickens.discovered) return 'Find the chickens at the old homestead first.';
   if (structureId === 'loom' && state.sheep.lastShornYear === null) return 'Shear the flock first.';
+  if (structureId === 'orchard' && !state.progress.homesteadFound) return 'Find the old homestead first.';
   if ('friend' in definition && !hasFriend(state, definition.friend)) return 'Befriend this animal first.';
   if (definition.prerequisite === 'coldNight' && !state.progress.hearthUnlocked) return 'Weather the cold night to unlock the hearth.';
   if (state.structures[structureId]) return 'Already built.';
@@ -1216,6 +1224,31 @@ const gatherApples: ActionHandler<'gatherApples'> = state => {
   };
 };
 
+const plantPip: ActionHandler<'plantPip'> = (state, action) => {
+  const blocker = plantBlocker(state, action.spot);
+  if (blocker) return refuse(state, blocker);
+  return {
+    state: advanceTime({ ...state,
+      orchard: { pips: state.orchard.pips - 1, trees: state.orchard.trees.map((tree, spot) => (spot === action.spot ? { plantedDay: state.day, ripeDay: state.day } : tree)) },
+      player: tire(state, BALANCE.gatherEnergyCost)
+    }, workSeconds(state, BALANCE.gatherSeconds), 'working'),
+    message: 'You plant a pip and mark it with a stake.'
+  };
+};
+
+const pickOrchardApple: ActionHandler<'pickOrchardApple'> = (state, action) => {
+  const blocker = pickTreeBlocker(state, action.spot);
+  if (blocker) return refuse(state, blocker);
+  return {
+    state: advanceTime({ ...state,
+      orchard: { ...state.orchard, trees: state.orchard.trees.map((tree, spot) => (tree && spot === action.spot ? { ...tree, ripeDay: state.day + BALANCE.orchardRipenDays } : tree)) },
+      inventory: { ...state.inventory, food: addFood(state.inventory.food, 'apple', 1, state.day) },
+      player: tire(state, BALANCE.gatherEnergyCost)
+    }, workSeconds(state, BALANCE.gatherSeconds), 'working'),
+    message: 'You pick an apple from your own tree.'
+  };
+};
+
 const searchShed: ActionHandler<'searchShed'> = state => {
   const blocker = shedBlocker(state);
   if (blocker) return refuse(state, blocker);
@@ -1264,7 +1297,7 @@ const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   weave,
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, buildMine, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, dropPineNeedles, pickUpStone, burnFiber, burnPineNeedles, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, rest, sleep, befriend, meetChickens, leadChickens, takeEgg, gatherApples, searchShed, craftPillow, craftCloak,
+  cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, rest, sleep, befriend, meetChickens, leadChickens, takeEgg, gatherApples, plantPip, pickOrchardApple, searchShed, craftPillow, craftCloak,
   makeFishingLine, fish
 };
 

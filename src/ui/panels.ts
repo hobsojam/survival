@@ -196,6 +196,13 @@ export function sheepPanelView(state: GameState): { shown: boolean; status: stri
   };
 }
 
+/** The saved pips, for the Bag panel; nothing until there are some. */
+export function pipsLine(state: GameState): string {
+  const { pips } = state.orchard;
+  if (pips === 0) return '';
+  return pips === 1 ? '1 apple pip' : `${pips} apple pips`;
+}
+
 export interface LoomItemView { id: WovenId; name: string; cost: string; disabled: boolean; hint: string }
 
 const LOOM_NAMES: Record<WovenId, string> = { blanket: 'Wool blanket', jumper: 'Warm jumper', rug: 'Rug' };
@@ -729,7 +736,7 @@ function clearingSideView(state: GameState, side: Side): ClearingSideView {
   const name = capitalised(side);
   if (!step) return { side, label: `${name} · cleared`, detail: '', disabled: true, done: true, chosen: false };
   const { trees, cost } = CLEARING_STEPS[step];
-  const room = roomLine(step, state.structures, id => Object.hasOwn(BUILDINGS, id));
+  const room = roomLine(step, state.structures, id => Object.hasOwn(BUILDINGS, id) && buildStatus(state, id as StructureId) !== 'locked');
   const price = cost.stone > 0
     ? `${trees.length} trees, then ${cost.wood} wood, ${cost.fiber} fiber and ${cost.stone} stone`
     : `${trees.length} trees, then ${cost.wood} wood and ${cost.fiber} fiber`;

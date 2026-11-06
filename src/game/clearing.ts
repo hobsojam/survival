@@ -9,11 +9,11 @@ import { availableStone } from './stone';
 // building the cleared ground makes room for.
 
 export type Side = 'north' | 'east' | 'south' | 'west';
-export type StepId = `${Side}-${'near' | 'far'}` | 'north-outer' | 'south-outer' | 'east-outer';
+export type StepId = `${Side}-${'near' | 'far' | 'outer'}`;
 export type StepDepth = 'near' | 'far' | 'outer';
 
 export const STEP_IDS: readonly StepId[] = [
-  'north-near', 'north-far', 'north-outer', 'east-near', 'east-far', 'east-outer', 'south-near', 'south-far', 'south-outer', 'west-near', 'west-far'
+  'north-near', 'north-far', 'north-outer', 'east-near', 'east-far', 'east-outer', 'south-near', 'south-far', 'south-outer', 'west-near', 'west-far', 'west-outer'
 ];
 
 /** How far out a step lies on its side: near, far or outer. */
@@ -41,7 +41,7 @@ export interface ClearingStep {
   /** An outer step clears only a nook: the arc of directions, in degrees from the fire, its reach applies to. */
   arc?: { from: number; to: number };
   /** A separate patch of ground out in the woods, in tiles, instead of a wider clearing round the fire. It stays grass. */
-  patch?: { x: number; y: number; width: number; height: number };
+  patch?: { x: number; y: number; width: number; height: number; where: string; ground: string };
 }
 
 export interface ClearingState {
@@ -97,7 +97,7 @@ export const CLEARING_STEPS: Record<StepId, ClearingStep> = {
   },
   'east-outer': {
     // A meadow up past the lookout, for the sheep: no wedge from the fire big enough for them would spare the wild things.
-    side: 'east', reach: 9, cost: OUTER_COST, room: ['sheepPen'], patch: { x: 31, y: 2, width: 6, height: 5 },
+    side: 'east', reach: 9, cost: OUTER_COST, room: ['sheepPen'], patch: { x: 31, y: 2, width: 6, height: 5, where: 'up past the lookout', ground: 'the meadow up past the lookout' },
     trees: [
       { x: 32.5, y: 3.5, sprite: 'treePine' }, { x: 35, y: 5.5, sprite: 'treeBroadleaf' }, { x: 36, y: 3, sprite: 'treePine' }
     ]
@@ -137,6 +137,14 @@ export const CLEARING_STEPS: Record<StepId, ClearingStep> = {
       { x: 12.5, y: 12.25, sprite: 'treeBroadleaf' }, { x: 12.5, y: 16.5, sprite: 'treePine' },
       { x: 10.75, y: 16.5, sprite: 'treeBroadleaf' }, { x: 11.75, y: 13.5, sprite: 'treePine' },
       { x: 11.25, y: 12.25, sprite: 'treeBroadleaf' }, { x: 11.25, y: 17.75, sprite: 'treePine' }
+    ]
+  },
+  'west-outer': {
+    // A plot of its own for the orchard, off the west path: no wedge from the fire big enough would spare the wild things.
+    side: 'west', reach: 9, cost: OUTER_COST, room: ['orchard'],
+    patch: { x: 2, y: 7.5, width: 5.5, height: 6.5, where: 'north of the west path', ground: 'the ground north of the west path' },
+    trees: [
+      { x: 3.5, y: 9, sprite: 'treeBroadleaf' }, { x: 5.5, y: 10.5, sprite: 'treePine' }, { x: 6.5, y: 13, sprite: 'treeBroadleaf' }
     ]
   }
 };
@@ -308,9 +316,10 @@ function buildingName(id: string): string {
   return id.replace(/([A-Z])/g, ' $1').toLowerCase();
 }
 
-/** "a larder", or, for a building named in the plural, just "vegetable beds". */
+/** "a larder" or "an orchard", or, for a building named in the plural, just "vegetable beds". */
 function withArticle(name: string): string {
-  return name.endsWith('s') ? name : `a ${name}`;
+  if (name.endsWith('s')) return name;
+  return /^[aeiou]/.test(name) ? `an ${name}` : `a ${name}`;
 }
 
 /** The sentence about what a cleared step makes room for, leading space included, or nothing if it is built or has none. */
@@ -320,8 +329,8 @@ export function roomLine(step: StepId, structures: Partial<Record<string, boolea
   return ` There's room for ${open.map(id => withArticle(buildingName(id))).join(' and ')} now.`;
 }
 
-/** Where a step's trees stand, for a sentence: its side, or the meadow's own place, which isn't reached by walking that way from the fire. */
-export const stepWhere = (id: StepId): string => (CLEARING_STEPS[id].patch ? 'up past the lookout' : `on the ${CLEARING_STEPS[id].side} side`);
+/** Where a step's trees stand, for a sentence: its side, or a patch's own place, which isn't reached by walking that way from the fire. */
+export const stepWhere = (id: StepId): string => CLEARING_STEPS[id].patch?.where ?? `on the ${CLEARING_STEPS[id].side} side`;
 
 /** The ground a step opens, for a sentence. */
-export const stepGround = (id: StepId): string => (CLEARING_STEPS[id].patch ? 'the meadow up past the lookout' : `the ${CLEARING_STEPS[id].side} side`);
+export const stepGround = (id: StepId): string => CLEARING_STEPS[id].patch?.ground ?? `the ${CLEARING_STEPS[id].side} side`;

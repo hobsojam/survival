@@ -6,6 +6,7 @@ import { sprites } from '../art/sprites';
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
 import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
+import { ORCHARD_SPOTS, spotAction, treeStage } from '../game/orchard';
 
 /** What a tap on the map points at, in tile units like `state.player`. */
 export type TapTarget =
@@ -20,6 +21,7 @@ export type TapTarget =
   | { kind: 'rubble'; x: number; y: number }
   | { kind: 'chickens'; x: number; y: number; action: 'meetChickens' | 'leadChickens' }
   | { kind: 'appleTree' | 'shed' | 'coop'; x: number; y: number }
+  | { kind: 'orchard'; spot: number; x: number; y: number; action: GameAction | null }
   | { kind: 'ground'; x: number; y: number };
 
 /** A tap this close to something counts as tapping it. */
@@ -57,6 +59,16 @@ function tapDistance(target: TapTarget, sprite: string | undefined, x: number, y
   return Math.min(fromTile, Math.min(fromMiddle, TAP_HIT_RADIUS));
 }
 
+/** Each spot of a standing orchard; a tree old enough to have branches can be tapped on them. */
+function orchardTargets(state: GameState): { target: TapTarget; sprite?: string }[] {
+  if (!state.structures.orchard) return [];
+  return ORCHARD_SPOTS.map((place, spot) => {
+    const tree = state.orchard.trees[spot];
+    const target: TapTarget = { kind: 'orchard', spot, ...place, action: spotAction(state, spot) };
+    return tree && treeStage(tree, state.day) === 'grown' ? { target, sprite: 'orchardTree' } : { target };
+  });
+}
+
 /** The closest interactive thing near the tap, or the tapped ground. */
 export function pickTapTarget(state: GameState, x: number, y: number): TapTarget {
   const piles = state.stonePiles.filter(pile => pile.area === state.area)
@@ -83,6 +95,7 @@ export function pickTapTarget(state: GameState, x: number, y: number): TapTarget
       { target: { kind: 'lookout', x: LOOKOUT.x, y: LOOKOUT.y }, sprite: 'lookout' },
       { target: { kind: 'fire', x: BALANCE.campX, y: BALANCE.campY } },
       ...(state.chickens.rescued ? [{ target: { kind: 'coop' as const, ...COOP_SITE } }] : []),
+      ...orchardTargets(state),
       ...(pathOpen(state) ? [{ target: { kind: 'crossing' as const, ...CAMP_EXIT } }, { target: { kind: 'crossing' as const, ...CAMP_HOMESTEAD_EXIT } }] : [])
     ];
   }
@@ -144,6 +157,7 @@ export function targetAction(target: TapTarget): GameAction | null {
     case 'appleTree': return { type: 'gatherApples' };
     case 'shed': return { type: 'searchShed' };
     case 'coop': return { type: 'takeEgg' };
+    case 'orchard': return target.action;
     case 'ground': return null;
   }
 }
