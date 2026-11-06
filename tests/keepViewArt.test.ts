@@ -60,6 +60,15 @@ describe('the picture', () => {
     expect(apples({ ...bare, orchard: [{ ...grownTree, apples: true }] }).length).toBeGreaterThan(0);
   });
 
+  it('in winter the roofs, sheep and sails stand out from the snowy clearing', () => {
+    const luminance = (color: string): number => [1, 3, 5].reduce((sum, at, i) => sum + [0.2126, 0.7152, 0.0722][i] * Number.parseInt(color.slice(at, at + 2), 16) / 255, 0);
+    const wide = { ...bare, clearingRadius: 30 };
+    const clearing = added(stillRects('winter', wide), stillRects('winter', bare))[0].color;
+    const roof = added(stillRects('winter', { ...wide, workshop: true }), stillRects('winter', wide)).find(rect => rect.h === 1)!.color;
+    const sheep = added(movingRects('winter', { ...wide, sheep: 1 }, 0), movingRects('winter', wide, 0))[0].color;
+    for (const color of [roof, sheep, SAIL_COLOR]) expect(luminance(color) - luminance(clearing)).toBeGreaterThan(0.08);
+  });
+
   it('each stage of a tree looks different', () => {
     const stages = (['sprout', 'sapling', 'young', 'grown'] as const).map(stage => JSON.stringify(added(stillRects('summer', { ...bare, orchard: [{ stage, apples: false }] }), stillRects('summer', bare))));
     expect(new Set(stages).size).toBe(4);

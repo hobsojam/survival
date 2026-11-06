@@ -10,7 +10,7 @@ vi.mock('phaser', () => ({ default: { Scene: class {} } }));
 
 import { GameScene } from '../src/scene/GameScene';
 import { SceneLighting } from '../src/scene/SceneLighting';
-import { DoorFade, VIEW_INPUT_DELAY_MS } from '../src/scene/doorFade';
+import { DoorFade, VIEW_INPUT_DELAY_MS, comesDownKey } from '../src/scene/doorFade';
 import { NightWatch } from '../src/scene/sleepReplay';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -42,7 +42,7 @@ function chainable(extra: Record<string, unknown> = {}): Record<string, unknown>
 
 interface SceneInside {
   state: GameState; pendingDoor?: unknown; viewShown: boolean; doorFade: DoorFade; time: { now: number }; walkTarget?: unknown; tapGate: () => boolean; scene: { isPaused(): boolean };
-  updateDoorFade(now: number): void; handleTap(x: number, y: number): void; syncPlayerSprite(moving: boolean): void; keyComesDown(event: { key: string; repeat: boolean }): void; say(...messages: (string | null)[]): void;
+  updateDoorFade(now: number): void; handleTap(x: number, y: number): void; syncPlayerSprite(moving: boolean): void; keyComesDown(event: Parameters<typeof comesDownKey>[0]): void; say(...messages: (string | null)[]): void;
   perform: GameScene['perform']; update: GameScene['update']; viewing: GameScene['viewing']; resizeViewport: GameScene['resizeViewport'];
 }
 
@@ -154,6 +154,15 @@ it('a key comes down, but not a repeat of the key held at the door, or Esc', () 
   scene.keyComesDown({ key: 'e', repeat: false });
   scene.updateDoorFade(SETTLED + 2000 + 650);
   expect(scene.viewing()).toBe(false);
+});
+
+it('a key combination such as a screenshot leaves the picture up', () => {
+  const { scene } = lookingOut();
+  scene.time.now = SETTLED + 100;
+  scene.keyComesDown({ key: 's', repeat: false, metaKey: true });
+  scene.keyComesDown({ key: 'PrintScreen', repeat: false });
+  scene.updateDoorFade(SETTLED + 2000);
+  expect(scene.viewing()).toBe(true);
 });
 
 it('a key means nothing when the picture is not up', () => {

@@ -23,6 +23,28 @@ export function doorFadeFor(action: GameAction, before: GameState): DoorFadeKind
   return null;
 }
 
+export interface KeyPress {
+  key: string;
+  repeat: boolean;
+  ctrlKey?: boolean;
+  altKey?: boolean;
+  metaKey?: boolean;
+  target?: unknown;
+}
+
+const PAGE_CONTROLS = 'button,a,input,select,textarea';
+
+/**
+ * Whether a key press means "come down" from the view. Only a plain key meant for the game does: a screenshot, Alt-Tab,
+ * the volume or tabbing through the page mustn't cost the player their view, and a key held from the door isn't a new press.
+ */
+export function comesDownKey(event: KeyPress): boolean {
+  if (event.repeat || event.ctrlKey || event.altKey || event.metaKey) return false;
+  const target = event.target as { closest?: (selector: string) => unknown } | null | undefined;
+  if (target?.closest?.(PAGE_CONTROLS)) return false;
+  return event.key.length === 1 || event.key === 'Enter' || event.key.startsWith('Arrow');
+}
+
 export class DoorFade {
   private kind: DoorFadeKind = 'sleep';
   private startedAt: number | null = null;

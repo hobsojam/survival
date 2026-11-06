@@ -21,7 +21,7 @@ import { ENDING_FADE_MS } from '../ui/ending';
 import { SceneEffects } from './SceneEffects';
 import { SceneLighting } from './SceneLighting';
 import { NightWatch } from './sleepReplay';
-import { DoorFade, doorFadeFor } from './doorFade';
+import { DoorFade, comesDownKey, doorFadeFor, type KeyPress } from './doorFade';
 import { KeepViewLayer } from './KeepViewLayer';
 import { newlyStayed, newlyWon, type NameTarget } from '../game/names';
 import { unnamedAnimalAt } from './animalTap';
@@ -268,9 +268,9 @@ export class GameScene extends Phaser.Scene {
     return this.viewShown;
   }
 
-  /** A fresh key press comes down from the view. Esc still pauses, and a key held from the door doesn't count. */
-  private keyComesDown(event: { key: string; repeat: boolean }): void {
-    if (this.viewShown && !event.repeat && event.key !== 'Escape' && !this.scene.isPaused()) this.doorFade.comeDown(this.time.now);
+  /** A plain key meant for the game comes down from the view. Esc still pauses. */
+  private keyComesDown(event: KeyPress): void {
+    if (this.viewShown && comesDownKey(event) && !this.scene.isPaused()) this.doorFade.comeDown(this.time.now);
   }
 
   private doorFading(): boolean {

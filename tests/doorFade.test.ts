@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { STEP_IDS, placeBranches } from '../src/game/clearing';
 import { KEEP_SITE } from '../src/game/keep';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
-import { DOOR_FADE_MS, DoorFade, VIEW_INPUT_DELAY_MS, doorFadeFor } from '../src/scene/doorFade';
+import { DOOR_FADE_MS, DoorFade, VIEW_INPUT_DELAY_MS, comesDownKey, doorFadeFor } from '../src/scene/doorFade';
 
 const game = createGame();
 const placed = placeBranches(game.nodes, [...STEP_IDS]);
@@ -138,5 +138,31 @@ describe('the fade', () => {
   it('a night is over however late it is asked', () => {
     const fade = started('sleep');
     expect([fade.running(1e9), fade.alpha(1e9), fade.hold(1e9), fade.viewing(1e9)]).toEqual([false, 0, false, false]);
+  });
+});
+
+describe('which keys come down from the view', () => {
+  const press = (key: string, extra: Partial<Parameters<typeof comesDownKey>[0]> = {}) => comesDownKey({ key, repeat: false, ...extra });
+  const on = (tag: string) => ({ target: { closest: (selector: string) => (selector.split(',').includes(tag) ? {} : null) } });
+
+  it.each(['e', 'x', ' ', 'Enter', 'ArrowUp', 'ArrowLeft'])('%j does', key => {
+    expect(press(key)).toBe(true);
+  });
+
+  it.each(['Escape', 'Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab', 'PrintScreen', 'F12', 'AudioVolumeUp', 'MediaPlayPause', 'ContextMenu'])('%s does not', key => {
+    expect(press(key)).toBe(false);
+  });
+
+  it('a key held from the door does not', () => {
+    expect(press('e', { repeat: true })).toBe(false);
+  });
+
+  it.each(['ctrlKey', 'altKey', 'metaKey'] as const)('a chord with %s does not, such as a screenshot', modifier => {
+    expect(press('s', { [modifier]: true })).toBe(false);
+  });
+
+  it('a key aimed at a page control does not', () => {
+    for (const tag of ['button', 'a', 'input', 'select', 'textarea']) expect(press('Enter', on(tag))).toBe(false);
+    expect(press('e', on('canvas'))).toBe(true);
   });
 });

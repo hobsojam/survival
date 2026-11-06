@@ -29,7 +29,7 @@ interface SeasonLook {
 
 const LOOKS: Record<Season, SeasonLook> = {
   autumn: { sky: ['#9fb9c9', '#c6cfc4', '#e6d3ac'], far: '#8a97a0', woods: ['#b5652a', '#c98a2e', '#8f4a24', '#3f5a3c'], woodsShade: '#3e3524', hills: ['#9a7a3c', '#8a5a2c', '#a8864a'], ground: '#8f9a55', snow: null, leaf: '#7f8f3a', grain: '#d4b24a', falling: { color: '#d08a30', count: 12 } },
-  winter: { sky: ['#aab8c6', '#c6ced6', '#dde0e0'], far: '#b4bfca', woods: ['#7d6f60', '#8c7f70', '#6a5f53', '#3f5548'], woodsShade: '#59606a', hills: ['#e8edf0', '#d6dee6', '#f4f6f6'], ground: '#eef2f4', snow: '#f4f6f6', leaf: '#6a5f53', grain: '#d6dee6', falling: { color: '#ffffff', count: 45 } },
+  winter: { sky: ['#aab8c6', '#c6ced6', '#dde0e0'], far: '#b4bfca', woods: ['#7d6f60', '#8c7f70', '#6a5f53', '#3f5548'], woodsShade: '#59606a', hills: ['#e8edf0', '#d6dee6', '#f4f6f6'], ground: '#c3d0dc', snow: '#f4f6f6', leaf: '#6a5f53', grain: '#d6dee6', falling: { color: '#ffffff', count: 45 } },
   spring: { sky: ['#8fc0dc', '#b8dae4', '#e2ecd8'], far: '#8fa8ad', woods: ['#6d9c48', '#86b354', '#527f3e', '#3a6444'], woodsShade: '#2f4a30', hills: ['#7f9a4a', '#d9b92e', '#8fa856'], ground: '#8fbb5a', snow: null, leaf: '#e6c8d4', grain: '#7fa64a', falling: { color: '#f2d5e0', count: 12 } },
   summer: { sky: ['#6fb0dc', '#a2d0e6', '#e8e6c8'], far: '#7d9aa8', woods: ['#3f7a3a', '#55913f', '#2f6432', '#2c5438'], woodsShade: '#233f26', hills: ['#7f5f8f', '#94709f', '#6d8a48'], ground: '#7aa648', snow: null, leaf: '#4f8f3f', grain: '#c9b447', falling: null }
 };

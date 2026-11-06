@@ -386,3 +386,4 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
 :is(.beds-panel, .workshop-panel, .granary-panel, .windmill-panel, .sheep-panel, .loom-panel, .bakery-panel, .beehive-panel, #mine-panel) .tool-row small { display: block; margin-top: 7px; color: #4f6655; text-align: center; font-size: 11px; }
 
 .keep-view .prompt, .keep-view .phone-meters { display: none; }
+.keep-view .game-frame::after { opacity: 0; transition: none; }
