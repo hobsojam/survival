@@ -127,7 +127,7 @@ describe('a save upgraded to version 37', () => {
   };
 
   it('is the next version', () => {
-    expect(SAVE_VERSION).toBe(37);
+    expect(SAVE_VERSION).toBeGreaterThanOrEqual(37);
   });
 
   it('has no hills, ore, forge or pony, and passes validation', () => {

@@ -1,4 +1,5 @@
 import { withFishing } from '../game/fishing';
+import { KEEP_SITE, withKeepDoor } from '../game/keep';
 import Phaser from 'phaser';
 import { BALANCE, type GameState } from '../game/state';
 import { newsBetween } from '../game/news';
@@ -19,6 +20,7 @@ import { ENDING_FADE_MS } from '../ui/ending';
 import { SceneEffects } from './SceneEffects';
 import { SceneLighting } from './SceneLighting';
 import { NightWatch } from './sleepReplay';
+import { DoorFade, doorFadeFor, viewZoom } from './doorFade';
 import { newlyStayed, newlyWon, type NameTarget } from '../game/names';
 import { unnamedAnimalAt } from './animalTap';
 import { hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from './tapTarget';
@@ -53,6 +55,11 @@ export class GameScene extends Phaser.Scene {
   private areaShown = '';
   private needsArmed: ReadonlySet<NeedAlert> = new Set(ALL_NEED_ALERTS);
   private readonly nightWatch = new NightWatch();
+  private readonly doorFade = new DoorFade();
+  private fadeCover!: Phaser.GameObjects.Rectangle;
+  /** Going in at the keep's door: it happens once the screen is black, so morning doesn't show before the fade does. */
+  private pendingDoor?: GameAction;
+  private viewShown = false;
 
   constructor(state: GameState, onStateChange: (state: GameState, cause: 'action' | 'tick') => void, onFeedback: (message: string) => void, onSound: (cue: SoundCue) => void = () => undefined) {
     super({ key: 'GameScene' });
@@ -76,6 +83,10 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.roundPixels = true;
     // The phone viewport can be set before the scene boots, so take the size the game already has.
     this.lighting = new SceneLighting(this, this.scale.gameSize.width, this.scale.gameSize.height);
+    const { width, height } = this.scale.gameSize;
+    // Well over the size of the screen, since the view from the keep pulls the camera back and a rotated phone is wider.
+    this.fadeCover = this.add.rectangle(width / 2, height / 2, BALANCE.mapWidth * TILE * 6, BALANCE.mapWidth * TILE * 6, 0x000000)
+      .setScrollFactor(0).setDepth(WEATHER_DEPTH + 2).setVisible(false);
     this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,F,R,Q,T,P,C,G,Z,L,O,X,V') as Record<string, Phaser.Input.Keyboard.Key>;
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       const over = this.unnamedAnimalUnder(pointer.worldX, pointer.worldY);
@@ -93,19 +104,22 @@ export class GameScene extends Phaser.Scene {
     if (document.hidden || !this.keys) return;
     if (shownTerrainKey(this.state) !== this.terrainShown) this.redrawTerrain();
     const dt = Math.min(delta / 1000, 0.05);
+    this.updateDoorFade(this.time.now);
     const walking = this.walkFromKeys(dt);
     const tapWalking = this.walkTowardTarget(dt);
     this.handleActionKeys();
     const beforeTick = this.state;
     // While a sleep plays out, the replay sets the clock instead of the tick.
-    const written = this.nightWatch.tick(this.time.now, () => recordJournal(beforeTick, advanceLiveTime(this.state, dt)));
+    // From going in at the keep's door until it has happened, the clock waits, so night or dawn can't get there first.
+    const written = this.nightWatch.tick(this.time.now, () => (this.pendingDoor ? { state: this.state, messages: [] } : recordJournal(beforeTick, advanceLiveTime(this.state, dt))));
     this.state = written.state;
     this.reportWeather(beforeTick, this.state, written.messages);
     this.syncPlayerSprite(walking || tapWalking);
     this.paintObjects();
     this.ambient.update(this.state, dt, this.time.now);
     this.effects.update(this.state, this.time.now);
-    this.lighting.update(this.state, this.time.now, this.nightWatch.sunriseAgeMs(this.time.now));
+    if (this.viewShown) this.lighting.hide();
+    else this.lighting.update(this.state, this.time.now, this.nightWatch.sunriseAgeMs(this.time.now));
     this.hudElapsed += delta;
     if (this.hudElapsed >= 250) {
       this.onStateChange(this.state, 'tick');
@@ -137,6 +151,7 @@ export class GameScene extends Phaser.Scene {
 
   /** E uses whatever is in reach, as a tap on it would. */
   private pressUse(): void {
+    if (this.doorFading()) return;
     const action = useKeyAction(this.state);
     if (action) this.perform(action);
     else {
@@ -146,6 +161,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private pressChop(): void {
+    if (this.doorFading()) return;
     const tree = closestTree(this.state);
     if (tree) this.perform({ type: 'chopTree', treeId: tree.id });
     else {
@@ -168,7 +184,7 @@ export class GameScene extends Phaser.Scene {
     const nudge = effectPose(visual.effect, now);
     this.playerSprite.setPosition(Math.round(worldX(this.state.player.x)) + nudge.dx, Math.round(worldY(this.state.player.y)) + nudge.dy);
     this.playerSprite.setRotation(nudge.rotation);
-    if (visual.puff && puffDue(this.lastPuffMs, now)) {
+    if (visual.puff && !this.doorFading() && puffDue(this.lastPuffMs, now)) {
       this.lastPuffMs = now;
       this.letOutPuff(visual.puff);
     }
@@ -201,10 +217,51 @@ export class GameScene extends Phaser.Scene {
 
   perform(requested: GameAction, announce = true): void {
     // The sidebar's buttons still click while the game is paused; nothing should happen.
-    if (this.scene.isPaused() || this.nightWatch.running) return;
+    if (this.scene.isPaused() || this.nightWatch.running || this.doorFading()) return;
     // A visit to the frozen spring with a line is a go at fishing, and fishing needs a roll of chance.
-    const action = withFishing(this.state, requested, Math.random());
+    // The keep's door means whatever it means as the survivor reaches it.
+    const action = withKeepDoor(this.state, withFishing(this.state, requested, Math.random()));
     if (action.type !== 'move') this.walkTarget = nextWalk(this.walkTarget, { kind: 'action' });
+    const fade = doorFadeFor(action, this.state);
+    if (fade) {
+      this.doorFade.begin(fade, this.time.now);
+      this.pendingDoor = action;
+      return;
+    }
+    this.carryOut(action, announce);
+  }
+
+  /** The fade at the keep's door, each frame. Everything it changes is put back as soon as it stops running, so a late frame can't leave it moved. */
+  private updateDoorFade(now: number): void {
+    if (this.pendingDoor && (this.doorFade.hold(now) || !this.doorFade.running(now))) {
+      const action = this.pendingDoor;
+      this.pendingDoor = undefined;
+      this.carryOut(action, true);
+    }
+    const running = this.doorFade.running(now);
+    this.fadeCover.setVisible(running).setAlpha(this.doorFade.alpha(now));
+    this.playerSprite.setVisible(!running);
+    const viewing = this.doorFade.viewing(now);
+    if (viewing === this.viewShown) return;
+    this.viewShown = viewing;
+    const camera = this.cameras.main;
+    if (viewing) {
+      const mapHeight = BALANCE.mapHeight * TILE;
+      camera.stopFollow();
+      camera.setZoom(viewZoom(camera.width, camera.height, BALANCE.mapWidth * TILE, mapHeight));
+      camera.centerOn(worldX(KEEP_SITE.x), mapHeight / 2);
+    } else {
+      camera.setZoom(1);
+      camera.startFollow(this.playerSprite, true, 0.09, 0.09);
+      camera.centerOn(this.playerSprite.x, this.playerSprite.y);
+    }
+  }
+
+  private doorFading(): boolean {
+    return this.doorFade.running(this.time.now);
+  }
+
+  private carryOut(action: GameAction, announce: boolean): void {
     const before = this.state;
     const result = applyAction(before, action);
     const written = recordJournal(before, result.state, action);
@@ -231,7 +288,7 @@ export class GameScene extends Phaser.Scene {
   private showActionDone(action: GameAction, before: GameState): void {
     const spot = gatherSpot(action, before);
     if (spot) this.onSound('gather');
-    if (action.type === 'build' || action.type === 'decorate' || action.type === 'buildMine') this.onSound('build');
+    if (action.type === 'build' || action.type === 'decorate' || action.type === 'buildMine' || action.type === 'layStone' || action.type === 'hangDoor') this.onSound('build');
     if (spot) this.effects?.trigger('gather', this.time.now, spot.x, spot.y, spot.kind);
     const effect = actionEffect(action, this.state);
     if (effect) this.effects?.trigger(effect.kind, this.time.now, effect.x, effect.y);
@@ -277,6 +334,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   visitNearestSite(): void {
+    if (this.doorFading()) return;
     const site = closestSite(this.state);
     if (site) this.perform({ type: 'visitSite', siteId: site.id });
     else {
@@ -304,7 +362,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleTap(pixelX: number, pixelY: number): void {
-    if (!this.tapGate()) return;
+    if (!this.tapGate() || this.doorFading()) return;
     const animal = this.unnamedAnimalUnder(pixelX, pixelY);
     if (animal) {
       this.walkTarget = undefined;

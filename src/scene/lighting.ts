@@ -6,6 +6,7 @@ import { coldNightApproach } from '../game/coldNight';
 import { palette } from '../art/palette';
 import { darkness } from './ambient';
 import { fireplaceBurning } from '../game/home';
+import { keepFinished } from '../game/keep';
 
 export interface LightingTint { color: number; alpha: number }
 export interface LightRadii { inner: number; middle: number; outer: number }
@@ -85,6 +86,15 @@ export function houseGlow(state: GameState): LightRadii | null {
   if (state.area !== 'camp' || !fireplaceBurning(state)) return null;
   return { inner: 5, middle: 11, outer: 18 };
 }
+
+/** The keep's lit window lets a little light through the night, seen from anywhere on the hills. */
+export function keepWindowGlow(state: GameState): LightRadii | null {
+  if (state.area !== 'hills' || !keepFinished(state) || state.timeOfDay < nightStart(state.day)) return null;
+  return { inner: 3, middle: 6, outer: 10 };
+}
+
+/** Where the keep's light sits, in world pixels from the door: the middle window, straight up the wall. */
+export const KEEP_WINDOW_OFFSET = { x: 0, y: -65 } as const;
 
 /** Where the house's light sits, in world pixels from the house's foot: the window, 6 across and 9 up. */
 export const HOUSE_WINDOW_OFFSET = { x: 6, y: -9 } as const;

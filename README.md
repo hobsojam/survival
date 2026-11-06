@@ -268,14 +268,32 @@ Once you've found the old quarry, the path carries on past it, out of the quarry
 
 **Ore.** A rocky outcrop near the top has rust-red streaks in it. With your pickaxe it gives three ore a day, one at a time. Ore is as heavy as stone and has no use until you have a forge. You can set it down and pick it up again, as you can stone.
 
-**The forge.** Once you've found ore and the workshop stands, you can add a **forge** to the workshop for two wood and six stone. It keeps up to twelve ore, which goes to it by itself whenever you're in the clearing, and it makes two things, once each:
+**The forge.** Once you've found ore and the workshop stands, you can add a **forge** to the workshop for two wood and six stone. It keeps up to twelve ore, which goes to it by itself whenever you're in the clearing, and it makes three things, once each:
 
 - **Iron pickaxe** (one wood, three ore): each dig at the quarry face gives two stone instead of one. It changes nothing else.
 - **Horseshoes** (one wood, two ore; needs the pony): the pony can come with you.
+- **Iron hinges** (one wood, two ore): for the door of the keep. See **The keep**.
 
 **The pony.** A shaggy wild pony grazes on the hills by day. If you come too close it ambles off, which costs nothing. Offer it an apple or vegetables, once a day, from a little way off. After four offers it's won over and follows you home, and you can give it a name, as you can the other animals. It looks after itself: it needs no feed, can't get ill and won't leave.
 
 Until it's shod, the pony stays at camp, because its hooves can't take the stony path. Once it's shod it walks beside you by day wherever you go, with packs on its back, and adds eight spaces to your bag. It won't go up on the hills in the snow, and waits at the foot of the path. Its spaces go with it, and it goes home to camp at nightfall. If your bag is over its limit while the pony is elsewhere, nothing is lost; you just can't pick up more until there's room.
+
+### The keep
+
+Once the forge stands, a square of pegs and twine marks a place to build at the top of the hills path: one tall stone tower, raised a stone at a time. It's mostly something to look at. You never have to build it or use it, and it needs no upkeep.
+
+**Laying stone.** Carry stone up from the quarry in your bag, and lay it by the site, one at a time. Each stone takes half the time and energy of a dig. The camp's stone pile is too far off to use. A stone counts as soon as it's laid, and the tower grows taller every four or so. It takes sixty in all, and you can leave it half-built for as long as you like.
+
+**The door.** At twenty-four stones the walls stop at head height until the door is hung. It needs the iron hinges from the forge and four wood, which can come from your bag or from the stores at camp.
+
+**The finished keep.** When the last stone goes on, the scaffolding comes down, and one window shows a light at night. Tap the door, or press E beside it, to go in:
+
+- **At night** you sleep until morning. It's a full night's rest in a bed, as warm and safe as the house whatever the fires at camp are doing, and it takes no fuel. If you're sick, it counts as a warm rest. A wolf at the dark camp takes nothing from your bag while you're in the keep, and your bird won't wake you up here. Camp carries on as it does on any night you're out.
+- **By day** you climb to the top for a look over the hills, which costs no energy. It gives you nothing but a line in the journal.
+
+**The pony.** Once the keep is finished, a shod pony that's with you on the hills as night falls stays beside the keep overnight instead of going home, so you still have it and its spaces in the morning. In winter it still waits at the foot of the path.
+
+The keep has no cooking, resting spot or stores. Home is still home.
 
 ## Saving
 

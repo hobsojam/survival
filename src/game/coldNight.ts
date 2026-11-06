@@ -1,4 +1,5 @@
 import { afternoonStart, nightStart } from './calendar';
+import { inKeep } from './keep';
 import { isColdNight } from './rules';
 import type { GameState } from './state';
 
@@ -28,6 +29,7 @@ export function coldNightWarning(before: GameState, after: GameState): string | 
 export function coldNightMessage(before: GameState, after: GameState): string | null {
   if (!isColdNight(before) && isColdNight(after)) return 'The cold night is here. Keep the fire alive until dawn.';
   if (!isColdNight(before) || isColdNight(after)) return null;
+  if (inKeep(before)) return `You slept through the cold night in the keep. Another comes on day ${after.progress.nextStormDay}.`;
   return after.progress.hearthUnlocked
     ? 'The fire held through the cold night. The stone hearth is now unlocked.'
     : `The fire went out in the night. Rest today; another cold night comes on day ${after.progress.nextStormDay}.`;
@@ -35,6 +37,6 @@ export function coldNightMessage(before: GameState, after: GameState): string | 
 
 /** What the morning after the cold night looks like: a warm sunrise if the fire held, frost if it went out. */
 export function dawnEffect(before: GameState, after: GameState): 'sunrise' | 'frost' | null {
-  if (!isColdNight(before) || isColdNight(after)) return null;
+  if (!isColdNight(before) || isColdNight(after) || inKeep(before)) return null;
   return after.progress.hearthUnlocked ? 'sunrise' : 'frost';
 }

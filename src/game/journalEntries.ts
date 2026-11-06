@@ -1,3 +1,4 @@
+import { inKeep } from './keep';
 import { duskLength, nightStart, season, seasonMessage, yearOf, type Season } from './calendar';
 import { defaultDish, type DishId } from './cooking';
 import { keepsakeStock } from './companion';
@@ -22,6 +23,8 @@ export type JournalId =
   | 'hazelnuts' | 'pineTea' | 'salad' | 'wildHoney' | 'fireside' | 'grainIn' | 'winterBread'
   | 'autumnGrain' | 'summerBread' | 'ovenBread' | 'shearing' | 'orchardApple'
   | 'hillsAutumn' | 'hillsWinter' | 'hillsSpring' | 'hillsSummer'
+  | 'keepViewAutumn' | 'keepViewWinter' | 'keepViewSpring' | 'keepViewSummer'
+  | 'keepFinishedAutumn' | 'keepFinishedWinter' | 'keepFinishedSpring' | 'keepFinishedSummer'
   | 'autumnKeepsake' | 'winterKeepsake' | 'springKeepsake' | 'summerKeepsake'
   | 'namedAutumn' | 'namedWinter' | 'namedSpring' | 'namedSummer';
 
@@ -40,6 +43,8 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'leaves', lines: ['The first leaves came down over camp.'] },
     { id: 'orchardApple', lines: ['Picked an apple from a tree I grew myself.'] },
     { id: 'hillsAutumn', lines: ['The bracken has gone rusty up on the hills.'] },
+    { id: 'keepViewAutumn', lines: ['From the top of the keep, the woods have all turned.'] },
+    { id: 'keepFinishedAutumn', lines: ['Laid the last stone on the keep.'] },
     { id: 'fox', lines: ['A fox nosed around the berry bushes at dusk.'] },
     { id: 'coldFront', lines: ['The cold night came. I kept the fire through it.', 'The cold night came, and it got the better of me.',
       'A cold autumn night, and the fire kept me warm.'] },
@@ -60,6 +65,8 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
       'Cooked a warm supper by the fire, with the snow coming down.'] },
     { id: 'pineTea', lines: ['Pine needle tea, hot in the snow.'] },
     { id: 'hillsWinter', lines: ['Snow on the hills.'] },
+    { id: 'keepViewWinter', lines: ['Snow as far as I can see from the top of the keep.'] },
+    { id: 'keepFinishedWinter', lines: ['Laid the last stone on the keep.'] },
     { id: 'winterBread', lines: ['Bread from my own field, warm by the fire.'] },
     { id: 'winterKeepsake', lines: ['A feather by the fire, bright against the snow.', 'A tuft of fur by the fire, frost on its tips.'] },
     { id: 'namedWinter', lines: ['{name} and I agreed that it was cold.'] }
@@ -68,6 +75,8 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'firstRain', lines: ['The first rain of spring.'], silent: true },
     { id: 'rabbits', lines: ['Rabbits in the meadow.'] },
     { id: 'hillsSpring', lines: ['Gorse in flower on the hills.'] },
+    { id: 'keepViewSpring', lines: ['From the top of the keep, the gorse is out all the way down.'] },
+    { id: 'keepFinishedSpring', lines: ['Laid the last stone on the keep.'] },
     { id: 'bushesFull', lines: ['The bushes are full again.'] },
     { id: 'stumpGrowing', lines: ['A stump I cut is growing back already.'] },
     { id: 'springRest', lines: ['Sat a while at the spring, now that it\'s thawed.'] },
@@ -88,6 +97,8 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'grainIn', lines: ['Brought the grain in. The granary smells of summer.'] },
     { id: 'summerBread', lines: ['The first loaf from the new grain, still warm.'] },
     { id: 'hillsSummer', lines: ['Heather out on the hills.'] },
+    { id: 'keepViewSummer', lines: ['Heather as far as I can see from the top of the keep.'] },
+    { id: 'keepFinishedSummer', lines: ['Laid the last stone on the keep.'] },
     { id: 'summerKeepsake', lines: ['A feather by the fire on a warm morning.', 'A wisp of fur by the fire on a warm morning.'] },
     { id: 'namedSummer', lines: ['A long warm evening with {name}. Neither of us did much.'] }
   ]
@@ -126,9 +137,13 @@ const atSpring = (m: Moment): boolean => ((m.action?.type === 'visitSite' && m.a
 /** A strip threshed that put grain into the granary, not into a granary already full. */
 const grainWentIn = (m: Moment): boolean => acted(m, 'threshStrip') && m.after.field.grain > m.before.field.grain;
 
-/** A feather or a tuft of fur just picked up by the fire, told by its own line. */
+/** The last stone just laid on the keep. */
+const keepJustFinished = (m: Moment): Noticed | null => onBefore(m, acted(m, 'layStone') && m.before.keep.finishedDay === null && m.after.keep.finishedDay !== null);
+/** A climb to the top of the keep. */
+const lookedOut = (m: Moment): Noticed | null => onBefore(m, acted(m, 'climbKeep'));
 const upOnHills = (m: Moment): Noticed | null => onAfter(m, awake(m) && m.after.area === 'hills' && daylight(m.after));
 
+/** A feather or a tuft of fur just picked up by the fire, told by its own line. */
 function keepsakeFound(m: Moment): Noticed | null {
   if (keepsakeStock(m.after, 'feather') > keepsakeStock(m.before, 'feather')) return { day: m.after.day, variant: 0 };
   return keepsakeStock(m.after, 'fur') > keepsakeStock(m.before, 'fur') ? { day: m.after.day, variant: 1 } : null;
@@ -159,7 +174,7 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   leaves: m => onAfter(m, awake(m) && m.before.timeOfDay >= 30 && isInClearing(m.after) && daylight(m.after)),
   fox: m => onAfter(m, awake(m) && isInClearing(m.after) && atDusk(m.after)),
   coldFront: m => {
-    if (isColdNight(m.before) && !isColdNight(m.after)) return { day: m.before.day, variant: m.after.progress.hearthUnlocked ? 0 : 1, silent: true };
+    if (isColdNight(m.before) && !isColdNight(m.after)) return inKeep(m.before) ? null : { day: m.before.day, variant: m.after.progress.hearthUnlocked ? 0 : 1, silent: true };
     // Once the cold night is long weathered, any autumn night kept warm at home fills its place in later years.
     const weathered = m.before.progress.hearthUnlocked && m.before.progress.nextStormDay === null;
     return dawn(m) && weathered && isAtHome(m.before) && fuelLeft(m.before) > 0 ? { day: m.before.day, variant: 2 } : null;
@@ -185,7 +200,7 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   twoHandfuls: m => onBefore(m, m.action?.type === 'gather' && berries(m.after) - berries(m.before) === 2),
   goldEvening: m => onAfter(m, awake(m) && isInClearing(m.after) && m.before.day === m.after.day
     && daylight(m.before) && !daylight(m.after)),
-  warmSleep: m => onBefore(m, acted(m, 'sleep') && !livesInHouse(m.before) && warmFuel(m.after) === 0),
+  warmSleep: m => onBefore(m, acted(m, 'sleep') && !livesInHouse(m.before) && !inKeep(m.before) && warmFuel(m.after) === 0),
   lookoutEvening: m => onAfter(m, awake(m) && m.after.progress.lookoutRepaired && m.after.area === 'camp'
     && within(m.after, LOOKOUT, 2) && atDusk(m.after)),
   hazelnuts: m => onBefore(m, gathered(m, 'hazelnut')),
@@ -199,6 +214,14 @@ const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   hillsWinter: upOnHills,
   hillsSpring: upOnHills,
   hillsSummer: upOnHills,
+  keepViewAutumn: lookedOut,
+  keepFinishedAutumn: keepJustFinished,
+  keepViewWinter: lookedOut,
+  keepFinishedWinter: keepJustFinished,
+  keepViewSpring: lookedOut,
+  keepFinishedSpring: keepJustFinished,
+  keepViewSummer: lookedOut,
+  keepFinishedSummer: keepJustFinished,
   orchardApple: m => onBefore(m, acted(m, 'pickOrchardApple') && m.after.orchard !== m.before.orchard),
   autumnGrain: m => onBefore(m, grainWentIn(m)),
   // A loaf is told on summer's page or winter's, each with its own line.

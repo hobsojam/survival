@@ -1,6 +1,7 @@
 import { BALANCE } from '../game/state';
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT } from '../game/areas';
 import { HILLS_EXIT, QUARRY_HILLS_EXIT } from '../game/hills';
+import { KEEP_SITE } from '../game/keep';
 
 /** A path runs between two tile centres: [fromX, fromY, toX, toY]. */
 export type PathRoute = readonly [number, number, number, number];
@@ -24,8 +25,8 @@ export const QUARRY_PATHS: readonly PathRoute[] = [[19, 14, QUARRY_EXIT.x, QUARR
 /** The old homestead's entrance reaches an open yard from the west edge. */
 /** The way on from the quarry floor to the hills, leaving by the west edge. */
 export const QUARRY_HILLS_PATHS: readonly PathRoute[] = [[QUARRY_HILLS_EXIT.x - 1, QUARRY_HILLS_EXIT.y, QUARRY_HILLS_EXIT.x, QUARRY_HILLS_EXIT.y], [QUARRY_HILLS_EXIT.x, QUARRY_HILLS_EXIT.y, 10, 18], [10, 18, 19, 17]];
-/** The path up the hills from their east edge to the outcrop. */
-export const HILLS_PATHS: readonly PathRoute[] = [[HILLS_EXIT.x + 1, HILLS_EXIT.y, HILLS_EXIT.x, HILLS_EXIT.y], [HILLS_EXIT.x, HILLS_EXIT.y, 26, 13], [26, 13, 12, 9]];
+/** The path up the hills from their east edge to the outcrop, with a short way up to the keep's door. */
+export const HILLS_PATHS: readonly PathRoute[] = [[HILLS_EXIT.x + 1, HILLS_EXIT.y, HILLS_EXIT.x, HILLS_EXIT.y], [HILLS_EXIT.x, HILLS_EXIT.y, 26, 13], [26, 13, 12, 9], [KEEP_SITE.x, KEEP_SITE.y + 1, KEEP_SITE.x, KEEP_SITE.y]];
 export const HOMESTEAD_PATHS: readonly PathRoute[] = [[HOMESTEAD_EXIT.x - 1, HOMESTEAD_EXIT.y, 19, 15], [19, 15, 24, 15]];
 
 /** Signposts beside each end of the west path: one at the quarry pointing home, one at camp pointing to the quarry. */

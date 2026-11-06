@@ -1,5 +1,6 @@
 import { isAtCamp } from './camp';
 import { fuelLeft, isAtHome, livesInHouse } from './home';
+import { inKeep } from './keep';
 import { BALANCE, type GameState } from './state';
 
 // Going a whole day without food makes the survivor sick. Sickness wears them down until it is cared for:
@@ -54,8 +55,9 @@ export function markWarmMeal(state: GameState): GameState {
   return state.sickness.sick ? { ...state, sickness: { ...state.sickness, ateWarm: true } } : state;
 }
 
-/** Resting or sleeping here is warm: by the lit fireplace at home, or by the burning campfire. */
+/** Resting or sleeping here is warm: by the lit fireplace at home, by the burning campfire, or in the keep. */
 export function isWarmRestHere(state: GameState): boolean {
+  if (inKeep(state)) return true;
   return livesInHouse(state) ? isAtHome(state) && fuelLeft(state) > 0 : isAtCamp(state) && state.fireFuel > 0;
 }
 

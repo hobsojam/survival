@@ -4,7 +4,9 @@ import { isAtCamp, isInClearing, mineBlocker, sleepBlocker, type GameAction } fr
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, pathOpen } from '../game/areas';
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
 import { HILLS_EXIT, OUTCROP_SITE, outcropNote } from '../game/hills';
+import { KEEP_DOOR_WOOD, KEEP_SITE, KEEP_STONES, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor } from '../game/keep';
 import { ponyNote, ponyOfferLabel } from '../game/pony';
+import { availableWood } from '../game/wood';
 import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
 import { ORCHARD_SPOTS, nearestSpot, spotAction, treeBears, treeStage } from '../game/orchard';
 import { choppableTrees, isClearingStump } from '../game/clearing';
@@ -24,7 +26,7 @@ export const KEY_ACTIONS: readonly [string, GameAction][] = [
 
 const ACTION_POSES: Partial<Record<GameAction['type'], SurvivorAction>> = {
   gather: 'gather', rest: 'rest', cook: 'cook', stargaze: 'stargaze',
-  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', digOre: 'gather', offerPony: 'gather', fish: 'gather',
+  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', digOre: 'gather', layStone: 'gather', hangDoor: 'gather', offerPony: 'gather', fish: 'gather',
   gatherApples: 'gather', plantPip: 'gather', pickOrchardApple: 'gather', searchShed: 'gather', takeEgg: 'gather'
 };
 
@@ -137,6 +139,7 @@ export function useKeyAction(state: GameState): GameAction | undefined {
 export function actionEffect(action: GameAction, after: GameState): { kind: 'dust' | 'cook' | 'stargaze'; x: number; y: number } | undefined {
   if (action.type === 'digQuarry') return { kind: 'dust', ...QUARRY_SITE };
   if (action.type === 'digOre') return { kind: 'dust', ...OUTCROP_SITE };
+  if (action.type === 'layStone' || action.type === 'hangDoor') return { kind: 'dust', ...KEEP_SITE };
   if (action.type === 'cook' || action.type === 'stargaze') return { kind: action.type, x: after.player.x, y: after.player.y };
   return undefined;
 }
@@ -249,15 +252,29 @@ export function lineToSay(before: GameState, after: GameState, message: string, 
   return announce || before.area !== after.area ? message : '';
 }
 
-/** Everything in reach in the quarry area: a loose pile first, then the rubble or the quarry face. */
+/** The keep, when the survivor is at it: what it wants next, or what they can do with it once it is finished. */
+function keepChoice(state: GameState): Choice | null {
+  if (!keepOpen(state) || !within(state, KEEP_SITE)) return null;
+  if (keepFinished(state)) return { label: withKeepDoor(state, { type: 'enterKeep' }).type === 'sleep' ? 'Sleep in the keep until morning' : 'Climb to the top', action: { type: 'enterKeep' } };
+  if (!keepNeedsDoor(state)) {
+    return state.inventory.stone > 0
+      ? { label: `Lay a stone (${state.keep.stones}/${KEEP_STONES})`, action: { type: 'layStone' } }
+      : { label: 'Keep · bring stone up from the quarry' };
+  }
+  if (!state.progress.workshop.hinges) return { label: 'Keep · make iron hinges at the forge' };
+  return availableWood(state) < KEEP_DOOR_WOOD ? { label: `Keep · needs ${KEEP_DOOR_WOOD} wood for the door` } : { label: 'Hang the door', action: { type: 'hangDoor' } };
+}
+
 function hillsChoices(state: GameState): Choice[] {
   const found = closestGatherable(state);
+  const keep = keepChoice(state);
   const offer = ponyOfferLabel(state);
   const note = ponyNote(state);
   const outcrop = !found && within(state, OUTCROP_SITE) ? outcropNote(state) : null;
   return [
     ...(found ? [gatherChoice(state, found)] : []),
     ...(outcrop ? [{ label: outcrop }] : []),
+    ...(keep ? [keep] : []),
     ...(offer ? [{ label: offer, action: { type: 'offerPony' as const } }] : []),
     ...(note ? [{ label: note }] : [])
   ];
@@ -270,6 +287,7 @@ function hillsPrompt(state: GameState): string {
   return 'WASD / arrows  Move';
 }
 
+/** Everything in reach in the quarry area: a loose pile first, then the rubble or the quarry face. */
 function quarryChoices(state: GameState): Choice[] {
   const found = closestGatherable(state);
   if (!found && within(state, QUARRY_SITE) && !mineBlocker(state)) return [{ label: 'Build timber mine', action: { type: 'buildMine' } }];

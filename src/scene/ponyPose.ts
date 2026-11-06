@@ -7,6 +7,9 @@ import type { GameState } from '../game/state';
 /** Where the pony grazes at camp: open grass south-east of the fire, in nobody's way. */
 export const PONY_HOME = { x: 33, y: 21 } as const;
 
+/** Where the shod pony stands overnight by the finished keep: beside its wall, off the path. */
+export const KEEP_PONY = { x: 21, y: 10 } as const;
+
 export interface PonyPose { x: number; y: number; frame: string; facing: 1 | -1 }
 
 const GRAZE_MS = 900;
@@ -31,5 +34,6 @@ export function ponyPoseFor(state: GameState, timeMs: number, facing: 1 | -1, mo
   if (pony.shod === null) return area === 'camp' ? homeNow : null;
   if (area === 'camp' && timeOfDay >= nightStart(day)) return { ...PONY_HOME, frame: 'pony:loadStand', facing: -1 };
   if (area === 'hills' && isWinter(day)) return null;
+  if (area === 'hills' && timeOfDay >= nightStart(day) && state.keep.ponyNight === day) return { ...KEEP_PONY, frame: 'pony:loadStand', facing: -1 };
   return ponyWith(state) ? beside(state, timeMs, facing, moving, true) : null;
 }

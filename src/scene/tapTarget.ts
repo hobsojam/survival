@@ -6,6 +6,8 @@ import { sprites } from '../art/sprites';
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, hillsPathOpen, pathOpen } from '../game/areas';
 import { wildPonyAt } from '../game/pony';
 import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, outcropLeft } from '../game/hills';
+import { KEEP_SITE, keepFinished, keepNeedsDoor } from '../game/keep';
+import { keepFrame } from './visuals';
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
 import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
 import { ORCHARD_SPOTS, spotAction, treeStage } from '../game/orchard';
@@ -23,6 +25,7 @@ export type TapTarget =
   | { kind: 'rubble'; x: number; y: number }
   | { kind: 'outcrop'; x: number; y: number }
   | { kind: 'pony'; x: number; y: number }
+  | { kind: 'keepSite' | 'keepHang' | 'keepDoor'; x: number; y: number }
   | { kind: 'chickens'; x: number; y: number; action: 'meetChickens' | 'leadChickens' }
   | { kind: 'appleTree' | 'shed' | 'coop'; x: number; y: number }
   | { kind: 'orchard'; spot: number; x: number; y: number; action: GameAction | null }
@@ -50,13 +53,16 @@ export function nextWalk(_current: TapTarget | undefined, event: WalkEvent): Tap
 }
 
 /** How far a tap is from a target, in tiles. Anywhere on tall art (trees, the lookout) counts as within the hit radius. */
-function tapDistance(target: TapTarget, sprite: string | undefined, x: number, y: number): number {
+function tapDistance(target: TapTarget, sprite: string | undefined, x: number, y: number, frame?: string): number {
   const fromTile = distance(target.x, target.y, x, y);
   if (!sprite) return fromTile;
-  const { size, anchor } = sprites[sprite];
+  const { size, anchor, frames } = sprites[sprite];
   const left = target.x - anchor[0] / TILE_PIXELS;
+  // A picture that doesn't fill its canvas counts only from its own top row, so the grass above low walls stays grass.
+  const firstRow = frame ? Math.max(0, frames[frame].findIndex(row => /[^.]/.test(row))) : 0;
+  const artTop = target.y - (anchor[1] - firstRow) / TILE_PIXELS;
   const top = target.y - anchor[1] / TILE_PIXELS;
-  const onArt = x >= left && x <= left + size[0] / TILE_PIXELS && y >= top && y <= top + size[1] / TILE_PIXELS;
+  const onArt = x >= left && x <= left + size[0] / TILE_PIXELS && y >= artTop && y <= top + size[1] / TILE_PIXELS;
   // On the art, rank by distance from its middle so a pile at a tree's foot still wins a tap on itself.
   if (!onArt) return fromTile;
   const fromMiddle = distance(left + size[0] / TILE_PIXELS / 2, top + size[1] / TILE_PIXELS / 2, x, y);
@@ -73,11 +79,21 @@ function orchardTargets(state: GameState): { target: TapTarget; sprite?: string 
   });
 }
 
+/** The keep's one spot: what it asks for now. It can be tapped anywhere on the picture as it stands. */
+function keepTargets(state: GameState): { target: TapTarget; sprite?: string; frame?: string }[] {
+  const shown = keepFrame(state);
+  if (!shown) return [];
+  let kind: 'keepSite' | 'keepHang' | 'keepDoor' = 'keepSite';
+  if (keepFinished(state)) kind = 'keepDoor';
+  else if (keepNeedsDoor(state)) kind = 'keepHang';
+  return [{ target: { kind, ...KEEP_SITE }, sprite: 'keep', frame: shown.split(':')[1] }];
+}
+
 /** The closest interactive thing near the tap, or the tapped ground. */
 export function pickTapTarget(state: GameState, x: number, y: number): TapTarget {
   const piles = state.stonePiles.filter(pile => pile.area === state.area)
     .map(pile => ({ target: { kind: 'pile' as const, id: pile.id, x: pile.x, y: pile.y } }));
-  let candidates: { target: TapTarget; sprite?: string }[];
+  let candidates: { target: TapTarget; sprite?: string; frame?: string }[];
   if (state.area === 'quarry') {
     candidates = [...piles,
       { target: { kind: 'quarry', x: QUARRY_SITE.x, y: QUARRY_SITE.y }, sprite: 'quarry' },
@@ -88,6 +104,7 @@ export function pickTapTarget(state: GameState, x: number, y: number): TapTarget
     const wild = wildPonyAt(state);
     candidates = [...piles,
       { target: { kind: 'outcrop', ...OUTCROP_SITE }, sprite: 'outcrop' },
+      ...keepTargets(state),
       ...(wild ? [{ target: { kind: 'pony' as const, ...wild }, sprite: 'pony' }] : []),
       { target: { kind: 'crossing', ...HILLS_EXIT } }];
   } else if (state.area === 'homestead') {
@@ -111,7 +128,7 @@ export function pickTapTarget(state: GameState, x: number, y: number): TapTarget
     ];
   }
   const hit = candidates
-    .map(({ target, sprite }) => ({ target, away: tapDistance(target, sprite, x, y) }))
+    .map(({ target, sprite, frame }) => ({ target, away: tapDistance(target, sprite, x, y, frame) }))
     .filter(({ away }) => away <= TAP_HIT_RADIUS)
     .sort((a, b) => a.away - b.away)[0];
   return hit?.target ?? { kind: 'ground', x: clamp(x, BALANCE.mapWidth - 1), y: clamp(y, BALANCE.mapHeight - 1) };
@@ -168,6 +185,9 @@ export function targetAction(target: TapTarget): GameAction | null {
     case 'rubble': return { type: 'gatherRubble' };
     case 'outcrop': return { type: 'digOre' };
     case 'pony': return { type: 'offerPony' };
+    case 'keepSite': return { type: 'layStone' };
+    case 'keepHang': return { type: 'hangDoor' };
+    case 'keepDoor': return { type: 'enterKeep' };
     case 'chickens': return { type: target.action };
     case 'appleTree': return { type: 'gatherApples' };
     case 'shed': return { type: 'searchShed' };
