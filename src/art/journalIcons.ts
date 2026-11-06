@@ -29,7 +29,27 @@ const hillIcon = (slope: PaletteKey, mark: PaletteKey, top: readonly [string, st
   rows: ['..........', ...top, '.ssssss...', 'ssssssssss', 'ssssssssss', 'ssssssssss', 'ssssssssss', '..........']
 });
 
+/** The tower on a hill in its season's colour, from the top of which the lines are written. */
+const keepViewIcon = (slope: PaletteKey, mark: PaletteKey, top: string): JournalIcon => ({
+  legend: { s: slope, t: mark, b: 'stone2', d: 'stone0' },
+  rows: [top, '...b.b.b..', '...bbbbb..', '...bdbdb..', '...bbbbb..', '...bbdbb..', 'ssssssssss', 'ssssssssss', 'ssssssssss', '..........']
+});
+
+/** The finished tower with a last stone beside it, and a touch of the season in the corner. */
+const keepFinishedIcon = (accent: PaletteKey, top: string): JournalIcon => ({
+  legend: { x: accent, b: 'stone2', d: 'stone0', e: 'stone4' },
+  rows: [top, '..b.b.b...', '..bbbbb...', '..bdbdb...', '..bbbbb...', '..bbbbb...', '..bbdbb...', '..bbdbb.ee', '..bbdbb.ee', '..........']
+});
+
 export const JOURNAL_ICONS: Record<JournalId, JournalIcon> = {
+  keepViewAutumn: keepViewIcon('fox1', 'fox3', '.......t..'),
+  keepViewWinter: keepViewIcon('frost', 'paper', '.t.....t..'),
+  keepViewSpring: keepViewIcon('leaf2', 'flower1', '.t........'),
+  keepViewSummer: keepViewIcon('leaf2', 'flower3', '.t......t.'),
+  keepFinishedAutumn: keepFinishedIcon('fox3', '.......xx.'),
+  keepFinishedWinter: keepFinishedIcon('frost', '.x.....x..'),
+  keepFinishedSpring: keepFinishedIcon('flower1', '.x........'),
+  keepFinishedSummer: keepFinishedIcon('flower3', 'x........x'),
   hillsAutumn: hillIcon('fox1', 'fox3', ['.t.....t..', 'tt.t..tt.t', '.t..t..t..']),
   hillsWinter: hillIcon('frost', 'paper', ['...tt.....', '..tttt....', '.tttttt...']),
   hillsSpring: hillIcon('leaf2', 'flower1', ['..........', '..t...tt..', '.ttt.tttt.']),

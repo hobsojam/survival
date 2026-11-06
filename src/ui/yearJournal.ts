@@ -1,3 +1,4 @@
+import { keepFinished } from '../game/keep';
 import { SEASON_LENGTH, YEAR_LENGTH, seasonName, type Season } from '../game/calendar';
 import { keepsakesToCome } from '../game/companion';
 import { journalIconUrl } from '../art/journalIcons';
@@ -33,6 +34,10 @@ const NAMED_MOMENTS: ReadonlySet<JournalId> = new Set<JournalId>(['namedAutumn',
 
 const HILLS_MOMENTS: ReadonlySet<JournalId> = new Set<JournalId>(['hillsAutumn', 'hillsWinter', 'hillsSpring', 'hillsSummer']);
 
+const KEEP_VIEW_MOMENTS: ReadonlySet<JournalId> = new Set<JournalId>(['keepViewAutumn', 'keepViewWinter', 'keepViewSpring', 'keepViewSummer']);
+
+const KEEP_FINISHED_MOMENTS: ReadonlySet<JournalId> = new Set<JournalId>(['keepFinishedAutumn', 'keepFinishedWinter', 'keepFinishedSpring', 'keepFinishedSummer']);
+
 const KEEPSAKE_MOMENTS: ReadonlySet<JournalId> = new Set<JournalId>(['autumnKeepsake', 'winterKeepsake', 'springKeepsake', 'summerKeepsake']);
 
 /** One season's page of the year journal; pages before the first or after today show the nearest real one. */
@@ -50,6 +55,10 @@ export function journalPageView(state: GameState, page: number): JournalPageView
     if (NAMED_MOMENTS.has(entry.id)) return anyNamed(state) || state.journal.some(item => item.year === year && item.id === entry.id);
     // A line about the hills waits on them being found, and a page that has one keeps it.
     if (HILLS_MOMENTS.has(entry.id)) return state.progress.hillsFound || state.journal.some(item => item.year === year && item.id === entry.id);
+    const onPage = state.journal.some(item => item.year === year && item.id === entry.id);
+    // A view from the top waits on the keep being finished; the line for finishing it is never a blank, since it only happens once.
+    if (KEEP_VIEW_MOMENTS.has(entry.id)) return keepFinished(state) || onPage;
+    if (KEEP_FINISHED_MOMENTS.has(entry.id)) return onPage;
     const building = WAITS_ON[entry.id];
     return !building || state.structures[building];
   });

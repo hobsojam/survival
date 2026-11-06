@@ -87,3 +87,12 @@ export function climbKeepBlocker(state: GameState): string | null {
   if (!inKeep(state)) return 'Move closer to the keep door.';
   return state.timeOfDay >= nightStart(state.day) ? 'It is too dark to see anything from the top.' : null;
 }
+
+/** The mornings after the keep's first stone and its last. Each is worked out from the saved day, so it comes once. */
+export function keepNews(before: GameState, after: GameState): string[] {
+  if (after.day <= before.day) return [];
+  const notes: string[] = [];
+  if (after.keep.startedDay === before.day) notes.push('The keep has its first stone now.');
+  if (after.keep.finishedDay === before.day) notes.push('The keep stands finished on the hills this morning.');
+  return notes;
+}

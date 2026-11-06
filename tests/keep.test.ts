@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { JOURNAL_ICONS } from '../src/art/journalIcons';
 import { sprites } from '../src/art/sprites';
+import { journalEntry, recordJournal } from '../src/game/journalEntries';
+import { newsBetween } from '../src/game/news';
+import { journalPageView } from '../src/ui/yearJournal';
 import { keepWindowGlow } from '../src/scene/lighting';
 import { HILLS_PATHS, pathDistance } from '../src/scene/mapGeometry';
 import { KEEP_PONY, ponyPoseFor } from '../src/scene/ponyPose';
@@ -8,7 +12,7 @@ import { replaysSleep } from '../src/scene/sleepReplay';
 import { hasArrived, pickTapTarget, targetAction } from '../src/scene/tapTarget';
 import { keepFrame, sceneVisuals } from '../src/scene/visuals';
 import { STEP_IDS, placeBranches } from '../src/game/clearing';
-import { KEEP_DOOR_AT, KEEP_SITE, KEEP_STONES, hangDoorBlocker, inKeep, layStoneBlocker, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor, type KeepState } from '../src/game/keep';
+import { KEEP_DOOR_AT, KEEP_SITE, KEEP_STONES, hangDoorBlocker, inKeep, keepNews, layStoneBlocker, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor, type KeepState } from '../src/game/keep';
 import { HILLS_EXIT, OUTCROP_SITE } from '../src/game/hills';
 import { isAtHome } from '../src/game/home';
 import { alarmAfter } from '../src/game/companion';
@@ -554,5 +558,83 @@ describe('the keep on the map', () => {
     expect(actionEffect({ type: 'layStone' }, byKeep())).toEqual({ kind: 'dust', ...KEEP_SITE });
     expect(actionPose('layStone')).toBe(actionPose('digOre'));
     expect(actionPose('hangDoor')).toBe(actionPose('digOre'));
+  });
+});
+
+describe('the keep in the journal', () => {
+  const VIEWS = [
+    [2, 'keepViewAutumn', 'From the top of the keep, the woods have all turned.'],
+    [12, 'keepViewWinter', 'Snow as far as I can see from the top of the keep.'],
+    [22, 'keepViewSpring', 'From the top of the keep, the gorse is out all the way down.'],
+    [32, 'keepViewSummer', 'Heather as far as I can see from the top of the keep.']
+  ] as const;
+  const done = (changes: Changes = {}): GameState => byKeep({ hinges: true, keep: raised(60), timeOfDay: 40, ...changes });
+  const page = (day: number): number => Math.floor((day - 1) / 10);
+
+  it.each(VIEWS)('climbing on day %i writes %s', (day, id, line) => {
+    const before = done({ day });
+    const action = { type: 'climbKeep' } as const;
+    const written = recordJournal(before, applyAction(before, action).state, action);
+    expect(written.state.journal.some(entry => entry.id === id)).toBe(true);
+    expect(journalEntry(id)?.lines[0]).toBe(line);
+    expect(written.messages).toContain(`Written in your journal: ${line}`);
+  });
+
+  it('writes nothing for a climb that was refused', () => {
+    const before = done({ day: 2, timeOfDay: 190 });
+    const action = { type: 'climbKeep' } as const;
+    expect(recordJournal(before, applyAction(before, action).state, action).state.journal.some(entry => entry.id === 'keepViewAutumn')).toBe(false);
+  });
+
+  it.each([[2, 'keepFinishedAutumn'], [12, 'keepFinishedWinter'], [22, 'keepFinishedSpring'], [32, 'keepFinishedSummer']] as const)('finishing on day %i writes %s', (day, id) => {
+    const before = byKeep({ day, hinges: true, keep: raised(59), timeOfDay: 40 });
+    const action = { type: 'layStone' } as const;
+    const written = recordJournal(before, applyAction(before, action).state, action);
+    expect(written.state.journal.some(entry => entry.id === id)).toBe(true);
+    expect(journalEntry(id)?.lines[0]).toBe('Laid the last stone on the keep.');
+  });
+
+  it('writes no finishing line for an ordinary stone', () => {
+    const before = byKeep({ day: 2, hinges: true, keep: raised(30), timeOfDay: 40 });
+    const action = { type: 'layStone' } as const;
+    expect(recordJournal(before, applyAction(before, action).state, action).state.journal.some(entry => entry.id === 'keepFinishedAutumn')).toBe(false);
+  });
+
+  it('keeps the view lines off the page until the keep is finished', () => {
+    const blanks = (state: GameState): number => journalPageView(state, page(state.day)).blanks;
+    const bare = byKeep({ day: 2 });
+    expect(blanks(byKeep({ day: 2, hinges: true, keep: raised(30) }))).toBe(blanks(bare));
+    expect(blanks(done({ day: 2 }))).toBe(blanks(bare) + 1);
+  });
+
+  it('never shows the finishing line as a blank, only on its own page once written', () => {
+    const before = byKeep({ day: 2, hinges: true, keep: raised(59), timeOfDay: 40 });
+    const action = { type: 'layStone' } as const;
+    const { state } = recordJournal(before, applyAction(before, action).state, action);
+    const lines = (at: number): string[] => journalPageView(state, at).entries.map(entry => entry.line);
+    expect(lines(page(2))).toContain('Laid the last stone on the keep.');
+    expect(state.journal.filter(entry => entry.id.startsWith('keepFinished'))).toHaveLength(1);
+  });
+
+  it('keeps the blanks on later pages to the one view line', () => {
+    const later = (keep: Partial<KeepState>): GameState => byKeep({ day: 12, hinges: true, keep });
+    const before = journalPageView(later(raised(30)), page(12)).blanks;
+    expect(journalPageView(later(raised(60)), page(12)).blanks).toBe(before + 1);
+  });
+
+  it('gives each line its own icon', () => {
+    for (const id of ['keepViewAutumn', 'keepViewWinter', 'keepViewSpring', 'keepViewSummer', 'keepFinishedAutumn', 'keepFinishedWinter', 'keepFinishedSpring', 'keepFinishedSummer'] as const) expect(JOURNAL_ICONS[id]).toBeDefined();
+  });
+
+  it('notes the first stone and the finish, the next morning, once each', () => {
+    const first = lay(byKeep({ timeOfDay: 40 })).state;
+    const morning = { ...first, day: first.day + 1, timeOfDay: 0 };
+    expect(keepNews(first, morning)).toEqual(['The keep has its first stone now.']);
+    expect(keepNews(morning, { ...morning, day: morning.day + 1 })).toEqual([]);
+    const last = lay(byKeep({ hinges: true, keep: raised(59), timeOfDay: 40 })).state;
+    const after = { ...last, day: last.day + 1, timeOfDay: 0 };
+    expect(keepNews(last, after)).toEqual(['The keep stands finished on the hills this morning.']);
+    expect(newsBetween(last, after)).toContain('The keep stands finished on the hills this morning.');
+    expect(keepNews(last, last)).toEqual([]);
   });
 });
