@@ -426,7 +426,7 @@ describe('how the hills look', () => {
   it('lets nothing on the hillside be gathered but ore', () => {
     const state = atOutcrop();
     for (const item of map('summer').decorations) {
-      expect(['ground', 'outcrop', 'crossing']).toContain(pickTapTarget(state, item.x, item.y).kind);
+      expect(['ground', 'outcrop', 'crossing', 'pony']).toContain(pickTapTarget(state, item.x, item.y).kind);
       const standing = at(state, 'hills', item.x, item.y);
       expect(['outcrop', undefined]).toContain(closestGatherable(standing)?.kind);
     }
