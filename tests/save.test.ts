@@ -5,7 +5,7 @@ import { STEP_IDS, placeBranches } from '../src/game/clearing';
 import { autosaveDelayMs, loadGame, saveGame, SAVE_KEY, SAVE_VERSION } from '../src/game/save';
 import { carriedCount } from '../src/game/rules';
 import { stock } from './stock';
-import { emptyCastle, NEEDS, type CastleState } from '../src/game/castle';
+import { emptyCastle, moatFill, NEEDS, type CastleState } from '../src/game/castle';
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();
@@ -797,6 +797,27 @@ describe('the castle in the save', () => {
   const framesDone = (state: GameState) => { cartMade(state); state.castle.frames = NEEDS.frames; state.castle.doneDays.frames = 7; };
   const fullTower = { stones: 20, beams: 4, fittings: 2 };
 
+  it('accepts a moat dug in part, and one dug whole, and a mid-spring game fills the same after a reload', () => {
+    const dugIn = (stretches: number, dugDay: number | null) => (state: GameState) => {
+      cartMade(state); wallDone(state.castle);
+      state.castle.moat = { stretches, lastDugDay: 8, dugDay };
+      if (dugDay !== null) state.castle.doneDays.moat = dugDay;
+    };
+    expect(accepts(dugIn(5, null))).toBe(true);
+    expect(accepts(dugIn(16, 8))).toBe(true);
+    const storage = new MemoryStorage();
+    const state = camp(dugIn(16, 8));
+    state.day = 25;
+    expect(saveGame(storage, state).ok).toBe(true);
+    const loaded = loadGame(storage);
+    expect(loaded.kind).toBe('loaded');
+    if (loaded.kind !== 'loaded') return;
+    expect(moatFill(loaded.state)).toBe(moatFill(state));
+    expect(moatFill(loaded.state)).toBeGreaterThan(0);
+    expect(moatFill(loaded.state)).toBeLessThan(1);
+    expect(moatFill({ ...loaded.state, day: 31 })).toBe(1);
+  });
+
   it('accepts a revealed castle, and one still hidden', () => {
     expect(accepts()).toBe(true);
     expect(accepts(state => { state.castle = emptyCastle(); })).toBe(true);
@@ -810,7 +831,7 @@ describe('the castle in the save', () => {
       castle.road = 30; castle.doneDays = { road: 6 }; state.progress.workshop.stoneCart = true; state.progress.workshop.portcullis = true; wallDone(castle);
       castle.towers = { nw: { ...fullTower }, ne: { ...fullTower }, se: { ...fullTower }, sw: { ...fullTower } };
       castle.doneDays = { ...castle.doneDays, 'tower-nw': 8, 'tower-ne': 8, 'tower-se': 8, 'tower-sw': 8 };
-      castle.gatehouse = 30; castle.doneDays['gatehouse'] = 8; castle.moat = { stretches: 16, lastDugDay: 8, dugDay: 8 };
+      castle.gatehouse = 30; castle.doneDays['gatehouse'] = 8; castle.moat = { stretches: 16, lastDugDay: 8, dugDay: 8 }; castle.doneDays['moat'] = 8;
       castle.hall = { stones: 40, beams: 12, fittings: 6, hangings: 2 };
       castle.feast = { ...NEEDS.feast };
       castle.finishedDay = 9; castle.home = 'hall'; castle.offeredHome = true;
@@ -859,6 +880,11 @@ describe('the castle in the save', () => {
     ['gatehouse stones with no portcullis made', state => { cartMade(state); wallDone(state.castle); state.castle.gatehouse = 1; }],
     ['gatehouse stones before the wall is done', state => { cartMade(state); state.progress.workshop.portcullis = true; state.castle.gatehouse = 1; }],
     ['a gatehouse over its length', state => { cartMade(state); wallDone(state.castle); state.progress.workshop.portcullis = true; state.castle.gatehouse = 31; }],
+    ['a moat day with the moat unfinished', state => { cartMade(state); wallDone(state.castle); state.castle.moat = { stretches: 15, lastDugDay: 8, dugDay: null }; state.castle.doneDays.moat = 8; }],
+    ['a finished moat with no day', state => { cartMade(state); wallDone(state.castle); state.castle.moat = { stretches: 16, lastDugDay: 8, dugDay: 8 }; }],
+    ['a moat day that is not the day it was dug', state => { cartMade(state); wallDone(state.castle); state.castle.moat = { stretches: 16, lastDugDay: 8, dugDay: 8 }; state.castle.doneDays.moat = 7; }],
+    ['a dug moat day with the moat unfinished', state => { cartMade(state); wallDone(state.castle); state.castle.moat = { stretches: 15, lastDugDay: 8, dugDay: 8 }; }],
+    ['moat stretches before the wall is done', state => { state.castle.moat = { stretches: 1, lastDugDay: 8, dugDay: null }; }],
     ['bread over the feast\'s need', state => { state.castle.feast.bread = 5; }],
     ['a finish with every section short', state => { state.castle.finishedDay = 9; }],
     ['moving into the hall before the finish', state => { state.castle.home = 'hall'; }],

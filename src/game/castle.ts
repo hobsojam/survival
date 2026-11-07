@@ -1,3 +1,5 @@
+import { YEAR_LENGTH } from './calendar';
+import { rainWindow } from './rain';
 import type { GameState } from './state';
 
 // EASTER EGG: the castle after the keep is deliberately left out of the README and hidden on screen until the survivor
@@ -104,3 +106,58 @@ export const castleSeen = (castle: CastleState, day: number): CastleState => {
   if (castle.firstClimbDay === null) return { ...castle, firstClimbDay: day };
   return castle.revealedDay === null && day > castle.firstClimbDay ? { ...castle, revealedDay: day } : castle;
 };
+
+/**
+ * The moat's ring, one tile outside the curtain wall, clockwise from the gatehouse on the east side. A bank of land is left
+ * where the road crosses it at the gate and where the path to the outcrop crosses it on the west. Each tile belongs to one of
+ * the sixteen stretches, which share the tiles out evenly.
+ */
+export const MOAT_TILES: readonly { x: number; y: number; stretch: number }[] = (() => {
+  const { left, right, top, bottom } = { left: WALLS.left - 1, right: WALLS.right + 1, top: WALLS.top - 1, bottom: WALLS.bottom + 1 };
+  const range = (from: number, to: number): number[] => Array.from({ length: Math.abs(to - from) + 1 }, (_, i) => from + Math.sign(to - from) * i);
+  const gate = (y: number): boolean => y >= 11 && y <= 13;
+  const path = (y: number): boolean => y >= 8 && y <= 10;
+  const ring = [
+    ...range(14, bottom).map(y => ({ x: right, y })),
+    ...range(right - 1, left).map(x => ({ x, y: bottom })),
+    ...range(bottom - 1, top).filter(y => !path(y)).map(y => ({ x: left, y })),
+    ...range(left + 1, right).map(x => ({ x, y: top })),
+    ...range(top + 1, 10).map(y => ({ x: right, y }))
+  ].filter(tile => tile.x !== right || !gate(tile.y));
+  return ring.map((tile, i) => ({ ...tile, stretch: Math.floor(i * NEEDS.moat / ring.length) }));
+})();
+
+/** Where a stretch of the moat is dug from: the middle of its run of tiles. */
+export const moatStretchSpot = (stretch: number): { x: number; y: number } => {
+  const run = MOAT_TILES.filter(tile => tile.stretch === stretch);
+  const { x, y } = run[Math.floor(run.length / 2)];
+  return { x, y };
+};
+
+/** The rainy spring days that fill the moat: the spring it was dug in, after that day, or else the next spring. */
+const fillSpring = (dugDay: number): { from: number; to: number } => {
+  const yearStart = Math.floor((dugDay - 1) / YEAR_LENGTH) * YEAR_LENGTH + 1;
+  const springStart = yearStart + 2 * (YEAR_LENGTH / 4);
+  const springEnd = springStart + YEAR_LENGTH / 4 - 1;
+  if (dugDay > springEnd) return { from: springStart + YEAR_LENGTH, to: springEnd + YEAR_LENGTH };
+  return { from: Math.max(springStart, dugDay + 1), to: springEnd };
+};
+
+const rainyDays = (from: number, to: number): number => {
+  let count = 0;
+  for (let day = from; day <= to; day++) if (rainWindow(day) !== null) count++;
+  return count;
+};
+
+/** How full the moat is, 0 to 1, from the day it was dug and today alone: it rises a little on each rainy spring day after it is dug, and is full from the summer after. */
+export const moatFill = (state: Pick<GameState, 'day' | 'castle'>): number => {
+  const { dugDay } = state.castle.moat;
+  if (dugDay === null) return 0;
+  const { from, to } = fillSpring(dugDay);
+  if (state.day > to) return 1;
+  const total = rainyDays(from, to);
+  return total === 0 ? 0 : rainyDays(from, state.day) / total;
+};
+
+/** Which of five pictures a fill shows: dry, then three rising, then full. Any rain shows at least a little. */
+export const moatLevel = (fill: number): number => (fill <= 0 ? 0 : fill >= 1 ? 4 : Math.min(3, Math.max(1, Math.ceil(fill * 4))));

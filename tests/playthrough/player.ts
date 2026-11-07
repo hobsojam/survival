@@ -9,7 +9,7 @@ import { FOOD_ITEMS, availableFood, foodCount, keptFoodTotal } from '../../src/g
 import { HILLS_EXIT, OUTCROP_SITE, availableOre, outcropLeft } from '../../src/game/hills';
 import { HOUSE_SPOT, fuelLeft, hasWoodStore, livesInHouse, woodStoreCapacity } from '../../src/game/home';
 import { recordJournal } from '../../src/game/journalEntries';
-import { NEEDS, TOWERS, isRevealed, towerFinished, wallFinished } from '../../src/game/castle';
+import { NEEDS, TOWERS, isRevealed, moatFill, towerFinished, wallFinished } from '../../src/game/castle';
 import { CART_SPOTS, GOODS, castleSpots, type CastleGood } from '../../src/game/castleSites';
 import { KEEP_DOOR_AT, KEEP_DOOR_WOOD, KEEP_SITE, keepFinished, keepOpen } from '../../src/game/keep';
 import { ORCHARD_SPOTS, spotAction } from '../../src/game/orchard';
@@ -435,6 +435,9 @@ export class Player {
       { id: 'castle-towers', shown: state => wallFinished(state.castle), done: state => TOWERS.every(id => towerFinished(state.castle.towers[id])), step: () => this.buildTower() },
       // The portcullis is made at the forge once the wall is done, and the gatehouse then takes its stones.
       { id: 'castle-gatehouse', shown: state => state.progress.workshop.portcullis, done: state => state.castle.gatehouse >= NEEDS.gatehouse, step: () => this.layCastleStone('gatehouse') },
+      // The moat is dug a stretch a day once the wall is done, never in winter, then waits for the next spring's rain to fill it.
+      { id: 'castle-moat', shown: state => wallFinished(state.castle), done: state => state.castle.moat.stretches >= NEEDS.moat, step: () => this.digMoat() },
+      { id: 'castle-moat-fills', shown: state => state.castle.moat.stretches >= NEEDS.moat, done: state => moatFill(state) === 1, step: () => false },
       { id: 'mine', shown: state => progress(state).pickaxeCrafted, done: state => progress(state).mineBuilt, step: () => this.buildMine() },
       ...(['basket', 'cairn'] as const).map(site => ({
         id: `visit:${site}`,
@@ -525,6 +528,13 @@ export class Player {
     if (this.quarryGives() && (this.free() >= BALANCE.stoneSpaces || this.state.castle.cart.at === 'quarry') && this.quarryStone()) return true;
     if (usable() === 0 && this.state.castle.cart.at === 'quarry' && this.state.castle.cart.stone > 0) return this.haulFromCart();
     return usable() > 0 && this.goTo(spot.area) && this.walkTo(spot) && this.act({ type: 'castleWork', site: spot.site });
+  }
+
+  /** One stretch of the moat, on a day the ground isn't frozen and none has been dug yet. */
+  private digMoat(): boolean {
+    const spot = castleSpots(this.state).find(each => each.site === 'moat');
+    if (!spot || isWinter(this.state.day) || this.state.castle.moat.lastDugDay === this.state.day) return false;
+    return this.goTo(spot.area) && this.walkTo(spot) && this.act({ type: 'castleWork', site: 'moat' });
   }
 
   /** The cart's load goes up the hill with the pony when it can, and into the bag when it can't (in winter, or after dark). */
@@ -805,6 +815,6 @@ export class Player {
   }
 }
 
-/** Long enough for the road, cart, frames, wall, towers and gatehouse: the slowest of the test games ends about 150 days after the keep. */
+/** Long enough for the road, cart, frames, wall, towers, gatehouse and moat, with the spring rain that fills it: the slowest of the test games has the moat full about 150 days after the keep. */
 const DAYS_AFTER_THE_KEEP = 200;
 const MILESTONES_THAT_END = ['keep-finished', 'keep-night', 'keep-climbed'];

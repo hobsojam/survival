@@ -1,5 +1,5 @@
 import { QUARRY_SITE } from './areas';
-import { CASTLE_SECTIONS, NEEDS, SIDES, TOWERS, WALLS, isRevealed, towerFinished, wallFinished, type CastleSection, type CastleState, type FeastItem, type TowerId, type WallSide } from './castle';
+import { CASTLE_SECTIONS, NEEDS, SIDES, TOWERS, WALLS, isRevealed, moatStretchSpot, towerFinished, wallFinished, type CastleSection, type CastleState, type FeastItem, type TowerId, type WallSide } from './castle';
 import { HILLS_EXIT, QUARRY_HILLS_EXIT, availableOre } from './hills';
 import { availableWood, freeSpaces, isInClearing, spaceFor, spendWood } from './camp';
 import { isWinter } from './calendar';
@@ -70,6 +70,10 @@ interface SiteRule {
   ask: (castle: CastleState, need: SiteNeed) => string;
   /** The refusal for the same shortage. */
   short: (castle: CastleState, need: SiteNeed) => string;
+  /** Why the section can't be worked today even with everything in hand, as its prompt and its refusal. */
+  wait?: (state: GameState) => { label: string; message: string } | null;
+  /** How much of a dig's time and energy a piece takes: half unless said. */
+  effort?: number;
 }
 
 const ROAD_LINES: Record<number, string> = {
@@ -223,6 +227,36 @@ function gatehouseRule(): SiteRule {
   };
 }
 
+/** The moat, once the wall is done: a stretch a go and a go a day, dug by hand, and not while the ground is frozen. */
+function moatRule(): SiteRule {
+  const stretches = NEEDS.moat;
+  return {
+    need: ({ castle }) => (wallFinished(castle) && castle.moat.stretches < stretches ? { kind: 'dig' } : null),
+    finished: castle => castle.moat.stretches === stretches,
+    spot: castle => ({ area: 'hills', ...moatStretchSpot(castle.moat.stretches) }),
+    far: 'Move closer to the moat.',
+    done: 'The moat is finished.',
+    lay: (castle, day) => {
+      const laid = castle.moat.stretches + 1;
+      return { ...castle, moat: { stretches: laid, lastDugDay: day, dugDay: laid === stretches ? day : castle.moat.dugDay }, doneDays: laid === stretches ? { ...castle.doneDays, moat: day } : castle.doneDays };
+    },
+    line: castle => {
+      if (castle.moat.stretches === stretches) return 'You dig the last stretch. The moat is dug, and the spring rain will fill it.';
+      if (castle.moat.stretches === stretches / 2) return 'The moat is halfway round.';
+      return castle.moat.stretches === 1 ? 'You dig the first stretch of the moat.' : 'You dig another stretch of the moat.';
+    },
+    count: castle => castle.moat.stretches,
+    label: castle => `Dig the moat (${castle.moat.stretches}/${stretches})`,
+    ask: () => 'Moat · dig a stretch',
+    short: () => 'Dig a stretch of the moat.',
+    wait: ({ castle, day }) => {
+      if (isWinter(day)) return { label: 'Moat · the ground is frozen, it can wait for spring', message: 'The ground is frozen. The moat can wait for spring.' };
+      return castle.moat.lastDugDay === day ? { label: 'Moat · today\'s stretch is dug, the next can wait until tomorrow', message: 'You have dug enough for today. The moat can wait until tomorrow.' } : null;
+    },
+    effort: 1
+  };
+}
+
 const SITE_RULES: Partial<Record<CastleSite, SiteRule>> = {
   road: {
     need: ({ castle }) => (castle.road < NEEDS.road ? { kind: 'stone' } : null),
@@ -240,7 +274,8 @@ const SITE_RULES: Partial<Record<CastleSite, SiteRule>> = {
   frames: framesRule(),
   ...Object.fromEntries(SIDES.map(side => [`wall-${side}`, wallRule(side)])),
   ...Object.fromEntries(TOWERS.map(id => [`tower-${id}`, towerRule(id)])),
-  gatehouse: gatehouseRule()
+  gatehouse: gatehouseRule(),
+  moat: moatRule()
 };
 
 /** The sites that can be worked on now, once the line of stones has shown. */
@@ -251,11 +286,13 @@ export const castleSpots = (state: GameState): SiteSpot[] => {
     .map(([site, rule]) => ({ site, ...rule.spot(state.castle) }));
 };
 
-/** The nearest open site in the area the survivor is in. */
+/** The nearest open site in the area the survivor is in. A site waiting on tomorrow or on spring gives way to one that can be worked, if that one is within reach. */
 export const nearestCastleSpot = (state: GameState): SiteSpot | null => {
   const here = castleSpots(state).filter(spot => spot.area === state.area);
   const gap = (spot: SiteSpot): number => Math.hypot(spot.x - state.player.x, spot.y - state.player.y);
-  return here.reduce<SiteSpot | null>((best, spot) => (best === null || gap(spot) < gap(best) ? spot : best), null);
+  const closest = (spots: SiteSpot[]): SiteSpot | null => spots.reduce<SiteSpot | null>((best, spot) => (best === null || gap(spot) < gap(best) ? spot : best), null);
+  const working = here.filter(spot => !SITE_RULES[spot.site]?.wait?.(state));
+  return closest(working.filter(spot => gap(spot) <= BALANCE.interactionRadius)) ?? closest(here);
 };
 
 /** Whether the open site the survivor is at asks for stone, which is the one thing the cart can carry. */
@@ -339,6 +376,8 @@ export const castleWorkBlocker = (state: GameState, site: CastleSite): string | 
   if (!need) return rule.finished(state.castle) ? rule.done : NOTHING_HERE;
   const spot = rule.spot(state.castle);
   if (state.area !== spot.area || Math.hypot(state.player.x - spot.x, state.player.y - spot.y) > BALANCE.interactionRadius) return rule.far;
+  const waiting = rule.wait?.(state);
+  if (waiting) return waiting.message;
   const short = lacking(state, need, rule);
   if (short) return short;
   return isExhausted(state) ? TOO_TIRED_MESSAGE : null;
@@ -349,6 +388,8 @@ export const castlePrompt = (state: GameState, spot: SiteSpot): string => {
   const rule = SITE_RULES[spot.site];
   if (!rule) return '';
   const need = rule.need(state);
+  const waiting = need ? rule.wait?.(state) : null;
+  if (waiting) return waiting.label;
   const short = need ? lacking(state, need, rule) : null;
   return short && need ? rule.ask(state.castle, need) : rule.label(state.castle);
 };
@@ -358,6 +399,9 @@ const payFor = (state: GameState, need: SiteNeed): GameState | null => {
   if (need.kind === 'stone') return spendCastleStone(state);
   return need.kind === 'wood' ? spendWood(state, need.amount) : state;
 };
+
+/** How much of a dig's time and energy a piece of work at a site takes. */
+export const castleEffort = (site: CastleSite): number => SITE_RULES[site]?.effort ?? 0.5;
 
 /** The state with one piece laid at a site, paying what it needs from the cart and the bag. Time and energy are the action's. */
 export const doCastleWork = (state: GameState, site: CastleSite): GameState => {
@@ -381,7 +425,8 @@ const NEWS: Partial<Record<CastleSection, string>> = {
   frames: 'The frames stand finished. The wall can start now.',
   ...Object.fromEntries(SIDES.map(side => [`wall-${side}`, `The ${side} wall stands finished.`])),
   ...Object.fromEntries(TOWERS.map(id => [`tower-${id}`, `The ${TOWER_NAMES[id]} tower stands finished.`])),
-  gatehouse: 'The gatehouse stands finished.'
+  gatehouse: 'The gatehouse stands finished.',
+  moat: 'The moat is dug. The spring rain will fill it.'
 };
 
 /** The mornings after a section is finished. Each is worked out from the saved day, so it comes once. */

@@ -30,6 +30,8 @@ export interface CastleView {
   towers: number;
   /** Whether the gatehouse is finished. */
   gatehouse: boolean;
+  /** Whether the moat is dug all the way round. */
+  moat: boolean;
 }
 
 const SMALLEST_CLEARING = 15;
@@ -41,7 +43,8 @@ export const castleView = (state: GameState): CastleView => {
     line: isRevealed(state),
     walls: SIDES.filter(side => wall[side] === NEEDS.wallSide).length,
     towers: TOWERS.filter(id => towerFinished(towers[id])).length,
-    gatehouse: state.castle.gatehouse === NEEDS.gatehouse
+    gatehouse: state.castle.gatehouse === NEEDS.gatehouse,
+    moat: state.castle.moat.stretches === NEEDS.moat
   };
 };
 

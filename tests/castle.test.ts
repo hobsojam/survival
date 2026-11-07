@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Season } from '../src/game/calendar';
-import { NEEDS, WALLS, emptyCastle, isRevealed, treeUnderWall, type Tower } from '../src/game/castle';
+import { MOAT_TILES, NEEDS, WALLS, emptyCastle, isRevealed, moatFill, moatLevel, treeUnderWall, type Tower } from '../src/game/castle';
+import { rainWindow } from '../src/game/rain';
+import { season } from '../src/game/calendar';
+import { buildMap } from '../src/scene/map';
+import { moatAt } from '../src/scene/hillsGeometry';
+import { roadStone } from '../src/game/castleSites';
 import { castleSprites } from '../src/art/castleSprites';
 import { castleView } from '../src/scene/keepViewCamp';
 import { CART_SPOTS, cartFollows, cartRoom, castleNews, castlePrompt, castleSpots, castleWorkBlocker, castleWorkLine, nearestCastleSpot, siteNeed, spendCastleStone } from '../src/game/castleSites';
@@ -958,7 +963,7 @@ describe('the towers', () => {
     expect(open).toEqual(TOWER_LIST.map(() => ({ kind: 'stone' })));
     const short = framesUp({ wall: { ...ALL_WALL, west: 29 } });
     expect(TOWER_LIST.map(id => siteNeed(short, `tower-${id}`))).toEqual([null, null, null, null]);
-    expect(castleSpots(wallsUp()).map(spot => spot.site)).toEqual([...TOWER_LIST.map(id => `tower-${id}`), 'gatehouse']);
+    expect(castleSpots(wallsUp()).map(spot => spot.site)).toEqual([...TOWER_LIST.map(id => `tower-${id}`), 'gatehouse', 'moat']);
   });
 
   it('ask for stones, then four beams, then two fittings, in that order', () => {
@@ -1085,7 +1090,7 @@ describe('where the frames, the wall and the towers stand', () => {
   });
 
   it('keeps each side and each corner out of reach of the others, so E takes the one the prompt names', () => {
-    const spots = [...castleSpots(framesUp()), ...castleSpots(wallsUp()).filter(spot => spot.site !== 'gatehouse')];
+    const spots = [...castleSpots(framesUp()), ...castleSpots(wallsUp()).filter(spot => spot.site !== 'gatehouse' && spot.site !== 'moat')];
     expect(spots).toHaveLength(8);
     for (const a of spots) for (const b of spots) {
       if (a !== b) expect(Math.hypot(a.x - b.x, a.y - b.y), `${a.site} and ${b.site}`).toBeGreaterThan(BALANCE.interactionRadius * 2);
@@ -1145,10 +1150,10 @@ describe('where the frames, the wall and the towers stand', () => {
 
 describe('the view from the keep, with the wall and towers', () => {
   it('counts the sides and the towers done', () => {
-    expect(castleView(revealed())).toEqual({ line: true, walls: 0, towers: 0, gatehouse: false });
-    expect(castleView(framesUp({ wall: { north: 30, east: 29, south: 30, west: 0 } }))).toEqual({ line: true, walls: 2, towers: 0, gatehouse: false });
-    expect(castleView(wallsUp({ towers: { ...emptyCastle().towers, nw: FULL_TOWER, se: { ...FULL_TOWER, fittings: 1 } } }))).toEqual({ line: true, walls: 4, towers: 1, gatehouse: false });
-    expect(castleView(finishedKeep())).toEqual({ line: false, walls: 0, towers: 0, gatehouse: false });
+    expect(castleView(revealed())).toEqual({ line: true, walls: 0, towers: 0, gatehouse: false, moat: false });
+    expect(castleView(framesUp({ wall: { north: 30, east: 29, south: 30, west: 0 } }))).toEqual({ line: true, walls: 2, towers: 0, gatehouse: false, moat: false });
+    expect(castleView(wallsUp({ towers: { ...emptyCastle().towers, nw: FULL_TOWER, se: { ...FULL_TOWER, fittings: 1 } } }))).toEqual({ line: true, walls: 4, towers: 1, gatehouse: false, moat: false });
+    expect(castleView(finishedKeep())).toEqual({ line: false, walls: 0, towers: 0, gatehouse: false, moat: false });
     expect(castleView(wallsUp({ gatehouse: 29 })).gatehouse).toBe(false);
     expect(castleView(wallsUp({ gatehouse: 30 })).gatehouse).toBe(true);
   });
@@ -1318,7 +1323,7 @@ describe('the gatehouse: where it stands', () => {
       expect(promptFor(there), `${x},${y}`).toMatch(new RegExp(`^E  ${castlePrompt(there, nearest).replace(/[()/]/g, '\\$&')}`));
       expect(targetAction(pickTapTarget(there, nearest.x, nearest.y)), `${x},${y}`).toEqual({ type: 'castleWork', site: nearest.site });
     }
-    expect(sites).toEqual(new Set(['gatehouse', 'tower-se']));
+    expect(sites).toEqual(new Set(['gatehouse', 'tower-se', 'moat']));
     const straddle = { ...state, player: { ...state.player, x: 23.4, y: 12.9 } };
     expect(near(straddle.player, spotOf(state, 'gatehouse'))).toBeLessThanOrEqual(BALANCE.interactionRadius);
     expect(near(straddle.player, spotOf(state, 'tower-se'))).toBeLessThanOrEqual(BALANCE.interactionRadius);
@@ -1415,5 +1420,430 @@ describe('the gatehouse: drawn on the east wall', () => {
       const state = standAt(gateOpen({ gatehouse: 29 }, { day }), 'gatehouse');
       expect(doWork(state, 'gatehouse').state.castle.gatehouse).toBe(30);
     }
+  });
+});
+
+// ---- The moat ----
+
+const FROZEN = 'The ground is frozen. The moat can wait for spring.';
+const DUG_TODAY = 'You have dug enough for today. The moat can wait until tomorrow.';
+/** The wall is up and the gatehouse is done, with the survivor on a summer day (day 33) at the next stretch. */
+const moatOpen = (castle: Partial<GameState['castle']> = {}, changes: Partial<GameState> = {}): GameState =>
+  wallsUp(castle, { day: 33, ...changes });
+const dug = (stretches: number, lastDugDay: number | null, castle: Partial<GameState['castle']> = {}, changes: Partial<GameState> = {}): GameState =>
+  moatOpen({ moat: { stretches, lastDugDay, dugDay: stretches === NEEDS.moat ? lastDugDay : null }, ...castle }, changes);
+const MOAT_DONE_DAYS = { road: 3, frames: 2, 'wall-north': 2, 'wall-east': 2, 'wall-south': 2, 'wall-west': 2 };
+const finishedMoat = (dugDay: number, day: number): GameState => ({
+  ...moatOpen({ moat: { stretches: NEEDS.moat, lastDugDay: dugDay, dugDay }, doneDays: { ...MOAT_DONE_DAYS, moat: dugDay } }), day
+});
+const rainy = (from: number, to: number): number => Array.from({ length: Math.max(0, to - from + 1) }, (_, i) => from + i).filter(day => rainWindow(day) !== null).length;
+
+describe('the moat: when it opens and what a go costs', () => {
+  it('opens once all four sides are done, and not before', () => {
+    expect(siteNeed(wallsUp(), 'moat')).toEqual({ kind: 'dig' });
+    expect(siteNeed(framesUp({ wall: { ...ALL_WALL, west: 29 } }), 'moat')).toBeNull();
+    expect(castleSpots(wallsUp()).map(spot => spot.site)).toContain('moat');
+    expect(castleSpots(framesUp()).map(spot => spot.site)).not.toContain('moat');
+  });
+
+  it('is dug a stretch at a time, at a dig\'s time and energy, with no stone spent', () => {
+    const before = standAt(moatOpen({}, { inventory: { ...game.inventory, stone: 2 } }), 'moat');
+    expect(promptFor(before)).toBe('E  Dig the moat (0/16)');
+    const { state, message } = doWork(before, 'moat');
+    expect(state.castle.moat).toEqual({ stretches: 1, lastDugDay: before.day, dugDay: null });
+    expect(state.inventory.stone).toBe(2);
+    expect(state.player.energy).toBeCloseTo(before.player.energy - BALANCE.digEnergyCost);
+    expect(state.timeOfDay).toBeCloseTo(before.timeOfDay + workSeconds(before, BALANCE.digSeconds));
+    expect(message).toBe('You dig the first stretch of the moat.');
+  });
+
+  it('keeps every other piece of castle work at half a dig', () => {
+    const before = standAt(gateOpen(), 'gatehouse');
+    const { state } = doWork(before, 'gatehouse');
+    expect(state.player.energy).toBeCloseTo(before.player.energy - BALANCE.digEnergyCost / 2);
+    expect(state.timeOfDay).toBeCloseTo(before.timeOfDay + workSeconds(before, BALANCE.digSeconds / 2));
+  });
+
+  it('allows one go a day, and the next on the day after', () => {
+    const first = doWork(standAt(moatOpen(), 'moat'), 'moat').state;
+    const again = standAt(first, 'moat');
+    expect(castleWorkBlocker(again, 'moat')).toBe(DUG_TODAY);
+    const refused = doWork(again, 'moat');
+    expect(refused.message).toBe(DUG_TODAY);
+    expect(refused.state).toEqual(again);
+    const morning = standAt({ ...first, day: first.day + 1, timeOfDay: 40 }, 'moat');
+    expect(castleWorkBlocker(morning, 'moat')).toBeNull();
+    expect(doWork(morning, 'moat').state.castle.moat.stretches).toBe(2);
+  });
+
+  it('is refused while the ground is frozen, in every winter day, and says so', () => {
+    for (const day of [11, 15, 20, 51, 60]) {
+      const state = standAt(moatOpen({}, { day }), 'moat');
+      expect(season(day)).toBe('winter');
+      expect(castleWorkBlocker(state, 'moat')).toBe(FROZEN);
+      const refused = doWork(state, 'moat');
+      expect(refused.message).toBe(FROZEN);
+      expect(refused.state).toEqual(state);
+    }
+    for (const day of [10, 21, 33, 41]) expect(castleWorkBlocker(standAt(moatOpen({}, { day }), 'moat'), 'moat'), `day ${day}`).toBeNull();
+  });
+
+  it('gives a tired survivor the usual line, never a trap, and digs again after rest', () => {
+    const tired = standAt(moatOpen(), 'moat');
+    const weak = { ...tired, player: { ...tired.player, energy: 0 } };
+    expect(doWork(weak, 'moat').message).toBe(TOO_TIRED_MESSAGE);
+    expect(doWork(weak, 'moat').state).toEqual(weak);
+    expect(castleWorkBlocker({ ...weak, player: { ...weak.player, energy: 100 } }, 'moat')).toBeNull();
+  });
+
+  it('is refused from afar', () => {
+    const state = { ...moatOpen(), player: { ...game.player, x: 18, y: 10 } };
+    expect(castleWorkBlocker(state, 'moat')).toBe('Move closer to the moat.');
+  });
+
+  it('works clockwise from the gatehouse, sixteen stretches round', () => {
+    const centre = { x: (WALLS.left + WALLS.right) / 2, y: (WALLS.top + WALLS.bottom) / 2 };
+    const turn = (spot: { x: number; y: number }) => (Math.atan2(spot.y - centre.y, spot.x - centre.x) - Math.atan2(GATE_AT.y - centre.y, GATE_AT.x - centre.x) + 4 * Math.PI) % (2 * Math.PI);
+    const turns = Array.from({ length: NEEDS.moat }, (_, n) => turn(spotOf(dug(n, n === 0 ? null : 32), 'moat')));
+    expect(spotOf(moatOpen(), 'moat').y).toBeGreaterThan(GATE_AT.y);
+    expect(spotOf(moatOpen(), 'moat').x).toBeGreaterThan(WALLS.right);
+    for (let n = 1; n < turns.length; n++) expect(turns[n], `stretch ${n}`).toBeGreaterThan(turns[n - 1]);
+    expect(turns[NEEDS.moat - 1]).toBeLessThan(2 * Math.PI);
+  });
+
+  it('digs sixteen stretches on sixteen days, then is done with a day set and a line', () => {
+    let state = standAt(moatOpen(), 'moat');
+    const lines: string[] = [];
+    for (let n = 1; n <= NEEDS.moat; n++) {
+      const result = doWork(standAt(state, 'moat'), 'moat');
+      expect(result.state.castle.moat.stretches).toBe(n);
+      lines.push(result.message);
+      state = { ...result.state, player: { ...result.state.player, energy: 100 }, day: result.state.day + (season(result.state.day + 1) === 'winter' ? 11 : 1), timeOfDay: 40 };
+    }
+    expect(lines[0]).toBe('You dig the first stretch of the moat.');
+    expect(lines[1]).toBe('You dig another stretch of the moat.');
+    expect(lines[7]).toBe('The moat is halfway round.');
+    expect(lines[15]).toBe('You dig the last stretch. The moat is dug, and the spring rain will fill it.');
+    expect(state.castle.moat.dugDay).toBe(state.castle.moat.lastDugDay);
+    expect(state.castle.doneDays.moat).toBe(state.castle.moat.dugDay);
+    expect(siteNeed(state, 'moat')).toBeNull();
+    expect(castleSpots(state).map(spot => spot.site)).not.toContain('moat');
+    expect(doWork(state, 'moat').message).toBe('The moat is finished.');
+  });
+
+  it('leaves a note the morning after the last stretch, once', () => {
+    const before = dug(15, 32, {}, { day: 33 });
+    const after = doWork(standAt(before, 'moat'), 'moat').state;
+    expect(castleNews(after, { ...after, day: after.day + 1 })).toEqual(['The moat is dug. The spring rain will fill it.']);
+    expect(castleNews({ ...after, day: after.day + 1 }, { ...after, day: after.day + 2 })).toEqual([]);
+  });
+});
+
+const GATE_AT = { x: WALLS.right, y: 12 };
+
+describe('the moat: how full it is', () => {
+  it('is empty until it is finished', () => {
+    expect(moatFill(moatOpen())).toBe(0);
+    expect(moatFill(dug(15, 32, {}, { day: 63 }))).toBe(0);
+  });
+
+  it('rises on the rainy days of the next spring when finished in autumn, winter or the first days of spring, and is full from summer', () => {
+    for (const dugDay of [5, 15, 21]) {
+      const total = rainy(21, 30) - (dugDay === 21 && rainWindow(21) ? 1 : 0);
+      expect(total).toBeGreaterThan(0);
+      for (let day = dugDay; day <= 30; day++) {
+        const counted = rainy(Math.max(21, dugDay + 1), day);
+        expect(moatFill(finishedMoat(dugDay, day)), `dug ${dugDay}, day ${day}`).toBeCloseTo(counted / total);
+      }
+      expect(moatFill(finishedMoat(dugDay, 30))).toBe(1);
+      expect(moatFill(finishedMoat(dugDay, 31))).toBe(1);
+      expect(moatFill(finishedMoat(dugDay, 100))).toBe(1);
+    }
+  });
+
+  it('is empty until the next spring when finished in summer, then fills across it', () => {
+    for (const day of [32, 40, 41, 55, 60]) expect(moatFill(finishedMoat(32, day)), `day ${day}`).toBe(0);
+    const total = rainy(61, 70);
+    for (let day = 61; day <= 70; day++) expect(moatFill(finishedMoat(32, day)), `day ${day}`).toBeCloseTo(rainy(61, day) / total);
+    expect(moatFill(finishedMoat(32, 71))).toBe(1);
+    expect(moatFill(finishedMoat(32, 400))).toBe(1);
+  });
+
+  it('rises from the day it was finished when finished mid-spring, and is full by summer', () => {
+    const dugDay = 25;
+    const total = rainy(26, 30);
+    expect(total).toBeGreaterThan(0);
+    expect(moatFill(finishedMoat(dugDay, dugDay))).toBe(0);
+    for (let day = 26; day <= 30; day++) expect(moatFill(finishedMoat(dugDay, day)), `day ${day}`).toBeCloseTo(rainy(26, day) / total);
+    expect(moatFill(finishedMoat(dugDay, 31))).toBe(1);
+  });
+
+  it('stays empty through a spring with no rain after it was finished, then is full in summer', () => {
+    const lastRain = [...Array(10).keys()].map(i => 21 + i).filter(day => rainWindow(day)).pop()!;
+    const dugDay = lastRain;
+    expect(rainy(dugDay + 1, 30)).toBe(0);
+    for (let day = dugDay; day <= 30; day++) expect(moatFill(finishedMoat(dugDay, day))).toBe(0);
+    expect(moatFill(finishedMoat(dugDay, 31))).toBe(1);
+  });
+
+  it('is never less on a later day, for any finishing day, over several years', () => {
+    for (let dugDay = 1; dugDay <= 160; dugDay += 3) {
+      let last = 0;
+      for (let day = dugDay; day <= dugDay + 130; day++) {
+        const fill = moatFill(finishedMoat(dugDay, day));
+        expect(fill, `dug ${dugDay}, day ${day}`).toBeGreaterThanOrEqual(last);
+        expect(fill).toBeLessThanOrEqual(1);
+        last = fill;
+      }
+      expect(last).toBe(1);
+    }
+  });
+
+  it('rises on a rainy day and holds on a dry one', () => {
+    for (let day = 101; day <= 110; day++) {
+      const change = moatFill(finishedMoat(85, day)) - moatFill(finishedMoat(85, day - 1));
+      expect(season(day)).toBe('spring');
+      if (rainWindow(day)) expect(change, `day ${day}`).toBeGreaterThan(0);
+      else expect(change, `day ${day}`).toBe(0);
+    }
+  });
+
+  it('follows each year\'s own rain: the springs have different totals, and each fills', () => {
+    const totals = [0, 1, 2, 3, 4, 5, 6, 7].map(year => rainy(21 + 40 * year, 30 + 40 * year));
+    expect(new Set(totals).size).toBeGreaterThan(1);
+    for (const year of [1, 2, 3, 4]) {
+      const dugDay = 5 + 40 * year;
+      expect(moatFill(finishedMoat(dugDay, 29 + 40 * year))).toBeGreaterThan(0);
+      expect(moatFill(finishedMoat(dugDay, 31 + 40 * year))).toBe(1);
+    }
+  });
+
+  it('works from the day and the dug day alone, so a state read back later gives the same fill', () => {
+    const state = finishedMoat(5, 25);
+    const again = JSON.parse(JSON.stringify(state)) as GameState;
+    expect(moatFill(again)).toBe(moatFill(state));
+    expect(moatFill(again)).toBeGreaterThanOrEqual(0);
+  });
+
+  it('draws a small fixed set of levels, each rain showing at least one', () => {
+    const levels = new Set([0, 0.001, 0.2, 0.34, 0.5, 0.74, 0.99, 1].map(moatLevel));
+    expect([...levels].sort()).toEqual([0, 1, 2, 3, 4]);
+    expect(moatLevel(0)).toBe(0);
+    expect(moatLevel(1)).toBe(4);
+    expect(moatLevel(0.01)).toBe(1);
+    expect(moatLevel(0.99)).toBe(3);
+  });
+});
+
+describe('the moat: where it lies', () => {
+  const near = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
+
+  it('is a ring one tile outside the wall, within the map, with sixteen stretches that tile it', () => {
+    expect(MOAT_TILES.length).toBeGreaterThan(40);
+    for (const tile of MOAT_TILES) {
+      expect(Math.max(WALLS.left - tile.x, tile.x - WALLS.right, WALLS.top - tile.y, tile.y - WALLS.bottom)).toBe(1);
+      expect(tile.x).toBeGreaterThan(0);
+      expect(tile.y).toBeGreaterThan(0);
+      expect(tile.stretch).toBeGreaterThanOrEqual(0);
+      expect(tile.stretch).toBeLessThan(NEEDS.moat);
+    }
+    expect(new Set(MOAT_TILES.map(tile => `${tile.x},${tile.y}`)).size).toBe(MOAT_TILES.length);
+    expect(new Set(MOAT_TILES.map(tile => tile.stretch)).size).toBe(NEEDS.moat);
+    expect(MOAT_TILES.map(tile => tile.stretch)).toEqual(MOAT_TILES.map(tile => tile.stretch).sort((a, b) => a - b));
+  });
+
+  it('keeps clear of the outcrop, the keep, the exit and the cart', () => {
+    for (const tile of MOAT_TILES) for (const other of [OUTCROP_SITE, KEEP_SITE, HILLS_EXIT, CART_SPOTS.hills]) expect(near(tile, other), `${tile.x},${tile.y}`).toBeGreaterThan(1.9);
+    expect(moatAt(OUTCROP_SITE.x, OUTCROP_SITE.y)).toBe(false);
+  });
+
+  it('leaves a bank of land where the road and the path cross it', () => {
+    for (let stone = 11; stone <= NEEDS.road; stone++) {
+      const at = roadStone(stone);
+      for (const tile of MOAT_TILES) expect(near(tile, at), `road stone ${stone}`).toBeGreaterThan(1.2);
+    }
+    for (const [x, y] of [[25, 12], [25, 13], [12, 9], [13, 9.2], [25, 12.75]]) expect(moatAt(x, y), `${x},${y}`).toBe(false);
+    for (const tile of MOAT_TILES) expect(moatAt(tile.x, tile.y)).toBe(true);
+  });
+
+  it('has no plants on it, in any season', () => {
+    for (const time of ['autumn', 'winter', 'spring', 'summer'] as const) {
+      const map = buildMap([], 'hills', time);
+      for (const item of map.decorations) expect(moatAt(Math.round(item.x), Math.round(item.y)), `${time} ${item.x},${item.y}`).toBe(false);
+    }
+  });
+});
+
+describe('the moat: prompts, keys and taps beside the towers and the gatehouse', () => {
+  const near = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
+  const sweep = (state: GameState, check: (there: GameState, nearest: NonNullable<ReturnType<typeof nearestCastleSpot>>) => void): Set<string> => {
+    const sites = new Set<string>();
+    for (let x = 10; x <= 27; x += 0.25) for (let y = 3; y <= 18; y += 0.25) {
+      const there = { ...state, player: { ...state.player, x, y } };
+      const nearest = nearestCastleSpot(there);
+      if (!nearest || near(there.player, nearest) > BALANCE.interactionRadius) {
+        expect(useKeyAction(there)?.type, `${x},${y}`).not.toBe('castleWork');
+        continue;
+      }
+      sites.add(nearest.site);
+      check(there, nearest);
+    }
+    return sites;
+  };
+  const agree = (there: GameState, nearest: NonNullable<ReturnType<typeof nearestCastleSpot>>): void => {
+    const where = `${there.player.x},${there.player.y}`;
+    expect(targetAction(pickTapTarget(there, nearest.x, nearest.y)), where).toEqual({ type: 'castleWork', site: nearest.site });
+    const prompt = promptFor(there);
+    if (castleWorkBlocker(there, nearest.site) === null) {
+      expect(useKeyAction(there), where).toEqual({ type: 'castleWork', site: nearest.site });
+      expect(prompt, where).toContain(castlePrompt(there, nearest as never));
+    } else {
+      expect(useKeyAction(there)?.type, where).not.toBe('castleWork');
+      expect(prompt, where).not.toMatch(/E  Dig/);
+    }
+  };
+  const all = (castle: Partial<GameState['castle']> = {}, changes: Partial<GameState> = {}): GameState =>
+    gateOpen(castle, { day: 33, ...changes });
+
+  it('keeps each stretch\'s spot clear of every tower and the gatehouse', () => {
+    for (let n = 0; n < NEEDS.moat; n++) {
+      const moat = spotOf(all({ moat: { stretches: n, lastDugDay: n ? 32 : null, dugDay: null } }), 'moat');
+      for (const other of [...TOWER_LIST.map(id => spotOf(all(), `tower-${id}`)), spotOf(all(), 'gatehouse')]) {
+        expect(near(moat, other), `stretch ${n} and ${other.site}`).toBeGreaterThan(1);
+      }
+    }
+  });
+
+  it('gives the prompt, E and a tap the same site wherever stretches, towers and the gatehouse are in reach', () => {
+    for (let n = 0; n < NEEDS.moat; n++) {
+      const state = all({ moat: { stretches: n, lastDugDay: n ? 32 : null, dugDay: null } });
+      const sites = sweep(state, agree);
+      expect(sites.has('moat'), `stretch ${n}`).toBe(true);
+    }
+  });
+
+  it('never loses a tower or the gatehouse: each is E\'s choice on its own spot, however the moat stands', () => {
+    for (let n = 0; n < NEEDS.moat; n++) for (const lastDugDay of [32, 33]) {
+      const state = all({ moat: { stretches: Math.max(n, 1), lastDugDay, dugDay: null } });
+      for (const site of [...TOWER_LIST.map(id => `tower-${id}`), 'gatehouse']) {
+        const spot = spotOf(state, site);
+        const there = { ...state, player: { ...state.player, x: spot.x, y: spot.y } };
+        expect(nearestCastleSpot(there)?.site, `${site} with stretch ${n} (${lastDugDay})`).toBe(site);
+        expect(useKeyAction(there), `${site} with stretch ${n}`).toEqual({ type: 'castleWork', site });
+      }
+    }
+  });
+
+  it('does the tower where a stretch dug today is nearer and the tower is in reach', () => {
+    let testedAny = 0;
+    for (let n = 1; n < NEEDS.moat; n++) {
+      const state = all({ moat: { stretches: n, lastDugDay: 33, dugDay: null } });
+      const moat = spotOf(state, 'moat');
+      let tested = 0;
+      for (const id of TOWER_LIST) {
+        const tower = spotOf(state, `tower-${id}`);
+        const mid = { x: (moat.x * 3 + tower.x) / 4, y: (moat.y * 3 + tower.y) / 4 };
+        const there = { ...state, player: { ...state.player, ...mid } };
+        if (near(there.player, tower) > BALANCE.interactionRadius || near(there.player, moat) >= near(there.player, tower)) continue;
+        tested++;
+        expect(nearestCastleSpot(there)?.site).toBe(`tower-${id}`);
+        expect(useKeyAction(there)).toEqual({ type: 'castleWork', site: `tower-${id}` });
+        expect(promptFor(there)).toContain('E  Lay a tower stone');
+      }
+      testedAny += tested;
+    }
+    expect(testedAny).toBeGreaterThan(0);
+    const sweepState = all({ moat: { stretches: 3, lastDugDay: 33, dugDay: null } });
+    const sites = sweep(sweepState, agree);
+    expect(sites.has('moat')).toBe(true);
+  });
+
+  it('says plainly, with no action, that a stretch dug today can wait until tomorrow', () => {
+    const state = standAt(all({ moat: { stretches: 2, lastDugDay: 33, dugDay: null } }), 'moat');
+    expect(castlePrompt(state, spotOf(state, 'moat'))).toBe('Moat · today\'s stretch is dug, the next can wait until tomorrow');
+    expect(promptFor(state)).toContain('Moat · today\'s stretch is dug, the next can wait until tomorrow');
+    expect(promptFor(state)).not.toContain('E  Moat');
+    expect(useKeyAction(state)?.type).not.toBe('castleWork');
+    expect(targetAction(pickTapTarget(state, spotOf(state, 'moat').x, spotOf(state, 'moat').y))).toEqual({ type: 'castleWork', site: 'moat' });
+    expect(applyAction(state, { type: 'castleWork', site: 'moat' }).message).toBe(DUG_TODAY);
+  });
+
+  it('says plainly that the ground is frozen in winter, with no action', () => {
+    const state = standAt(all({}, { day: 15 }), 'moat');
+    expect(promptFor(state)).toContain('Moat · the ground is frozen, it can wait for spring');
+    expect(promptFor(state)).not.toContain('E  Moat');
+    expect(useKeyAction(state)?.type).not.toBe('castleWork');
+    expect(applyAction(state, { type: 'castleWork', site: 'moat' }).message).toBe(FROZEN);
+  });
+
+  it('keeps a frozen moat from taking the tower\'s E, and sweeps clean in winter', () => {
+    const state = all({}, { day: 15 });
+    const sites = sweep(state, agree);
+    expect(sites).toEqual(new Set(['moat', 'gatehouse', 'tower-nw', 'tower-ne', 'tower-se', 'tower-sw']));
+  });
+
+  it('digs by key and by tap, from a place reached on foot, in every season but winter', () => {
+    for (const day of [5, 25, 33, 45]) {
+      const state = standAt(moatOpen({}, { day }), 'moat');
+      expect(useKeyAction(state), `day ${day}`).toEqual({ type: 'castleWork', site: 'moat' });
+      expect(targetAction(pickTapTarget(state, spotOf(state, 'moat').x, spotOf(state, 'moat').y))).toEqual({ type: 'castleWork', site: 'moat' });
+    }
+  });
+
+  it('plays dust where the survivor dug', () => {
+    const after = doWork(standAt(moatOpen(), 'moat'), 'moat').state;
+    expect(actionEffect({ type: 'castleWork', site: 'moat' }, after)).toEqual({ kind: 'dust', x: after.player.x, y: after.player.y });
+  });
+});
+
+describe('the moat: drawn on the hills', () => {
+  const moatVisuals = (state: GameState) => sceneVisuals(state, 0).filter(visual => visual.id.startsWith('castle-moat'));
+  const filled = (day: number, dugDay = 5): GameState => ({ ...finishedMoat(dugDay, day), day });
+
+  it('draws nothing before the first stretch, then only the stretches dug', () => {
+    expect(moatVisuals(moatOpen())).toEqual([]);
+    const one = moatVisuals(dug(1, 33));
+    expect(one.length).toBe(MOAT_TILES.filter(tile => tile.stretch === 0).length);
+    const eight = moatVisuals(dug(8, 33));
+    expect(eight.length).toBe(MOAT_TILES.filter(tile => tile.stretch < 8).length);
+    expect(moatVisuals(dug(16, 33)).length).toBe(MOAT_TILES.length);
+  });
+
+  it('draws only on the hills, on the ground under everything else', () => {
+    expect(sceneVisuals({ ...dug(8, 33), area: 'camp' }, 0).some(visual => visual.id.startsWith('castle-moat'))).toBe(false);
+    for (const visual of moatVisuals(dug(16, 33))) expect(visual.depth).toBeLessThan(0);
+  });
+
+  it('shows a dry ditch while it is empty, rising as the rain falls, and full by summer', () => {
+    const texture = (day: number) => moatVisuals(filled(day))[0].texture.split(':')[1].replace(/[hvs]/g, '');
+    expect(texture(8)).toBe('0');
+    expect(texture(20)).toBe('0');
+    expect(texture(21)).toBe(rainWindow(21) ? texture(21) : '0');
+    const rainDay = [...Array(10).keys()].map(i => 21 + i).find(day => rainWindow(day))!;
+    expect(texture(rainDay)).not.toBe('0');
+    expect(texture(31)).toBe('4');
+    expect(texture(33)).toBe('4');
+  });
+
+  it('is frozen in winter frames, and dry ditches wear snow', () => {
+    const summer = moatVisuals(filled(33))[0].texture;
+    const winter = moatVisuals(filled(55))[0].texture;
+    expect(winter).toBe(`${summer}s`);
+    expect(moatVisuals(dug(3, 33, {}, { day: 15 }))[0].texture.endsWith('s')).toBe(true);
+  });
+
+  it('keeps textures to a small fixed set that exist as sprites', () => {
+    const seen = new Set<string>();
+    for (const day of [1, 5, 12, 22, 24, 26, 28, 33, 55, 63, 66, 70, 75, 100]) {
+      for (const dugDay of [5, 25, 35]) for (const visual of moatVisuals(filled(day, dugDay))) seen.add(visual.texture);
+    }
+    expect(seen.size).toBeLessThanOrEqual(20);
+    for (const texture of seen) expect(castleSprites.castleMoat.frames[texture.split(':')[1]], texture).toBeDefined();
+  });
+
+  it('shows the view from the keep a dug moat, and not one still being dug', () => {
+    expect(castleView(dug(16, 33)).moat).toBe(true);
+    expect(castleView(dug(15, 33)).moat).toBe(false);
+    expect(castleView(moatOpen()).moat).toBe(false);
   });
 });

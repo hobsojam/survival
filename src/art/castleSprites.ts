@@ -292,6 +292,39 @@ export const GRATE_STEPS = PASSAGE_H / 4;
 const grateFrames: Record<string, (g: Grid) => void> = {};
 for (let drop = 1; drop <= GRATE_STEPS; drop++) grateFrames[`${drop}`] = g => grate(g, drop * 4);
 
+// The moat: one tile of the ring, seen from above. A bank of earth on both sides of a bed that is dry at first, then holds more
+// and more water as the spring rain comes. In winter the water is ice, and snow lies on the banks and the dry bed.
+const moatLegend: Record<string, PaletteKey> = { e: 'earth1', f: 'earth2', g: 'earth0', b: 'grass2', c: 'grass1', s: 'storm', l: 'flower4', i: 'frost', n: 'paper' };
+
+/** Water's thickness across the 10 pixel bed at each of the five levels. */
+const MOAT_WATER = [0, 3, 5, 8, 10];
+
+/** One tile of the moat running across (`h`) or up and down (`v`), at a fill level, with snow on it or not. */
+function moatTile(g: Grid, across: boolean, level: number, winter: boolean): void {
+  const put = (a: number, b: number, w: number, h: number, c: string): void => (across ? box(g, a, b, w, h, c) : box(g, b, a, h, w, c));
+  put(0, 0, 16, 2, winter ? 'n' : 'b'); put(0, 2, 16, 1, winter ? 'i' : 'c');
+  put(0, 14, 16, 2, winter ? 'n' : 'b'); put(0, 13, 16, 1, winter ? 'i' : 'c');
+  put(0, 3, 16, 10, 'e');
+  for (let x = 1; x < 16; x += 5) put(x, 4 + (x % 3) * 3, 2, 1, 'f');
+  const thick = MOAT_WATER[level];
+  if (thick === 0) {
+    if (winter) for (let x = 0; x < 16; x += 4) put(x, 7, 2, 1, 'n');
+    return;
+  }
+  const start = 3 + Math.floor((10 - thick) / 2);
+  put(0, start, 16, thick, winter ? 'i' : 's');
+  if (thick >= 5) put(0, start, 16, 1, 'g');
+  for (let x = 2; x < 16; x += 6) put(x, start + 1 + (x % 2), 3, 1, winter ? 'n' : 'l');
+}
+
+const moatFrames: Record<string, (g: Grid) => void> = {};
+for (const [orient, across] of [['h', true], ['v', false]] as const) {
+  for (let level = 0; level <= 4; level++) {
+    moatFrames[`${orient}${level}`] = g => moatTile(g, across, level, false);
+    moatFrames[`${orient}${level}s`] = g => moatTile(g, across, level, true);
+  }
+}
+
 export const castleSprites: Record<string, SpriteDef> = {
   castleFrames: define(FRAMES_W, FRAMES_H, frameFrames, [24, FRAMES_BASE + 1], buildLegend),
   castleWall: define(WALL_W, WALL_H, wallFrames, [8, WALL_BASE + 1], buildLegend),
@@ -299,6 +332,7 @@ export const castleSprites: Record<string, SpriteDef> = {
   castleGatehouse: define(GATE_W, GATE_H, gateFrames, [GATE_CENTRE, GATE_BASE + 1], buildLegend),
   castlePortcullis: define(PASSAGE_W, PASSAGE_H + 1, grateFrames, [PASSAGE_W / 2, 0], buildLegend),
   castleLine: define(LINE_W, LINE_H, { still }, [1, 1], legend),
+  castleMoat: define(16, 16, moatFrames, [8, 8], moatLegend),
   castleRoad: define(12, 8, { a: stone('b', 'a'), b: stone('a', 'b') }, [6, 4], legend),
   castleCart: define(20, 14, { empty: g => cart(g, 'empty'), some: g => cart(g, 'some'), full: g => cart(g, 'full') }, [10, 12], cartLegend)
 };

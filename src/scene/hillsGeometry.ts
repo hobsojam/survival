@@ -1,3 +1,4 @@
+import { MOAT_TILES } from '../game/castle';
 import { OUTCROP_SITE } from '../game/hills';
 
 // The shape of the hills, in tile units: long folds of light and shade across the slope, and rock near the top.
@@ -15,3 +16,8 @@ export function hillRockDepth(x: number, y: number): number {
 
 /** Whether bare rock shows here: only near the top, around the outcrop. */
 export const hillRockAt = (x: number, y: number): boolean => hillRockDepth(x, y) < 1;
+
+const MOAT_AT = new Set(MOAT_TILES.map(tile => `${tile.x},${tile.y}`));
+
+/** Whether the tile a point falls on lies in the moat's ring, so nothing grows there. */
+export const moatAt = (x: number, y: number): boolean => MOAT_AT.has(`${Math.round(x)},${Math.round(y)}`);

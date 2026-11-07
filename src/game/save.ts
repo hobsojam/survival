@@ -483,7 +483,7 @@ function validCastle({ castle, keep, progress, pony, day }: SaveShape): boolean 
     ['road', typed.road === NEEDS.road], ['frames', typed.frames === NEEDS.frames],
     ...SIDES.map((side): [string, boolean] => [`wall-${side}`, typed.wall[side] === NEEDS.wallSide]),
     ...TOWERS.map((id): [string, boolean] => [`tower-${id}`, towerFinished(typed.towers[id])]),
-    ['gatehouse', typed.gatehouse === NEEDS.gatehouse]
+    ['gatehouse', typed.gatehouse === NEEDS.gatehouse], ['moat', moat.stretches === NEEDS.moat]
   ];
   if (finished.some(([section, done]) => ((doneDays as Record<string, unknown>)[section] !== undefined) !== done)) return false;
   const towerList = TOWERS.map(id => typed.towers[id]);
@@ -501,7 +501,7 @@ function validCastle({ castle, keep, progress, pony, day }: SaveShape): boolean 
   // A tower's beams go on once its stones are laid, and its iron once its beams are on.
   if (towerList.some(tower => (tower.beams > 0 && tower.stones < NEEDS.towerStones) || (tower.fittings > 0 && tower.beams < NEEDS.towerBeams))) return false;
   if ((moat.stretches > 0 || moat.lastDugDay !== null) && !wallFinished(typed)) return false;
-  if ((moat.dugDay !== null) !== (moat.stretches === NEEDS.moat)) return false;
+  if ((moat.dugDay !== null) !== (moat.stretches === NEEDS.moat) || (moat.dugDay !== null && typed.doneDays.moat !== moat.dugDay)) return false;
   if ((hall.stones > 0 || hall.beams > 0 || hall.fittings > 0 || hall.hangings > 0) && typed.frames < NEEDS.frames) return false;
   const allBuilt = typed.road === NEEDS.road && made.stoneCart === true && typed.frames === NEEDS.frames && wallFinished(typed)
     && towerList.every(towerFinished)

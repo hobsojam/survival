@@ -1,4 +1,4 @@
-import { NEEDS, TOWERS, isRevealed, towerFinished, wallFinished } from '../../src/game/castle';
+import { NEEDS, TOWERS, isRevealed, moatFill, towerFinished, wallFinished } from '../../src/game/castle';
 import { KEEP_DOOR_AT, keepFinished } from '../../src/game/keep';
 import type { GameState, StructureId } from '../../src/game/state';
 
@@ -54,5 +54,8 @@ export const MILESTONES: readonly Milestone[] = [
   { id: 'cart', label: 'Made the stone cart', reached: state => state.progress.workshop.stoneCart },
   { id: 'frames', label: 'Raised the timber frames', reached: state => state.castle.frames >= NEEDS.frames },
   { id: 'wall', label: 'Finished the curtain wall', reached: state => wallFinished(state.castle) },
-  { id: 'towers', label: 'Roofed and fitted the four towers', reached: state => TOWERS.every(id => towerFinished(state.castle.towers[id])) }
+  { id: 'towers', label: 'Roofed and fitted the four towers', reached: state => TOWERS.every(id => towerFinished(state.castle.towers[id])) },
+  { id: 'gatehouse', label: 'Finished the gatehouse', reached: state => state.castle.gatehouse >= NEEDS.gatehouse },
+  { id: 'moat-dug', label: 'Dug the moat', reached: state => state.castle.moat.stretches >= NEEDS.moat },
+  { id: 'moat-full', label: 'The spring rain filled the moat', reached: state => moatFill(state) === 1 }
 ];

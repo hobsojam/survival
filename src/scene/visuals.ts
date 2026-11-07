@@ -12,7 +12,7 @@ import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 import { OUTCROP_SITE, outcropLeft } from '../game/hills';
 import { KEEP_SITE, KEEP_STONES, keepFinished, keepOpen } from '../game/keep';
-import { NEEDS, SIDES, TOWERS, WALLS, isRevealed, treeUnderWall, type Tower, type TowerId, type WallSide } from '../game/castle';
+import { MOAT_TILES, NEEDS, SIDES, TOWERS, WALLS, isRevealed, moatFill, moatLevel, treeUnderWall, type Tower, type TowerId, type WallSide } from '../game/castle';
 import { CART_SPOTS, FRAMES_SPOT, GATE_SPOT, roadStone } from '../game/castleSites';
 import { markedTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
@@ -102,6 +102,19 @@ function addBuilding(state: GameState, add: AddVisual): void {
   }
 }
 
+/** The moat's dug stretches as flat water on the ground: dry until the spring rain, then rising, and frozen in winter. EASTER EGG: the castle, see src/game/castle.ts. */
+function addMoat(state: GameState, add: AddVisual): void {
+  const { stretches } = state.castle.moat;
+  if (stretches === 0) return;
+  const level = moatLevel(moatFill(state));
+  const snow = isWinter(state.day) ? 's' : '';
+  MOAT_TILES.forEach((tile, i) => {
+    if (tile.stretch >= stretches) return;
+    const across = tile.y === WALLS.top - 1 || tile.y === WALLS.bottom + 1;
+    add(`castle-moat-${i}`, `castleMoat:${across && tile.x > WALLS.left - 1 && tile.x < WALLS.right + 1 ? 'h' : 'v'}${level}${snow}`, tile.x, tile.y, GROUND_DECAL_DEPTH + 1);
+  });
+}
+
 /** The keep's picture as things stand, or null before the forge stands and there is nothing to see on the hills. */
 export function keepFrame(state: GameState): string | null {
   if (!keepOpen(state)) return null;
@@ -144,6 +157,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     // EASTER EGG: the castle's line of old stones, a faint ground mark that stays under everything else.
     addRoad(state, add);
     addCart(state, add);
+    addMoat(state, add);
     addBuilding(state, add);
     if (isRevealed(state)) add('castle-line', 'castleLine:still', WALLS.left, WALLS.top, GROUND_DECAL_DEPTH);
     HILL_TREES.forEach((tree, index) => treeUnderWall(state.castle, tree) || add(`hill-tree-${index}`, `${tree.sprite}:${frame}`, tree.x, tree.y));

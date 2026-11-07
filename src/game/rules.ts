@@ -20,7 +20,7 @@ import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
 import { logsInStore } from './wood';
 import { settleStores } from './stores';
 import { castleSeen } from './castle';
-import { GOODS, cartFollows, castleWorkBlocker, castleWorkLine, doCastleWork, goodBatch, goodBlocker, intakeNote, stoneIntake, takeCartBlocker, withStoneIntake, type CastleGood, type CastleSite } from './castleSites';
+import { GOODS, cartFollows, castleEffort, castleWorkBlocker, castleWorkLine, doCastleWork, goodBatch, goodBlocker, intakeNote, stoneIntake, takeCartBlocker, withStoneIntake, type CastleGood, type CastleSite } from './castleSites';
 import { KEEP_DOOR_WOOD, climbKeepBlocker, hangDoorBlocker, inKeep, keepFinished, layStoneBlocker, stoneLine, withKeepDoor, withStoneLaid } from './keep';
 import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, cartSpace, countWord, fellingWood, upgradeBlocker, type UpgradeId } from './workshop';
 import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishingSecondsFor, validRoll } from './fishing';
@@ -1414,13 +1414,14 @@ const layStone: ActionHandler<'layStone'> = state => {
   };
 };
 
-/** One piece of work on the castle: half a dig's time and energy, as a keep stone takes. */
+/** One piece of work on the castle: half a dig's time and energy, as a keep stone takes, or a whole dig's for the moat. */
 const castleWork: ActionHandler<'castleWork'> = (state, action) => {
   const blocker = castleWorkBlocker(state, action.site);
   if (blocker) return refuse(state, blocker);
   const worked = doCastleWork(state, action.site);
+  const effort = castleEffort(action.site);
   return {
-    state: advanceTime({ ...worked, player: tire(state, BALANCE.digEnergyCost / 2) }, workSeconds(state, BALANCE.digSeconds / 2), 'working'),
+    state: advanceTime({ ...worked, player: tire(state, BALANCE.digEnergyCost * effort) }, workSeconds(state, BALANCE.digSeconds * effort), 'working'),
     message: castleWorkLine(state, worked)
   };
 };

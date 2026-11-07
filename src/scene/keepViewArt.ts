@@ -188,6 +188,14 @@ function paintLine(p: Painter, look: SeasonLook, castle: CastleView): void {
     p.rect(20, y, 1, 3, stone);
     p.rect(98, y, 1, 3, stone);
   }
+  if (castle.moat) {
+    const water = look.snow ? '#b9c8d2' : '#4f7f95';
+    p.rect(17, 145, 85, 2, water);
+    p.rect(17, 171, 85, 2, water);
+    p.rect(17, 145, 2, 28, water);
+    p.rect(100, 145, 2, 13, water);
+    p.rect(100, 164, 2, 9, water);
+  }
   const wall = look.snow ? '#8b8f92' : '#77736a';
   const top = look.snow ?? '#928d81';
   const sides = [[20, 148, 79, 3], [97, 148, 3, 22], [20, 167, 79, 3], [20, 148, 3, 22]] as const;
