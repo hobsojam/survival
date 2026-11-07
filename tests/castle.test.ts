@@ -1320,7 +1320,7 @@ describe('the gatehouse: where it stands', () => {
       }
       sites.add(nearest.site);
       expect(useKeyAction(there), `${x},${y}`).toEqual({ type: 'castleWork', site: nearest.site });
-      expect(promptFor(there), `${x},${y}`).toMatch(new RegExp(`^E  ${castlePrompt(there, nearest).replace(/[()/]/g, '\\$&')}`));
+      expect(promptFor(there).startsWith(`E  ${castlePrompt(there, nearest)}`), `${x},${y}: ${promptFor(there)}`).toBe(true);
       expect(targetAction(pickTapTarget(there, nearest.x, nearest.y)), `${x},${y}`).toEqual({ type: 'castleWork', site: nearest.site });
     }
     expect(sites).toEqual(new Set(['gatehouse', 'tower-se', 'moat']));
