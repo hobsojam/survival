@@ -810,11 +810,16 @@ describe('the castle in the save', () => {
       castle.road = 30; castle.doneDays = { road: 6 }; state.progress.workshop.stoneCart = true; state.progress.workshop.portcullis = true; wallDone(castle);
       castle.towers = { nw: { ...fullTower }, ne: { ...fullTower }, se: { ...fullTower }, sw: { ...fullTower } };
       castle.doneDays = { ...castle.doneDays, 'tower-nw': 8, 'tower-ne': 8, 'tower-se': 8, 'tower-sw': 8 };
-      castle.gatehouse = 30; castle.moat = { stretches: 16, lastDugDay: 8, dugDay: 8 };
+      castle.gatehouse = 30; castle.doneDays['gatehouse'] = 8; castle.moat = { stretches: 16, lastDugDay: 8, dugDay: 8 };
       castle.hall = { stones: 40, beams: 12, fittings: 6, hangings: 2 };
       castle.feast = { ...NEEDS.feast };
       castle.finishedDay = 9; castle.home = 'hall'; castle.offeredHome = true;
     })).toBe(true);
+  });
+
+  it('accepts a gatehouse part-laid and one finished, each with its portcullis', () => {
+    expect(accepts(state => { cartMade(state); wallDone(state.castle); state.progress.workshop.portcullis = true; state.castle.gatehouse = 12; })).toBe(true);
+    expect(accepts(state => { cartMade(state); wallDone(state.castle); state.progress.workshop.portcullis = true; state.castle.gatehouse = 30; state.castle.doneDays.gatehouse = 9; })).toBe(true);
   });
 
   it('accepts frames part-raised, a wall begun, and towers part-built in their order', () => {
@@ -849,6 +854,11 @@ describe('the castle in the save', () => {
     ['wall stones before the frames', state => { state.castle.frames = 11; state.castle.wall.east = 1; }],
     ['tower stones before the wall is done', state => { state.castle.frames = 12; state.castle.wall = { north: 30, east: 30, south: 30, west: 29 }; state.castle.towers.nw.stones = 1; }],
     ['a portcullis before the wall is done', state => { state.progress.workshop.portcullis = true; }],
+    ['a gatehouse day with the gatehouse unfinished', state => { cartMade(state); wallDone(state.castle); state.progress.workshop.portcullis = true; state.castle.gatehouse = 29; state.castle.doneDays.gatehouse = 9; }],
+    ['a finished gatehouse with no day', state => { cartMade(state); wallDone(state.castle); state.progress.workshop.portcullis = true; state.castle.gatehouse = 30; }],
+    ['gatehouse stones with no portcullis made', state => { cartMade(state); wallDone(state.castle); state.castle.gatehouse = 1; }],
+    ['gatehouse stones before the wall is done', state => { cartMade(state); state.progress.workshop.portcullis = true; state.castle.gatehouse = 1; }],
+    ['a gatehouse over its length', state => { cartMade(state); wallDone(state.castle); state.progress.workshop.portcullis = true; state.castle.gatehouse = 31; }],
     ['bread over the feast\'s need', state => { state.castle.feast.bread = 5; }],
     ['a finish with every section short', state => { state.castle.finishedDay = 9; }],
     ['moving into the hall before the finish', state => { state.castle.home = 'hall'; }],

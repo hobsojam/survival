@@ -403,9 +403,7 @@ export class Player {
   private allTasks(): Task[] {
     const progress = (state: GameState) => state.progress;
     const builds = (Object.keys(BUILDINGS) as StructureId[]).map(id => this.buildTask(id));
-    const upgrades = (Object.keys(WORKSHOP_UPGRADES) as UpgradeId[])
-      // The portcullis has no panel row yet, so this player has no way to ask for it.
-      .filter(id => id !== 'portcullis').map(id => this.upgradeTask(id));
+    const upgrades = (Object.keys(WORKSHOP_UPGRADES) as UpgradeId[]).map(id => this.upgradeTask(id));
     return [
       ...builds,
       this.toolTask('axe', state => axeView(state).shown !== false && progress(state).hearthUnlocked && state.structures.toolshed, state => progress(state).axeCrafted, { wood: 1, fiber: 1, stone: 1 }, { type: 'craftAxe' }),
@@ -435,6 +433,8 @@ export class Player {
       this.goodTask('beams', { wood: GOODS.beams.cost.wood, fiber: 0, stone: 0 }, NEEDS.towerBeams),
       this.goodTask('fittings', { wood: GOODS.fittings.cost.wood, fiber: 0, stone: 0, ore: GOODS.fittings.cost.ore }, NEEDS.towerFittings),
       { id: 'castle-towers', shown: state => wallFinished(state.castle), done: state => TOWERS.every(id => towerFinished(state.castle.towers[id])), step: () => this.buildTower() },
+      // The portcullis is made at the forge once the wall is done, and the gatehouse then takes its stones.
+      { id: 'castle-gatehouse', shown: state => state.progress.workshop.portcullis, done: state => state.castle.gatehouse >= NEEDS.gatehouse, step: () => this.layCastleStone('gatehouse') },
       { id: 'mine', shown: state => progress(state).pickaxeCrafted, done: state => progress(state).mineBuilt, step: () => this.buildMine() },
       ...(['basket', 'cairn'] as const).map(site => ({
         id: `visit:${site}`,
@@ -805,6 +805,6 @@ export class Player {
   }
 }
 
-/** Long enough for the road, cart, frames, wall and towers: the slowest of the test games roofs its last tower 127 days after the keep. */
-const DAYS_AFTER_THE_KEEP = 150;
+/** Long enough for the road, cart, frames, wall, towers and gatehouse: the slowest of the test games ends about 150 days after the keep. */
+const DAYS_AFTER_THE_KEEP = 200;
 const MILESTONES_THAT_END = ['keep-finished', 'keep-night', 'keep-climbed'];

@@ -19,6 +19,8 @@ import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { actionEffect, actionPose, promptFor, useKeyAction } from '../src/scene/prompts';
 import { HILL_TREES, playerVisualDepth, sceneVisuals } from '../src/scene/visuals';
 import { journalPageView } from '../src/ui/yearJournal';
+import { effectVisuals } from '../src/scene/effectVisuals';
+import { workshopView } from '../src/ui/panels';
 
 const game = createGame();
 const finishedKeep = (day = 5): GameState => ({
@@ -956,7 +958,7 @@ describe('the towers', () => {
     expect(open).toEqual(TOWER_LIST.map(() => ({ kind: 'stone' })));
     const short = framesUp({ wall: { ...ALL_WALL, west: 29 } });
     expect(TOWER_LIST.map(id => siteNeed(short, `tower-${id}`))).toEqual([null, null, null, null]);
-    expect(castleSpots(wallsUp()).map(spot => spot.site)).toEqual(TOWER_LIST.map(id => `tower-${id}`));
+    expect(castleSpots(wallsUp()).map(spot => spot.site)).toEqual([...TOWER_LIST.map(id => `tower-${id}`), 'gatehouse']);
   });
 
   it('ask for stones, then four beams, then two fittings, in that order', () => {
@@ -1083,7 +1085,7 @@ describe('where the frames, the wall and the towers stand', () => {
   });
 
   it('keeps each side and each corner out of reach of the others, so E takes the one the prompt names', () => {
-    const spots = [...castleSpots(framesUp()), ...castleSpots(wallsUp())];
+    const spots = [...castleSpots(framesUp()), ...castleSpots(wallsUp()).filter(spot => spot.site !== 'gatehouse')];
     expect(spots).toHaveLength(8);
     for (const a of spots) for (const b of spots) {
       if (a !== b) expect(Math.hypot(a.x - b.x, a.y - b.y), `${a.site} and ${b.site}`).toBeGreaterThan(BALANCE.interactionRadius * 2);
@@ -1143,9 +1145,275 @@ describe('where the frames, the wall and the towers stand', () => {
 
 describe('the view from the keep, with the wall and towers', () => {
   it('counts the sides and the towers done', () => {
-    expect(castleView(revealed())).toEqual({ line: true, walls: 0, towers: 0 });
-    expect(castleView(framesUp({ wall: { north: 30, east: 29, south: 30, west: 0 } }))).toEqual({ line: true, walls: 2, towers: 0 });
-    expect(castleView(wallsUp({ towers: { ...emptyCastle().towers, nw: FULL_TOWER, se: { ...FULL_TOWER, fittings: 1 } } }))).toEqual({ line: true, walls: 4, towers: 1 });
-    expect(castleView(finishedKeep())).toEqual({ line: false, walls: 0, towers: 0 });
+    expect(castleView(revealed())).toEqual({ line: true, walls: 0, towers: 0, gatehouse: false });
+    expect(castleView(framesUp({ wall: { north: 30, east: 29, south: 30, west: 0 } }))).toEqual({ line: true, walls: 2, towers: 0, gatehouse: false });
+    expect(castleView(wallsUp({ towers: { ...emptyCastle().towers, nw: FULL_TOWER, se: { ...FULL_TOWER, fittings: 1 } } }))).toEqual({ line: true, walls: 4, towers: 1, gatehouse: false });
+    expect(castleView(finishedKeep())).toEqual({ line: false, walls: 0, towers: 0, gatehouse: false });
+    expect(castleView(wallsUp({ gatehouse: 29 })).gatehouse).toBe(false);
+    expect(castleView(wallsUp({ gatehouse: 30 })).gatehouse).toBe(true);
+  });
+});
+
+// ---- Portcullis and gatehouse ----
+
+const withPortcullis = (state: GameState): GameState => ({ ...state, progress: { ...state.progress, workshop: { ...state.progress.workshop, portcullis: true } } });
+const gateOpen = (castle: Partial<GameState['castle']> = {}, changes: Partial<GameState> = {}): GameState => withPortcullis(wallsUp(castle, { inventory: { ...game.inventory, stone: 3 }, ...changes }));
+const GATE_LINES = { half: 'The gatehouse is halfway.', last: 'You lay the last stone. The portcullis dropped and rose again, and the gatehouse is finished.' };
+
+describe('the portcullis at the forge', () => {
+  const forgeCamp = (castle: Partial<GameState['castle']> = {}): GameState => {
+    const base = wallsUp(castle);
+    return {
+      ...base, area: 'camp', player: { ...base.player, x: BALANCE.campX, y: BALANCE.campY }, storedWood: 10, structures: { ...base.structures, workshop: true },
+      inventory: { ...base.inventory, ore: 6 }, progress: { ...base.progress, workshop: { ...base.progress.workshop, forge: true } }
+    };
+  };
+
+  it('shows its row once the wall is done, with its copy and its price', () => {
+    const row = workshopView(forgeCamp()).rows.portcullis;
+    expect(row).toMatchObject({ shown: true, title: 'Portcullis', copy: 'Heavy iron and oak for the gatehouse.', cost: '4 wood · 4 ore', ready: true });
+    expect(workshopView(forgeCamp({ wall: { ...ALL_WALL, west: 29 } })).rows.portcullis.shown).toBe(false);
+  });
+
+  it('is made once, and its row then goes', () => {
+    const made = applyAction(forgeCamp(), { type: 'makeUpgrade', upgrade: 'portcullis' });
+    expect(made.state.progress.workshop.portcullis).toBe(true);
+    expect(made.message).toBe('You made a portcullis.');
+    expect(workshopView(made.state).rows.portcullis.shown).toBe(false);
+    expect(workshopView(made.state).rows.portcullis.copy).toBe('It waits for the gatehouse.');
+  });
+});
+
+describe('the gatehouse: when it opens and what it asks for', () => {
+  it('opens once the wall is done, asking for the portcullis first', () => {
+    expect(siteNeed(framesUp({ wall: { ...ALL_WALL, west: 29 } }), 'gatehouse')).toBeNull();
+    expect(siteNeed(wallsUp(), 'gatehouse')).toEqual({ kind: 'portcullis' });
+    expect(siteNeed(gateOpen(), 'gatehouse')).toEqual({ kind: 'stone' });
+    expect(siteNeed(gateOpen({ gatehouse: 29 }), 'gatehouse')).toEqual({ kind: 'stone' });
+    expect(siteNeed(gateOpen({ gatehouse: 30 }), 'gatehouse')).toBeNull();
+  });
+
+  it('shows nothing before the reveal', () => {
+    expect(castleSpots({ ...gateOpen(), castle: { ...gateOpen().castle, revealedDay: null } }).map(spot => spot.site)).toEqual([]);
+  });
+
+  it('refuses stone until the portcullis is made, and says to make one at the forge', () => {
+    const state = standAt(wallsUp({}, { inventory: { ...game.inventory, stone: 3 } }), 'gatehouse');
+    expect(castleWorkBlocker(state, 'gatehouse')).toBe('Make a portcullis at the forge first.');
+    expect(promptFor(state)).toBe('Gatehouse · make a portcullis at the forge');
+    expect(useKeyAction(state)).toBeUndefined();
+    const refused = doWork(state, 'gatehouse');
+    expect(refused.state).toEqual(state);
+    expect(refused.message).toBe('Make a portcullis at the forge first.');
+  });
+
+  it('lays stones once the portcullis is made, from the cart first and then the bag', () => {
+    const state = standAt(gateOpen({ cart: { stone: 1, at: 'hills' } }), 'gatehouse');
+    expect(promptFor(state)).toMatch(/^E  Lay a gatehouse stone \(0\/30\)/);
+    const first = doWork(state, 'gatehouse');
+    expect(first.state.castle.gatehouse).toBe(1);
+    expect(first.state.castle.cart.stone).toBe(0);
+    expect(first.state.inventory.stone).toBe(3);
+    expect(first.state.player.energy).toBeLessThan(state.player.energy);
+    expect(castleWorkLine(state, first.state)).toBe('You lay the first stone of the gatehouse.');
+    expect(doWork(first.state, 'gatehouse').state.castle.gatehouse).toBe(2);
+  });
+
+  it('asks for stone when the bag is empty, and refuses a tired survivor with the usual line', () => {
+    const empty = standAt(gateOpen({}, { inventory: { ...game.inventory, stone: 0 } }), 'gatehouse');
+    expect(castleWorkBlocker(empty, 'gatehouse')).toBe('Bring stone to build the gatehouse.');
+    expect(promptFor(empty)).toMatch(/^Gatehouse · bring stone to build it/);
+    const tired = standAt(gateOpen(), 'gatehouse');
+    expect(doWork({ ...tired, player: { ...tired.player, energy: 0 } }, 'gatehouse').message).toBe(TOO_TIRED_MESSAGE);
+    const unmade = standAt(wallsUp({}, { inventory: { ...game.inventory, stone: 3 } }), 'gatehouse');
+    expect(doWork({ ...unmade, player: { ...unmade.player, energy: 0 } }, 'gatehouse').message).toBe('Make a portcullis at the forge first.');
+  });
+
+  it('finishes on the thirtieth stone, with the day marked, a line that says the portcullis dropped and rose, and a morning note', () => {
+    const before = standAt(gateOpen({ gatehouse: 29 }), 'gatehouse');
+    const after = doWork(before, 'gatehouse').state;
+    expect(after.castle.gatehouse).toBe(30);
+    expect(after.castle.doneDays.gatehouse).toBe(before.day);
+    expect(castleWorkLine(before, after)).toBe(GATE_LINES.last);
+    expect(castleNews(after, { ...after, day: after.day + 1 })).toEqual(['The gatehouse stands finished.']);
+    expect(siteNeed(after, 'gatehouse')).toBeNull();
+    expect(doWork(after, 'gatehouse').state).toEqual(after);
+    expect(doWork(after, 'gatehouse').message).toBe('The gatehouse is finished.');
+  });
+
+  it('has no fitting step and no new saved field: the castle keeps its shape', () => {
+    const before = standAt(gateOpen({ gatehouse: 29 }), 'gatehouse');
+    const after = doWork(before, 'gatehouse').state;
+    expect(Object.keys(after.castle).sort()).toEqual(Object.keys(emptyCastle()).sort());
+    expect(after.progress.workshop.portcullis).toBe(true);
+  });
+
+  it('says its first stone, its halfway and a plain stone, with no exclamation marks', () => {
+    const line = (laid: number) => {
+      const before = standAt(gateOpen({ gatehouse: laid }), 'gatehouse');
+      return castleWorkLine(before, doWork(before, 'gatehouse').state);
+    };
+    expect(line(0)).toBe('You lay the first stone of the gatehouse.');
+    expect(line(14)).toBe(GATE_LINES.half);
+    expect(line(5)).toBe('You lay another stone of the gatehouse.');
+    for (const laid of [0, 5, 14, 29]) expect(line(laid)).not.toContain('!');
+  });
+
+  it('is told apart from a tower stone when both are open', () => {
+    const state = gateOpen({ gatehouse: 4, towers: { ...emptyCastle().towers, se: { stones: 3, beams: 0, fittings: 0 } } });
+    const at = standAt(state, 'gatehouse');
+    const after = doWork(at, 'gatehouse').state;
+    expect(castleWorkLine(at, after)).toBe('You lay another stone of the gatehouse.');
+    expect(after.castle.towers.se.stones).toBe(3);
+  });
+});
+
+describe('the gatehouse: where it stands', () => {
+  const gate = (): { site: string; x: number; y: number } => spotOf(gateOpen(), 'gatehouse');
+  const near = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
+
+  it('stands on the east wall where the hills path crosses it', () => {
+    expect(gate()).toMatchObject({ area: 'hills', x: 24, y: 12 });
+    expect(gate().x).toBe(WALLS.right);
+  });
+
+  it('keeps clear of the keep, the outcrop, the exit and the cart, and never hides the east wall spot', () => {
+    for (const other of [KEEP_SITE, OUTCROP_SITE, HILLS_EXIT, CART_SPOTS.hills]) expect(near(gate(), other)).toBeGreaterThan(BALANCE.interactionRadius * 2);
+    expect(siteNeed(gateOpen(), 'wall-east')).toBeNull();
+  });
+
+  it('is reachable from the path, outside the wall, and from the yard inside it', () => {
+    const state = gateOpen();
+    for (const [x, y] of [[25.5, 12.5], [22.5, 12]]) {
+      const there = { ...state, player: { ...state.player, x, y } };
+      expect(castleWorkBlocker(there, 'gatehouse')).toBeNull();
+    }
+  });
+
+  it('leaves a place to stand where only the south-east tower is the nearest', () => {
+    const state = gateOpen();
+    const tower = spotOf(state, 'tower-se');
+    for (const [dx, dy] of [[0, 0], [-0.5, 0.3], [0.5, 0], [0, 0.8]]) {
+      const there = { ...state, player: { ...state.player, x: tower.x + dx, y: tower.y + dy } };
+      expect(nearestCastleSpot(there)?.site, `${dx},${dy}`).toBe('tower-se');
+      expect(useKeyAction(there), `${dx},${dy}`).toEqual({ type: 'castleWork', site: 'tower-se' });
+      expect(promptFor(there)).toContain('Lay a tower stone, south-east');
+    }
+  });
+
+  it('gives the prompt, E and a tap the same site wherever both are in reach', () => {
+    const state = gateOpen();
+    const both: [number, number][] = [];
+    for (let x = 21; x <= 26; x += 0.25) for (let y = 11; y <= 15; y += 0.25) both.push([x, y]);
+    const sites = new Set<string>();
+    for (const [x, y] of both) {
+      const there = { ...state, player: { ...state.player, x, y } };
+      const nearest = nearestCastleSpot(there);
+      if (!nearest || near(there.player, nearest) > BALANCE.interactionRadius) {
+        expect(useKeyAction(there)?.type, `${x},${y}`).not.toBe('castleWork');
+        continue;
+      }
+      sites.add(nearest.site);
+      expect(useKeyAction(there), `${x},${y}`).toEqual({ type: 'castleWork', site: nearest.site });
+      expect(promptFor(there), `${x},${y}`).toMatch(new RegExp(`^E  ${castlePrompt(there, nearest).replace(/[()/]/g, '\\$&')}`));
+      expect(targetAction(pickTapTarget(there, nearest.x, nearest.y)), `${x},${y}`).toEqual({ type: 'castleWork', site: nearest.site });
+    }
+    expect(sites).toEqual(new Set(['gatehouse', 'tower-se']));
+    const straddle = { ...state, player: { ...state.player, x: 23.4, y: 12.9 } };
+    expect(near(straddle.player, spotOf(state, 'gatehouse'))).toBeLessThanOrEqual(BALANCE.interactionRadius);
+    expect(near(straddle.player, spotOf(state, 'tower-se'))).toBeLessThanOrEqual(BALANCE.interactionRadius);
+  });
+
+  it('is tapped at its own place and not the tower\'s', () => {
+    const state = gateOpen();
+    expect(targetAction(pickTapTarget(state, 24, 12))).toEqual({ type: 'castleWork', site: 'gatehouse' });
+    expect(targetAction(pickTapTarget(state, 23, 14))).toEqual({ type: 'castleWork', site: 'tower-se' });
+  });
+});
+
+describe('the gatehouse: the drop and rise of the portcullis', () => {
+  const finishing = () => {
+    const before = standAt(gateOpen({ gatehouse: 29 }), 'gatehouse');
+    return { before, after: doWork(before, 'gatehouse').state };
+  };
+
+  it('plays on the finishing stone only, at the gatehouse', () => {
+    const { before, after } = finishing();
+    expect(actionEffect({ type: 'castleWork', site: 'gatehouse' }, after)).toEqual({ kind: 'portcullis', x: 24, y: 12 });
+    const middle = doWork(standAt(gateOpen({ gatehouse: 10 }), 'gatehouse'), 'gatehouse').state;
+    expect(actionEffect({ type: 'castleWork', site: 'gatehouse' }, middle)).toEqual({ kind: 'dust', x: middle.player.x, y: middle.player.y });
+    expect(actionEffect({ type: 'castleWork', site: 'tower-se' }, after)?.kind).toBe('dust');
+    expect(actionEffect({ type: 'castleWork', site: 'gatehouse' }, before)?.kind).toBe('dust');
+  });
+
+  it('drops, holds, rises and is gone, over a few seconds', () => {
+    const { after } = finishing();
+    const event = { kind: 'portcullis' as const, startedAtMs: 1000, x: 24, y: 12 };
+    const gateAt = (ms: number) => effectVisuals(after, ms, [event]).filter(visual => visual.texture.startsWith('castlePortcullis'));
+    expect(gateAt(900)).toEqual([]);
+    const down = [1000, 1400, 1800, 2200, 2900, 3500].map(ms => Number(gateAt(ms)[0].texture.split(':')[1]));
+    expect(down[1]).toBeGreaterThan(down[0]);
+    expect(down[2]).toBe(castleSprites.castlePortcullis.frames ? Object.keys(castleSprites.castlePortcullis.frames).length : 0);
+    expect(down[3]).toBe(down[2]);
+    expect(down[4]).toBeLessThan(down[3]);
+    expect(down[5]).toBeLessThan(down[4]);
+    expect(gateAt(1500)[0].y).toBe(gateAt(2000)[0].y);
+    expect(gateAt(5000)).toEqual([]);
+    for (const visual of gateAt(1500)) expect(castleSprites.castlePortcullis.frames[visual.texture.split(':')[1]]).toBeDefined();
+  });
+
+  it('is only a scene effect: nothing saved, and a reload mid-effect changes nothing', () => {
+    const { before, after } = finishing();
+    expect(Object.keys(after).sort()).toEqual(Object.keys(before).sort());
+    const reloaded: GameState = JSON.parse(JSON.stringify(after));
+    expect(sceneVisuals(reloaded, 0)).toEqual(sceneVisuals(after, 0));
+    expect(sceneVisuals(after, 2000)).toEqual(sceneVisuals(after, 0));
+    expect(effectVisuals(reloaded, 2000, []).filter(visual => visual.texture.startsWith('castlePortcullis'))).toEqual([]);
+  });
+});
+
+describe('the gatehouse: drawn on the east wall', () => {
+  const gateVisual = (state: GameState) => sceneVisuals(state, 0).find(visual => visual.id === 'castle-gatehouse');
+  const texture = (laid: number, day = 5) => gateVisual(gateOpen({ gatehouse: laid }, { day }))?.texture;
+
+  it('shows nothing before a stone is laid, then a picture that changes as it rises', () => {
+    expect(texture(0)).toBeUndefined();
+    const steps = [1, 7, 13, 19, 25, 30].map(laid => texture(laid));
+    expect(new Set(steps).size).toBe(6);
+    for (let laid = 0; laid < 30; laid += 6) expect(texture(laid + 1)).not.toBe(texture(laid + 7));
+    expect(gateVisual(gateOpen({ gatehouse: 3 }))).toMatchObject({ x: expect.any(Number) });
+  });
+
+  it('has a sprite for every picture, in both seasons, and snow on its top in winter', () => {
+    for (const laid of [1, 6, 7, 12, 13, 18, 19, 24, 25, 30]) {
+      for (const day of [5, 12]) expect(castleSprites.castleGatehouse.frames[texture(laid, day)!.split(':')[1]], `${laid} on ${day}`).toBeDefined();
+    }
+    expect(texture(30, 12)).toBe(`${texture(30)}s`);
+  });
+
+  it('draws only on the hills', () => {
+    expect(sceneVisuals({ ...gateOpen({ gatehouse: 10 }), area: 'camp' }, 0).some(visual => visual.id === 'castle-gatehouse')).toBe(false);
+  });
+
+  it('stands in the place of the wall stretch at the gate, once begun', () => {
+    const ids = (laid: number) => sceneVisuals(gateOpen({ gatehouse: laid }), 0).map(visual => visual.id);
+    expect(ids(0)).toContain('castle-wall-east-6');
+    expect(ids(1)).not.toContain('castle-wall-east-6');
+    expect(ids(1)).toContain('castle-wall-east-5');
+    expect(ids(1)).toContain('castle-wall-east-7');
+  });
+
+  it('sorts the survivor against the gatehouse in front and behind', () => {
+    const state = gateOpen({ gatehouse: 30 });
+    const { depth } = gateVisual(state)!;
+    expect(playerVisualDepth({ ...state, player: { ...state.player, x: 24, y: 11 } })).toBeLessThan(depth);
+    expect(playerVisualDepth({ ...state, player: { ...state.player, x: 24, y: 13 } })).toBeGreaterThan(depth);
+  });
+
+  it('works whatever season it is', () => {
+    for (const day of [2, 12, 22, 32]) {
+      const state = standAt(gateOpen({ gatehouse: 29 }, { day }), 'gatehouse');
+      expect(doWork(state, 'gatehouse').state.castle.gatehouse).toBe(30);
+    }
   });
 });

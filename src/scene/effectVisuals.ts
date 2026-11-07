@@ -4,9 +4,10 @@ import { rainFade } from '../game/rain';
 import { coldNightApproach } from '../game/coldNight';
 import { HOUSE_SPOT, fireplaceBurning } from '../game/home';
 import { TILE, worldX, worldY } from './art';
+import { GRATE_STEPS, PASSAGE_H } from '../art/castleSprites';
 import { GROUND_DECAL_DEPTH, LIGHT_DEPTH, WEATHER_DEPTH } from './visuals';
 
-export type EffectKind = 'gather' | 'cook' | 'stargaze' | 'frost' | 'dust';
+export type EffectKind = 'gather' | 'cook' | 'stargaze' | 'frost' | 'dust' | 'portcullis';
 export interface EffectEvent {
   kind: EffectKind;
   startedAtMs: number;
@@ -135,6 +136,7 @@ function eventVisuals(state: GameState, event: EffectEvent, index: number, age: 
     return [visual(id, `shootingStar:star${frame}`, x - 60 + Math.floor(age / 16), y - 93, LIGHT_DEPTH + 0.1, 1 - age / 1200)];
   }
   if (event.kind === 'dust' && age < 900) return dustVisuals(id, x, y, age);
+  if (event.kind === 'portcullis') return portcullisVisuals(id, x, y, age);
   if (event.kind === 'frost' && state.area === 'camp' && age < 30000) {
     return [[-32, 16], [16, -32], [48, 32]].map(([dx, dy], i) => visual(`${id}:frost:${i}`, `morningFrost:frost${i}`, x + dx, y + dy,
       GROUND_DECAL_DEPTH + 1, 0.75 * (1 - age / 30000)));
@@ -152,4 +154,26 @@ function dustVisuals(id: string, x: number, y: number, age: number): EffectVisua
   const chips = [-1, 1].map((side, i) => visual(`${id}:chip:${i}`, 'stoneChip:still',
     x + side * (4 + Math.floor(progress * 14)), y - 6 - Math.round(Math.sin(progress * Math.PI) * 8) + Math.floor(progress * 6), y + 1));
   return [...puffs, ...chips];
+}
+
+/** How long the portcullis takes to drop, how long it stays down, and how long it takes to rise. */
+const GATE_DROP_MS = 1000;
+const GATE_HOLD_MS = 800;
+const GATE_RISE_MS = 1400;
+/** The portcullis is already up under the lintel as the finished gatehouse shows it, so it starts and ends one step down. */
+const GATE_RAISED_STEP = 1;
+
+/** How many steps of the grating are let down this long after the last stone, or none once it is back up. */
+export function portcullisDrop(age: number): number {
+  if (age < GATE_DROP_MS) return GATE_RAISED_STEP + Math.floor(age / GATE_DROP_MS * (GRATE_STEPS - GATE_RAISED_STEP + 1));
+  if (age < GATE_DROP_MS + GATE_HOLD_MS) return GRATE_STEPS;
+  const rising = age - GATE_DROP_MS - GATE_HOLD_MS;
+  if (rising >= GATE_RISE_MS) return 0;
+  return GATE_RAISED_STEP + Math.floor((1 - rising / GATE_RISE_MS) * (GRATE_STEPS - GATE_RAISED_STEP));
+}
+
+/** The portcullis let down from under the lintel, held a moment, and drawn up again, where the gatehouse stands. */
+function portcullisVisuals(id: string, x: number, y: number, age: number): EffectVisual[] {
+  const drop = portcullisDrop(age);
+  return drop > 0 ? [visual(id, `castlePortcullis:${drop}`, x, y - PASSAGE_H - 1, LIGHT_DEPTH + 0.1)] : [];
 }

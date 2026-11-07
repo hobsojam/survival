@@ -200,6 +200,13 @@ function paintLine(p: Painter, look: SeasonLook, castle: CastleView): void {
     p.rect(x - 1, y - 8, 6, 10, wall);
     p.rect(x - 2, y - 11, 8, 3, roof);
   }
+  if (castle.gatehouse) {
+    p.rect(95, 156, 7, 12, wall);
+    p.rect(95, 156, 7, 1, top);
+    p.rect(97, 161, 3, 7, look.snow ? '#5d6164' : '#3b372f');
+    p.rect(94, 153, 2, 3, roof);
+    p.rect(100, 153, 2, 3, roof);
+  }
 }
 
 function paintBattlements(p: Painter, look: SeasonLook): void {

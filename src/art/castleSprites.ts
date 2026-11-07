@@ -225,10 +225,79 @@ for (let step = 1; step <= 6; step++) {
   frameFrames[`${step}s`] = g => scaffolding(g, step, true);
 }
 
+const GATE_W = 40;
+const GATE_H = 72;
+const GATE_BASE = 66;
+const GATE_CENTRE = 20;
+const GATE_LEFT = 2;
+const GATE_BODY = 36;
+/** The passage through the gatehouse, in pixels: its width, and how high it stands before the lintel. */
+const PASSAGE_W = 12;
+export const PASSAGE_H = 20;
+/** How high the gatehouse walls stand at each of its six steps, one for every five stones, in pixels. */
+const GATE_HEIGHT = [0, 10, 20, 30, 38, 46, 50];
+
+/** The portcullis drawn up under the lintel, as the finished gatehouse always shows it. */
+const GRATE_RAISED = 4;
+
+/** The grating: iron bars with pointed ends and a crossbar, as long as it has been let down, from the top of the passage. */
+function grate(g: Grid, length: number, across = 0, down = 0): void {
+  const left = across + 2;
+  for (let x = left; x < left + 9; x += 3) {
+    box(g, x, down, 1, length, 'i');
+    dot(g, x, down + length, 'i');
+  }
+  for (let y = 1; y < length; y += 6) box(g, left - 1, down + y, 11, 1, 'i');
+}
+
+/** The gatehouse on the east wall: two piers rising stone by stone, the passage between them, then battlements and the portcullis raised. */
+function gatehouse(g: Grid, step: number, winter: boolean): void {
+  const height = GATE_HEIGHT[step];
+  const top = GATE_BASE - height + 1;
+  box(g, GATE_LEFT, GATE_BASE + 1, GATE_BODY, 3, 'k');
+  courses(g, GATE_LEFT, GATE_BODY, GATE_BASE, height);
+  const open = Math.min(height, PASSAGE_H);
+  const passage = GATE_CENTRE - PASSAGE_W / 2;
+  box(g, passage, GATE_BASE - open + 1, PASSAGE_W, open, 'k');
+  if (height > PASSAGE_H) {
+    box(g, passage - 1, GATE_BASE - PASSAGE_H, PASSAGE_W + 2, 1, 'e');
+    for (const x of [passage - 1, passage + PASSAGE_W]) box(g, x, GATE_BASE - PASSAGE_H + 1, 1, PASSAGE_H, 'b');
+  }
+  if (step === 6) {
+    for (let x = GATE_LEFT; x < GATE_LEFT + GATE_BODY; x += 8) {
+      box(g, x, top - 4, 5, 4, 'd');
+      box(g, x, top - 4, 5, 1, 'e');
+      box(g, x + 4, top - 4, 1, 4, 'b');
+    }
+    box(g, GATE_LEFT, top, GATE_BODY, 1, 'e');
+    grate(g, GRATE_RAISED, passage, GATE_BASE - PASSAGE_H + 1);
+  } else {
+    box(g, GATE_LEFT, top, GATE_BODY, 1, 'd');
+    for (const x of [GATE_LEFT + 5, GATE_LEFT + 21]) dot(g, x, top, 'c');
+  }
+  if (!winter) return;
+  box(g, GATE_LEFT, top, GATE_BODY, 2, 'W');
+  box(g, GATE_LEFT, top + 2, GATE_BODY, 1, 'w');
+  if (step === 6) for (let x = GATE_LEFT; x < GATE_LEFT + GATE_BODY; x += 8) box(g, x, top - 4, 5, 1, 'W');
+}
+
+const gateFrames: Record<string, (g: Grid) => void> = {};
+for (let step = 1; step <= 6; step++) {
+  gateFrames[`${step}`] = g => gatehouse(g, step, false);
+  gateFrames[`${step}s`] = g => gatehouse(g, step, true);
+}
+
+/** How far down the passage the portcullis can be let, in steps of four pixels. */
+export const GRATE_STEPS = PASSAGE_H / 4;
+const grateFrames: Record<string, (g: Grid) => void> = {};
+for (let drop = 1; drop <= GRATE_STEPS; drop++) grateFrames[`${drop}`] = g => grate(g, drop * 4);
+
 export const castleSprites: Record<string, SpriteDef> = {
   castleFrames: define(FRAMES_W, FRAMES_H, frameFrames, [24, FRAMES_BASE + 1], buildLegend),
   castleWall: define(WALL_W, WALL_H, wallFrames, [8, WALL_BASE + 1], buildLegend),
   castleTower: define(TOWER_W, TOWER_H, towerFrames, [TOWER_CENTRE, TOWER_BASE + 1], buildLegend),
+  castleGatehouse: define(GATE_W, GATE_H, gateFrames, [GATE_CENTRE, GATE_BASE + 1], buildLegend),
+  castlePortcullis: define(PASSAGE_W, PASSAGE_H + 1, grateFrames, [PASSAGE_W / 2, 0], buildLegend),
   castleLine: define(LINE_W, LINE_H, { still }, [1, 1], legend),
   castleRoad: define(12, 8, { a: stone('b', 'a'), b: stone('a', 'b') }, [6, 4], legend),
   castleCart: define(20, 14, { empty: g => cart(g, 'empty'), some: g => cart(g, 'some'), full: g => cart(g, 'full') }, [10, 12], cartLegend)

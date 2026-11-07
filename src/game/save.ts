@@ -482,7 +482,8 @@ function validCastle({ castle, keep, progress, pony, day }: SaveShape): boolean 
   const finished: [string, boolean][] = [
     ['road', typed.road === NEEDS.road], ['frames', typed.frames === NEEDS.frames],
     ...SIDES.map((side): [string, boolean] => [`wall-${side}`, typed.wall[side] === NEEDS.wallSide]),
-    ...TOWERS.map((id): [string, boolean] => [`tower-${id}`, towerFinished(typed.towers[id])])
+    ...TOWERS.map((id): [string, boolean] => [`tower-${id}`, towerFinished(typed.towers[id])]),
+    ['gatehouse', typed.gatehouse === NEEDS.gatehouse]
   ];
   if (finished.some(([section, done]) => ((doneDays as Record<string, unknown>)[section] !== undefined) !== done)) return false;
   const towerList = TOWERS.map(id => typed.towers[id]);
