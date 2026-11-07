@@ -65,3 +65,32 @@ export const isRevealed = (state: GameState): boolean => state.castle.revealedDa
 
 /** Whether all four sides of the curtain wall are done. */
 export const wallFinished = (castle: CastleState): boolean => SIDES.every(side => castle.wall[side] === NEEDS.wallSide);
+
+/** The curtain wall's corners on the hills, in tiles, with the keep standing inside. */
+export const WALLS = { left: 13, right: 24, top: 5, bottom: 15 } as const;
+
+/** How far a point is from the line the walls follow, whichever side it is on. */
+export const lineDistance = (point: { x: number; y: number }): number => {
+  const dx = Math.max(WALLS.left - point.x, 0, point.x - WALLS.right);
+  const dy = Math.max(WALLS.top - point.y, 0, point.y - WALLS.bottom);
+  if (dx > 0 || dy > 0) return Math.hypot(dx, dy);
+  return Math.min(point.x - WALLS.left, WALLS.right - point.x, point.y - WALLS.top, WALLS.bottom - point.y);
+};
+
+/** The wall side a point inside the walls is nearest. */
+const nearestSide = (point: { x: number; y: number }): WallSide => {
+  const gaps: [WallSide, number][] = [['west', point.x - WALLS.left], ['east', WALLS.right - point.x], ['north', point.y - WALLS.top], ['south', WALLS.bottom - point.y]];
+  return gaps.reduce((best, gap) => (gap[1] < best[1] ? gap : best))[0];
+};
+
+/** Whether a tree inside the walls has been cleared, once the wall side nearest it has begun. Outside the walls nothing is cleared. */
+export const treeUnderWall = (castle: CastleState, tree: { x: number; y: number }): boolean => {
+  const inside = tree.x >= WALLS.left && tree.x <= WALLS.right && tree.y >= WALLS.top && tree.y <= WALLS.bottom;
+  return inside && castle.wall[nearestSide(tree)] > 0;
+};
+
+/** What a climb to the top of the keep on this day shows: the first only marks the day, and one on a later day sees the line of stones. */
+export const castleSeen = (castle: CastleState, day: number): CastleState => {
+  if (castle.firstClimbDay === null) return { ...castle, firstClimbDay: day };
+  return castle.revealedDay === null && day > castle.firstClimbDay ? { ...castle, revealedDay: day } : castle;
+};

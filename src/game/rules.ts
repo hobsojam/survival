@@ -19,6 +19,7 @@ import { BED_CROPS, bedsDawn, drawWaterBlocker, emptyBed, harvestBedBlocker, nee
 import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
 import { logsInStore } from './wood';
 import { settleStores } from './stores';
+import { castleSeen } from './castle';
 import { KEEP_DOOR_WOOD, climbKeepBlocker, hangDoorBlocker, inKeep, keepFinished, layStoneBlocker, stoneLine, withKeepDoor, withStoneLaid } from './keep';
 import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, cartSpace, countWord, fellingWood, upgradeBlocker, type UpgradeId } from './workshop';
 import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishingSecondsFor, validRoll } from './fishing';
@@ -1394,7 +1395,7 @@ const hangDoor: ActionHandler<'hangDoor'> = state => {
 const climbKeep = (state: GameState): ActionResult => {
   const blocker = climbKeepBlocker(state);
   if (blocker) return refuse(state, blocker);
-  return { state: advanceTime(state, BALANCE.stargazeSeconds, 'resting'), message: '' };
+  return { state: advanceTime({ ...state, castle: castleSeen(state.castle, state.day) }, BALANCE.stargazeSeconds, 'resting'), message: '' };
 };
 
 const enterKeep = (state: GameState): ActionResult =>

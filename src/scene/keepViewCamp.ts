@@ -1,6 +1,7 @@
 import { season } from '../game/calendar';
 import { STEP_IDS } from '../game/clearing';
 import { treeStage, type TreeStage } from '../game/orchard';
+import { isRevealed } from '../game/castle';
 import type { GameState } from '../game/state';
 
 // What the camp looks like from the top of the keep, read one landmark at a time from what the player has really built.
@@ -18,10 +19,18 @@ export interface CampView {
   bakery: boolean;
   sheep: number;
   orchard: { stage: TreeStage; apples: boolean }[] | null;
+  castle: CastleView;
+}
+
+/** What the castle adds to the view. EASTER EGG: nothing of it shows before the line of stones has been seen. */
+export interface CastleView {
+  line: boolean;
 }
 
 const SMALLEST_CLEARING = 15;
 const SHEEP_IN_THE_FLOCK = 3;
+
+export const castleView = (state: GameState): CastleView => ({ line: isRevealed(state) });
 
 export function campView(state: GameState): CampView {
   const built = state.structures;
@@ -44,6 +53,7 @@ export function campView(state: GameState): CampView {
         const stage = treeStage(tree, state.day);
         return [{ stage, apples: autumn && stage === 'grown' }];
       })
-      : null
+      : null,
+    castle: castleView(state)
   };
 }

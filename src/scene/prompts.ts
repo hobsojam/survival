@@ -4,6 +4,7 @@ import { isAtCamp, isInClearing, mineBlocker, sleepBlocker, type GameAction } fr
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, hillsPathOpen, pathOpen } from '../game/areas';
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
 import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, outcropNote } from '../game/hills';
+import { isRevealed, lineDistance } from '../game/castle';
 import { KEEP_DOOR_WOOD, KEEP_SITE, KEEP_STONES, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor } from '../game/keep';
 import { ponyNote, ponyOfferLabel } from '../game/pony';
 import { availableWood } from '../game/wood';
@@ -268,6 +269,8 @@ function keepChoice(state: GameState): Choice | null {
 function hillsChoices(state: GameState): Choice[] {
   const found = closestGatherable(state);
   const keep = keepChoice(state);
+  // EASTER EGG: the castle's line of old stones, named only once it has been seen.
+  const stones = isRevealed(state) && lineDistance(state.player) <= BALANCE.interactionRadius;
   const offer = ponyOfferLabel(state);
   const note = ponyNote(state);
   const outcrop = !found && within(state, OUTCROP_SITE) ? outcropNote(state) : null;
@@ -275,6 +278,7 @@ function hillsChoices(state: GameState): Choice[] {
     ...(found ? [gatherChoice(state, found)] : []),
     ...(outcrop ? [{ label: outcrop }] : []),
     ...(keep ? [keep] : []),
+    ...(stones ? [{ label: 'Old stones · a wall could run here' }] : []),
     ...(offer ? [{ label: offer, action: { type: 'offerPony' as const } }] : []),
     ...(note ? [{ label: note }] : [])
   ];

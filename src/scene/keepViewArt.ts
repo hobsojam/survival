@@ -177,6 +177,19 @@ function paintHills(p: Painter, look: SeasonLook): void {
   }
 }
 
+/** The line of stones the survivor has seen in the hills, off to the left of the camp: a dashed outline of old stone. */
+function paintLine(p: Painter, look: SeasonLook): void {
+  const stone = look.snow ? '#8b8f92' : '#a8a292';
+  for (let x = 20; x < 100; x += 5) {
+    p.rect(x, 150, 3, 1, stone);
+    p.rect(x, 168, 3, 1, stone);
+  }
+  for (let y = 150; y < 168; y += 5) {
+    p.rect(20, y, 1, 3, stone);
+    p.rect(98, y, 1, 3, stone);
+  }
+}
+
 function paintBattlements(p: Painter, look: SeasonLook): void {
   const stone = look.snow ? '#8b8f92' : '#77736a';
   const top = look.snow ?? '#928d81';
@@ -206,6 +219,7 @@ export function stillRects(season: Season, camp: CampView): PictureRect[] {
   paintCamp(p, look, camp);
   paintCliff(p, look);
   paintHills(p, look);
+  if (camp.castle.line) paintLine(p, look);
   paintBattlements(p, look);
   return p.rects;
 }

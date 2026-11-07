@@ -12,6 +12,7 @@ import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 import { OUTCROP_SITE, outcropLeft } from '../game/hills';
 import { KEEP_SITE, KEEP_STONES, keepFinished, keepOpen } from '../game/keep';
+import { isRevealed, treeUnderWall, WALLS } from '../game/castle';
 import { markedTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
 import { fireplaceBurning, woodStoreCapacity } from '../game/home';
@@ -79,7 +80,9 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     // One window is lit at night once the keep is finished, whether or not anybody is in.
     if (keepFinished(state) && state.timeOfDay >= nightStart(state.day)) add('keepGlow', 'keepGlow:lit', KEEP_SITE.x, KEEP_SITE.y, Math.round(worldY(KEEP_SITE.y)) + 1);
     const frame = isWinter(state.day) ? 'snow' : season(state.day);
-    HILL_TREES.forEach((tree, index) => add(`hill-tree-${index}`, `${tree.sprite}:${frame}`, tree.x, tree.y));
+    // EASTER EGG: the castle's line of old stones, a faint ground mark that stays under everything else.
+    if (isRevealed(state)) add('castle-line', 'castleLine:still', WALLS.left, WALLS.top, GROUND_DECAL_DEPTH);
+    HILL_TREES.forEach((tree, index) => treeUnderWall(state.castle, tree) || add(`hill-tree-${index}`, `${tree.sprite}:${frame}`, tree.x, tree.y));
     addPiles(state, visuals, add);
     return visuals;
   }
