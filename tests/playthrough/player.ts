@@ -9,11 +9,11 @@ import { FOOD_ITEMS, availableFood, foodCount, keptFoodTotal } from '../../src/g
 import { HILLS_EXIT, OUTCROP_SITE, availableOre, outcropLeft } from '../../src/game/hills';
 import { HOUSE_SPOT, fuelLeft, hasWoodStore, livesInHouse, woodStoreCapacity } from '../../src/game/home';
 import { recordJournal } from '../../src/game/journalEntries';
-import { NEEDS, isRevealed } from '../../src/game/castle';
-import { castleSpots } from '../../src/game/castleSites';
+import { NEEDS, TOWERS, isRevealed, towerFinished, wallFinished } from '../../src/game/castle';
+import { CART_SPOTS, GOODS, castleSpots, type CastleGood } from '../../src/game/castleSites';
 import { KEEP_DOOR_AT, KEEP_DOOR_WOOD, KEEP_SITE, keepFinished, keepOpen } from '../../src/game/keep';
 import { ORCHARD_SPOTS, spotAction } from '../../src/game/orchard';
-import { PONY_SPOTS, wildPonyAt, ponyOfferBlocker } from '../../src/game/pony';
+import { PONY_SPOTS, ponyOfferBlocker, ponyWith, wildPonyAt } from '../../src/game/pony';
 import { MINE_COST, advanceLiveTime, applyAction, type GameAction } from '../../src/game/rules';
 import { APPLE_TREE, HOMESTEAD_SHED } from '../../src/game/homestead';
 import { BALANCE, LOOKOUT, SITES, createGame, type AreaId, type GameState, type StructureId } from '../../src/game/state';
@@ -429,6 +429,12 @@ export class Player {
       // The castle: a second climb on a later day shows the line of stones, then the road is laid from the quarry to the keep.
       { id: 'castle-line', shown: state => keepFinished(state) && this.hits.has('keep-climbed'), done: isRevealed, step: () => this.seeTheLine() },
       { id: 'castle-road', shown: isRevealed, done: state => state.castle.road >= NEEDS.road, step: () => this.layRoad() },
+      // Then timber frames, the four sides of the wall, and the towers, with the beams and iron the towers are roofed with.
+      { id: 'castle-frames', shown: state => state.progress.workshop.stoneCart, done: state => state.castle.frames >= NEEDS.frames, step: () => this.raiseFrames() },
+      { id: 'castle-wall', shown: state => state.castle.frames >= NEEDS.frames, done: state => wallFinished(state.castle), step: () => this.layCastleStone('wall-') },
+      this.goodTask('beams', { wood: GOODS.beams.cost.wood, fiber: 0, stone: 0 }, NEEDS.towerBeams),
+      this.goodTask('fittings', { wood: GOODS.fittings.cost.wood, fiber: 0, stone: 0, ore: GOODS.fittings.cost.ore }, NEEDS.towerFittings),
+      { id: 'castle-towers', shown: state => wallFinished(state.castle), done: state => TOWERS.every(id => towerFinished(state.castle.towers[id])), step: () => this.buildTower() },
       { id: 'mine', shown: state => progress(state).pickaxeCrafted, done: state => progress(state).mineBuilt, step: () => this.buildMine() },
       ...(['basket', 'cairn'] as const).map(site => ({
         id: `visit:${site}`,
@@ -494,6 +500,63 @@ export class Player {
     if (this.state.inventory.stone === 0 && !this.makeRoom(BALANCE.stoneSpaces, 'stone')) return false;
     if (this.free() >= BALANCE.stoneSpaces && this.quarryStone()) return true;
     return this.state.inventory.stone > 0 && this.goTo(spot.area) && this.walkTo(spot) && this.act({ type: 'castleWork', site: spot.site });
+  }
+
+  /** Two wood a go, from the stores or the bag, carried up to where the frames go. */
+  private raiseFrames(): boolean {
+    const spot = castleSpots(this.state).find(each => each.site === 'frames');
+    if (!spot) return false;
+    if (availableWood(this.state) < 2) return this.fetchWood();
+    return this.goTo(spot.area) && this.walkTo(spot) && this.act({ type: 'castleWork', site: 'frames' });
+  }
+
+  /** Whether the quarry still has stone to give today. */
+  private quarryGives(): boolean {
+    const { state } = this;
+    return state.progress.pickaxeCrafted && (state.rubbleReadyDay <= state.day || state.quarryReadyDay <= state.day || (state.progress.mineBuilt && state.mineReadyDay <= state.day));
+  }
+
+  /** Stone for a wall side or a tower: dug into the cart or the bag, hauled up with the pony, and laid, nearest site first. */
+  private layCastleStone(prefix: string): boolean {
+    const spot = castleSpots(this.state).filter(each => each.site.startsWith(prefix))[0];
+    if (!spot) return false;
+    const usable = (): number => this.state.inventory.stone + (this.state.castle.cart.at === 'hills' ? this.state.castle.cart.stone : 0);
+    if (usable() === 0 && this.state.castle.cart.stone === 0 && !this.makeRoom(BALANCE.stoneSpaces, 'stone')) return false;
+    if (this.quarryGives() && (this.free() >= BALANCE.stoneSpaces || this.state.castle.cart.at === 'quarry') && this.quarryStone()) return true;
+    if (usable() === 0 && this.state.castle.cart.at === 'quarry' && this.state.castle.cart.stone > 0) return this.haulFromCart();
+    return usable() > 0 && this.goTo(spot.area) && this.walkTo(spot) && this.act({ type: 'castleWork', site: spot.site });
+  }
+
+  /** The cart's load goes up the hill with the pony when it can, and into the bag when it can't (in winter, or after dark). */
+  private haulFromCart(): boolean {
+    if (!this.goTo('quarry')) return false;
+    if (ponyWith(this.state) && !isWinter(this.state.day)) {
+      this.goTo('hills');
+      return this.state.castle.cart.at === 'hills';
+    }
+    return this.makeRoom(BALANCE.stoneSpaces, 'stone') && this.walkTo(CART_SPOTS.quarry) && this.act({ type: 'takeCartStone' });
+  }
+
+  /** A tower's stones, then the beams and iron made at camp, which are set from where the survivor stands. */
+  private buildTower(): boolean {
+    const spot = castleSpots(this.state).find(each => each.site.startsWith('tower-'));
+    if (!spot) return false;
+    const tower = this.state.castle.towers[spot.site.slice(6) as typeof TOWERS[number]];
+    if (tower.stones < NEEDS.towerStones) return this.layCastleStone('tower-');
+    const good = tower.beams < NEEDS.towerBeams ? 'beams' : 'fittings';
+    if (this.state.castle.goods[good] === 0) return false;
+    return this.goTo(spot.area) && this.walkTo(spot) && this.act({ type: 'castleWork', site: spot.site });
+  }
+
+  /** Oak beams from the workshop, or iron fittings from the forge, enough for the four towers. */
+  private goodTask(good: Exclude<CastleGood, 'hangings'>, cost: Cost, perTower: number): Task {
+    const built = (state: GameState): number => state.castle.goods[good] + TOWERS.reduce((sum, id) => sum + state.castle.towers[id][good], 0);
+    return {
+      id: `castle-${good}`,
+      shown: state => state.castle.frames > 0 && state.structures.workshop && (good === 'beams' || state.progress.workshop.forge),
+      done: state => built(state) >= perTower * TOWERS.length,
+      step: () => this.payFor(cost, { type: 'makeCastleGood', good })
+    };
   }
 
   private buildMine(): boolean {
@@ -742,5 +805,6 @@ export class Player {
   }
 }
 
-const DAYS_AFTER_THE_KEEP = 40;
+/** Long enough for the road, cart, frames, wall and towers: the slowest of the test games roofs its last tower 127 days after the keep. */
+const DAYS_AFTER_THE_KEEP = 150;
 const MILESTONES_THAT_END = ['keep-finished', 'keep-night', 'keep-climbed'];

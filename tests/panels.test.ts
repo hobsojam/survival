@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { fieldPanelView, granaryPanelView, stripMarkup, workshopView } from '../src/ui/panels';
+import { castleGoodsView, fieldPanelView, granaryPanelView, stripMarkup, workshopView } from '../src/ui/panels';
 import type { FieldStrip } from '../src/game/field';
 import { fieldCamp, strip, withField } from './fieldCamp';
 import { nightStart } from '../src/game/calendar';
 import { rosterLine } from '../src/game/names';
 import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from '../src/game/state';
+import { emptyCastle } from '../src/game/castle';
 import { CLEARING_STEPS } from '../src/game/clearing';
 import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, campStoresView, chickenCoopPanelView, friendRosterView, loomItemMarkup, loomPanelView, sheepPanelView, cloakView, foodLaidByDays, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
 import { dishBlocker } from '../src/game/cooking';
@@ -878,5 +879,34 @@ describe('cooking a berry', () => {
   it('offers it once there is a berry and a fire', () => {
     const berry = { ...lit, inventory: { ...lit.inventory, food: addFood(emptyFood(), 'berry', 1, 1) } };
     expect(cookBerryView(berry)).toEqual({ disabled: false, title: 'Toast a berry by the fire.' });
+  });
+});
+
+describe('the castle goods panel', () => {
+  const base = createGame();
+  const camp: GameState = {
+    ...base, area: 'camp', player: { ...base.player, x: BALANCE.campX, y: BALANCE.campY }, storedWood: 20, storedOre: 3,
+    structures: { ...base.structures, workshop: true },
+    progress: { ...base.progress, workshop: { ...base.progress.workshop, forge: true } },
+    castle: { ...emptyCastle(), firstClimbDay: 4, revealedDay: 5, frames: 1 }
+  };
+  const rows = (state: GameState) => Object.fromEntries(castleGoodsView(state).map(row => [row.good, row]));
+
+  it('shows beams and fittings with their costs and what is made, and keeps hangings hidden', () => {
+    const view = rows({ ...camp, castle: { ...camp.castle, goods: { beams: 4, fittings: 1, hangings: 0 } } });
+    expect(view.beams).toMatchObject({ shown: true, cost: '8 wood', have: 4, disabled: false });
+    expect(view.fittings).toMatchObject({ shown: true, cost: '1 wood · 1 ore', have: 1, disabled: false });
+    expect(view.hangings.shown).toBe(false);
+  });
+
+  it('is hidden before the reveal and before the frames are begun', () => {
+    expect(rows({ ...camp, castle: { ...camp.castle, revealedDay: null } }).beams.shown).toBe(false);
+    expect(rows({ ...camp, castle: { ...camp.castle, frames: 0 } }).beams.shown).toBe(false);
+  });
+
+  it('hides a row once the castle has enough, and shows why a row cannot be used', () => {
+    expect(rows({ ...camp, castle: { ...camp.castle, goods: { beams: 28, fittings: 0, hangings: 0 } } }).beams.shown).toBe(false);
+    const poor = rows({ ...camp, storedWood: 0 });
+    expect(poor.beams).toMatchObject({ shown: true, disabled: true, copy: 'Need 8 wood for the beams.' });
   });
 });
