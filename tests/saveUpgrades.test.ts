@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createGame } from '../src/game/state';
 import { loadGame, saveGame, SAVE_KEY, SAVE_VERSION } from '../src/game/save';
 import { emptyField } from '../src/game/field';
+import { STEP_IDS, placeBranches } from '../src/game/clearing';
+import { emptyCastle } from '../src/game/castle';
 import { beehiveCamp } from './beehiveCamp';
 import { OLDEST_UPGRADABLE_VERSION, SAVE_UPGRADES, upgradeSave, type SaveUpgrade } from '../src/game/saveUpgrades';
 
@@ -287,5 +289,36 @@ describe('the version 29 upgrade: the wild tree out of camp', () => {
     storage.setItem(SAVE_KEY, JSON.stringify({ version: 28, state: version28() }));
     const loaded = loadGame(storage);
     expect(loaded.kind === 'loaded' && loaded.state.trees.find(tree => tree.id === 'tree-1')).toMatchObject({ x: 16, y: 4 });
+  });
+});
+
+describe('the version 39 upgrade: the castle', () => {
+  it('gives a camp with a finished keep an unrevealed castle and no cart or portcullis, and loads', () => {
+    const old = createGame() as unknown as Record<string, any>;
+    old.day = 9;
+    old.progress.quarryFound = true;
+    old.progress.hillsFound = true;
+    old.progress.oreFoundDay = 2;
+    old.clearing = { cleared: [...STEP_IDS], marked: null, felled: [] };
+    old.nodes = placeBranches(old.nodes, [...STEP_IDS]);
+    old.structures.shelter = true;
+    old.structures.toolshed = true;
+    old.structures.workshop = true;
+    old.progress.nextStormDay = null;
+    old.progress.hearthUnlocked = true;
+    old.progress.packWoven = true;
+    old.progress.workshop = { ...old.progress.workshop, forge: true, hinges: true };
+    old.keep = { stones: 60, door: true, startedDay: 1, finishedDay: 2, ponyNight: null };
+    delete old.castle;
+    delete old.progress.workshop.stoneCart;
+    delete old.progress.workshop.portcullis;
+    const storage = new MemoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 38, state: old }));
+    const loaded = loadGame(storage);
+    expect(loaded.kind).toBe('loaded');
+    if (loaded.kind !== 'loaded') return;
+    expect(loaded.state.castle).toEqual(emptyCastle());
+    expect(loaded.state.progress.workshop).toMatchObject({ forge: true, hinges: true, stoneCart: false, portcullis: false });
+    expect(loaded.state.keep.stones).toBe(60);
   });
 });

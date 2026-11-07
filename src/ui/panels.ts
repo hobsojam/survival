@@ -1,3 +1,4 @@
+import { NEEDS, isRevealed } from '../game/castle';
 import { cutStripBlocker, grindGrainBlocker, sowStripBlocker, stripStage, threshStripBlocker, type StripStage } from '../game/field';
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isWinter, nightStart, season } from '../game/calendar';
 import { millGrainBlocker, takeLoafBlocker } from '../game/bakehouse';
@@ -15,6 +16,7 @@ import { hasWoodStore, livesInHouse, woodStoreCapacity } from '../game/home';
 import { availableFiber, availableWood, isAtCamp, axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, mineBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
 import { availableOre } from '../game/hills';
 import { ponyWith } from '../game/pony';
+import { GOODS, goodBlocker, goodRoom, type CastleGood } from '../game/castleSites';
 import { WORKSHOP_UPGRADES, upgradeBlocker, type UpgradeId } from '../game/workshop';
 import { logsInStore } from '../game/wood';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
@@ -276,14 +278,16 @@ const UPGRADE_COPY: Record<UpgradeId, { title: string; copy: string; made: strin
   forge: { title: 'Forge', copy: 'Add a stone lean-to and an anvil, to work the ore from the hills.', made: 'Ore from the hills is kept at the forge.' },
   horseshoes: { title: 'Horseshoes', copy: 'Shoe the pony, so it can come with you and carry a load.', made: 'The pony can come with you and carry a load.' },
   ironPickaxe: { title: 'Iron pickaxe', copy: 'Each dig at the quarry face gives two stone.', made: 'Each dig at the quarry face gives two stone.' },
-  hinges: { title: 'Iron hinges', copy: 'For the door of the keep, when its walls are ready.', made: 'They wait for the keep door.' }
+  hinges: { title: 'Iron hinges', copy: 'For the door of the keep, when its walls are ready.', made: 'They wait for the keep door.' },
+  stoneCart: { title: 'Stone cart', copy: 'A cart for the pony to pull. Stone dug at the quarry goes straight into it.', made: 'Stone dug at the quarry goes into the cart while it stands there, and it follows the pony to the hills.' },
+  portcullis: { title: 'Portcullis', copy: '', made: '' }
 };
 
 /** Whether an upgrade's row shows: the bed tools once there are beds, the harvest tools once there is a field, the quern once there is a granary. */
 const UPGRADE_SHOWN: Record<UpgradeId, (state: GameState) => boolean> = {
   saw: () => true, handcart: () => true, bedTools: state => state.structures.vegetableBeds,
   harvestTools: state => state.structures.field, quern: state => state.structures.granary, shears: state => state.structures.sheepPen,
-  forge: state => state.progress.oreFoundDay !== null, horseshoes: state => state.progress.workshop.forge && state.pony.won !== null, ironPickaxe: state => state.progress.workshop.forge, hinges: state => state.progress.workshop.forge
+  forge: state => state.progress.oreFoundDay !== null, horseshoes: state => state.progress.workshop.forge && state.pony.won !== null, ironPickaxe: state => state.progress.workshop.forge, hinges: state => state.progress.workshop.forge, stoneCart: state => state.castle.road >= NEEDS.road, portcullis: () => false
 };
 
 /** "3 wood · 3 stone": an upgrade's cost, leaving out what it doesn't need. */
@@ -317,8 +321,26 @@ export function workshopView(state: GameState): WorkshopView {
     const blocker = upgradeBlocker(state, id);
     return { shown, title, copy: blocker ?? copy, cost: costLabel(WORKSHOP_UPGRADES[id].cost), disabled: false, ready: !blocker };
   };
-  const rows = { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools'), harvestTools: row('harvestTools'), quern: row('quern'), shears: row('shears'), forge: row('forge'), horseshoes: row('horseshoes'), ironPickaxe: row('ironPickaxe'), hinges: row('hinges') };
+  const rows = { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools'), harvestTools: row('harvestTools'), quern: row('quern'), shears: row('shears'), forge: row('forge'), horseshoes: row('horseshoes'), ironPickaxe: row('ironPickaxe'), hinges: row('hinges'), stoneCart: row('stoneCart'), portcullis: row('portcullis') };
   return { shown: state.structures.workshop && Object.values(rows).some(item => item.shown), rows };
+}
+
+export interface CastleGoodRow { good: CastleGood; shown: boolean; title: string; copy: string; cost: string; have: number; disabled: boolean }
+
+const GOOD_COPY: Record<CastleGood, { title: string; copy: string; cost: string }> = {
+  beams: { title: 'Oak beams', copy: 'Four at a time, cut and dressed for the towers and the hall.', cost: costLabel({ ...GOODS.beams.cost, fiber: 0, stone: 0 }) },
+  fittings: { title: 'Iron fittings', copy: 'One at a time, to fit the beams.', cost: costLabel({ ...GOODS.fittings.cost, fiber: 0, stone: 0 }) },
+  hangings: { title: 'Wool hangings', copy: '', cost: '' }
+};
+
+/** The castle's goods, made at camp: a row shows once the frames are begun and the castle still wants more of it. Hangings stay hidden until the loom makes them. */
+export function castleGoodsView(state: GameState): CastleGoodRow[] {
+  return (['beams', 'fittings', 'hangings'] as const).map(good => {
+    const { title, copy, cost } = GOOD_COPY[good];
+    const blocker = goodBlocker(state, good);
+    const shown = good !== 'hangings' && isRevealed(state) && state.castle.frames > 0 && goodRoom(state.castle, good) > 0;
+    return { good, shown, title, copy: blocker ?? copy, cost, have: state.castle.goods[good], disabled: Boolean(blocker) };
+  });
 }
 
 export function lookoutView(state: GameState): ActionPanelView {

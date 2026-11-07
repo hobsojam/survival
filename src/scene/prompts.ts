@@ -1,9 +1,11 @@
 import { isWinter, nightStart } from '../game/calendar';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceKind, type SiteId, type TreeNode } from '../game/state';
-import { isAtCamp, isInClearing, mineBlocker, sleepBlocker, type GameAction } from '../game/rules';
+import { isAtCamp, isInClearing, mineBlocker, sleepBlocker, freeSpaces, spaceFor, type GameAction } from '../game/rules';
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, hillsPathOpen, pathOpen } from '../game/areas';
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
 import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, outcropNote } from '../game/hills';
+import { NEEDS, isRevealed, lineDistance } from '../game/castle';
+import { cartWithin, castleNeedsStone, castlePrompt, castleWorkBlocker, nearestCastleSpot } from '../game/castleSites';
 import { KEEP_DOOR_WOOD, KEEP_SITE, KEEP_STONES, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor } from '../game/keep';
 import { ponyNote, ponyOfferLabel } from '../game/pony';
 import { availableWood } from '../game/wood';
@@ -26,7 +28,7 @@ export const KEY_ACTIONS: readonly [string, GameAction][] = [
 
 const ACTION_POSES: Partial<Record<GameAction['type'], SurvivorAction>> = {
   gather: 'gather', rest: 'rest', cook: 'cook', stargaze: 'stargaze',
-  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', digOre: 'gather', layStone: 'gather', hangDoor: 'gather', offerPony: 'gather', fish: 'gather',
+  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', takeCartStone: 'gather', digOre: 'gather', layStone: 'gather', castleWork: 'gather', hangDoor: 'gather', offerPony: 'gather', fish: 'gather',
   gatherApples: 'gather', plantPip: 'gather', pickOrchardApple: 'gather', searchShed: 'gather', takeEgg: 'gather'
 };
 
@@ -140,6 +142,7 @@ export function actionEffect(action: GameAction, after: GameState): { kind: 'dus
   if (action.type === 'digQuarry') return { kind: 'dust', ...QUARRY_SITE };
   if (action.type === 'digOre') return { kind: 'dust', ...OUTCROP_SITE };
   if (action.type === 'layStone' || action.type === 'hangDoor') return { kind: 'dust', ...KEEP_SITE };
+  if (action.type === 'castleWork') return { kind: 'dust', x: after.player.x, y: after.player.y };
   if (action.type === 'cook' || action.type === 'stargaze') return { kind: action.type, x: after.player.x, y: after.player.y };
   return undefined;
 }
@@ -265,9 +268,48 @@ function keepChoice(state: GameState): Choice | null {
   return availableWood(state) < KEEP_DOOR_WOOD ? { label: `Keep · needs ${KEEP_DOOR_WOOD} wood for the door` } : { label: 'Hang the door', action: { type: 'hangDoor' } };
 }
 
+/** EASTER EGG: the castle's work nearest the survivor, when it is within reach. */
+function castleChoice(state: GameState): Choice | null {
+  const spot = nearestCastleSpot(state);
+  if (!spot || !within(state, spot)) return null;
+  const label = castlePrompt(state, spot);
+  return castleWorkBlocker(state, spot.site) === null ? { label, action: { type: 'castleWork', site: spot.site } } : { label };
+}
+
+/** EASTER EGG: the stone cart, when the survivor is at it: what it holds, and a load to take from it. */
+export function cartChoice(state: GameState): Choice | null {
+  if (!cartWithin(state)) return null;
+  const { stone } = state.castle.cart;
+  const load = `${stone}/${NEEDS.cartStone}`;
+  if (stone < 1) return { label: `Cart · empty (${load})` };
+  if (freeSpaces(state) < spaceFor('stone')) return { label: `Cart · your bag is full (${load})` };
+  return { label: `Take stone from the cart (${load})`, action: { type: 'takeCartStone' } };
+}
+
+/** EASTER EGG: the cart's load as a plain label, when it is made and stands in the survivor's area, so work near it shows it filling. */
+export function cartLoadNote(state: GameState): string | null {
+  const { stone, at } = state.castle.cart;
+  return state.progress.workshop.stoneCart && at === state.area ? `Cart ${stone}/${NEEDS.cartStone}` : null;
+}
+
+/** Whether the castle work in reach takes stone, so the cart's load is worth showing beside it. */
+function stoneWork(state: GameState): boolean {
+  return castleChoice(state) !== null && castleNeedsStone(state, nearestCastleSpot(state));
+}
+
+/** The load beside the work it follows: the quarry face, the rubble or an open castle site, but not at the cart, which names its own load. */
+function withCartLoad(state: GameState, prompt: string, nearWork: boolean): string {
+  const note = cartLoadNote(state);
+  return note && nearWork && !cartWithin(state) ? `${prompt} · ${note}` : prompt;
+}
+
 function hillsChoices(state: GameState): Choice[] {
   const found = closestGatherable(state);
   const keep = keepChoice(state);
+  const castle = castleChoice(state);
+  const cart = cartChoice(state);
+  // EASTER EGG: the castle's line of old stones, named only once it has been seen.
+  const stones = isRevealed(state) && state.castle.frames === 0 && !castle && lineDistance(state.player) <= BALANCE.interactionRadius;
   const offer = ponyOfferLabel(state);
   const note = ponyNote(state);
   const outcrop = !found && within(state, OUTCROP_SITE) ? outcropNote(state) : null;
@@ -275,6 +317,9 @@ function hillsChoices(state: GameState): Choice[] {
     ...(found ? [gatherChoice(state, found)] : []),
     ...(outcrop ? [{ label: outcrop }] : []),
     ...(keep ? [keep] : []),
+    ...(castle ? [castle] : []),
+    ...(cart ? [cart] : []),
+    ...(stones ? [{ label: 'Old stones · a wall could run here' }] : []),
     ...(offer ? [{ label: offer, action: { type: 'offerPony' as const } }] : []),
     ...(note ? [{ label: note }] : [])
   ];
@@ -282,7 +327,7 @@ function hillsChoices(state: GameState): Choice[] {
 
 function hillsPrompt(state: GameState): string {
   const labels = choiceLabels(hillsChoices(state));
-  if (labels.length) return labels.join(' · ');
+  if (labels.length) return withCartLoad(state, labels.join(' · '), stoneWork(state));
   if (within(state, HILLS_EXIT)) return 'Walk east to go back down';
   return 'WASD / arrows  Move';
 }
@@ -290,11 +335,27 @@ function hillsPrompt(state: GameState): string {
 /** Everything in reach in the quarry area: a loose pile first, then the rubble or the quarry face. */
 function quarryChoices(state: GameState): Choice[] {
   const found = closestGatherable(state);
+  const castle = castleChoice(state);
+  const cart = cartChoice(state);
   if (!found && within(state, QUARRY_SITE) && !mineBlocker(state)) return [{ label: 'Build timber mine', action: { type: 'buildMine' } }];
-  return found ? [gatherChoice(state, found)] : [];
+  return [...(found ? [gatherChoice(state, found)] : []), ...(castle ? [castle] : []), ...(cart ? [cart] : [])];
 }
 
+/** The quarry's prompt, with the road's beside it when the survivor is at the road. */
 function quarryPrompt(state: GameState): string {
+  const nearWork = within(state, QUARRY_SITE) || within(state, RUBBLE_SITE);
+  return withCartLoad(state, quarryRoadPrompt(state), nearWork || stoneWork(state));
+}
+
+function quarryRoadPrompt(state: GameState): string {
+  const base = quarryBasePrompt(state);
+  const castle = castleChoice(state) ?? cartChoice(state);
+  if (!castle) return base;
+  const label = castle.action && useKeyAction(state)?.type === castle.action.type ? `E  ${castle.label}` : castle.label;
+  return base === 'WASD / arrows  Move' ? label : `${base} · ${label}`;
+}
+
+function quarryBasePrompt(state: GameState): string {
   const found = closestGatherable(state);
   if (found) {
     const [label] = choiceLabels([gatherChoice(state, found)]);

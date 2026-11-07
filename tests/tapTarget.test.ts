@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE, LOOKOUT, SITES, createGame } from '../src/game/state';
+import { BALANCE, LOOKOUT, SITES, createGame, type GameState } from '../src/game/state';
+import { castleSpots } from '../src/game/castleSites';
 import { CAMP_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { markedTrees } from '../src/game/clearing';
 import { closestGatherable, hasArrived, moveStep, nextWalk, pickTapTarget, targetAction, type TapTarget } from '../src/scene/tapTarget';
@@ -287,5 +288,33 @@ describe('forage out of season', () => {
     state.day = 21;
     expect(pickTapTarget(state, hazel.x, hazel.y)).toMatchObject({ kind: 'ground' });
     expect(closestGatherable(state)).toBeUndefined();
+  });
+});
+
+describe('the road in a tap', () => {
+  const revealedGame = (): GameState => {
+    const base = createGame();
+    return { ...base, inventory: { ...base.inventory, stone: 3 }, castle: { ...base.castle, firstClimbDay: 1, revealedDay: 2 } };
+  };
+
+  it('picks the head of the road on the quarry floor, and lays a stone there', () => {
+    const state = { ...revealedGame(), area: 'quarry' as const };
+    const [spot] = castleSpots(state);
+    const target = pickTapTarget(state, spot.x, spot.y);
+    expect(target).toEqual({ kind: 'castleSite', site: 'road', x: spot.x, y: spot.y });
+    expect(targetAction(target)).toEqual({ type: 'castleWork', site: 'road' });
+  });
+
+  it('picks the head of the road on the hills', () => {
+    const state = { ...revealedGame(), area: 'hills' as const, castle: { ...revealedGame().castle, road: 15 } };
+    const [spot] = castleSpots(state);
+    expect(pickTapTarget(state, spot.x, spot.y).kind).toBe('castleSite');
+  });
+
+  it('is not there before the line has shown, or on the other area', () => {
+    const unseen = { ...revealedGame(), area: 'quarry' as const, castle: createGame().castle };
+    expect(pickTapTarget(unseen, 9, 12.5).kind).not.toBe('castleSite');
+    const hills = { ...revealedGame(), area: 'hills' as const };
+    expect(pickTapTarget(hills, 10, 13).kind).not.toBe('castleSite');
   });
 });

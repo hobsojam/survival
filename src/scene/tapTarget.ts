@@ -6,6 +6,7 @@ import { sprites } from '../art/sprites';
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, hillsPathOpen, pathOpen } from '../game/areas';
 import { wildPonyAt } from '../game/pony';
 import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, outcropLeft } from '../game/hills';
+import { CART_SPOTS, castleSpots, type CastleSite } from '../game/castleSites';
 import { KEEP_SITE, keepFinished, keepNeedsDoor } from '../game/keep';
 import { keepFrame } from './visuals';
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
@@ -26,6 +27,8 @@ export type TapTarget =
   | { kind: 'outcrop'; x: number; y: number }
   | { kind: 'pony'; x: number; y: number }
   | { kind: 'keepSite' | 'keepHang' | 'keepDoor'; x: number; y: number }
+  | { kind: 'castleSite'; site: CastleSite; x: number; y: number }
+  | { kind: 'stoneCart'; x: number; y: number }
   | { kind: 'chickens'; x: number; y: number; action: 'meetChickens' | 'leadChickens' }
   | { kind: 'appleTree' | 'shed' | 'coop'; x: number; y: number }
   | { kind: 'orchard'; spot: number; x: number; y: number; action: GameAction | null }
@@ -89,6 +92,17 @@ function keepTargets(state: GameState): { target: TapTarget; sprite?: string; fr
   return [{ target: { kind, ...KEEP_SITE }, sprite: 'keep', frame: shown.split(':')[1] }];
 }
 
+/** The castle's open sites in this area, each tapped where its next piece goes. */
+function castleTargets(state: GameState): { target: TapTarget }[] {
+  return castleSpots(state).filter(spot => spot.area === state.area).map(({ site, x, y }) => ({ target: { kind: 'castleSite' as const, site, x, y } }));
+}
+
+/** The stone cart where it stands, once it is made. EASTER EGG: the castle, see src/game/castle.ts. */
+function cartTargets(state: GameState): { target: TapTarget; sprite: string }[] {
+  const at = state.castle.cart.at;
+  return state.progress.workshop.stoneCart && state.area === at ? [{ target: { kind: 'stoneCart' as const, ...CART_SPOTS[at] }, sprite: 'castleCart' }] : [];
+}
+
 /** The closest interactive thing near the tap, or the tapped ground. */
 export function pickTapTarget(state: GameState, x: number, y: number): TapTarget {
   const piles = state.stonePiles.filter(pile => pile.area === state.area)
@@ -98,6 +112,8 @@ export function pickTapTarget(state: GameState, x: number, y: number): TapTarget
     candidates = [...piles,
       { target: { kind: 'quarry', x: QUARRY_SITE.x, y: QUARRY_SITE.y }, sprite: 'quarry' },
       { target: { kind: 'rubble', x: RUBBLE_SITE.x, y: RUBBLE_SITE.y } },
+      ...castleTargets(state),
+      ...cartTargets(state),
       { target: { kind: 'crossing', x: QUARRY_EXIT.x, y: QUARRY_EXIT.y } },
       ...(hillsPathOpen(state) ? [{ target: { kind: 'crossing' as const, ...QUARRY_HILLS_EXIT } }] : [])];
   } else if (state.area === 'hills') {
@@ -105,6 +121,8 @@ export function pickTapTarget(state: GameState, x: number, y: number): TapTarget
     candidates = [...piles,
       { target: { kind: 'outcrop', ...OUTCROP_SITE }, sprite: 'outcrop' },
       ...keepTargets(state),
+      ...castleTargets(state),
+      ...cartTargets(state),
       ...(wild ? [{ target: { kind: 'pony' as const, ...wild }, sprite: 'pony' }] : []),
       { target: { kind: 'crossing', ...HILLS_EXIT } }];
   } else if (state.area === 'homestead') {
@@ -188,6 +206,8 @@ export function targetAction(target: TapTarget): GameAction | null {
     case 'keepSite': return { type: 'layStone' };
     case 'keepHang': return { type: 'hangDoor' };
     case 'keepDoor': return { type: 'enterKeep' };
+    case 'castleSite': return { type: 'castleWork', site: target.site };
+    case 'stoneCart': return { type: 'takeCartStone' };
     case 'chickens': return { type: target.action };
     case 'appleTree': return { type: 'gatherApples' };
     case 'shed': return { type: 'searchShed' };

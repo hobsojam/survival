@@ -64,7 +64,7 @@ describe('the workshop', () => {
     expect(BUILDINGS.workshop).toEqual({ name: 'Workshop', description: 'Make a saw, a handcart and bed tools', symbol: '⚒',
       cost: { wood: 10, fiber: 4, stone: 6 }, prerequisite: 'toolshed', ground: 'east-far' });
     expect(createGame().structures.workshop).toBe(false);
-    expect(createGame().progress.workshop).toEqual({ saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false, shears: false, forge: false, horseshoes: false, ironPickaxe: false, hinges: false });
+    expect(createGame().progress.workshop).toEqual({ saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false, shears: false, forge: false, horseshoes: false, ironPickaxe: false, hinges: false, stoneCart: false, portcullis: false });
     expect(WORKSHOP_UPGRADES).toEqual({
       saw: { name: 'saw', cost: { wood: 3, fiber: 0, stone: 3 } },
       handcart: { name: 'handcart', cost: { wood: 8, fiber: 2, stone: 1 } },
@@ -75,9 +75,11 @@ describe('the workshop', () => {
       forge: { name: 'forge', cost: { wood: 2, fiber: 0, stone: 6 } },
       horseshoes: { name: 'horseshoes', cost: { wood: 1, fiber: 0, stone: 0, ore: 2 } },
       ironPickaxe: { name: 'iron pickaxe', cost: { wood: 1, fiber: 0, stone: 0, ore: 3 } },
-      hinges: { name: 'iron hinges', cost: { wood: 1, fiber: 0, stone: 0, ore: 2 } }
+      hinges: { name: 'iron hinges', cost: { wood: 1, fiber: 0, stone: 0, ore: 2 } },
+      stoneCart: { name: 'stone cart', cost: { wood: 8, fiber: 0, stone: 0, ore: 2 } },
+      portcullis: { name: 'portcullis', cost: { wood: 4, fiber: 0, stone: 0, ore: 4 } }
     });
-    expect(Object.keys(WORKSHOP_UPGRADES)).toEqual(['saw', 'handcart', 'bedTools', 'harvestTools', 'quern', 'shears', 'forge', 'horseshoes', 'ironPickaxe', 'hinges']);
+    expect(Object.keys(WORKSHOP_UPGRADES)).toEqual(['saw', 'handcart', 'bedTools', 'harvestTools', 'quern', 'shears', 'forge', 'horseshoes', 'ironPickaxe', 'hinges', 'stoneCart', 'portcullis']);
     expect(BALANCE.sawWood).toBe(4);
   });
 
@@ -111,7 +113,7 @@ describe('making an upgrade', () => {
     const state = workshopCamp({ woodpile: true, stonePile: true }, { storedWood: 2, storedStone: 3 });
     const result = applyAction(withBag(state, { wood: 1 }), { type: 'makeUpgrade', upgrade: 'saw' });
     expect(result.message).toBe('You made a saw. A felled tree gives twice the wood now.');
-    expect(result.state.progress.workshop).toEqual({ saw: true, handcart: false, bedTools: false, harvestTools: false, quern: false, shears: false, forge: false, horseshoes: false, ironPickaxe: false, hinges: false });
+    expect(result.state.progress.workshop).toEqual({ saw: true, handcart: false, bedTools: false, harvestTools: false, quern: false, shears: false, forge: false, horseshoes: false, ironPickaxe: false, hinges: false, stoneCart: false, portcullis: false });
     expect(result.state).toMatchObject({ storedWood: 0, storedStone: 0, inventory: { wood: 0, stone: 0 } });
     expect(result.state.timeOfDay).toBe(state.timeOfDay + BALANCE.buildSeconds);
     expect(result.state.player.energy).toBe(state.player.energy - BALANCE.buildEnergyCost);
@@ -176,7 +178,7 @@ describe('saving the workshop', () => {
   it('keeps the upgrades made', () => {
     const loaded = roundTrip(made(workshopCamp(), 'saw'));
     expect(loaded.kind).toBe('loaded');
-    if (loaded.kind === 'loaded') expect(loaded.state.progress.workshop).toEqual({ saw: true, handcart: false, bedTools: false, harvestTools: false, quern: false, shears: false, forge: false, horseshoes: false, ironPickaxe: false, hinges: false });
+    if (loaded.kind === 'loaded') expect(loaded.state.progress.workshop).toEqual({ saw: true, handcart: false, bedTools: false, harvestTools: false, quern: false, shears: false, forge: false, horseshoes: false, ironPickaxe: false, hinges: false, stoneCart: false, portcullis: false });
   });
 
   const tampered = (edit: (data: Record<string, any>) => void): string => {
@@ -416,5 +418,48 @@ describe('the workshop panel', () => {
     expect(journalView(state).nextHint).toBe('Build a workshop on the cleared east ground to make a saw and a handcart.');
     expect(journalView(workshopCamp()).nextHint).not.toContain('workshop');
     expect(journalView(workshopCamp({ workshop: false }, {}, ['east-near'])).nextHint).not.toContain('workshop');
+  });
+});
+
+describe('the castle upgrades', () => {
+  const forgeCamp = (changes: Partial<GameState> = {}): GameState => {
+    const state = workshopCamp({}, changes);
+    return { ...state, progress: { ...state.progress, workshop: { ...state.progress.workshop, forge: true } }, inventory: { ...state.inventory, ore: 4 }, storedWood: 8 };
+  };
+
+  it('keeps the stone cart until the road is done and the pony is shod', () => {
+    const base = forgeCamp();
+    expect(upgradeBlocker(base, 'stoneCart')).not.toBeNull();
+    const road = { ...base, castle: { ...base.castle, road: 30 } };
+    expect(upgradeBlocker(road, 'stoneCart')).toBe('The cart needs the finished road and a shod pony.');
+    expect(upgradeBlocker({ ...road, pony: { ...road.pony, shod: 5 } }, 'stoneCart')).toBeNull();
+    expect(upgradeBlocker({ ...base, castle: { ...base.castle, road: 29 }, pony: { ...base.pony, shod: 5 } }, 'stoneCart')).not.toBeNull();
+  });
+
+  it('keeps the portcullis until all four wall sides are done', () => {
+    const base = forgeCamp();
+    const wall = (west: number) => ({ ...base, castle: { ...base.castle, wall: { north: 30, east: 30, south: 30, west } } });
+    expect(upgradeBlocker(wall(29), 'portcullis')).toBe('The portcullis can wait until the wall is done.');
+    expect(upgradeBlocker(wall(30), 'portcullis')).toBeNull();
+  });
+
+  it('shows the cart on the workshop panel only once the road is done, and the portcullis not yet', () => {
+    const base = forgeCamp();
+    const before = workshopView({ ...base, castle: { ...base.castle, road: 29 } }).rows;
+    expect([before.stoneCart.shown, before.portcullis.shown]).toEqual([false, false]);
+    const road = { ...base, castle: { ...base.castle, road: 30 }, pony: { ...base.pony, shod: 5 } };
+    const { rows } = workshopView(road);
+    expect([rows.stoneCart.shown, rows.portcullis.shown]).toEqual([true, false]);
+    expect(rows.stoneCart.copy).toBe('A cart for the pony to pull. Stone dug at the quarry goes straight into it.');
+    expect(rows.stoneCart.title).toBe('Stone cart');
+    expect(rows.stoneCart.cost).toBe('8 wood · 2 ore');
+    expect(rows.stoneCart.ready).toBe(true);
+  });
+
+  it('says the cart is made once it is', () => {
+    const base = forgeCamp();
+    const made = { ...base, castle: { ...base.castle, road: 30 }, progress: { ...base.progress, workshop: { ...base.progress.workshop, stoneCart: true } } };
+    const { rows } = workshopView(made);
+    expect(rows.stoneCart).toMatchObject({ shown: false, cost: 'Made', disabled: true, copy: 'Stone dug at the quarry goes into the cart while it stands there, and it follows the pony to the hills.' });
   });
 });
