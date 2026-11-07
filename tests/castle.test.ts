@@ -3,7 +3,7 @@ import type { Season } from '../src/game/calendar';
 import { NEEDS, WALLS, emptyCastle, isRevealed, treeUnderWall } from '../src/game/castle';
 import { castleNews, castlePrompt, castleSpots, castleWorkBlocker, castleWorkLine, nearestCastleSpot, siteNeed } from '../src/game/castleSites';
 import { HILLS_EXIT, QUARRY_HILLS_EXIT } from '../src/game/hills';
-import { QUARRY_SITE } from '../src/game/areas';
+import { QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { TOO_TIRED_MESSAGE, workSeconds } from '../src/game/needs';
 import { newsBetween } from '../src/game/news';
 import { upgradeBlocker } from '../src/game/workshop';
@@ -173,8 +173,7 @@ describe('the road: where it is', () => {
     const heads = Array.from({ length: 20 }, (_, i) => castleSpots(atRoad(10 + i))[0]);
     expect(heads.every(spot => spot.area === 'hills')).toBe(true);
     expect(Math.hypot(heads[0].x - HILLS_EXIT.x, heads[0].y - HILLS_EXIT.y)).toBeLessThan(3);
-    expect(heads[19].x).toBeCloseTo(KEEP_SITE.x, 0);
-    expect(heads[19].y).toBeCloseTo(KEEP_SITE.y + 1, 0);
+    expect(Math.hypot(heads[19].x - KEEP_SITE.x, heads[19].y - KEEP_SITE.y)).toBeLessThan(3.5);
     const keepGap = heads.map(spot => Math.hypot(spot.x - KEEP_SITE.x, spot.y - KEEP_SITE.y));
     expect(keepGap[0]).toBeGreaterThan(keepGap[19]);
   });
@@ -197,6 +196,21 @@ describe('the road: where it is', () => {
     const refused = applyAction(atRoad(0), { type: 'castleWork', site: 'frames' });
     expect(refused.message).toBe('There is nothing to build here yet.');
     expect(refused.state.castle).toEqual(atRoad(0).castle);
+  });
+});
+
+describe('the road: out of the way of other work', () => {
+  it('keeps every head beyond reach of the quarry face, the rubble and the keep', () => {
+    for (let road = 0; road < NEEDS.road; road++) {
+      const head = castleSpots(atRoad(road))[0];
+      for (const site of [QUARRY_SITE, RUBBLE_SITE, KEEP_SITE]) {
+        if (head.area === (site === KEEP_SITE ? 'hills' : 'quarry')) expect(Math.hypot(head.x - site.x, head.y - site.y), `stone ${road + 1}`).toBeGreaterThan(BALANCE.interactionRadius);
+      }
+    }
+  });
+
+  it.each([0, 28, 29])('lays a stone on E at road = %i', road => {
+    expect(useKeyAction(atRoad(road))).toEqual({ type: 'castleWork', site: 'road' });
   });
 });
 
@@ -255,8 +269,8 @@ describe('the road: laying stones', () => {
   });
 
   it('marks the day the road was finished, and no sooner', () => {
-    expect(work(atRoad(28)).state.castle.roadDay).toBeNull();
-    expect(work(atRoad(29)).state.castle.roadDay).toBe(5);
+    expect(work(atRoad(28)).state.castle.doneDays).toEqual({});
+    expect(work(atRoad(29)).state.castle.doneDays).toEqual({ road: 5 });
   });
 
   it('lets the workshop offer the cart once the road is done', () => {

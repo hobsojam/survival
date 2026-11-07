@@ -9,6 +9,10 @@ export type WallSide = 'north' | 'east' | 'south' | 'west';
 export type TowerId = 'nw' | 'ne' | 'se' | 'sw';
 export type FeastItem = 'bread' | 'roastedHazelnuts' | 'honey' | 'apple' | 'vegetables';
 
+/** The sections that are finished one at a time, each of which can leave a note for the morning after. */
+export type CastleSection = 'road' | 'frames' | 'wall-north' | 'wall-east' | 'wall-south' | 'wall-west' | 'tower-nw' | 'tower-ne' | 'tower-se' | 'tower-sw' | 'gatehouse' | 'moat' | 'hall';
+export const CASTLE_SECTIONS: readonly CastleSection[] = ['road', 'frames', 'wall-north', 'wall-east', 'wall-south', 'wall-west', 'tower-nw', 'tower-ne', 'tower-se', 'tower-sw', 'gatehouse', 'moat', 'hall'];
+
 export interface Tower { stones: number; beams: number; fittings: number }
 
 export interface CastleState {
@@ -16,8 +20,6 @@ export interface CastleState {
   firstClimbDay: number | null;
   revealedDay: number | null;
   road: number;
-  /** The day the road's last stone went on. */
-  roadDay: number | null;
   /** Stone in the cart, and where the cart stands. */
   cart: { stone: number; at: 'quarry' | 'hills' };
   frames: number;
@@ -29,6 +31,8 @@ export interface CastleState {
   /** Goods made at camp, which count from anywhere. */
   goods: { beams: number; fittings: number; hangings: number };
   feast: Record<FeastItem, number>;
+  /** The day each section was finished, once it is. */
+  doneDays: Partial<Record<CastleSection, number>>;
   finishedDay: number | null;
   home: 'house' | 'hall';
   offeredHome: boolean;
@@ -40,7 +44,7 @@ export const FEAST_ITEMS: readonly FeastItem[] = ['bread', 'roastedHazelnuts', '
 
 export const emptyCastle = (): CastleState => ({
   firstClimbDay: null, revealedDay: null,
-  road: 0, roadDay: null,
+  road: 0,
   cart: { stone: 0, at: 'quarry' },
   frames: 0,
   wall: { north: 0, east: 0, south: 0, west: 0 },
@@ -50,6 +54,7 @@ export const emptyCastle = (): CastleState => ({
   hall: { stones: 0, beams: 0, fittings: 0, hangings: 0 },
   goods: { beams: 0, fittings: 0, hangings: 0 },
   feast: { bread: 0, roastedHazelnuts: 0, honey: 0, apple: 0, vegetables: 0 },
+  doneDays: {},
   finishedDay: null,
   home: 'house',
   offeredHome: false

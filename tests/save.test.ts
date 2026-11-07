@@ -798,10 +798,10 @@ describe('the castle in the save', () => {
   });
 
   it('accepts a castle built in order, up to its finish', () => {
-    expect(accepts(state => { state.castle.road = 30; state.castle.roadDay = 6; state.progress.workshop.stoneCart = true; state.castle.cart.stone = 40; wallDone(state.castle); })).toBe(true);
+    expect(accepts(state => { state.castle.road = 30; state.castle.doneDays = { road: 6 }; state.progress.workshop.stoneCart = true; state.castle.cart.stone = 40; wallDone(state.castle); })).toBe(true);
     expect(accepts(state => {
       const castle = state.castle;
-      castle.road = 30; state.progress.workshop.stoneCart = true; state.progress.workshop.portcullis = true; wallDone(castle);
+      castle.road = 30; castle.doneDays = { road: 6 }; state.progress.workshop.stoneCart = true; state.progress.workshop.portcullis = true; wallDone(castle);
       castle.towers = { nw: { stones: 20, beams: 4, fittings: 2 }, ne: { stones: 20, beams: 4, fittings: 2 }, se: { stones: 20, beams: 4, fittings: 2 }, sw: { stones: 20, beams: 4, fittings: 2 } };
       castle.gatehouse = 30; castle.moat = { stretches: 16, lastDugDay: 8, dugDay: 8 };
       castle.hall = { stones: 40, beams: 12, fittings: 6, hangings: 2 };
@@ -811,8 +811,13 @@ describe('the castle in the save', () => {
   });
 
   it.each<[string, (state: GameState) => void]>([
-    ['a road finished day with the road unfinished', state => { state.castle.road = 29; state.castle.roadDay = 5; }],
-    ['a road finished day in the future', state => { state.castle.road = 30; state.castle.roadDay = 9999; }],
+    ['a road day with the road unfinished', state => { state.castle.road = 29; state.castle.doneDays = { road: 5 }; }],
+    ['a finished road with no day', state => { state.castle.road = 30; state.castle.doneDays = {}; }],
+    ['a done day in the future', state => { state.castle.road = 30; state.castle.doneDays = { road: 9999 }; }],
+    ['a done day of zero', state => { state.castle.road = 30; state.castle.doneDays = { road: 0 }; }],
+    ['a done day that is not whole', state => { state.castle.road = 30; state.castle.doneDays = { road: 5.5 }; }],
+    ['a done day for an unknown section', state => { (state.castle.doneDays as Record<string, number>).keep = 5; }],
+    ['done days that are not a map', state => { (state.castle as unknown as Record<string, unknown>).doneDays = null; }],
     ['a road over its length', state => { state.castle.road = 31; }],
     ['more stone in the cart than it holds', state => { state.castle.cart.stone = 41; }],
     ['a wall side over its length', state => { state.castle.wall.north = 31; }],

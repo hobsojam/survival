@@ -19,10 +19,14 @@ export type SiteNeed =
   | { kind: 'food'; item: FeastItem }
   | { kind: 'portcullis' };
 
+/** The road starts a little past the quarry face and stops a little short of the keep's door, so reaching for a stone never reaches the face or the door too. */
+const ROAD_START = { x: QUARRY_SITE.x - 2.4, y: QUARRY_SITE.y + 0.6 };
+const ROAD_END = { x: KEEP_SITE.x + 2.2, y: KEEP_SITE.y + 1.55 };
+
 /** The road's first ten stones lie on the quarry, and the other twenty on the hills. */
 const ROAD_QUARRY = 10;
 /** Where the road comes up the hills: in from the east edge, round the bend, and up to the keep's door. */
-const ROAD_HILLS: readonly { x: number; y: number }[] = [HILLS_EXIT, { x: 26, y: 13 }, { x: KEEP_SITE.x, y: KEEP_SITE.y + 1 }];
+const ROAD_HILLS: readonly { x: number; y: number }[] = [HILLS_EXIT, { x: 26, y: 13 }, ROAD_END];
 
 /** A point a fraction of the way along a line of corners, by distance. */
 const along = (corners: readonly { x: number; y: number }[], fraction: number): { x: number; y: number } => {
@@ -40,7 +44,7 @@ const along = (corners: readonly { x: number; y: number }[], fraction: number): 
 
 /** Where the nth stone of the road (counting from 1) lies. */
 export const roadStone = (n: number): { area: AreaId; x: number; y: number } => {
-  if (n <= ROAD_QUARRY) return { area: 'quarry', ...along([QUARRY_SITE, QUARRY_HILLS_EXIT], n / ROAD_QUARRY) };
+  if (n <= ROAD_QUARRY) return { area: 'quarry', ...along([ROAD_START, QUARRY_HILLS_EXIT], n / ROAD_QUARRY) };
   return { area: 'hills', ...along(ROAD_HILLS, (n - ROAD_QUARRY) / (NEEDS.road - ROAD_QUARRY)) };
 };
 
@@ -76,7 +80,7 @@ const SITE_RULES: Partial<Record<CastleSite, SiteRule>> = {
     spot: castle => roadStone(castle.road + 1),
     far: 'Move closer to the road.',
     done: 'The road is finished.',
-    lay: (castle, day) => ({ ...castle, road: castle.road + 1, roadDay: castle.road + 1 === NEEDS.road ? day : castle.roadDay }),
+    lay: (castle, day) => ({ ...castle, road: castle.road + 1, doneDays: castle.road + 1 === NEEDS.road ? { ...castle.doneDays, road: day } : castle.doneDays }),
     line: castle => ROAD_LINES[castle.road] ?? 'You lay another stone of the road.',
     count: castle => castle.road,
     label: castle => `Lay a road stone (${castle.road}/${NEEDS.road})`,
@@ -150,6 +154,6 @@ export const castleWorkLine = (before: GameState, after: GameState): string => {
 export const castleNews = (before: GameState, after: GameState): string[] => {
   if (after.day <= before.day) return [];
   const notes: string[] = [];
-  if (after.castle.roadDay === before.day) notes.push('The road is finished. The pony could pull a cart along it now.');
+  if (after.castle.doneDays.road === before.day) notes.push('The road is finished. The pony could pull a cart along it now.');
   return notes;
 };
