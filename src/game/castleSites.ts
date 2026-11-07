@@ -1,7 +1,7 @@
 import { QUARRY_SITE } from './areas';
-import { NEEDS, isRevealed, type CastleState, type FeastItem, type TowerId, type WallSide } from './castle';
-import { HILLS_EXIT, QUARRY_HILLS_EXIT } from './hills';
-import { freeSpaces, spaceFor } from './camp';
+import { NEEDS, TOWERS, isRevealed, type CastleState, type FeastItem, type TowerId, type WallSide } from './castle';
+import { HILLS_EXIT, QUARRY_HILLS_EXIT, availableOre } from './hills';
+import { availableWood, freeSpaces, isInClearing, spaceFor } from './camp';
 import { isWinter } from './calendar';
 import { KEEP_SITE } from './keep';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
@@ -215,3 +215,48 @@ export const castleNews = (before: GameState, after: GameState): string[] => {
   if (after.castle.doneDays.road === before.day) notes.push('The road is finished. The pony could pull a cart along it now.');
   return notes;
 };
+
+export type CastleGood = 'beams' | 'fittings' | 'hangings';
+
+/** What the camp makes for the castle: how many come at once and what a batch costs. Hangings are made at the loom from wool. */
+export const GOODS = {
+  beams: { batch: 4, cost: { wood: 8 } },
+  fittings: { batch: 1, cost: { wood: 1, ore: 1 } },
+  hangings: { batch: 1, wool: 3 }
+} as const;
+
+/** What the whole castle takes of a good, and how much of it is already built into the towers and the hall. */
+const goodTotals = (castle: CastleState, good: CastleGood): { needed: number; built: number } => {
+  if (good === 'hangings') return { needed: NEEDS.hallHangings, built: castle.hall.hangings };
+  const key = good === 'beams' ? 'beams' : 'fittings';
+  const perTower = good === 'beams' ? NEEDS.towerBeams : NEEDS.towerFittings;
+  const hall = good === 'beams' ? NEEDS.hallBeams : NEEDS.hallFittings;
+  return { needed: perTower * TOWERS.length + hall, built: TOWERS.reduce((sum, id) => sum + castle.towers[id][key], castle.hall[key]) };
+};
+
+/** How many of a good are still worth making: what the castle needs, less what is made and what is already built in. */
+export const goodRoom = (castle: CastleState, good: CastleGood): number => {
+  const { needed, built } = goodTotals(castle, good);
+  return Math.max(0, needed - built - castle.goods[good]);
+};
+
+/** How many of a good one making gives: a full batch, or what is left if less. */
+export const goodBatch = (castle: CastleState, good: CastleGood): number => Math.min(GOODS[good].batch, goodRoom(castle, good));
+
+/** Why a good can't be made right now, or null if it can. The cost can come from the bag and the camp stores. */
+export function goodBlocker(state: GameState, good: CastleGood): string | null {
+  if (!isRevealed(state)) return 'There is nothing to make that for yet.';
+  if (good === 'hangings') return 'Hangings are made at the loom.';
+  if (!state.structures.workshop) return 'Build a workshop first.';
+  if (good === 'fittings' && !state.progress.workshop.forge) return 'Add a forge to the workshop first.';
+  if (state.castle.frames === 0) return 'Begin the timber frames first.';
+  if (goodRoom(state.castle, good) === 0) return `The castle has enough ${good} now.`;
+  if (!isInClearing(state)) return 'Return to camp to work at the workshop.';
+  if (isExhausted(state)) return TOO_TIRED_MESSAGE;
+  const { cost } = GOODS[good];
+  const ore = 'ore' in cost ? cost.ore : 0;
+  if (availableWood(state) < cost.wood || availableOre(state) < ore) {
+    return good === 'beams' ? `Need ${cost.wood} wood for the beams.` : 'Need 1 wood and 1 ore for a fitting.';
+  }
+  return null;
+}

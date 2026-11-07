@@ -1,4 +1,4 @@
-import { NEEDS } from '../game/castle';
+import { NEEDS, isRevealed } from '../game/castle';
 import { cutStripBlocker, grindGrainBlocker, sowStripBlocker, stripStage, threshStripBlocker, type StripStage } from '../game/field';
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isWinter, nightStart, season } from '../game/calendar';
 import { millGrainBlocker, takeLoafBlocker } from '../game/bakehouse';
@@ -16,6 +16,7 @@ import { hasWoodStore, livesInHouse, woodStoreCapacity } from '../game/home';
 import { availableFiber, availableWood, isAtCamp, axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, mineBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
 import { availableOre } from '../game/hills';
 import { ponyWith } from '../game/pony';
+import { GOODS, goodBlocker, goodRoom, type CastleGood } from '../game/castleSites';
 import { WORKSHOP_UPGRADES, upgradeBlocker, type UpgradeId } from '../game/workshop';
 import { logsInStore } from '../game/wood';
 import { forecastFireCheck, logsForColdNight } from '../game/forecast';
@@ -322,6 +323,24 @@ export function workshopView(state: GameState): WorkshopView {
   };
   const rows = { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools'), harvestTools: row('harvestTools'), quern: row('quern'), shears: row('shears'), forge: row('forge'), horseshoes: row('horseshoes'), ironPickaxe: row('ironPickaxe'), hinges: row('hinges'), stoneCart: row('stoneCart'), portcullis: row('portcullis') };
   return { shown: state.structures.workshop && Object.values(rows).some(item => item.shown), rows };
+}
+
+export interface CastleGoodRow { good: CastleGood; shown: boolean; title: string; copy: string; cost: string; have: number; disabled: boolean }
+
+const GOOD_COPY: Record<CastleGood, { title: string; copy: string; cost: string }> = {
+  beams: { title: 'Oak beams', copy: 'Four at a time, cut and dressed for the towers and the hall.', cost: costLabel({ ...GOODS.beams.cost, fiber: 0, stone: 0 }) },
+  fittings: { title: 'Iron fittings', copy: 'One at a time, to fit the beams.', cost: costLabel({ ...GOODS.fittings.cost, fiber: 0, stone: 0 }) },
+  hangings: { title: 'Wool hangings', copy: '', cost: '' }
+};
+
+/** The castle's goods, made at camp: a row shows once the frames are begun and the castle still wants more of it. Hangings stay hidden until the loom makes them. */
+export function castleGoodsView(state: GameState): CastleGoodRow[] {
+  return (['beams', 'fittings', 'hangings'] as const).map(good => {
+    const { title, copy, cost } = GOOD_COPY[good];
+    const blocker = goodBlocker(state, good);
+    const shown = good !== 'hangings' && isRevealed(state) && state.castle.frames > 0 && goodRoom(state.castle, good) > 0;
+    return { good, shown, title, copy: blocker ?? copy, cost, have: state.castle.goods[good], disabled: Boolean(blocker) };
+  });
 }
 
 export function lookoutView(state: GameState): ActionPanelView {

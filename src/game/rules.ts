@@ -20,7 +20,7 @@ import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
 import { logsInStore } from './wood';
 import { settleStores } from './stores';
 import { castleSeen } from './castle';
-import { cartFollows, castleWorkBlocker, castleWorkLine, doCastleWork, intakeNote, stoneIntake, takeCartBlocker, withStoneIntake, type CastleSite } from './castleSites';
+import { GOODS, cartFollows, castleWorkBlocker, castleWorkLine, doCastleWork, goodBatch, goodBlocker, intakeNote, stoneIntake, takeCartBlocker, withStoneIntake, type CastleGood, type CastleSite } from './castleSites';
 import { KEEP_DOOR_WOOD, climbKeepBlocker, hangDoorBlocker, inKeep, keepFinished, layStoneBlocker, stoneLine, withKeepDoor, withStoneLaid } from './keep';
 import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, cartSpace, countWord, fellingWood, upgradeBlocker, type UpgradeId } from './workshop';
 import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishingSecondsFor, validRoll } from './fishing';
@@ -56,6 +56,7 @@ export type GameAction =
   | { type: 'weave'; item: WovenId }
   | { type: 'takeLoaf' }
   | { type: 'castleWork'; site: CastleSite }
+  | { type: 'makeCastleGood'; good: CastleGood }
   | { type: 'takeHoney' }
   | { type: 'drawWater' }
   | { type: 'makeUpgrade'; upgrade: UpgradeId }
@@ -1386,6 +1387,22 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
   };
 };
 
+/** Beams from the workshop and fittings from the forge, made at camp for the castle: they count from anywhere. */
+const makeCastleGood: ActionHandler<'makeCastleGood'> = (state, action) => {
+  const blocker = goodBlocker(state, action.good);
+  if (blocker) return refuse(state, blocker);
+  const { good } = action;
+  if (good === 'hangings') return refuse(state, 'Hangings are made at the loom.');
+  const made = goodBatch(state.castle, good);
+  const cost: { wood: number; ore?: number } = GOODS[good].cost;
+  return {
+    state: payAndBuild(spendOre(state, cost.ore ?? 0), { wood: cost.wood, fiber: 0, stone: 0 }, {
+      castle: { ...state.castle, goods: { ...state.castle.goods, [good]: state.castle.goods[good] + made } }
+    }),
+    message: good === 'beams' ? `You cut and dressed ${countWord(made)} oak beams.` : 'You forged an iron fitting.'
+  };
+};
+
 const layStone: ActionHandler<'layStone'> = state => {
   const blocker = layStoneBlocker(state);
   if (blocker) return refuse(state, blocker);
@@ -1434,7 +1451,7 @@ const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   weave,
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, takeCartStone, digOre, dropOre, offerPony, buildMine, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, dropPineNeedles, pickUpStone, burnFiber, burnPineNeedles, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, layStone, castleWork, hangDoor, climbKeep, enterKeep, rest, sleep, befriend, meetChickens, leadChickens, takeEgg, gatherApples, plantPip, pickOrchardApple, searchShed, craftPillow, craftCloak,
+  cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, makeCastleGood, layStone, castleWork, hangDoor, climbKeep, enterKeep, rest, sleep, befriend, meetChickens, leadChickens, takeEgg, gatherApples, plantPip, pickOrchardApple, searchShed, craftPillow, craftCloak,
   makeFishingLine, fish
 };
 

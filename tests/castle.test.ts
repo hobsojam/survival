@@ -9,6 +9,7 @@ import { QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { TOO_TIRED_MESSAGE, workSeconds } from '../src/game/needs';
 import { newsBetween } from '../src/game/news';
 import { upgradeBlocker } from '../src/game/workshop';
+import { GOODS, goodBlocker } from '../src/game/castleSites';
 import { recordJournal } from '../src/game/journalEntries';
 import { KEEP_SITE, KEEP_STONES } from '../src/game/keep';
 import { FULL_BAG_MESSAGE, applyAction } from '../src/game/rules';
@@ -655,5 +656,98 @@ describe('the stone cart: its load beside the work', () => {
   it('is not repeated at the cart, which names its own load', () => {
     const state = { ...withCart(12), player: { ...withCart(12).player, ...CART_SPOTS.quarry } };
     expect(promptFor(state).match(/12\/40/g)).toHaveLength(1);
+  });
+});
+
+describe('making beams and fittings', () => {
+  const atCamp = (changes: Partial<GameState> = {}, goods: Partial<GameState['castle']['goods']> = {}, frames = 1): GameState => {
+    const base = revealed();
+    return {
+      ...base, area: 'camp', player: { ...base.player, x: BALANCE.campX, y: BALANCE.campY },
+      structures: { ...base.structures, workshop: true },
+      progress: { ...base.progress, oreFoundDay: 1, workshop: { ...base.progress.workshop, forge: true } },
+      storedWood: 20, storedOre: 5,
+      castle: { ...base.castle, frames, goods: { ...base.castle.goods, ...goods } },
+      ...changes
+    };
+  };
+  const make = (state: GameState, good: 'beams' | 'fittings' | 'hangings') => applyAction(state, { type: 'makeCastleGood', good });
+
+  it('makes four beams from eight wood, drawing on the stores and the bag', () => {
+    const state = atCamp({ storedWood: 3, inventory: { ...game.inventory, wood: 5 } });
+    expect(GOODS.beams).toEqual({ batch: 4, cost: { wood: 8 } });
+    const { state: after } = make(state, 'beams');
+    expect(after.castle.goods.beams).toBe(4);
+    expect(after.inventory.wood + after.storedWood).toBe(0);
+    expect(after.player.energy).toBeLessThan(state.player.energy);
+  });
+
+  it('makes a fitting from one wood and one ore', () => {
+    const { state: after } = make(atCamp({ storedOre: 0, inventory: { ...game.inventory, ore: 1 } }), 'fittings');
+    expect(after.castle.goods.fittings).toBe(1);
+    expect(after.inventory.ore + after.storedOre).toBe(0);
+    expect(after.storedWood).toBe(19);
+  });
+
+  it('needs the workshop, the forge and the frames begun', () => {
+    expect(goodBlocker(atCamp({}, {}, 0), 'beams')).toMatch(/frames/);
+    expect(goodBlocker(atCamp({}, {}, 0), 'fittings')).toMatch(/frames/);
+    const noShop = atCamp();
+    expect(goodBlocker({ ...noShop, structures: { ...noShop.structures, workshop: false } }, 'beams')).toMatch(/workshop/);
+    expect(goodBlocker({ ...noShop, progress: { ...noShop.progress, workshop: { ...noShop.progress.workshop, forge: false } } }, 'fittings')).toMatch(/forge/);
+    expect(goodBlocker(atCamp(), 'beams')).toBeNull();
+    expect(goodBlocker(atCamp(), 'fittings')).toBeNull();
+  });
+
+  it('is not offered before the line of stones has shown', () => {
+    const state = atCamp();
+    expect(goodBlocker({ ...state, castle: { ...state.castle, revealedDay: null } }, 'beams')).not.toBeNull();
+  });
+
+  it('is made only in the clearing', () => {
+    const state = atCamp();
+    expect(goodBlocker({ ...state, area: 'hills' }, 'beams')).toMatch(/camp/);
+    expect(make({ ...state, area: 'hills' }, 'beams').state.castle.goods.beams).toBe(0);
+  });
+
+  it('refuses a tired survivor with the usual line, and spends nothing', () => {
+    const state = atCamp();
+    const tired = { ...state, player: { ...state.player, energy: 0 } };
+    const result = make(tired, 'beams');
+    expect(result.message).toBe(TOO_TIRED_MESSAGE);
+    expect(result.state.castle.goods.beams).toBe(0);
+    expect(result.state.storedWood).toBe(20);
+  });
+
+  it('refuses when there is too little to pay', () => {
+    expect(goodBlocker(atCamp({ storedWood: 7 }), 'beams')).toBe('Need 8 wood for the beams.');
+    expect(goodBlocker(atCamp({ storedOre: 0 }), 'fittings')).toBe('Need 1 wood and 1 ore for a fitting.');
+  });
+
+  it('stops once the whole castle has what it needs, counting what is already built in', () => {
+    // 4 per tower and 12 for the hall is 28 beams; 2 per tower and 6 for the hall is 14 fittings.
+    expect(goodBlocker(atCamp({}, { beams: 28 }), 'beams')).toMatch(/enough/);
+    expect(goodBlocker(atCamp({}, { fittings: 14 }), 'fittings')).toMatch(/enough/);
+    expect(goodBlocker(atCamp({}, { beams: 24 }), 'beams')).toBeNull();
+    const state = atCamp({}, { beams: 4, fittings: 2 });
+    const built = { ...state, castle: { ...state.castle,
+      towers: { ...state.castle.towers, nw: { stones: 20, beams: 4, fittings: 2 }, ne: { stones: 20, beams: 4, fittings: 2 } },
+      hall: { ...state.castle.hall, beams: 12, fittings: 6 } } };
+    expect(goodBlocker(built, 'beams')).toBeNull();
+    const nearly = { ...built, castle: { ...built.castle, goods: { ...built.castle.goods, beams: 8 } } };
+    expect(goodBlocker(nearly, 'beams')).toMatch(/enough/);
+    const fits = { ...built, castle: { ...built.castle, goods: { ...built.castle.goods, fittings: 6 } } };
+    expect(goodBlocker(fits, 'fittings')).toMatch(/enough/);
+  });
+
+  it('does not reopen when a tower is finished from the goods', () => {
+    const full = atCamp({}, { beams: 28 });
+    const built = { ...full, castle: { ...full.castle, goods: { ...full.castle.goods, beams: 24 },
+      towers: { ...full.castle.towers, nw: { stones: 20, beams: 4, fittings: 0 } } } };
+    expect(goodBlocker(built, 'beams')).toMatch(/enough/);
+  });
+
+  it('cannot yet make hangings', () => {
+    expect(goodBlocker(atCamp(), 'hangings')).not.toBeNull();
   });
 });
