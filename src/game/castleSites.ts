@@ -1,8 +1,11 @@
 import { QUARRY_SITE } from './areas';
 import { NEEDS, isRevealed, type CastleState, type FeastItem, type TowerId, type WallSide } from './castle';
 import { HILLS_EXIT, QUARRY_HILLS_EXIT } from './hills';
+import { freeSpaces, spaceFor } from './camp';
+import { isWinter } from './calendar';
 import { KEEP_SITE } from './keep';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
+import { ponyWith } from './pony';
 import { BALANCE, type AreaId, type GameState } from './state';
 
 // EASTER EGG: the castle, see src/game/castle.ts. The sections of it that can be worked on, kept apart from the saved
@@ -109,9 +112,63 @@ export const siteNeed = (state: GameState, site: CastleSite): SiteNeed | null =>
 
 const NOTHING_HERE = 'There is nothing to build here yet.';
 
+/** Where the cart stands in each area, clear of the quarry face and rubble, the road and the paths on one side, and of the keep, the outcrop and the road on the other. */
+export const CART_SPOTS = { quarry: { x: 24, y: 8 }, hills: { x: 30, y: 7 } } as const;
+
+/** How much more the cart can take, or none before it is made. */
+export const cartRoom = (state: GameState): number => (state.progress.workshop.stoneCart ? NEEDS.cartStone - state.castle.cart.stone : 0);
+
+/** The cart's stone that building can use: only while it stands on the hills, where the building is. */
+const cartLoad = (state: GameState): number => (state.castle.cart.at === 'hills' ? state.castle.cart.stone : 0);
+
+/** Where a dig's stones go: into the cart while it stands at the quarry, then into the bag, never more than there is room for. */
+export const stoneIntake = (state: GameState, stones: number): { toCart: number; toBag: number } => {
+  const toCart = Math.min(stones, state.castle.cart.at === 'quarry' ? cartRoom(state) : 0);
+  return { toCart, toBag: Math.min(stones - toCart, Math.floor(freeSpaces(state) / spaceFor('stone'))) };
+};
+
+/** The state with that intake put away. */
+export const withStoneIntake = (state: GameState, { toCart, toBag }: { toCart: number; toBag: number }): GameState => ({
+  ...state, inventory: { ...state.inventory, stone: state.inventory.stone + toBag }, castle: { ...state.castle, cart: { ...state.castle.cart, stone: state.castle.cart.stone + toCart } }
+});
+
+/** What a dig or a rubble says about where its stone went. */
+export const intakeNote = ({ toCart, toBag }: { toCart: number; toBag: number }): string => {
+  if (toCart === 0) return '';
+  if (toBag > 0) return ' One went into the cart.';
+  return toCart === 1 ? ' It went into the cart.' : ' Both went into the cart.';
+};
+
+/** The state with one stone spent on the castle: from a cart on the hills first, then the bag. Null if there is none. */
+export const spendCastleStone = (state: GameState): GameState | null => {
+  if (cartLoad(state) > 0) return { ...state, castle: { ...state.castle, cart: { ...state.castle.cart, stone: state.castle.cart.stone - 1 } } };
+  return state.inventory.stone > 0 ? { ...state, inventory: { ...state.inventory, stone: state.inventory.stone - 1 } } : null;
+};
+
+/** The cart goes between the quarry and the hills with the shod pony, which is with the survivor by day and out of the hills' snow. */
+export const cartFollows = (before: GameState, after: GameState): GameState => {
+  const { cart } = after.castle;
+  if (before.area === after.area || !after.progress.workshop.stoneCart || cart.at !== before.area) return after;
+  if ((after.area !== 'quarry' && after.area !== 'hills') || !ponyWith(before) || isWinter(after.day)) return after;
+  return { ...after, castle: { ...after.castle, cart: { ...cart, at: after.area } } };
+};
+
+/** The cart's spot if the survivor is within reach of it. */
+export const cartWithin = (state: GameState): boolean => {
+  const spot = CART_SPOTS[state.castle.cart.at];
+  return state.progress.workshop.stoneCart && state.area === state.castle.cart.at && Math.hypot(state.player.x - spot.x, state.player.y - spot.y) <= BALANCE.interactionRadius;
+};
+
+/** Why stone can't be taken from the cart now, or null if it can. */
+export const takeCartBlocker = (state: GameState): string | null => {
+  if (!cartWithin(state)) return 'Move closer to the cart.';
+  if (state.castle.cart.stone < 1) return 'The cart is empty.';
+  return null;
+};
+
 /** What the bag can't cover of a need, as a line, or null if it is covered. */
 const lacking = (state: GameState, need: SiteNeed, rule: SiteRule): string | null =>
-  need.kind === 'stone' && state.inventory.stone < 1 ? rule.short : null;
+  need.kind === 'stone' && state.inventory.stone + cartLoad(state) < 1 ? rule.short : null;
 
 /** Why a piece can't be laid at a site right now, or null if it can. */
 export const castleWorkBlocker = (state: GameState, site: CastleSite): string | null => {
@@ -135,13 +192,14 @@ export const castlePrompt = (state: GameState, spot: SiteSpot): string => {
   return short ? rule.ask : rule.label(state.castle);
 };
 
-/** The state with one piece laid at a site, paying what it needs from the bag. Time and energy are the action's. */
+/** The state with one piece laid at a site, paying what it needs from the cart and the bag. Time and energy are the action's. */
 export const doCastleWork = (state: GameState, site: CastleSite): GameState => {
   const rule = SITE_RULES[site];
   const need = rule?.need(state.castle);
   if (!rule || !need) return state;
-  const inventory = need.kind === 'stone' ? { ...state.inventory, stone: state.inventory.stone - 1 } : state.inventory;
-  return { ...state, inventory, castle: rule.lay(state.castle, state.day) };
+  const paid = need.kind === 'stone' ? spendCastleStone(state) : state;
+  if (!paid) return state;
+  return { ...paid, castle: rule.lay(paid.castle, state.day) };
 };
 
 /** What a piece of work says, read from the castle before and after it. */

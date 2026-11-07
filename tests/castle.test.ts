@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Season } from '../src/game/calendar';
 import { NEEDS, WALLS, emptyCastle, isRevealed, treeUnderWall } from '../src/game/castle';
-import { castleNews, castlePrompt, castleSpots, castleWorkBlocker, castleWorkLine, nearestCastleSpot, siteNeed } from '../src/game/castleSites';
+import { CART_SPOTS, cartFollows, cartRoom, castleNews, castlePrompt, castleSpots, castleWorkBlocker, castleWorkLine, nearestCastleSpot, siteNeed, spendCastleStone } from '../src/game/castleSites';
+import { availableStone } from '../src/game/camp';
+import { pickTapTarget, targetAction } from '../src/scene/tapTarget';
 import { HILLS_EXIT, QUARRY_HILLS_EXIT } from '../src/game/hills';
 import { QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { TOO_TIRED_MESSAGE, workSeconds } from '../src/game/needs';
@@ -9,7 +11,7 @@ import { newsBetween } from '../src/game/news';
 import { upgradeBlocker } from '../src/game/workshop';
 import { recordJournal } from '../src/game/journalEntries';
 import { KEEP_SITE, KEEP_STONES } from '../src/game/keep';
-import { applyAction } from '../src/game/rules';
+import { FULL_BAG_MESSAGE, applyAction } from '../src/game/rules';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { actionEffect, actionPose, promptFor, useKeyAction } from '../src/scene/prompts';
 import { HILL_TREES, sceneVisuals } from '../src/scene/visuals';
@@ -337,5 +339,270 @@ describe('the road: prompts, keys and sprites', () => {
     const after = work(atRoad(2)).state;
     expect(actionEffect({ type: 'castleWork', site: 'road' }, after)).toEqual({ kind: 'dust', x: after.player.x, y: after.player.y });
     expect(actionPose('castleWork')).toBe('gather');
+  });
+});
+
+/** Road done, cart made, a shod pony: the survivor stands at the quarry face by day with an empty bag, the cart at the quarry with `stone` in it. */
+const withCart = (stone = 0, changes: Partial<GameState> = {}): GameState => {
+  const base = revealed();
+  return {
+    ...base, area: 'quarry', player: { ...base.player, ...QUARRY_SITE, energy: 100 }, inventory: { ...game.inventory, stone: 0 },
+    pony: { ...game.pony, won: 1, shod: 2 }, quarryReadyDay: 0, rubbleReadyDay: 0,
+    progress: { ...base.progress, quarryFound: true, pickaxeCrafted: true, workshop: { ...base.progress.workshop, stoneCart: true } },
+    castle: { ...base.castle, road: NEEDS.road, doneDays: { road: 3 }, cart: { stone, at: 'quarry' } }, ...changes
+  };
+};
+const cartAt = (state: GameState, at: 'quarry' | 'hills', stone = state.castle.cart.stone): GameState => ({ ...state, castle: { ...state.castle, cart: { stone, at } } });
+const atRubble = (state: GameState): GameState => ({ ...state, player: { ...state.player, ...RUBBLE_SITE } });
+const cross = (state: GameState, to: 'quarry' | 'hills'): GameState => {
+  const exit = to === 'hills' ? QUARRY_HILLS_EXIT : HILLS_EXIT;
+  const from = { ...state, area: to === 'hills' ? 'quarry' as const : 'hills' as const, player: { ...state.player, x: exit.x, y: exit.y } };
+  return applyAction(from, { type: 'cross' }).state;
+};
+const ironPickaxe = (state: GameState): GameState => ({ ...state, progress: { ...state.progress, workshop: { ...state.progress.workshop, ironPickaxe: true } } });
+const dig = (state: GameState) => applyAction(state, { type: 'digQuarry' });
+
+describe('the stone cart: digging into it', () => {
+  it('holds forty and has room for what is left, or none before it is made', () => {
+    expect(cartRoom(withCart(0))).toBe(NEEDS.cartStone);
+    expect(cartRoom(withCart(15))).toBe(25);
+    const unmade = withCart(0);
+    expect(cartRoom({ ...unmade, progress: { ...unmade.progress, workshop: { ...unmade.progress.workshop, stoneCart: false } } })).toBe(0);
+  });
+
+  it('puts a dig at the quarry straight into the cart', () => {
+    const result = dig(withCart(3));
+    expect(result.state.castle.cart.stone).toBe(4);
+    expect(result.state.inventory.stone).toBe(0);
+    expect(result.message).toBe('Broke a good stone from the quarry face. It went into the cart.');
+  });
+
+  it('splits an iron-pickaxe dig across the cart and the bag when one room is left', () => {
+    const result = dig(ironPickaxe(withCart(39)));
+    expect(result.state.castle.cart.stone).toBe(40);
+    expect(result.state.inventory.stone).toBe(1);
+    expect(result.message).toBe('Broke two good stones from the quarry face. One went into the cart.');
+  });
+
+  it('puts both stones of an iron-pickaxe dig into the cart when there is room', () => {
+    const result = dig(ironPickaxe(withCart(10)));
+    expect(result.state.castle.cart.stone).toBe(12);
+    expect(result.message).toBe('Broke two good stones from the quarry face. Both went into the cart.');
+  });
+
+  it('digs into the bag as before when the cart is full or stands on the hills', () => {
+    const full = dig(withCart(40));
+    expect(full.state.castle.cart.stone).toBe(40);
+    expect(full.state.inventory.stone).toBe(1);
+    expect(full.message).toBe('Broke a good stone from the quarry face.');
+    const away = dig(cartAt(withCart(0), 'hills'));
+    expect(away.state.inventory.stone).toBe(1);
+    expect(away.state.castle.cart.stone).toBe(0);
+  });
+
+  it('leaves the day\'s dig limit unchanged', () => {
+    const first = dig(withCart(0)).state;
+    expect(first.quarryReadyDay).toBe(first.day + 1);
+    expect(dig(first).message).toBe('The quarry face is worked out until morning.');
+  });
+
+  it('refuses with the full-bag line, spending nothing, when the cart and the bag are both full', () => {
+    const state = withCart(40, { inventory: { ...game.inventory, stone: 8 } });
+    const result = dig(state);
+    expect(result.message).toBe(FULL_BAG_MESSAGE);
+    expect(result.state.inventory.stone).toBe(8);
+    expect(result.state.castle.cart.stone).toBe(40);
+    expect(result.state.quarryReadyDay).toBe(state.quarryReadyDay);
+    expect(result.state.player.energy).toBe(state.player.energy);
+    expect(result.state.timeOfDay).toBe(state.timeOfDay);
+  });
+
+  it('digs into a full bag when the cart has room', () => {
+    const result = dig(withCart(0, { inventory: { ...game.inventory, stone: 8 } }));
+    expect(result.state.castle.cart.stone).toBe(1);
+    expect(result.state.inventory.stone).toBe(8);
+  });
+
+  it('takes rubble the same way', () => {
+    const result = applyAction(atRubble(withCart(5)), { type: 'gatherRubble' });
+    expect(result.state.castle.cart.stone).toBe(6);
+    expect(result.state.inventory.stone).toBe(0);
+    expect(result.message).toBe('Pried a stone from the rubble. It went into the cart.');
+    const full = applyAction(atRubble(withCart(40)), { type: 'gatherRubble' });
+    expect(full.state.inventory.stone).toBe(1);
+    expect(full.message).toBe('Pried a stone from the rubble.');
+    const stuck = applyAction(atRubble(withCart(40, { inventory: { ...game.inventory, stone: 8 } })), { type: 'gatherRubble' });
+    expect(stuck.message).toBe(FULL_BAG_MESSAGE);
+    expect(stuck.state.rubbleReadyDay).toBe(0);
+  });
+
+  it('never counts the cart as stone for building, or settles it at camp', () => {
+    const state = withCart(30, { storedStone: 2, inventory: { ...game.inventory, stone: 1 } });
+    expect(availableStone(state)).toBe(3);
+    const camp = applyAction({ ...state, area: 'quarry', player: { ...state.player, x: 39, y: 15 } }, { type: 'cross' }).state;
+    expect(camp.area).toBe('camp');
+    expect(camp.castle.cart).toEqual({ stone: 30, at: 'quarry' });
+    expect(availableStone(camp)).toBe(3);
+  });
+});
+
+describe('the stone cart: taking stone from it', () => {
+  const atCart = (state: GameState): GameState => ({ ...state, player: { ...state.player, ...CART_SPOTS[state.castle.cart.at] }, area: state.castle.cart.at });
+  const take = (state: GameState) => applyAction(atCart(state), { type: 'takeCartStone' });
+
+  it('moves a bag\'s worth when the cart holds more', () => {
+    const result = take(withCart(30));
+    expect(result.state.inventory.stone).toBe(8);
+    expect(result.state.castle.cart.stone).toBe(22);
+  });
+
+  it('moves what is there when the cart holds less than the bag has room for', () => {
+    const result = take(withCart(3, { inventory: { ...game.inventory, stone: 1 } }));
+    expect(result.state.inventory.stone).toBe(4);
+    expect(result.state.castle.cart.stone).toBe(0);
+  });
+
+  it('refuses when the cart is empty, the bag is full or the cart is out of reach', () => {
+    expect(take(withCart(0)).message).toBe('The cart is empty.');
+    expect(take(withCart(5, { inventory: { ...game.inventory, stone: 8 } })).message).toBe(FULL_BAG_MESSAGE);
+    expect(applyAction(withCart(5), { type: 'takeCartStone' }).message).toBe('Move closer to the cart.');
+    expect(applyAction(cartAt(atCart(withCart(5)), 'hills'), { type: 'takeCartStone' }).message).toBe('Move closer to the cart.');
+  });
+
+  it('works for a tired survivor', () => {
+    const tired = withCart(5, { player: { ...game.player, energy: 0 } });
+    expect(take(tired).state.inventory.stone).toBe(5);
+  });
+
+  it('is a tap on the cart, and E at it, and shows the load in the prompt', () => {
+    const state = atCart(withCart(12));
+    expect(targetAction(pickTapTarget(state, CART_SPOTS.quarry.x, CART_SPOTS.quarry.y))).toEqual({ type: 'takeCartStone' });
+    expect(useKeyAction(state)).toEqual({ type: 'takeCartStone' });
+    expect(promptFor(state)).toContain('E  Take stone from the cart (12/40)');
+    expect(promptFor(atCart(withCart(0)))).toContain('Cart · empty');
+    const hills = atCart(cartAt(withCart(7), 'hills'));
+    expect(useKeyAction(hills)).toEqual({ type: 'takeCartStone' });
+    expect(promptFor(hills)).toContain('(7/40)');
+  });
+
+  it('shows no cart before it is made, and none where it does not stand', () => {
+    const unmade = withCart(0);
+    const state = { ...unmade, player: { ...unmade.player, ...CART_SPOTS.quarry }, progress: { ...unmade.progress, workshop: { ...unmade.progress.workshop, stoneCart: false } } };
+    expect(promptFor(state)).not.toContain('art');
+    expect(useKeyAction(state)).toBeUndefined();
+    expect(useKeyAction({ ...atCart(withCart(5)), area: 'hills' })).toBeUndefined();
+  });
+
+  it('keeps the cart out of reach of every other place to act, so E does what it did before', () => {
+    for (const at of ['quarry', 'hills'] as const) {
+      const spot = CART_SPOTS[at];
+      const others = at === 'quarry' ? [QUARRY_SITE, RUBBLE_SITE, QUARRY_HILLS_EXIT, { x: 39, y: 15 }] : [KEEP_SITE, HILLS_EXIT, { x: 10, y: 7 }];
+      for (const other of others) expect(Math.hypot(spot.x - other.x, spot.y - other.y), `${at} ${other.x},${other.y}`).toBeGreaterThan(BALANCE.interactionRadius * 2);
+      for (let road = 0; road < NEEDS.road; road++) {
+        const head = roadHead(road);
+        if (head.area === at) expect(Math.hypot(spot.x - head.x, spot.y - head.y), `stone ${road + 1}`).toBeGreaterThan(BALANCE.interactionRadius * 2);
+      }
+    }
+  });
+
+  it('leaves E at the quarry face and the road to what they were', () => {
+    expect(useKeyAction(withCart(12))).toEqual({ type: 'digQuarry' });
+    expect(useKeyAction(atRoad(0, { progress: withCart().progress }))).toEqual({ type: 'castleWork', site: 'road' });
+  });
+});
+
+const roadHead = (road: number) => castleSpots(atRoad(road))[0];
+
+describe('the stone cart: following the pony', () => {
+  it('goes to the hills with the shod pony, and comes back', () => {
+    const up = cross(withCart(12), 'hills');
+    expect(up.area).toBe('hills');
+    expect(up.castle.cart).toEqual({ stone: 12, at: 'hills' });
+    const down = cross(up, 'quarry');
+    expect(down.castle.cart).toEqual({ stone: 12, at: 'quarry' });
+  });
+
+  it('stays behind without the pony shod, or after dark when the pony has gone home', () => {
+    const unshod = withCart(12);
+    expect(cross({ ...unshod, pony: { ...unshod.pony, shod: null } }, 'hills').castle.cart.at).toBe('quarry');
+    expect(cross({ ...unshod, timeOfDay: 400 }, 'hills').castle.cart.at).toBe('quarry');
+  });
+
+  it('stays at the quarry in winter, and keeps filling', () => {
+    const winter = withCart(12, { day: 12 });
+    expect(cross(winter, 'hills').castle.cart).toEqual({ stone: 12, at: 'quarry' });
+    expect(dig(winter).state.castle.cart.stone).toBe(13);
+  });
+
+  it('is left on the hills when winter has come: laying draws from it, a dig goes to the bag, and spring brings it back', () => {
+    const stuck = cartAt(withCart(12, { day: 12 }), 'hills');
+    expect(cross({ ...stuck, area: 'hills' }, 'quarry').castle.cart).toEqual({ stone: 12, at: 'hills' });
+    const bag = dig({ ...stuck, area: 'quarry' });
+    expect(bag.state.inventory.stone).toBe(1);
+    expect(bag.state.castle.cart.stone).toBe(12);
+    const spring = { ...stuck, day: 22 };
+    expect(cross(cross(spring, 'hills'), 'quarry').castle.cart.at).toBe('quarry');
+  });
+
+  it('only moves between the quarry and the hills', () => {
+    const state = withCart(12);
+    expect(cartFollows(state, { ...state, area: 'camp' }).castle.cart.at).toBe('quarry');
+    expect(cartFollows(state, state)).toBe(state);
+  });
+
+  it('moves only a cart that has been made', () => {
+    const unmade = withCart(0);
+    const state = { ...unmade, progress: { ...unmade.progress, workshop: { ...unmade.progress.workshop, stoneCart: false } } };
+    expect(cross(state, 'hills').castle.cart.at).toBe('quarry');
+  });
+});
+
+describe('the stone cart: spending it', () => {
+  it('spends from a cart on the hills first, then the bag', () => {
+    const state = cartAt(withCart(2, { inventory: { ...game.inventory, stone: 3 } }), 'hills');
+    const one = spendCastleStone(state);
+    expect(one?.castle.cart.stone).toBe(1);
+    expect(one?.inventory.stone).toBe(3);
+    const two = spendCastleStone(one as GameState);
+    const three = spendCastleStone(two as GameState);
+    expect(three?.castle.cart.stone).toBe(0);
+    expect(three?.inventory.stone).toBe(2);
+  });
+
+  it('never spends from a cart at the quarry, and gives null when there is nothing', () => {
+    const state = withCart(9, { inventory: { ...game.inventory, stone: 1 } });
+    expect(spendCastleStone(state)?.inventory.stone).toBe(0);
+    expect(spendCastleStone(state)?.castle.cart.stone).toBe(9);
+    expect(spendCastleStone({ ...state, inventory: { ...state.inventory, stone: 0 } })).toBeNull();
+    expect(spendCastleStone(cartAt({ ...state, inventory: { ...state.inventory, stone: 0 } }, 'hills', 0))).toBeNull();
+  });
+
+  it('lets the road be laid from a cart on the hills with an empty bag', () => {
+    const base = atRoad(20, { inventory: { ...game.inventory, stone: 0 } });
+    const state = { ...cartAt(base, 'hills', 3), progress: withCart().progress };
+    expect(castleWorkBlocker(state, 'road')).toBeNull();
+    const laid = work(state).state;
+    expect(laid.castle.road).toBe(21);
+    expect(laid.castle.cart.stone).toBe(2);
+    expect(laid.inventory.stone).toBe(0);
+    expect(castleWorkBlocker(cartAt(state, 'hills', 0), 'road')).toBe('Bring stone to lay the road.');
+    expect(castleWorkBlocker(cartAt(state, 'quarry', 3), 'road')).toBe('Bring stone to lay the road.');
+  });
+});
+
+describe('the stone cart: in the scene', () => {
+  const cartVisual = (state: GameState) => sceneVisuals(state, 0).find(visual => visual.id === 'castle-cart');
+
+  it('stands where it is, once made, loaded as full as it is', () => {
+    expect(cartVisual(withCart(0))?.texture).toBe('castleCart:empty');
+    expect(cartVisual(withCart(10))?.texture).toBe('castleCart:some');
+    expect(cartVisual(withCart(30))?.texture).toBe('castleCart:full');
+    expect(cartVisual({ ...cartAt(withCart(10), 'hills'), area: 'hills' })?.texture).toBe('castleCart:some');
+  });
+
+  it('is not drawn where it does not stand, or before it is made', () => {
+    expect(cartVisual({ ...cartAt(withCart(10), 'hills'), area: 'quarry' })).toBeUndefined();
+    const unmade = withCart(0);
+    expect(cartVisual({ ...unmade, progress: { ...unmade.progress, workshop: { ...unmade.progress.workshop, stoneCart: false } } })).toBeUndefined();
   });
 });

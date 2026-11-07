@@ -1,5 +1,5 @@
 import type { PaletteKey } from './palette';
-import { box, define, type Grid } from './sheepSprites';
+import { box, define, dot, oval, type Grid } from './sheepSprites';
 import type { SpriteDef } from './sprites';
 import { WALLS } from '../game/castle';
 
@@ -38,7 +38,28 @@ const stone = (face: string, edge: string) => (g: Grid): void => {
   box(g, 3, 2, 3, 1, 'c');
 };
 
+/** A straight run of pixels between two points. */
+const line = (g: Grid, x0: number, y0: number, x1: number, y1: number, c: string): void => {
+  const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+  for (let i = 0; i <= steps; i++) dot(g, Math.round(x0 + (x1 - x0) * i / Math.max(steps, 1)), Math.round(y0 + (y1 - y0) * i / Math.max(steps, 1)), c);
+};
+
+const cartLegend: Record<string, PaletteKey> = { a: 'wood0', b: 'wood1', c: 'wood2', d: 'wood3', s: 'stone1', t: 'stone2', u: 'stone3', w: 'shadow' };
+
+/** The stone cart: a plank bed on one wheel and two shafts for the pony, loaded with rough stones as it fills. */
+function cart(g: Grid, load: 'empty' | 'some' | 'full'): void {
+  oval(g, 10, 12, 9, 1.5, 'w');
+  line(g, 13, 8, 19, 10, 'a'); line(g, 13, 7, 19, 9, 'c'); line(g, 18, 10, 18, 12, 'a');
+  const rock = (x: number, y: number): void => { box(g, x, y, 4, 3, 's'); box(g, x + 1, y, 2, 2, 't'); dot(g, x + 1, y, 'u'); };
+  if (load !== 'empty') { rock(2, 4); rock(7, 4); }
+  if (load === 'full') { rock(4, 2); rock(9, 2); rock(6, 0); }
+  box(g, 1, 6, 13, 4, 'a'); box(g, 2, 6, 11, 3, 'c'); line(g, 2, 7, 12, 7, 'b'); line(g, 7, 6, 7, 8, 'b');
+  oval(g, 7, 10.5, 3, 2.5, 'a'); oval(g, 7, 10.5, 2, 1.5, 'b');
+  line(g, 5, 10, 9, 11, 'd'); line(g, 7, 9, 7, 12, 'd'); dot(g, 7, 10, 'd');
+}
+
 export const castleSprites: Record<string, SpriteDef> = {
   castleLine: define(LINE_W, LINE_H, { still }, [1, 1], legend),
-  castleRoad: define(12, 8, { a: stone('b', 'a'), b: stone('a', 'b') }, [6, 4], legend)
+  castleRoad: define(12, 8, { a: stone('b', 'a'), b: stone('a', 'b') }, [6, 4], legend),
+  castleCart: define(20, 14, { empty: g => cart(g, 'empty'), some: g => cart(g, 'some'), full: g => cart(g, 'full') }, [10, 12], cartLegend)
 };

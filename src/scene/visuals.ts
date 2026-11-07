@@ -12,8 +12,8 @@ import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 import { OUTCROP_SITE, outcropLeft } from '../game/hills';
 import { KEEP_SITE, KEEP_STONES, keepFinished, keepOpen } from '../game/keep';
-import { isRevealed, treeUnderWall, WALLS } from '../game/castle';
-import { roadStone } from '../game/castleSites';
+import { NEEDS, isRevealed, treeUnderWall, WALLS } from '../game/castle';
+import { CART_SPOTS, roadStone } from '../game/castleSites';
 import { markedTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
 import { fireplaceBurning, woodStoreCapacity } from '../game/home';
@@ -52,6 +52,14 @@ function addRoad(state: GameState, add: AddVisual): void {
   }
 }
 
+/** The stone cart where it stands, loaded as full as it is. EASTER EGG: the castle, see src/game/castle.ts. */
+function addCart(state: GameState, add: AddVisual): void {
+  const { stone, at } = state.castle.cart;
+  if (!state.progress.workshop.stoneCart || at !== state.area) return;
+  const load = stone === 0 ? 'empty' : stone <= NEEDS.cartStone / 2 ? 'some' : 'full';
+  add('castle-cart', `castleCart:${load}`, CART_SPOTS[at].x, CART_SPOTS[at].y);
+}
+
 /** The keep's picture as things stand, or null before the forge stands and there is nothing to see on the hills. */
 export function keepFrame(state: GameState): string | null {
   if (!keepOpen(state)) return null;
@@ -79,6 +87,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     }
     add('quarry', quarryTexture, QUARRY_SITE.x, QUARRY_SITE.y);
     addRoad(state, add);
+    addCart(state, add);
     add('rubble', state.rubbleReadyDay <= state.day ? 'rubble:ready' : 'rubble:gathered', RUBBLE_SITE.x, RUBBLE_SITE.y);
     addPiles(state, visuals, add);
     return visuals;
@@ -92,6 +101,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     const frame = isWinter(state.day) ? 'snow' : season(state.day);
     // EASTER EGG: the castle's line of old stones, a faint ground mark that stays under everything else.
     addRoad(state, add);
+    addCart(state, add);
     if (isRevealed(state)) add('castle-line', 'castleLine:still', WALLS.left, WALLS.top, GROUND_DECAL_DEPTH);
     HILL_TREES.forEach((tree, index) => treeUnderWall(state.castle, tree) || add(`hill-tree-${index}`, `${tree.sprite}:${frame}`, tree.x, tree.y));
     addPiles(state, visuals, add);

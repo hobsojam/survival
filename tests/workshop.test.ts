@@ -443,8 +443,23 @@ describe('the castle upgrades', () => {
     expect(upgradeBlocker(wall(30), 'portcullis')).toBeNull();
   });
 
-  it('shows neither on the workshop panel yet', () => {
-    const { rows } = workshopView(forgeCamp());
-    expect([rows.stoneCart.shown, rows.portcullis.shown]).toEqual([false, false]);
+  it('shows the cart on the workshop panel only once the road is done, and the portcullis not yet', () => {
+    const base = forgeCamp();
+    const before = workshopView({ ...base, castle: { ...base.castle, road: 29 } }).rows;
+    expect([before.stoneCart.shown, before.portcullis.shown]).toEqual([false, false]);
+    const road = { ...base, castle: { ...base.castle, road: 30 }, pony: { ...base.pony, shod: 5 } };
+    const { rows } = workshopView(road);
+    expect([rows.stoneCart.shown, rows.portcullis.shown]).toEqual([true, false]);
+    expect(rows.stoneCart.copy).toBe('A cart for the pony to pull. Stone dug at the quarry goes straight into it.');
+    expect(rows.stoneCart.title).toBe('Stone cart');
+    expect(rows.stoneCart.cost).toBe('8 wood · 2 ore');
+    expect(rows.stoneCart.ready).toBe(true);
+  });
+
+  it('says the cart is made once it is', () => {
+    const base = forgeCamp();
+    const made = { ...base, castle: { ...base.castle, road: 30 }, progress: { ...base.progress, workshop: { ...base.progress.workshop, stoneCart: true } } };
+    const { rows } = workshopView(made);
+    expect(rows.stoneCart).toMatchObject({ shown: false, cost: 'Made', disabled: true, copy: 'Stone dug at the quarry goes into the cart while it stands there, and it follows the pony to the hills.' });
   });
 });

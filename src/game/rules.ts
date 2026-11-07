@@ -20,7 +20,7 @@ import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
 import { logsInStore } from './wood';
 import { settleStores } from './stores';
 import { castleSeen } from './castle';
-import { castleWorkBlocker, castleWorkLine, doCastleWork, type CastleSite } from './castleSites';
+import { cartFollows, castleWorkBlocker, castleWorkLine, doCastleWork, intakeNote, stoneIntake, takeCartBlocker, withStoneIntake, type CastleSite } from './castleSites';
 import { KEEP_DOOR_WOOD, climbKeepBlocker, hangDoorBlocker, inKeep, keepFinished, layStoneBlocker, stoneLine, withKeepDoor, withStoneLaid } from './keep';
 import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, cartSpace, countWord, fellingWood, upgradeBlocker, type UpgradeId } from './workshop';
 import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishingSecondsFor, validRoll } from './fishing';
@@ -63,7 +63,7 @@ export type GameAction =
   | { type: 'storeFood'; item: FoodItem }
   | { type: 'takeFood'; item: FoodItem }
   | { type: 'cook'; dish?: DishId }
-  | { type: 'layStone' | 'hangDoor' | 'climbKeep' | 'enterKeep' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'digOre' | 'dropOre' | 'offerPony' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'buildMine' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' | 'meetChickens' | 'leadChickens' | 'takeEgg' | 'gatherApples' | 'searchShed' }
+  | { type: 'layStone' | 'hangDoor' | 'climbKeep' | 'enterKeep' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'digOre' | 'dropOre' | 'offerPony' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'takeCartStone' | 'buildMine' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' | 'meetChickens' | 'leadChickens' | 'takeEgg' | 'gatherApples' | 'searchShed' }
   | { type: 'pickUpStone'; pileId: string }
   | { type: 'plantPip'; spot: number }
   | { type: 'pickOrchardApple'; spot: number }
@@ -398,7 +398,7 @@ function walkedArrival(moved: GameState): ActionResult {
 /** Adds what changing area means for the pony to whatever the crossing itself said. */
 function withPonyArrival(before: GameState, result: ActionResult): ActionResult {
   const arrived = ponyArrives(before, result.state);
-  return { state: arrived.state, message: [result.message, arrived.message].filter(Boolean).join(' ') };
+  return { state: cartFollows(before, arrived.state), message: [result.message, arrived.message].filter(Boolean).join(' ') };
 }
 
 const move: ActionHandler<'move'> = (state, action) => {
@@ -569,15 +569,15 @@ const craftPack: ActionHandler<'craftPack'> = state => {
 const gatherRubble: ActionHandler<'gatherRubble'> = state => {
   if (state.area !== 'quarry' || !near(state.player.x, state.player.y, RUBBLE_SITE.x, RUBBLE_SITE.y)) return refuse(state, 'Move closer to the rubble.');
   if (state.rubbleReadyDay > state.day) return refuse(state, 'The rubble is picked over. More will loosen in a few days.');
-  if (freeSpaces(state) < spaceFor('stone')) return refuse(state, FULL_BAG_MESSAGE);
+  const intake = stoneIntake(state, 1);
+  if (intake.toCart + intake.toBag < 1) return refuse(state, FULL_BAG_MESSAGE);
   return {
     state: advanceTime({
-      ...state,
+      ...withStoneIntake(state, intake),
       player: tire(state, BALANCE.gatherEnergyCost),
-      inventory: { ...state.inventory, stone: state.inventory.stone + 1 },
       rubbleReadyDay: state.day + BALANCE.rubbleRegrowDays
     }, workSeconds(state, BALANCE.gatherSeconds), 'working'),
-    message: 'Pried a stone from the rubble.'
+    message: `Pried a stone from the rubble.${intakeNote(intake)}`
   };
 };
 
@@ -588,17 +588,30 @@ const digQuarry: ActionHandler<'digQuarry'> = state => {
   const secondReady = state.progress.mineBuilt && state.mineReadyDay <= state.day;
   if (!firstReady && !secondReady) return refuse(state, 'The quarry face is worked out until morning.');
   if (isExhausted(state)) return refuse(state, TOO_TIRED_MESSAGE);
-  if (freeSpaces(state) < spaceFor('stone')) return refuse(state, FULL_BAG_MESSAGE);
-  const stones = Math.min(state.progress.workshop.ironPickaxe ? 2 : 1, Math.floor(freeSpaces(state) / spaceFor('stone')));
+  const intake = stoneIntake(state, state.progress.workshop.ironPickaxe ? 2 : 1);
+  const stones = intake.toCart + intake.toBag;
+  if (stones < 1) return refuse(state, FULL_BAG_MESSAGE);
   return {
     state: advanceTime({
-      ...state,
+      ...withStoneIntake(state, intake),
       player: tire(state, BALANCE.digEnergyCost),
-      inventory: { ...state.inventory, stone: state.inventory.stone + stones },
       quarryReadyDay: firstReady ? state.day + 1 : state.quarryReadyDay,
       mineReadyDay: !firstReady && secondReady ? state.day + 1 : state.mineReadyDay
     }, workSeconds(state, BALANCE.digSeconds), 'working'),
-    message: stones === 2 ? 'Broke two good stones from the quarry face.' : 'Broke a good stone from the quarry face.'
+    message: `${stones === 2 ? 'Broke two good stones from the quarry face.' : 'Broke a good stone from the quarry face.'}${intakeNote(intake)}`
+  };
+};
+
+/** A bag's worth of stone from the cart, or what is there: a little time, no effort. */
+const takeCartStone: ActionHandler<'takeCartStone'> = state => {
+  const blocker = takeCartBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  const room = Math.floor(freeSpaces(state) / spaceFor('stone'));
+  if (room < 1) return refuse(state, FULL_BAG_MESSAGE);
+  const moved = Math.min(room, state.castle.cart.stone);
+  return {
+    state: advanceTime({ ...state, inventory: { ...state.inventory, stone: state.inventory.stone + moved }, castle: { ...state.castle, cart: { ...state.castle.cart, stone: state.castle.cart.stone - moved } } }, BALANCE.gatherSeconds, 'working'),
+    message: moved === 1 ? 'You took a stone from the cart.' : `You took ${countWord(moved)} stones from the cart.`
   };
 };
 
@@ -1419,7 +1432,7 @@ const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   nameAnimal,
   shearFlock,
   weave,
-  move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, digOre, dropOre, offerPony, buildMine, chopTree, markClearing, clearGround, visitSite,
+  move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, takeCartStone, digOre, dropOre, offerPony, buildMine, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, dropPineNeedles, pickUpStone, burnFiber, burnPineNeedles, eat, eatTrailFood, prepareTrailFood,
   cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, layStone, castleWork, hangDoor, climbKeep, enterKeep, rest, sleep, befriend, meetChickens, leadChickens, takeEgg, gatherApples, plantPip, pickOrchardApple, searchShed, craftPillow, craftCloak,
   makeFishingLine, fish
