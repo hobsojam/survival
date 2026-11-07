@@ -17,7 +17,7 @@ import { FIELD_STRIPS, ripeDay } from './field';
 import { ORCHARD_SPOTS } from './orchard';
 
 import { KEEP_DOOR_AT, KEEP_STONES } from './keep';
-import { CASTLE_SECTIONS, FEAST_ITEMS, NEEDS, SIDES, TOWERS, wallFinished, type CastleState } from './castle';
+import { CASTLE_SECTIONS, FEAST_ITEMS, NEEDS, SIDES, TOWERS, towerFinished, wallFinished, type CastleState } from './castle';
 import { SAVE_VERSION, upgradeSave } from './saveUpgrades';
 
 export { SAVE_VERSION };
@@ -478,7 +478,13 @@ function validCastle({ castle, keep, progress, pony, day }: SaveShape): boolean 
   if (!count(goods.beams) || !count(goods.fittings) || !count(goods.hangings) || !FEAST_ITEMS.every(item => upTo(feast[item], NEEDS.feast[item]))) return false;
   const typed = castle as unknown as CastleState;
   if (!object(doneDays) || !Object.entries(doneDays).every(([section, value]) => (CASTLE_SECTIONS as readonly string[]).includes(section) && whole(value) && value >= 1 && value <= (day as number))) return false;
-  if ((typed.doneDays.road !== undefined) !== (typed.road === NEEDS.road)) return false;
+  // A section's day is set exactly when that section is finished.
+  const finished: [string, boolean][] = [
+    ['road', typed.road === NEEDS.road], ['frames', typed.frames === NEEDS.frames],
+    ...SIDES.map((side): [string, boolean] => [`wall-${side}`, typed.wall[side] === NEEDS.wallSide]),
+    ...TOWERS.map((id): [string, boolean] => [`tower-${id}`, towerFinished(typed.towers[id])])
+  ];
+  if (finished.some(([section, done]) => ((doneDays as Record<string, unknown>)[section] !== undefined) !== done)) return false;
   const towerList = TOWERS.map(id => typed.towers[id]);
   const made = progress.workshop;
   // The line of stones shows on a climb after the first, and nothing is built before it shows.
@@ -486,15 +492,18 @@ function validCastle({ castle, keep, progress, pony, day }: SaveShape): boolean 
   if (revealedDay === null && (typed.road > 0 || made.stoneCart === true || made.portcullis === true || finishedDay !== null || offeredHome)) return false;
   if ((made.stoneCart === true || cart.stone > 0) && (typed.road < NEEDS.road || made.stoneCart !== true)) return false;
   if ((made.portcullis === true || typed.gatehouse > 0) && (!wallFinished(typed) || made.portcullis !== true)) return false;
+  if (typed.frames > 0 && made.stoneCart !== true) return false;
   const anyWall = SIDES.some(side => typed.wall[side] > 0);
   if (anyWall && typed.frames < NEEDS.frames) return false;
   const anyTower = towerList.some(tower => tower.stones > 0);
   if (anyTower && !wallFinished(typed)) return false;
+  // A tower's beams go on once its stones are laid, and its iron once its beams are on.
+  if (towerList.some(tower => (tower.beams > 0 && tower.stones < NEEDS.towerStones) || (tower.fittings > 0 && tower.beams < NEEDS.towerBeams))) return false;
   if ((moat.stretches > 0 || moat.lastDugDay !== null) && !wallFinished(typed)) return false;
   if ((moat.dugDay !== null) !== (moat.stretches === NEEDS.moat)) return false;
   if ((hall.stones > 0 || hall.beams > 0 || hall.fittings > 0 || hall.hangings > 0) && typed.frames < NEEDS.frames) return false;
   const allBuilt = typed.road === NEEDS.road && made.stoneCart === true && typed.frames === NEEDS.frames && wallFinished(typed)
-    && towerList.every(tower => tower.stones === NEEDS.towerStones && tower.beams === NEEDS.towerBeams && tower.fittings === NEEDS.towerFittings)
+    && towerList.every(towerFinished)
     && typed.gatehouse === NEEDS.gatehouse && moat.stretches === NEEDS.moat && hall.stones === NEEDS.hallStones && hall.beams === NEEDS.hallBeams
     && hall.fittings === NEEDS.hallFittings && hall.hangings === NEEDS.hallHangings;
   const feastSet = FEAST_ITEMS.every(item => feast[item] === NEEDS.feast[item]);

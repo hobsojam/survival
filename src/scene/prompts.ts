@@ -5,7 +5,7 @@ import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SIT
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
 import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, outcropNote } from '../game/hills';
 import { NEEDS, isRevealed, lineDistance } from '../game/castle';
-import { cartWithin, castlePrompt, castleWorkBlocker, nearestCastleSpot } from '../game/castleSites';
+import { cartWithin, castleNeedsStone, castlePrompt, castleWorkBlocker, nearestCastleSpot } from '../game/castleSites';
 import { KEEP_DOOR_WOOD, KEEP_SITE, KEEP_STONES, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor } from '../game/keep';
 import { ponyNote, ponyOfferLabel } from '../game/pony';
 import { availableWood } from '../game/wood';
@@ -292,6 +292,11 @@ export function cartLoadNote(state: GameState): string | null {
   return state.progress.workshop.stoneCart && at === state.area ? `Cart ${stone}/${NEEDS.cartStone}` : null;
 }
 
+/** Whether the castle work in reach takes stone, so the cart's load is worth showing beside it. */
+function stoneWork(state: GameState): boolean {
+  return castleChoice(state) !== null && castleNeedsStone(state, nearestCastleSpot(state));
+}
+
 /** The load beside the work it follows: the quarry face, the rubble or an open castle site, but not at the cart, which names its own load. */
 function withCartLoad(state: GameState, prompt: string, nearWork: boolean): string {
   const note = cartLoadNote(state);
@@ -304,7 +309,7 @@ function hillsChoices(state: GameState): Choice[] {
   const castle = castleChoice(state);
   const cart = cartChoice(state);
   // EASTER EGG: the castle's line of old stones, named only once it has been seen.
-  const stones = isRevealed(state) && lineDistance(state.player) <= BALANCE.interactionRadius;
+  const stones = isRevealed(state) && state.castle.frames === 0 && !castle && lineDistance(state.player) <= BALANCE.interactionRadius;
   const offer = ponyOfferLabel(state);
   const note = ponyNote(state);
   const outcrop = !found && within(state, OUTCROP_SITE) ? outcropNote(state) : null;
@@ -322,7 +327,7 @@ function hillsChoices(state: GameState): Choice[] {
 
 function hillsPrompt(state: GameState): string {
   const labels = choiceLabels(hillsChoices(state));
-  if (labels.length) return withCartLoad(state, labels.join(' · '), castleChoice(state) !== null);
+  if (labels.length) return withCartLoad(state, labels.join(' · '), stoneWork(state));
   if (within(state, HILLS_EXIT)) return 'Walk east to go back down';
   return 'WASD / arrows  Move';
 }
@@ -339,7 +344,7 @@ function quarryChoices(state: GameState): Choice[] {
 /** The quarry's prompt, with the road's beside it when the survivor is at the road. */
 function quarryPrompt(state: GameState): string {
   const nearWork = within(state, QUARRY_SITE) || within(state, RUBBLE_SITE);
-  return withCartLoad(state, quarryRoadPrompt(state), nearWork || castleChoice(state) !== null);
+  return withCartLoad(state, quarryRoadPrompt(state), nearWork || stoneWork(state));
 }
 
 function quarryRoadPrompt(state: GameState): string {

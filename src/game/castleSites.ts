@@ -1,7 +1,7 @@
 import { QUARRY_SITE } from './areas';
-import { NEEDS, TOWERS, isRevealed, type CastleState, type FeastItem, type TowerId, type WallSide } from './castle';
+import { CASTLE_SECTIONS, NEEDS, SIDES, TOWERS, WALLS, isRevealed, towerFinished, wallFinished, type CastleSection, type CastleState, type FeastItem, type TowerId, type WallSide } from './castle';
 import { HILLS_EXIT, QUARRY_HILLS_EXIT, availableOre } from './hills';
-import { availableWood, freeSpaces, isInClearing, spaceFor } from './camp';
+import { availableWood, freeSpaces, isInClearing, spaceFor, spendWood } from './camp';
 import { isWinter } from './calendar';
 import { KEEP_SITE } from './keep';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
@@ -53,7 +53,9 @@ export const roadStone = (n: number): { area: AreaId; x: number; y: number } => 
 
 /** One section of the castle: what it asks for next (null once done), where the next piece goes, and what each piece says. */
 interface SiteRule {
-  need: (castle: CastleState) => SiteNeed | null;
+  need: (state: GameState) => SiteNeed | null;
+  /** Whether the section is finished, as against not yet open. */
+  finished: (castle: CastleState) => boolean;
   spot: (castle: CastleState) => { area: AreaId; x: number; y: number };
   far: string;
   done: string;
@@ -65,9 +67,9 @@ interface SiteRule {
   count: (castle: CastleState) => number;
   /** The prompt for a spot that can be worked now, and for one that is short of something. */
   label: (castle: CastleState) => string;
-  ask: string;
+  ask: (castle: CastleState) => string;
   /** The refusal for the same shortage. */
-  short: string;
+  short: (castle: CastleState) => string;
 }
 
 const ROAD_LINES: Record<number, string> = {
@@ -77,9 +79,123 @@ const ROAD_LINES: Record<number, string> = {
   [NEEDS.road]: 'You lay the last stone. The road runs from the quarry to the keep.'
 };
 
+/** Where the frames go: inside the line, clear of the keep and the paths. */
+export const FRAMES_SPOT = { area: 'hills' as AreaId, x: 21, y: 13.5 };
+/** Each wall side's work stands at the middle of that side, and each tower's a tile in from its corner, so no two are within reach of each other. */
+const SIDE_SPOTS: Record<WallSide, { x: number; y: number }> = {
+  north: { x: (WALLS.left + WALLS.right) / 2, y: WALLS.top }, south: { x: (WALLS.left + WALLS.right) / 2, y: WALLS.bottom },
+  west: { x: WALLS.left, y: (WALLS.top + WALLS.bottom) / 2 }, east: { x: WALLS.right, y: (WALLS.top + WALLS.bottom) / 2 }
+};
+const TOWER_SPOTS: Record<TowerId, { x: number; y: number }> = {
+  nw: { x: WALLS.left + 1, y: WALLS.top + 1 }, ne: { x: WALLS.right - 1, y: WALLS.top + 1 },
+  se: { x: WALLS.right - 1, y: WALLS.bottom - 1 }, sw: { x: WALLS.left + 1, y: WALLS.bottom - 1 }
+};
+const TOWER_NAMES: Record<TowerId, string> = { nw: 'north-west', ne: 'north-east', se: 'south-east', sw: 'south-west' };
+
+/** The timber frames and the hoist: wood, two at a time, from the stores or the bag, once the cart is made. */
+function framesRule(): SiteRule {
+  const wood = 2;
+  return {
+    need: ({ castle, progress }) => (progress.workshop.stoneCart && castle.frames < NEEDS.frames ? { kind: 'wood', amount: wood } : null),
+    finished: castle => castle.frames === NEEDS.frames,
+    spot: () => FRAMES_SPOT,
+    far: 'Move closer to the frames.',
+    done: 'The frames are finished.',
+    lay: (castle, day) => {
+      const frames = Math.min(NEEDS.frames, castle.frames + wood);
+      return { ...castle, frames, doneDays: frames === NEEDS.frames ? { ...castle.doneDays, frames: day } : castle.doneDays };
+    },
+    line: castle => {
+      if (castle.frames === NEEDS.frames) return 'The frames and the hoist are up. The wall can start now.';
+      return castle.frames === wood ? 'You set the first timbers of the frames.' : 'You raise more of the frames.';
+    },
+    count: castle => castle.frames,
+    label: castle => `Raise the timber frames (${castle.frames}/${NEEDS.frames})`,
+    ask: () => 'Frames · bring wood to raise them',
+    short: () => 'Bring wood to raise the frames.'
+  };
+}
+
+/** One side of the curtain wall, a stone at a time, once the frames are up. */
+function wallRule(side: WallSide): SiteRule {
+  return {
+    need: ({ castle }) => (castle.frames === NEEDS.frames && castle.wall[side] < NEEDS.wallSide ? { kind: 'stone' } : null),
+    finished: castle => castle.wall[side] === NEEDS.wallSide,
+    spot: () => ({ area: 'hills', ...SIDE_SPOTS[side] }),
+    far: 'Move closer to the wall.',
+    done: `The ${side} wall is finished.`,
+    lay: (castle, day) => {
+      const stones = castle.wall[side] + 1;
+      return { ...castle, wall: { ...castle.wall, [side]: stones }, doneDays: stones === NEEDS.wallSide ? { ...castle.doneDays, [`wall-${side}`]: day } : castle.doneDays };
+    },
+    line: castle => {
+      const stones = castle.wall[side];
+      if (stones === NEEDS.wallSide) return `The ${side} wall is finished.`;
+      if (stones === NEEDS.wallSide / 2) return `The ${side} wall is halfway.`;
+      return stones === 1 ? `You lay the first stone of the ${side} wall.` : 'You lay another stone of the wall.';
+    },
+    count: castle => castle.wall[side],
+    label: castle => `Lay a wall stone, ${side} side (${castle.wall[side]}/${NEEDS.wallSide})`,
+    ask: () => 'Wall · bring stone to build it',
+    short: () => 'Bring stone to build the wall.'
+  };
+}
+
+/** What a tower asks for next: its stones, then its roof beams, then its iron. */
+const towerStage = (castle: CastleState, id: TowerId): 'stones' | 'beams' | 'fittings' | null => {
+  const tower = castle.towers[id];
+  if (tower.stones < NEEDS.towerStones) return 'stones';
+  if (tower.beams < NEEDS.towerBeams) return 'beams';
+  return tower.fittings < NEEDS.towerFittings ? 'fittings' : null;
+};
+
+/** One corner tower, once the wall is done. Beams and fittings are made at camp and move from the castle's goods into the tower. */
+function towerRule(id: TowerId): SiteRule {
+  const name = TOWER_NAMES[id];
+  const stage = (castle: CastleState) => towerStage(castle, id) ?? 'fittings';
+  return {
+    need: ({ castle }) => {
+      const next = wallFinished(castle) ? towerStage(castle, id) : null;
+      if (next === null) return null;
+      return next === 'stones' ? { kind: 'stone' } : { kind: 'good', good: next };
+    },
+    finished: castle => towerFinished(castle.towers[id]),
+    spot: () => ({ area: 'hills', ...TOWER_SPOTS[id] }),
+    far: 'Move closer to the tower.',
+    done: `The ${name} tower is finished.`,
+    lay: (castle, day) => {
+      const next = stage(castle);
+      const tower = { ...castle.towers[id], [next]: castle.towers[id][next] + 1 };
+      const goods = next === 'stones' ? castle.goods : { ...castle.goods, [next]: castle.goods[next] - 1 };
+      return { ...castle, goods, towers: { ...castle.towers, [id]: tower }, doneDays: towerFinished(tower) ? { ...castle.doneDays, [`tower-${id}`]: day } : castle.doneDays };
+    },
+    line: castle => {
+      const tower = castle.towers[id];
+      if (towerFinished(tower)) return `The ${name} tower is roofed and fitted.`;
+      if (tower.fittings > 0) return `You fit iron to the ${name} tower roof.`;
+      if (tower.beams > 0) return `You set a roof beam on the ${name} tower.`;
+      if (tower.stones === NEEDS.towerStones) return `You lay the last stone of the ${name} tower. It wants a roof.`;
+      return tower.stones === 1 ? `You lay the first stone of the ${name} tower.` : 'You lay another stone of the tower.';
+    },
+    count: castle => castle.towers[id].stones + castle.towers[id].beams + castle.towers[id].fittings,
+    label: castle => {
+      const tower = castle.towers[id];
+      const next = stage(castle);
+      if (next === 'stones') return `Lay a tower stone, ${name} (${tower.stones}/${NEEDS.towerStones})`;
+      return next === 'beams' ? `Set a roof beam on the ${name} tower (${tower.beams}/${NEEDS.towerBeams})` : `Fit iron to the ${name} tower roof (${tower.fittings}/${NEEDS.towerFittings})`;
+    },
+    ask: castle => TOWER_ASKS[stage(castle)],
+    short: castle => TOWER_SHORTS[stage(castle)]
+  };
+}
+
+const TOWER_ASKS = { stones: 'Tower · bring stone to build it', beams: 'Tower · make oak beams at the workshop', fittings: 'Tower · make iron fittings at the forge' } as const;
+const TOWER_SHORTS = { stones: 'Bring stone to build the tower.', beams: 'Make oak beams at the workshop for the tower.', fittings: 'Make iron fittings at the forge for the tower.' } as const;
+
 const SITE_RULES: Partial<Record<CastleSite, SiteRule>> = {
   road: {
-    need: castle => (castle.road < NEEDS.road ? { kind: 'stone' } : null),
+    need: ({ castle }) => (castle.road < NEEDS.road ? { kind: 'stone' } : null),
+    finished: castle => castle.road === NEEDS.road,
     spot: castle => roadStone(castle.road + 1),
     far: 'Move closer to the road.',
     done: 'The road is finished.',
@@ -87,16 +203,19 @@ const SITE_RULES: Partial<Record<CastleSite, SiteRule>> = {
     line: castle => ROAD_LINES[castle.road] ?? 'You lay another stone of the road.',
     count: castle => castle.road,
     label: castle => `Lay a road stone (${castle.road}/${NEEDS.road})`,
-    ask: 'Road · bring stone to lay it',
-    short: 'Bring stone to lay the road.'
-  }
+    ask: () => 'Road · bring stone to lay it',
+    short: () => 'Bring stone to lay the road.'
+  },
+  frames: framesRule(),
+  ...Object.fromEntries(SIDES.map(side => [`wall-${side}`, wallRule(side)])),
+  ...Object.fromEntries(TOWERS.map(id => [`tower-${id}`, towerRule(id)]))
 };
 
 /** The sites that can be worked on now, once the line of stones has shown. */
 export const castleSpots = (state: GameState): SiteSpot[] => {
   if (!isRevealed(state)) return [];
   return (Object.entries(SITE_RULES) as [CastleSite, SiteRule][])
-    .filter(([, rule]) => rule.need(state.castle) !== null)
+    .filter(([, rule]) => rule.need(state) !== null)
     .map(([site, rule]) => ({ site, ...rule.spot(state.castle) }));
 };
 
@@ -107,8 +226,11 @@ export const nearestCastleSpot = (state: GameState): SiteSpot | null => {
   return here.reduce<SiteSpot | null>((best, spot) => (best === null || gap(spot) < gap(best) ? spot : best), null);
 };
 
+/** Whether the open site the survivor is at asks for stone, which is the one thing the cart can carry. */
+export const castleNeedsStone = (state: GameState, spot: SiteSpot | null): boolean => spot !== null && siteNeed(state, spot.site)?.kind === 'stone';
+
 /** What a site asks for next, or null once it is done or is not open. */
-export const siteNeed = (state: GameState, site: CastleSite): SiteNeed | null => SITE_RULES[site]?.need(state.castle) ?? null;
+export const siteNeed = (state: GameState, site: CastleSite): SiteNeed | null => SITE_RULES[site]?.need(state) ?? null;
 
 const NOTHING_HERE = 'There is nothing to build here yet.';
 
@@ -166,16 +288,22 @@ export const takeCartBlocker = (state: GameState): string | null => {
   return null;
 };
 
-/** What the bag can't cover of a need, as a line, or null if it is covered. */
-const lacking = (state: GameState, need: SiteNeed, rule: SiteRule): string | null =>
-  need.kind === 'stone' && state.inventory.stone + cartLoad(state) < 1 ? rule.short : null;
+/** What the bag, the stores and the goods can't cover of a need, as a line, or null if it is covered. */
+const lacking = (state: GameState, need: SiteNeed, rule: SiteRule): string | null => {
+  const covered = {
+    stone: state.inventory.stone + cartLoad(state) >= 1,
+    wood: need.kind === 'wood' && availableWood(state) >= need.amount,
+    good: need.kind === 'good' && state.castle.goods[need.good] >= 1
+  };
+  return need.kind in covered && !covered[need.kind as keyof typeof covered] ? rule.short(state.castle) : null;
+};
 
 /** Why a piece can't be laid at a site right now, or null if it can. */
 export const castleWorkBlocker = (state: GameState, site: CastleSite): string | null => {
   const rule = SITE_RULES[site];
   if (!rule || !isRevealed(state)) return NOTHING_HERE;
-  const need = rule.need(state.castle);
-  if (!need) return rule.done;
+  const need = rule.need(state);
+  if (!need) return rule.finished(state.castle) ? rule.done : NOTHING_HERE;
   const spot = rule.spot(state.castle);
   if (state.area !== spot.area || Math.hypot(state.player.x - spot.x, state.player.y - spot.y) > BALANCE.interactionRadius) return rule.far;
   const short = lacking(state, need, rule);
@@ -187,17 +315,23 @@ export const castleWorkBlocker = (state: GameState, site: CastleSite): string | 
 export const castlePrompt = (state: GameState, spot: SiteSpot): string => {
   const rule = SITE_RULES[spot.site];
   if (!rule) return '';
-  const need = rule.need(state.castle);
+  const need = rule.need(state);
   const short = need ? lacking(state, need, rule) : null;
-  return short ? rule.ask : rule.label(state.castle);
+  return short ? rule.ask(state.castle) : rule.label(state.castle);
+};
+
+/** The state with a need paid: stone from the cart and the bag, wood from the stores and the bag. Goods are moved by the piece laid. */
+const payFor = (state: GameState, need: SiteNeed): GameState | null => {
+  if (need.kind === 'stone') return spendCastleStone(state);
+  return need.kind === 'wood' ? spendWood(state, need.amount) : state;
 };
 
 /** The state with one piece laid at a site, paying what it needs from the cart and the bag. Time and energy are the action's. */
 export const doCastleWork = (state: GameState, site: CastleSite): GameState => {
   const rule = SITE_RULES[site];
-  const need = rule?.need(state.castle);
+  const need = rule?.need(state);
   if (!rule || !need) return state;
-  const paid = need.kind === 'stone' ? spendCastleStone(state) : state;
+  const paid = payFor(state, need);
   if (!paid) return state;
   return { ...paid, castle: rule.lay(paid.castle, state.day) };
 };
@@ -208,12 +342,18 @@ export const castleWorkLine = (before: GameState, after: GameState): string => {
   return rule?.line(after.castle) ?? '';
 };
 
+/** What the morning after a section is finished says. */
+const NEWS: Partial<Record<CastleSection, string>> = {
+  road: 'The road is finished. The pony could pull a cart along it now.',
+  frames: 'The frames stand finished. The wall can start now.',
+  ...Object.fromEntries(SIDES.map(side => [`wall-${side}`, `The ${side} wall stands finished.`])),
+  ...Object.fromEntries(TOWERS.map(id => [`tower-${id}`, `The ${TOWER_NAMES[id]} tower stands finished.`]))
+};
+
 /** The mornings after a section is finished. Each is worked out from the saved day, so it comes once. */
 export const castleNews = (before: GameState, after: GameState): string[] => {
   if (after.day <= before.day) return [];
-  const notes: string[] = [];
-  if (after.castle.doneDays.road === before.day) notes.push('The road is finished. The pony could pull a cart along it now.');
-  return notes;
+  return CASTLE_SECTIONS.filter(section => NEWS[section] && after.castle.doneDays[section] === before.day).map(section => NEWS[section] as string);
 };
 
 export type CastleGood = 'beams' | 'fittings' | 'hangings';

@@ -12,8 +12,8 @@ import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 import { OUTCROP_SITE, outcropLeft } from '../game/hills';
 import { KEEP_SITE, KEEP_STONES, keepFinished, keepOpen } from '../game/keep';
-import { NEEDS, isRevealed, treeUnderWall, WALLS } from '../game/castle';
-import { CART_SPOTS, roadStone } from '../game/castleSites';
+import { NEEDS, SIDES, TOWERS, WALLS, isRevealed, treeUnderWall, type Tower, type TowerId, type WallSide } from '../game/castle';
+import { CART_SPOTS, FRAMES_SPOT, roadStone } from '../game/castleSites';
 import { markedTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
 import { fireplaceBurning, woodStoreCapacity } from '../game/home';
@@ -60,6 +60,43 @@ function addCart(state: GameState, add: AddVisual): void {
   add('castle-cart', `castleCart:${load}`, CART_SPOTS[at].x, CART_SPOTS[at].y);
 }
 
+/** Where each side of the wall runs, as the tiles between the corner towers. */
+const wallTiles = (side: WallSide): { x: number; y: number }[] => {
+  const across = side === 'north' || side === 'south';
+  const length = (across ? WALLS.right - WALLS.left : WALLS.bottom - WALLS.top) - 1;
+  const fixed = { north: WALLS.top, south: WALLS.bottom, west: WALLS.left, east: WALLS.right }[side];
+  return Array.from({ length }, (_, i) => (across ? { x: WALLS.left + 1 + i, y: fixed } : { x: fixed, y: WALLS.top + 1 + i }));
+};
+
+const TOWER_CORNERS: Record<TowerId, { x: number; y: number }> = {
+  nw: { x: WALLS.left, y: WALLS.top }, ne: { x: WALLS.right, y: WALLS.top }, se: { x: WALLS.right, y: WALLS.bottom }, sw: { x: WALLS.left, y: WALLS.bottom }
+};
+
+/** Which picture of a tower these stones, beams and fittings show: one for every four stones, one for the finished walls, then one for each beam and fitting. */
+export const towerStep = (tower: Tower): number => {
+  if (tower.fittings > 0) return 10 + tower.fittings;
+  if (tower.beams > 0) return 6 + tower.beams;
+  return tower.stones === NEEDS.towerStones ? 6 : Math.ceil(tower.stones / 4);
+};
+
+/** The frames, the wall and the towers as far as they are built, drawn on the hills with the same snow as the keep. EASTER EGG: the castle, see src/game/castle.ts. */
+function addBuilding(state: GameState, add: AddVisual): void {
+  const { castle } = state;
+  const snow = isWinter(state.day) ? 's' : '';
+  if (castle.frames > 0) add('castle-frames', `castleFrames:${Math.ceil(castle.frames / 2)}${snow}`, FRAMES_SPOT.x, FRAMES_SPOT.y);
+  for (const side of SIDES) {
+    const tiles = wallTiles(side);
+    tiles.forEach((tile, i) => {
+      const level = Math.ceil(Math.min(1, Math.max(0, castle.wall[side] * tiles.length / NEEDS.wallSide - i)) * 4);
+      if (level > 0) add(`castle-wall-${side}-${i}`, `castleWall:${level}${snow}`, tile.x, tile.y);
+    });
+  }
+  for (const id of TOWERS) {
+    const step = towerStep(castle.towers[id]);
+    if (step > 0) add(`castle-tower-${id}`, `castleTower:${step}${snow}`, TOWER_CORNERS[id].x, TOWER_CORNERS[id].y);
+  }
+}
+
 /** The keep's picture as things stand, or null before the forge stands and there is nothing to see on the hills. */
 export function keepFrame(state: GameState): string | null {
   if (!keepOpen(state)) return null;
@@ -102,6 +139,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     // EASTER EGG: the castle's line of old stones, a faint ground mark that stays under everything else.
     addRoad(state, add);
     addCart(state, add);
+    addBuilding(state, add);
     if (isRevealed(state)) add('castle-line', 'castleLine:still', WALLS.left, WALLS.top, GROUND_DECAL_DEPTH);
     HILL_TREES.forEach((tree, index) => treeUnderWall(state.castle, tree) || add(`hill-tree-${index}`, `${tree.sprite}:${frame}`, tree.x, tree.y));
     addPiles(state, visuals, add);
