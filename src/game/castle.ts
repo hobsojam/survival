@@ -92,7 +92,7 @@ export const lineDistance = (point: { x: number; y: number }): number => {
 /** The wall side a point inside the walls is nearest. */
 const nearestSide = (point: { x: number; y: number }): WallSide => {
   const gaps: [WallSide, number][] = [['west', point.x - WALLS.left], ['east', WALLS.right - point.x], ['north', point.y - WALLS.top], ['south', WALLS.bottom - point.y]];
-  return gaps.reduce((best, gap) => (gap[1] < best[1] ? gap : best))[0];
+  return gaps.reduce((best, gap) => (gap[1] < best[1] ? gap : best), gaps[0])[0];
 };
 
 /** Whether a tree inside the walls has been cleared, once the wall side nearest it has begun. Outside the walls nothing is cleared. */
