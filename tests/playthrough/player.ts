@@ -401,7 +401,9 @@ export class Player {
   private allTasks(): Task[] {
     const progress = (state: GameState) => state.progress;
     const builds = (Object.keys(BUILDINGS) as StructureId[]).map(id => this.buildTask(id));
-    const upgrades = (Object.keys(WORKSHOP_UPGRADES) as UpgradeId[]).map(id => this.upgradeTask(id));
+    const upgrades = (Object.keys(WORKSHOP_UPGRADES) as UpgradeId[])
+      // The castle's two upgrades have no panel row yet, so this player has no way to ask for them.
+      .filter(id => id !== 'stoneCart' && id !== 'portcullis').map(id => this.upgradeTask(id));
     return [
       ...builds,
       this.toolTask('axe', state => axeView(state).shown !== false && progress(state).hearthUnlocked && state.structures.toolshed, state => progress(state).axeCrafted, { wood: 1, fiber: 1, stone: 1 }, { type: 'craftAxe' }),

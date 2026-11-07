@@ -2,6 +2,7 @@ import { emptyField } from './field';
 import { emptyOrchard } from './orchard';
 import { emptyPony } from './pony';
 import { emptyKeep } from './keep';
+import { emptyCastle } from './castle';
 
 // Bringing an older save up to date as it loads. Every change to the saved shape bumps SAVE_VERSION by one and adds
 // the step that upgrades a save from the version before: SAVE_UPGRADES[23] turns a version 23 save into version 24.
@@ -9,7 +10,7 @@ import { emptyKeep } from './keep';
 // anything the player had. Loading runs every step a save needs, in order, then validates the result as usual.
 
 /** The saved shape's version. Bump it by one with every change to the shape, and add its upgrade step below. */
-export const SAVE_VERSION = 38;
+export const SAVE_VERSION = 39;
 
 /** The oldest save that can still be brought up to date: earlier formats were never upgraded and don't load. */
 export const OLDEST_UPGRADABLE_VERSION = 23;
@@ -154,6 +155,11 @@ export const SAVE_UPGRADES: Readonly<Record<number, SaveUpgrade>> = {
   37: old => {
     const state = old as Upgradable & { progress: Upgradable & { workshop: Upgradable } };
     return { ...state, keep: emptyKeep(), progress: { ...state.progress, workshop: { ...state.progress.workshop, hinges: false } } };
+  },
+  // Version 39: the castle after the keep. An older camp has revealed and built nothing, and made no cart or portcullis.
+  38: old => {
+    const state = old as Upgradable & { progress: Upgradable & { workshop: Upgradable } };
+    return { ...state, castle: emptyCastle(), progress: { ...state.progress, workshop: { ...state.progress.workshop, stoneCart: false, portcullis: false } } };
   }
 };
 

@@ -6,6 +6,7 @@ import type { UpgradeId } from './workshop';
 import { emptyField, type FieldState } from './field';
 import { emptyOrchard, type OrchardState } from './orchard';
 import { emptyKeep, type KeepState } from './keep';
+import { emptyCastle, type CastleState } from './castle';
 import { emptyPony, type PonyState } from './pony';
 export type ResourceKind = 'branch' | 'berry' | 'fiber' | 'stone' | 'hazel' | 'pine' | 'greens' | 'honey' | 'wildGrain';
 
@@ -181,6 +182,8 @@ export interface GameState {
   pony: PonyState;
   /** The stone keep on the hills. */
   keep: KeepState;
+  /** The castle after the keep: a secret until the survivor finds the line of stones. */
+  castle: CastleState;
   /** Wood split and stacked on the woodpile, outside the bag: it counts for building and the fire, from anywhere. */
   storedWood: number;
   /** Felled wood waiting in the handcart: it counts as stored wood, for building and the fires, from anywhere. */
@@ -474,7 +477,7 @@ export function createGame(): GameState {
     structures: { orchard: false, shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, storehouse: false, woodpile: false, timberYard: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false, field: false, granary: false, windmill: false, bakery: false, beehive: false, sheepPen: false, loom: false, chickenCoop: false, birdhouse: false, wolfHouse: false, foxDen: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
       quarryFound: false, homesteadFound: false, hillsFound: false, oreFoundDay: null, pickaxeCrafted: false, mineBuilt: false, potCrafted: false, packWoven: false, fishingLine: false,
-      workshop: { saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false, shears: false, forge: false, horseshoes: false, ironPickaxe: false, hinges: false },
+      workshop: { saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false, shears: false, forge: false, horseshoes: false, ironPickaxe: false, hinges: false, stoneCart: false, portcullis: false },
       discoveries: { basket: false, spring: false, cairn: false } },
     nodes,
     trees,
@@ -490,6 +493,7 @@ export function createGame(): GameState {
     outcrop: { day: 0, dug: 0 },
     pony: emptyPony(),
     keep: emptyKeep(),
+    castle: emptyCastle(),
     storedWood: 0, cartWood: 0,
     storedFiber: 0,
     larder: emptyFood(),

@@ -6,4 +6,4 @@ When reviewing changes to code covered by mutation testing or its tests, check t
 
 Some features are secrets on purpose: they're left out of the README and stay hidden on screen until the player finds them. Each one is marked in the code with an `EASTER EGG:` comment (`grep -rn "EASTER EGG" src`). Don't add these to the README or any other player-facing text, and don't flag their absence from the README as a documentation gap. The tests still cover them like any other feature.
 
-Current easter eggs: a wolf friend brings a rabbit home on some winter dawns (`src/game/companion.ts`).
+Current easter eggs: a wolf friend brings a rabbit home on some winter dawns (`src/game/companion.ts`), and the castle after the keep (`src/game/castle.ts`).
