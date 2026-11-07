@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { addFood, emptyFood, type FoodStore } from '../src/game/food';
-import { placeBranches } from '../src/game/clearing';
+import { STEP_IDS, placeBranches } from '../src/game/clearing';
 import { autosaveDelayMs, loadGame, saveGame, SAVE_KEY, SAVE_VERSION } from '../src/game/save';
 import { carriedCount } from '../src/game/rules';
 import { stock } from './stock';
+import { emptyCastle, NEEDS, type CastleState } from '../src/game/castle';
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();
@@ -103,6 +104,8 @@ describe('local save', () => {
     state.inventory.food = stock(2);
     state.inventory.fiber = 1;
     state.fireFuel = 43;
+    state.clearing = { cleared: [...STEP_IDS], marked: null, felled: [] };
+    state.nodes = placeBranches(state.nodes, [...STEP_IDS]);
     state.structures.shelter = true;
     state.structures.toolshed = true;
     state.progress.packWoven = true;
@@ -758,5 +761,78 @@ describe('the larder in the save', () => {
     state.inventory.food = stock(3);
     expect(carriedCount({ ...state, larder: stock(10) })).toBe(3);
     expect(accepts(state => { state.structures.larder = true; state.inventory.food = stock(8); state.larder = stock(10); })).toBe(true);
+  });
+});
+
+describe('the castle in the save', () => {
+  /** A camp with the keep finished on day 2 and the castle revealed on day 5. */
+  const camp = (change: (state: GameState) => void = () => {}): GameState => {
+    const state = createGame();
+    state.day = 9;
+    state.progress.quarryFound = true;
+    state.progress.hillsFound = true;
+    state.progress.oreFoundDay = 2;
+    state.clearing = { cleared: [...STEP_IDS], marked: null, felled: [] };
+    state.nodes = placeBranches(state.nodes, [...STEP_IDS]);
+    state.structures.shelter = true;
+    state.structures.toolshed = true;
+    state.structures.workshop = true;
+    state.progress.nextStormDay = null;
+    state.progress.hearthUnlocked = true;
+    state.progress.packWoven = true;
+    state.progress.workshop.forge = true;
+    state.keep = { stones: 60, door: false, startedDay: 1, finishedDay: 2, ponyNight: null };
+    state.progress.workshop.hinges = true;
+    state.keep.door = true;
+    state.castle = { ...emptyCastle(), firstClimbDay: 4, revealedDay: 5 };
+    change(state);
+    return state;
+  };
+  const accepts = (change?: (state: GameState) => void) => saveGame(new MemoryStorage(), camp(change)).ok;
+  const wallDone = (castle: CastleState) => { castle.wall = { north: 30, east: 30, south: 30, west: 30 }; castle.frames = NEEDS.frames; };
+
+  it('accepts a revealed castle, and one still hidden', () => {
+    expect(accepts()).toBe(true);
+    expect(accepts(state => { state.castle = emptyCastle(); })).toBe(true);
+    expect(accepts(state => { state.castle.revealedDay = null; })).toBe(true);
+  });
+
+  it('accepts a castle built in order, up to its finish', () => {
+    expect(accepts(state => { state.castle.road = 30; state.castle.doneDays = { road: 6 }; state.progress.workshop.stoneCart = true; state.castle.cart.stone = 40; wallDone(state.castle); })).toBe(true);
+    expect(accepts(state => {
+      const castle = state.castle;
+      castle.road = 30; castle.doneDays = { road: 6 }; state.progress.workshop.stoneCart = true; state.progress.workshop.portcullis = true; wallDone(castle);
+      castle.towers = { nw: { stones: 20, beams: 4, fittings: 2 }, ne: { stones: 20, beams: 4, fittings: 2 }, se: { stones: 20, beams: 4, fittings: 2 }, sw: { stones: 20, beams: 4, fittings: 2 } };
+      castle.gatehouse = 30; castle.moat = { stretches: 16, lastDugDay: 8, dugDay: 8 };
+      castle.hall = { stones: 40, beams: 12, fittings: 6, hangings: 2 };
+      castle.feast = { ...NEEDS.feast };
+      castle.finishedDay = 9; castle.home = 'hall'; castle.offeredHome = true;
+    })).toBe(true);
+  });
+
+  it.each<[string, (state: GameState) => void]>([
+    ['a road day with the road unfinished', state => { state.castle.road = 29; state.castle.doneDays = { road: 5 }; }],
+    ['a finished road with no day', state => { state.castle.road = 30; state.castle.doneDays = {}; }],
+    ['a done day in the future', state => { state.castle.road = 30; state.castle.doneDays = { road: 9999 }; }],
+    ['a done day of zero', state => { state.castle.road = 30; state.castle.doneDays = { road: 0 }; }],
+    ['a done day that is not whole', state => { state.castle.road = 30; state.castle.doneDays = { road: 5.5 }; }],
+    ['a done day for an unknown section', state => { (state.castle.doneDays as Record<string, number>).keep = 5; }],
+    ['done days that are not a map', state => { (state.castle as unknown as Record<string, unknown>).doneDays = null; }],
+    ['a road over its length', state => { state.castle.road = 31; }],
+    ['more stone in the cart than it holds', state => { state.castle.cart.stone = 41; }],
+    ['a wall side over its length', state => { state.castle.wall.north = 31; }],
+    ['a reveal with no first climb', state => { state.castle.firstClimbDay = null; }],
+    ['a road before the reveal', state => { state.castle.revealedDay = null; state.castle.road = 1; }],
+    ['a cart before the road is done', state => { state.castle.road = 29; state.progress.workshop.stoneCart = true; }],
+    ['wall stones before the frames', state => { state.castle.frames = 11; state.castle.wall.east = 1; }],
+    ['tower stones before the wall is done', state => { state.castle.frames = 12; state.castle.wall = { north: 30, east: 30, south: 30, west: 29 }; state.castle.towers.nw.stones = 1; }],
+    ['a portcullis before the wall is done', state => { state.progress.workshop.portcullis = true; }],
+    ['bread over the feast\'s need', state => { state.castle.feast.bread = 5; }],
+    ['a finish with every section short', state => { state.castle.finishedDay = 9; }],
+    ['moving into the hall before the finish', state => { state.castle.home = 'hall'; }],
+    ['a reveal with the keep not finished', state => { state.keep = { stones: 59, door: true, startedDay: 1, finishedDay: null, ponyNight: null }; }],
+    ['a castle that is not an object', state => { (state as unknown as Record<string, unknown>).castle = null; }]
+  ])('rejects %s', (_, change) => {
+    expect(accepts(change)).toBe(false);
   });
 });

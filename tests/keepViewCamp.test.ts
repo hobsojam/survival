@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { STEP_IDS } from '../src/game/clearing';
 import { emptyOrchard, treeStage } from '../src/game/orchard';
 import { createGame, type GameState } from '../src/game/state';
-import { campView } from '../src/scene/keepViewCamp';
+import { emptyCastle } from '../src/game/castle';
+import { campView, castleView } from '../src/scene/keepViewCamp';
 
 const game = createGame();
 const withBuilt = (...built: (keyof GameState['structures'])[]): GameState => ({
@@ -21,7 +22,7 @@ const withTrees = (day: number, ...trees: ReturnType<typeof planted>[]): GameSta
 describe('what the camp shows from the keep', () => {
   it('a new camp shows only its clearing and fire', () => {
     expect(campView(game)).toEqual({
-      clearingRadius: 15, shelter: 'none', campfire: true, house: false, beds: false, well: false, workshop: false, field: false, windmill: false, bakery: false, sheep: 0, orchard: null
+      clearingRadius: 15, shelter: 'none', campfire: true, house: false, beds: false, well: false, workshop: false, field: false, windmill: false, bakery: false, sheep: 0, orchard: null, castle: { line: false }
     });
   });
 
@@ -63,5 +64,16 @@ describe('what the camp shows from the keep', () => {
     expect(treeStage(young, AUTUMN_YEAR_FOUR)).toBe('young');
     expect(campView(withTrees(AUTUMN_YEAR_FOUR, old, young)).orchard?.map(tree => tree.apples)).toEqual([true, false]);
     expect(campView(withTrees(SPRING_YEAR_FOUR, old)).orchard?.[0].apples).toBe(false);
+  });
+});
+
+describe('what the castle shows from the keep', () => {
+  it('shows nothing before the line of stones has shown', () => {
+    expect(castleView(game)).toEqual({ line: false });
+  });
+
+  it('shows the line once revealed', () => {
+    expect(castleView({ ...game, castle: { ...emptyCastle(), revealedDay: 5 } })).toEqual({ line: true });
+    expect(campView({ ...game, castle: { ...emptyCastle(), revealedDay: 5 } }).castle).toEqual({ line: true });
   });
 });

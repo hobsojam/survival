@@ -5,11 +5,11 @@ import type { CampView } from '../src/scene/keepViewCamp';
 
 const SEASONS: readonly Season[] = ['autumn', 'winter', 'spring', 'summer'];
 const bare: CampView = {
-  clearingRadius: 15, shelter: 'none', campfire: true, house: false, beds: false, well: false, workshop: false, field: false, windmill: false, bakery: false, sheep: 0, orchard: null
+  clearingRadius: 15, shelter: 'none', campfire: true, house: false, beds: false, well: false, workshop: false, field: false, windmill: false, bakery: false, sheep: 0, orchard: null, castle: { line: false }
 };
 const grownTree = { stage: 'grown', apples: false } as const;
 const full: CampView = {
-  clearingRadius: 30, shelter: 'woodshed', campfire: false, house: true, beds: true, well: true, workshop: true, field: true, windmill: true, bakery: true, sheep: 3, orchard: [grownTree, grownTree, grownTree, grownTree, grownTree, grownTree]
+  clearingRadius: 30, shelter: 'woodshed', campfire: false, house: true, beds: true, well: true, workshop: true, field: true, windmill: true, bakery: true, sheep: 3, orchard: [grownTree, grownTree, grownTree, grownTree, grownTree, grownTree], castle: { line: false }
 };
 const key = (rect: PictureRect): string => `${rect.x},${rect.y},${rect.w},${rect.h},${rect.color}`;
 const added = (rects: PictureRect[], base: PictureRect[]): PictureRect[] => {
@@ -42,6 +42,17 @@ describe('the picture', () => {
       expect(rect.x + rect.w).toBeLessThanOrEqual(155);
       expect(rect.y).toBeGreaterThanOrEqual(65);
       expect(rect.y + rect.h).toBeLessThanOrEqual(120);
+    }
+  });
+
+  it.each(SEASONS)('the line of stones in %s adds to the picture, only in the hills outside the camp', (season) => {
+    const fresh = added(stillRects(season, { ...bare, castle: { line: true } }), stillRects(season, bare));
+    expect(fresh.length).toBeGreaterThan(0);
+    expect(movingRects(season, { ...bare, castle: { line: true } }, 3)).toEqual(movingRects(season, bare, 3));
+    for (const rect of fresh) {
+      const clear = rect.x + rect.w <= 85 || rect.x >= 155 || rect.y >= 120 || rect.y + rect.h <= 65;
+      expect(clear).toBe(true);
+      expect(rect.y).toBeGreaterThanOrEqual(120);
     }
   });
 

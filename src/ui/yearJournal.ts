@@ -38,6 +38,8 @@ const KEEP_VIEW_MOMENTS: ReadonlySet<JournalId> = new Set<JournalId>(['keepViewA
 
 const KEEP_FINISHED_MOMENTS: ReadonlySet<JournalId> = new Set<JournalId>(['keepFinishedAutumn', 'keepFinishedWinter', 'keepFinishedSpring', 'keepFinishedSummer']);
 
+const CASTLE_LINE_MOMENTS: ReadonlySet<JournalId> = new Set<JournalId>(['castleLineAutumn', 'castleLineWinter', 'castleLineSpring', 'castleLineSummer']);
+
 const KEEPSAKE_MOMENTS: ReadonlySet<JournalId> = new Set<JournalId>(['autumnKeepsake', 'winterKeepsake', 'springKeepsake', 'summerKeepsake']);
 
 /** One season's page of the year journal; pages before the first or after today show the nearest real one. */
@@ -58,7 +60,7 @@ export function journalPageView(state: GameState, page: number): JournalPageView
     const onPage = state.journal.some(item => item.year === year && item.id === entry.id);
     // A view from the top waits on the keep being finished; the line for finishing it is never a blank, since it only happens once.
     if (KEEP_VIEW_MOMENTS.has(entry.id)) return keepFinished(state) || onPage;
-    if (KEEP_FINISHED_MOMENTS.has(entry.id)) return onPage;
+    if (KEEP_FINISHED_MOMENTS.has(entry.id) || CASTLE_LINE_MOMENTS.has(entry.id)) return onPage;
     // Nothing can be sheared without shears, and a shorn flock always has them.
     if (entry.id === 'shearing' && !state.progress.workshop.shears) return false;
     const building = WAITS_ON[entry.id];

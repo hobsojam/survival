@@ -41,6 +41,12 @@ const keepFinishedIcon = (accent: PaletteKey, top: string): JournalIcon => ({
   rows: [top, '..b.b.b...', '..bbbbb...', '..bdbdb...', '..bbbbb...', '..bbbbb...', '..bbdbb...', '..bbdbb.ee', '..bbdbb.ee', '..........']
 });
 
+/** A row of old stones in the grass of the season, with the keep standing small behind. */
+const castleLineIcon = (grass: PaletteKey, mark: PaletteKey, top: string): JournalIcon => ({
+  legend: { s: grass, t: mark, b: 'stone2', d: 'stone0' },
+  rows: [top, '....bb....', '....bd....', 'ssssssssss', 'ssssssssss', 's.b.bb.b.s', 'ssssssssss', 'ssssssssss', 'sstssssts.', '..........']
+});
+
 export const JOURNAL_ICONS: Record<JournalId, JournalIcon> = {
   keepViewAutumn: keepViewIcon('fox1', 'fox3', '.......t..'),
   keepViewWinter: keepViewIcon('frost', 'paper', '.t.....t..'),
@@ -50,6 +56,10 @@ export const JOURNAL_ICONS: Record<JournalId, JournalIcon> = {
   keepFinishedWinter: keepFinishedIcon('frost', '.x.....x..'),
   keepFinishedSpring: keepFinishedIcon('flower1', '.x........'),
   keepFinishedSummer: keepFinishedIcon('flower3', 'x........x'),
+  castleLineAutumn: castleLineIcon('fox1', 'fox3', '.......t..'),
+  castleLineWinter: castleLineIcon('frost', 'paper', '.t.....t..'),
+  castleLineSpring: castleLineIcon('leaf2', 'flower1', '.t........'),
+  castleLineSummer: castleLineIcon('leaf2', 'flower3', '.t......t.'),
   hillsAutumn: hillIcon('fox1', 'fox3', ['.t.....t..', 'tt.t..tt.t', '.t..t..t..']),
   hillsWinter: hillIcon('frost', 'paper', ['...tt.....', '..tttt....', '.tttttt...']),
   hillsSpring: hillIcon('leaf2', 'flower1', ['..........', '..t...tt..', '.ttt.tttt.']),

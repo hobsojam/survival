@@ -9,6 +9,8 @@ import { FOOD_ITEMS, availableFood, foodCount, keptFoodTotal } from '../../src/g
 import { HILLS_EXIT, OUTCROP_SITE, availableOre, outcropLeft } from '../../src/game/hills';
 import { HOUSE_SPOT, fuelLeft, hasWoodStore, livesInHouse, woodStoreCapacity } from '../../src/game/home';
 import { recordJournal } from '../../src/game/journalEntries';
+import { NEEDS, isRevealed } from '../../src/game/castle';
+import { castleSpots } from '../../src/game/castleSites';
 import { KEEP_DOOR_AT, KEEP_DOOR_WOOD, KEEP_SITE, keepFinished, keepOpen } from '../../src/game/keep';
 import { ORCHARD_SPOTS, spotAction } from '../../src/game/orchard';
 import { PONY_SPOTS, wildPonyAt, ponyOfferBlocker } from '../../src/game/pony';
@@ -401,7 +403,9 @@ export class Player {
   private allTasks(): Task[] {
     const progress = (state: GameState) => state.progress;
     const builds = (Object.keys(BUILDINGS) as StructureId[]).map(id => this.buildTask(id));
-    const upgrades = (Object.keys(WORKSHOP_UPGRADES) as UpgradeId[]).map(id => this.upgradeTask(id));
+    const upgrades = (Object.keys(WORKSHOP_UPGRADES) as UpgradeId[])
+      // The portcullis has no panel row yet, so this player has no way to ask for it.
+      .filter(id => id !== 'portcullis').map(id => this.upgradeTask(id));
     return [
       ...builds,
       this.toolTask('axe', state => axeView(state).shown !== false && progress(state).hearthUnlocked && state.structures.toolshed, state => progress(state).axeCrafted, { wood: 1, fiber: 1, stone: 1 }, { type: 'craftAxe' }),
@@ -422,6 +426,9 @@ export class Player {
       { id: 'pony', shown: state => progress(state).hillsFound, done: state => state.pony.won !== null, step: () => this.offerPony() },
       { id: 'keep', shown: keepOpen, done: keepFinished, step: () => this.raiseKeep() },
       { id: 'keep-view', shown: keepFinished, done: () => this.hits.has('keep-climbed'), step: () => this.climb() },
+      // The castle: a second climb on a later day shows the line of stones, then the road is laid from the quarry to the keep.
+      { id: 'castle-line', shown: state => keepFinished(state) && this.hits.has('keep-climbed'), done: isRevealed, step: () => this.seeTheLine() },
+      { id: 'castle-road', shown: isRevealed, done: state => state.castle.road >= NEEDS.road, step: () => this.layRoad() },
       { id: 'mine', shown: state => progress(state).pickaxeCrafted, done: state => progress(state).mineBuilt, step: () => this.buildMine() },
       ...(['basket', 'cairn'] as const).map(site => ({
         id: `visit:${site}`,
@@ -474,6 +481,19 @@ export class Player {
   private climb(): boolean {
     if (this.state.timeOfDay >= nightStart(this.state.day) - 20 || !this.goTo('hills') || !this.walkTo(KEEP_SITE)) return false;
     return this.act({ type: 'enterKeep' });
+  }
+
+  private seeTheLine(): boolean {
+    const first = this.state.castle.firstClimbDay;
+    return (first === null || this.state.day > first) && this.climb();
+  }
+
+  private layRoad(): boolean {
+    const spot = castleSpots(this.state)[0];
+    if (!spot) return false;
+    if (this.state.inventory.stone === 0 && !this.makeRoom(BALANCE.stoneSpaces, 'stone')) return false;
+    if (this.free() >= BALANCE.stoneSpaces && this.quarryStone()) return true;
+    return this.state.inventory.stone > 0 && this.goTo(spot.area) && this.walkTo(spot) && this.act({ type: 'castleWork', site: spot.site });
   }
 
   private buildMine(): boolean {

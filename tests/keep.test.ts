@@ -203,7 +203,7 @@ describe('saving the keep', () => {
     const old = JSON.parse(JSON.stringify(createGame()));
     delete old.keep; delete old.progress.workshop.hinges;
     const result = upgradeSave(37, old, 38);
-    expect(SAVE_VERSION).toBe(38);
+    expect(SAVE_VERSION).toBeGreaterThanOrEqual(38);
     expect(result.ok).toBe(true);
     const state = (result as { state: GameState }).state;
     expect(state.keep).toEqual({ stones: 0, door: false, startedDay: null, finishedDay: null, ponyNight: null });

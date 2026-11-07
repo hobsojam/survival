@@ -1,3 +1,4 @@
+import { NEEDS } from '../game/castle';
 import { cutStripBlocker, grindGrainBlocker, sowStripBlocker, stripStage, threshStripBlocker, type StripStage } from '../game/field';
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isWinter, nightStart, season } from '../game/calendar';
 import { millGrainBlocker, takeLoafBlocker } from '../game/bakehouse';
@@ -276,14 +277,16 @@ const UPGRADE_COPY: Record<UpgradeId, { title: string; copy: string; made: strin
   forge: { title: 'Forge', copy: 'Add a stone lean-to and an anvil, to work the ore from the hills.', made: 'Ore from the hills is kept at the forge.' },
   horseshoes: { title: 'Horseshoes', copy: 'Shoe the pony, so it can come with you and carry a load.', made: 'The pony can come with you and carry a load.' },
   ironPickaxe: { title: 'Iron pickaxe', copy: 'Each dig at the quarry face gives two stone.', made: 'Each dig at the quarry face gives two stone.' },
-  hinges: { title: 'Iron hinges', copy: 'For the door of the keep, when its walls are ready.', made: 'They wait for the keep door.' }
+  hinges: { title: 'Iron hinges', copy: 'For the door of the keep, when its walls are ready.', made: 'They wait for the keep door.' },
+  stoneCart: { title: 'Stone cart', copy: 'A cart for the pony to pull. Stone dug at the quarry goes straight into it.', made: 'Stone dug at the quarry goes into the cart while it stands there, and it follows the pony to the hills.' },
+  portcullis: { title: 'Portcullis', copy: '', made: '' }
 };
 
 /** Whether an upgrade's row shows: the bed tools once there are beds, the harvest tools once there is a field, the quern once there is a granary. */
 const UPGRADE_SHOWN: Record<UpgradeId, (state: GameState) => boolean> = {
   saw: () => true, handcart: () => true, bedTools: state => state.structures.vegetableBeds,
   harvestTools: state => state.structures.field, quern: state => state.structures.granary, shears: state => state.structures.sheepPen,
-  forge: state => state.progress.oreFoundDay !== null, horseshoes: state => state.progress.workshop.forge && state.pony.won !== null, ironPickaxe: state => state.progress.workshop.forge, hinges: state => state.progress.workshop.forge
+  forge: state => state.progress.oreFoundDay !== null, horseshoes: state => state.progress.workshop.forge && state.pony.won !== null, ironPickaxe: state => state.progress.workshop.forge, hinges: state => state.progress.workshop.forge, stoneCart: state => state.castle.road >= NEEDS.road, portcullis: () => false
 };
 
 /** "3 wood · 3 stone": an upgrade's cost, leaving out what it doesn't need. */
@@ -317,7 +320,7 @@ export function workshopView(state: GameState): WorkshopView {
     const blocker = upgradeBlocker(state, id);
     return { shown, title, copy: blocker ?? copy, cost: costLabel(WORKSHOP_UPGRADES[id].cost), disabled: false, ready: !blocker };
   };
-  const rows = { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools'), harvestTools: row('harvestTools'), quern: row('quern'), shears: row('shears'), forge: row('forge'), horseshoes: row('horseshoes'), ironPickaxe: row('ironPickaxe'), hinges: row('hinges') };
+  const rows = { saw: row('saw'), handcart: row('handcart'), bedTools: row('bedTools'), harvestTools: row('harvestTools'), quern: row('quern'), shears: row('shears'), forge: row('forge'), horseshoes: row('horseshoes'), ironPickaxe: row('ironPickaxe'), hinges: row('hinges'), stoneCart: row('stoneCart'), portcullis: row('portcullis') };
   return { shown: state.structures.workshop && Object.values(rows).some(item => item.shown), rows };
 }
 
