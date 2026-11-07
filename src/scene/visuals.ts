@@ -12,8 +12,8 @@ import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 import { OUTCROP_SITE, outcropLeft } from '../game/hills';
 import { KEEP_SITE, KEEP_STONES, keepFinished, keepOpen } from '../game/keep';
-import { NEEDS, SIDES, TOWERS, WALLS, isRevealed, treeUnderWall, type Tower, type TowerId, type WallSide } from '../game/castle';
-import { CART_SPOTS, FRAMES_SPOT, roadStone } from '../game/castleSites';
+import { MOAT_TILES, NEEDS, SIDES, TOWERS, WALLS, isRevealed, moatFill, moatLevel, moatPiece, treeUnderWall, type Tower, type TowerId, type WallSide } from '../game/castle';
+import { CART_SPOTS, FRAMES_SPOT, GATE_SPOT, roadStone } from '../game/castleSites';
 import { markedTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
 import { fireplaceBurning, woodStoreCapacity } from '../game/home';
@@ -84,7 +84,10 @@ export const towerStep = (tower: Tower): number => {
   return tower.stones === NEEDS.towerStones ? 6 : Math.ceil(tower.stones / 4);
 };
 
-/** The frames, the wall and the towers as far as they are built, drawn on the hills with the same snow as the keep. EASTER EGG: the castle, see src/game/castle.ts. */
+/** Which picture of the gatehouse these stones show: one for every five, six in all. */
+export const gatehouseStep = (stones: number): number => Math.ceil(stones / 5);
+
+/** The frames, the wall, the towers and the gatehouse as far as they are built, drawn on the hills with the same snow as the keep. EASTER EGG: the castle, see src/game/castle.ts. */
 function addBuilding(state: GameState, add: AddVisual): void {
   const { castle } = state;
   const snow = isWinter(state.day) ? 's' : '';
@@ -96,10 +99,23 @@ function addBuilding(state: GameState, add: AddVisual): void {
       if (level > 0) add(`castle-wall-${side}-${i}`, `castleWall:${level}${snow}`, tile.x, tile.y);
     });
   }
+  if (castle.gatehouse > 0) add('castle-gatehouse', `castleGatehouse:${gatehouseStep(castle.gatehouse)}${snow}`, GATE_SPOT.x, GATE_SPOT.y);
   for (const id of TOWERS) {
     const step = towerStep(castle.towers[id]);
     if (step > 0) add(`castle-tower-${id}`, `castleTower:${step}${snow}`, TOWER_CORNERS[id].x, TOWER_CORNERS[id].y);
   }
+}
+
+/** The moat's dug stretches as flat water on the ground: dry until the spring rain, then rising, and frozen in winter. EASTER EGG: the castle, see src/game/castle.ts. */
+function addMoat(state: GameState, add: AddVisual): void {
+  const { stretches } = state.castle.moat;
+  if (stretches === 0) return;
+  const level = moatLevel(moatFill(state));
+  const snow = isWinter(state.day) ? 's' : '';
+  MOAT_TILES.forEach((tile, i) => {
+    if (tile.stretch >= stretches) return;
+    add(`castle-moat-${i}`, `castleMoat:${moatPiece(tile)}${level}${snow}`, tile.x, tile.y, GROUND_DECAL_DEPTH + 1);
+  });
 }
 
 /** The keep's picture as things stand, or null before the forge stands and there is nothing to see on the hills. */
@@ -144,6 +160,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     // EASTER EGG: the castle's line of old stones, a faint ground mark that stays under everything else.
     addRoad(state, add);
     addCart(state, add);
+    addMoat(state, add);
     addBuilding(state, add);
     if (isRevealed(state)) add('castle-line', 'castleLine:still', WALLS.left, WALLS.top, GROUND_DECAL_DEPTH);
     HILL_TREES.forEach((tree, index) => treeUnderWall(state.castle, tree) || add(`hill-tree-${index}`, `${tree.sprite}:${frame}`, tree.x, tree.y));

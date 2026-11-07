@@ -443,7 +443,7 @@ describe('the castle upgrades', () => {
     expect(upgradeBlocker(wall(30), 'portcullis')).toBeNull();
   });
 
-  it('shows the cart on the workshop panel only once the road is done, and the portcullis not yet', () => {
+  it('shows the cart on the workshop panel only once the road is done, and the portcullis once the wall is done', () => {
     const base = forgeCamp();
     const before = workshopView({ ...base, castle: { ...base.castle, road: 29 } }).rows;
     expect([before.stoneCart.shown, before.portcullis.shown]).toEqual([false, false]);
@@ -453,6 +453,8 @@ describe('the castle upgrades', () => {
     expect(rows.stoneCart.copy).toBe('A cart for the pony to pull. Stone dug at the quarry goes straight into it.');
     expect(rows.stoneCart.title).toBe('Stone cart');
     expect(rows.stoneCart.cost).toBe('8 wood · 2 ore');
+    const walled = workshopView({ ...road, castle: { ...road.castle, wall: { north: 30, east: 30, south: 30, west: 30 } } }).rows;
+    expect([walled.portcullis.shown, walled.portcullis.copy, walled.portcullis.cost]).toEqual([true, 'Heavy iron and oak for the gatehouse.', '4 wood · 4 ore']);
     expect(rows.stoneCart.ready).toBe(true);
   });
 

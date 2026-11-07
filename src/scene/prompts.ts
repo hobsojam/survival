@@ -5,7 +5,7 @@ import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SIT
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
 import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, outcropNote } from '../game/hills';
 import { NEEDS, isRevealed, lineDistance } from '../game/castle';
-import { cartWithin, castleNeedsStone, castlePrompt, castleWorkBlocker, nearestCastleSpot } from '../game/castleSites';
+import { GATE_SPOT, cartWithin, castleNeedsStone, castlePrompt, castleWorkBlocker, nearestCastleSpot } from '../game/castleSites';
 import { KEEP_DOOR_WOOD, KEEP_SITE, KEEP_STONES, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor } from '../game/keep';
 import { ponyNote, ponyOfferLabel } from '../game/pony';
 import { availableWood } from '../game/wood';
@@ -138,10 +138,11 @@ export function useKeyAction(state: GameState): GameAction | undefined {
 }
 
 /** The scene effect an action that changed the game plays, and where: dust off the quarry face, or steam or a star by the survivor. */
-export function actionEffect(action: GameAction, after: GameState): { kind: 'dust' | 'cook' | 'stargaze'; x: number; y: number } | undefined {
+export function actionEffect(action: GameAction, after: GameState): { kind: 'dust' | 'cook' | 'stargaze' | 'portcullis'; x: number; y: number } | undefined {
   if (action.type === 'digQuarry') return { kind: 'dust', ...QUARRY_SITE };
   if (action.type === 'digOre') return { kind: 'dust', ...OUTCROP_SITE };
   if (action.type === 'layStone' || action.type === 'hangDoor') return { kind: 'dust', ...KEEP_SITE };
+  if (action.type === 'castleWork' && action.site === 'gatehouse' && after.castle.gatehouse === NEEDS.gatehouse) return { kind: 'portcullis', x: GATE_SPOT.x, y: GATE_SPOT.y };
   if (action.type === 'castleWork') return { kind: 'dust', x: after.player.x, y: after.player.y };
   if (action.type === 'cook' || action.type === 'stargaze') return { kind: action.type, x: after.player.x, y: after.player.y };
   return undefined;

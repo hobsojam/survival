@@ -2,7 +2,7 @@ import { BALANCE, type GameState, type ResourceKind, type ResourceNode } from '.
 import { season, type Season } from '../game/calendar';
 import { QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, hillsPathOpen, homesteadPathOpen, pathOpen } from '../game/areas';
 import { clearingTile, hillGroundTile, pathTile, quarryGroundTile, terrainSprites } from '../art/terrain';
-import { hillRockAt } from './hillsGeometry';
+import { hillRockAt, moatAt } from './hillsGeometry';
 import { CLEARING_STEPS, STEP_IDS, clearingKey, clearingReach, inClearedPatch, type ClearingState, type StepId } from '../game/clearing';
 import { CAMP_BOTH_OPEN_PATHS, CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_HOMESTEAD_PATHS, CAMP_OPEN_PATHS, CAMP_PATHS, CAMP_SIGN, HOMESTEAD_PATHS, HOMESTEAD_SIGN, QUARRY_PATHS, QUARRY_HILLS_PATHS, HILLS_PATHS, HILLS_SIGN, QUARRY_SIGN, mixHash, pathDistance, type PathRoute } from './mapGeometry';
 import { FACE_HEIGHT, QUARRY_MEADOWS, faceBottom, floorDepth } from './quarryGeometry';
@@ -240,7 +240,7 @@ function buildHillsMap(time: Season): TerrainMap {
       row.push(hillGroundTile(x, y));
       const path = pathTile(x, y, HILLS_PATHS);
       if (path) map.pathTiles.push({ x, y, sprite: path });
-      const sprite = hillRockAt(x, y) || pathDistance(x + .5, y + .5, HILLS_PATHS) < 1.7 || nearSign(x, y, HILLS_SIGN) ? undefined : hillPlant(x, y, time);
+      const sprite = hillRockAt(x, y) || moatAt(x, y) || pathDistance(x + .5, y + .5, HILLS_PATHS) < 1.7 || nearSign(x, y, HILLS_SIGN) ? undefined : hillPlant(x, y, time);
       // A little off the tile's middle, so the plants don't stand in rows.
       if (sprite) map.decorations.push({ x: x + (hash(x, y, 46) % 5 - 2) / 5, y: y + (hash(x, y, 47) % 5 - 2) / 5, sprite });
     }

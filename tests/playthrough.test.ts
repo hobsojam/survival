@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MILESTONES } from './playthrough/milestones';
 import { Player, type RunResult, type Style } from './playthrough/player';
 import { reportTables } from './playthrough/report';
 
 // Plays whole games through the real rules, from a new camp to the finished keep, so a change that strands a player somewhere
 // fails here. To regenerate the tables in docs/playthrough: VITE_PLAYTHROUGH_REPORT=1 npx vitest run tests/playthrough.test.ts --disable-console-intercept --silent=false
+
+// A whole game is many thousands of actions, and the first test to ask for one plays it, so the usual limit would fail on a busy machine.
+vi.setConfig({ testTimeout: 120000 });
 
 const GAMES: ReadonlyArray<readonly [number, Style]> = [[1, 'orderly'], [2, 'wandering'], [3, 'wandering'], [4, 'unhurried'], [7, 'unhurried']];
 /** Over four years: well past any of these games, so this only trips on a real stall. */

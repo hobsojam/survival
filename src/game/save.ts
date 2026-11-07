@@ -495,7 +495,8 @@ function castleDaysOk(castle: ObjectValue, moat: ObjectValue, day: unknown): boo
   const finished: [string, boolean][] = [
     ['road', typed.road === NEEDS.road], ['frames', typed.frames === NEEDS.frames],
     ...SIDES.map((side): [string, boolean] => [`wall-${side}`, typed.wall[side] === NEEDS.wallSide]),
-    ...TOWERS.map((id): [string, boolean] => [`tower-${id}`, towerFinished(typed.towers[id])])
+    ...TOWERS.map((id): [string, boolean] => [`tower-${id}`, towerFinished(typed.towers[id])]),
+    ['gatehouse', typed.gatehouse === NEEDS.gatehouse], ['moat', typed.moat.stretches === NEEDS.moat]
   ];
   return finished.every(([section, done]) => (doneDays[section] !== undefined) === done);
 }
@@ -524,7 +525,8 @@ function castleBuildOrderOk(castle: CastleState, made: ObjectValue): boolean {
 function moatOrderOk(castle: CastleState): boolean {
   const { moat } = castle;
   if ((moat.stretches > 0 || moat.lastDugDay !== null) && !wallFinished(castle)) return false;
-  return (moat.dugDay !== null) === (moat.stretches === NEEDS.moat);
+  if ((moat.dugDay !== null) !== (moat.stretches === NEEDS.moat)) return false;
+  return moat.dugDay === null || castle.doneDays.moat === moat.dugDay;
 }
 
 /** The feast is laid only once everything is built, the castle is finished exactly when it is set, and the hall is home only after that. */

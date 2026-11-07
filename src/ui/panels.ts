@@ -1,4 +1,4 @@
-import { NEEDS, isRevealed } from '../game/castle';
+import { NEEDS, isRevealed, wallFinished } from '../game/castle';
 import { cutStripBlocker, grindGrainBlocker, sowStripBlocker, stripStage, threshStripBlocker, type StripStage } from '../game/field';
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isWinter, nightStart, season } from '../game/calendar';
 import { millGrainBlocker, takeLoafBlocker } from '../game/bakehouse';
@@ -280,14 +280,14 @@ const UPGRADE_COPY: Record<UpgradeId, { title: string; copy: string; made: strin
   ironPickaxe: { title: 'Iron pickaxe', copy: 'Each dig at the quarry face gives two stone.', made: 'Each dig at the quarry face gives two stone.' },
   hinges: { title: 'Iron hinges', copy: 'For the door of the keep, when its walls are ready.', made: 'They wait for the keep door.' },
   stoneCart: { title: 'Stone cart', copy: 'A cart for the pony to pull. Stone dug at the quarry goes straight into it.', made: 'Stone dug at the quarry goes into the cart while it stands there, and it follows the pony to the hills.' },
-  portcullis: { title: 'Portcullis', copy: '', made: '' }
+  portcullis: { title: 'Portcullis', copy: 'Heavy iron and oak for the gatehouse.', made: 'It waits for the gatehouse.' }
 };
 
 /** Whether an upgrade's row shows: the bed tools once there are beds, the harvest tools once there is a field, the quern once there is a granary. */
 const UPGRADE_SHOWN: Record<UpgradeId, (state: GameState) => boolean> = {
   saw: () => true, handcart: () => true, bedTools: state => state.structures.vegetableBeds,
   harvestTools: state => state.structures.field, quern: state => state.structures.granary, shears: state => state.structures.sheepPen,
-  forge: state => state.progress.oreFoundDay !== null, horseshoes: state => state.progress.workshop.forge && state.pony.won !== null, ironPickaxe: state => state.progress.workshop.forge, hinges: state => state.progress.workshop.forge, stoneCart: state => state.castle.road >= NEEDS.road, portcullis: () => false
+  forge: state => state.progress.oreFoundDay !== null, horseshoes: state => state.progress.workshop.forge && state.pony.won !== null, ironPickaxe: state => state.progress.workshop.forge, hinges: state => state.progress.workshop.forge, stoneCart: state => state.castle.road >= NEEDS.road, portcullis: state => wallFinished(state.castle)
 };
 
 /** "3 wood · 3 stone": an upgrade's cost, leaving out what it doesn't need. */
