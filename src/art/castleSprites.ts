@@ -31,6 +31,14 @@ function still(g: Grid): void {
   for (const [x, y] of [[0, 0], [LINE_W - 3, 0], [0, LINE_H - 3], [LINE_W - 3, LINE_H - 3]] as const) box(g, x, y, 3, 3, 'c');
 }
 
+/** One flagstone of the road, in two shades so a row of them doesn't look stamped. */
+const stone = (face: string, edge: string) => (g: Grid): void => {
+  box(g, 1, 1, 10, 6, edge);
+  box(g, 2, 1, 8, 5, face);
+  box(g, 3, 2, 3, 1, 'c');
+};
+
 export const castleSprites: Record<string, SpriteDef> = {
-  castleLine: define(LINE_W, LINE_H, { still }, [1, 1], legend)
+  castleLine: define(LINE_W, LINE_H, { still }, [1, 1], legend),
+  castleRoad: define(12, 8, { a: stone('b', 'a'), b: stone('a', 'b') }, [6, 4], legend)
 };

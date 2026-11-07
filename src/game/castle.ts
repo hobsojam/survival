@@ -16,6 +16,8 @@ export interface CastleState {
   firstClimbDay: number | null;
   revealedDay: number | null;
   road: number;
+  /** The day the road's last stone went on. */
+  roadDay: number | null;
   /** Stone in the cart, and where the cart stands. */
   cart: { stone: number; at: 'quarry' | 'hills' };
   frames: number;
@@ -38,7 +40,7 @@ export const FEAST_ITEMS: readonly FeastItem[] = ['bread', 'roastedHazelnuts', '
 
 export const emptyCastle = (): CastleState => ({
   firstClimbDay: null, revealedDay: null,
-  road: 0,
+  road: 0, roadDay: null,
   cart: { stone: 0, at: 'quarry' },
   frames: 0,
   wall: { north: 0, east: 0, south: 0, west: 0 },

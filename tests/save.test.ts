@@ -798,7 +798,7 @@ describe('the castle in the save', () => {
   });
 
   it('accepts a castle built in order, up to its finish', () => {
-    expect(accepts(state => { state.castle.road = 30; state.progress.workshop.stoneCart = true; state.castle.cart.stone = 40; wallDone(state.castle); })).toBe(true);
+    expect(accepts(state => { state.castle.road = 30; state.castle.roadDay = 6; state.progress.workshop.stoneCart = true; state.castle.cart.stone = 40; wallDone(state.castle); })).toBe(true);
     expect(accepts(state => {
       const castle = state.castle;
       castle.road = 30; state.progress.workshop.stoneCart = true; state.progress.workshop.portcullis = true; wallDone(castle);
@@ -811,6 +811,8 @@ describe('the castle in the save', () => {
   });
 
   it.each<[string, (state: GameState) => void]>([
+    ['a road finished day with the road unfinished', state => { state.castle.road = 29; state.castle.roadDay = 5; }],
+    ['a road finished day in the future', state => { state.castle.road = 30; state.castle.roadDay = 9999; }],
     ['a road over its length', state => { state.castle.road = 31; }],
     ['more stone in the cart than it holds', state => { state.castle.cart.stone = 41; }],
     ['a wall side over its length', state => { state.castle.wall.north = 31; }],

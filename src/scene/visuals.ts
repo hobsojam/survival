@@ -13,6 +13,7 @@ import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 import { OUTCROP_SITE, outcropLeft } from '../game/hills';
 import { KEEP_SITE, KEEP_STONES, keepFinished, keepOpen } from '../game/keep';
 import { isRevealed, treeUnderWall, WALLS } from '../game/castle';
+import { roadStone } from '../game/castleSites';
 import { markedTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
 import { fireplaceBurning, woodStoreCapacity } from '../game/home';
@@ -43,6 +44,14 @@ export interface SceneVisual {
 /** Which picture of the keep this many stones show: a new one every four, and one more for the last stone, when the scaffolding comes down. */
 export const keepStep = (stones: number): number => Math.ceil(stones / 4) + (stones >= KEEP_STONES ? 1 : 0);
 
+/** The road's laid stones that lie in this area, each as a flat mark on the ground. EASTER EGG: the castle, see src/game/castle.ts. */
+function addRoad(state: GameState, add: AddVisual): void {
+  for (let stone = 1; stone <= state.castle.road; stone++) {
+    const { area, x, y } = roadStone(stone);
+    if (area === state.area) add(`castle-road-${stone}`, `castleRoad:${stone % 2 ? 'a' : 'b'}`, x, y, GROUND_DECAL_DEPTH + 1);
+  }
+}
+
 /** The keep's picture as things stand, or null before the forge stands and there is nothing to see on the hills. */
 export function keepFrame(state: GameState): string | null {
   if (!keepOpen(state)) return null;
@@ -69,6 +78,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
       quarryTexture = `mine:${frame}`;
     }
     add('quarry', quarryTexture, QUARRY_SITE.x, QUARRY_SITE.y);
+    addRoad(state, add);
     add('rubble', state.rubbleReadyDay <= state.day ? 'rubble:ready' : 'rubble:gathered', RUBBLE_SITE.x, RUBBLE_SITE.y);
     addPiles(state, visuals, add);
     return visuals;
@@ -81,6 +91,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     if (keepFinished(state) && state.timeOfDay >= nightStart(state.day)) add('keepGlow', 'keepGlow:lit', KEEP_SITE.x, KEEP_SITE.y, Math.round(worldY(KEEP_SITE.y)) + 1);
     const frame = isWinter(state.day) ? 'snow' : season(state.day);
     // EASTER EGG: the castle's line of old stones, a faint ground mark that stays under everything else.
+    addRoad(state, add);
     if (isRevealed(state)) add('castle-line', 'castleLine:still', WALLS.left, WALLS.top, GROUND_DECAL_DEPTH);
     HILL_TREES.forEach((tree, index) => treeUnderWall(state.castle, tree) || add(`hill-tree-${index}`, `${tree.sprite}:${frame}`, tree.x, tree.y));
     addPiles(state, visuals, add);

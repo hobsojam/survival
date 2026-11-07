@@ -468,8 +468,8 @@ function validCastle({ castle, keep, progress, pony, day }: SaveShape): boolean 
   if (!object(cart) || !object(wall) || !object(towers) || !object(moat) || !object(hall) || !object(goods) || !object(feast)) return false;
   const dayOk = (value: unknown): boolean => value === null || (whole(value) && value >= 1 && value <= (day as number));
   const upTo = (value: unknown, max: number): value is number => count(value) && value <= max;
-  const { firstClimbDay, revealedDay, finishedDay, home, offeredHome } = castle;
-  if (!dayOk(firstClimbDay) || !dayOk(revealedDay) || !dayOk(finishedDay) || !dayOk(moat.lastDugDay) || !dayOk(moat.dugDay)) return false;
+  const { firstClimbDay, revealedDay, finishedDay, roadDay, home, offeredHome } = castle;
+  if (!dayOk(firstClimbDay) || !dayOk(revealedDay) || !dayOk(finishedDay) || !dayOk(roadDay) || !dayOk(moat.lastDugDay) || !dayOk(moat.dugDay)) return false;
   if (!bool(offeredHome) || (home !== 'house' && home !== 'hall') || (cart.at !== 'quarry' && cart.at !== 'hills')) return false;
   if (!upTo(castle.road, NEEDS.road) || !upTo(cart.stone, NEEDS.cartStone) || !upTo(castle.frames, NEEDS.frames) || !upTo(castle.gatehouse, NEEDS.gatehouse)) return false;
   if (!SIDES.every(side => upTo(wall[side], NEEDS.wallSide))) return false;
@@ -477,6 +477,7 @@ function validCastle({ castle, keep, progress, pony, day }: SaveShape): boolean 
   if (!upTo(moat.stretches, NEEDS.moat) || !upTo(hall.stones, NEEDS.hallStones) || !upTo(hall.beams, NEEDS.hallBeams) || !upTo(hall.fittings, NEEDS.hallFittings) || !upTo(hall.hangings, NEEDS.hallHangings)) return false;
   if (!count(goods.beams) || !count(goods.fittings) || !count(goods.hangings) || !FEAST_ITEMS.every(item => upTo(feast[item], NEEDS.feast[item]))) return false;
   const typed = castle as unknown as CastleState;
+  if (roadDay !== null && typed.road !== NEEDS.road) return false;
   const towerList = TOWERS.map(id => typed.towers[id]);
   const made = progress.workshop;
   // The line of stones shows on a climb after the first, and nothing is built before it shows.

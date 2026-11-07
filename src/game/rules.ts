@@ -20,6 +20,7 @@ import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
 import { logsInStore } from './wood';
 import { settleStores } from './stores';
 import { castleSeen } from './castle';
+import { castleWorkBlocker, castleWorkLine, doCastleWork, type CastleSite } from './castleSites';
 import { KEEP_DOOR_WOOD, climbKeepBlocker, hangDoorBlocker, inKeep, keepFinished, layStoneBlocker, stoneLine, withKeepDoor, withStoneLaid } from './keep';
 import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, cartSpace, countWord, fellingWood, upgradeBlocker, type UpgradeId } from './workshop';
 import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishingSecondsFor, validRoll } from './fishing';
@@ -54,6 +55,7 @@ export type GameAction =
   | { type: 'shearFlock' }
   | { type: 'weave'; item: WovenId }
   | { type: 'takeLoaf' }
+  | { type: 'castleWork'; site: CastleSite }
   | { type: 'takeHoney' }
   | { type: 'drawWater' }
   | { type: 'makeUpgrade'; upgrade: UpgradeId }
@@ -1382,6 +1384,17 @@ const layStone: ActionHandler<'layStone'> = state => {
   };
 };
 
+/** One piece of work on the castle: half a dig's time and energy, as a keep stone takes. */
+const castleWork: ActionHandler<'castleWork'> = (state, action) => {
+  const blocker = castleWorkBlocker(state, action.site);
+  if (blocker) return refuse(state, blocker);
+  const worked = doCastleWork(state, action.site);
+  return {
+    state: advanceTime({ ...worked, player: tire(state, BALANCE.digEnergyCost / 2) }, workSeconds(state, BALANCE.digSeconds / 2), 'working'),
+    message: castleWorkLine(state, worked)
+  };
+};
+
 const hangDoor: ActionHandler<'hangDoor'> = state => {
   const blocker = hangDoorBlocker(state);
   if (blocker) return refuse(state, blocker);
@@ -1408,7 +1421,7 @@ const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   weave,
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, digOre, dropOre, offerPony, buildMine, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, dropPineNeedles, pickUpStone, burnFiber, burnPineNeedles, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, layStone, hangDoor, climbKeep, enterKeep, rest, sleep, befriend, meetChickens, leadChickens, takeEgg, gatherApples, plantPip, pickOrchardApple, searchShed, craftPillow, craftCloak,
+  cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, layStone, castleWork, hangDoor, climbKeep, enterKeep, rest, sleep, befriend, meetChickens, leadChickens, takeEgg, gatherApples, plantPip, pickOrchardApple, searchShed, craftPillow, craftCloak,
   makeFishingLine, fish
 };
 
