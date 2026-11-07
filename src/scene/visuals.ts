@@ -12,7 +12,7 @@ import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 import { OUTCROP_SITE, outcropLeft } from '../game/hills';
 import { KEEP_SITE, KEEP_STONES, keepFinished, keepOpen } from '../game/keep';
-import { MOAT_TILES, NEEDS, SIDES, TOWERS, WALLS, isRevealed, moatFill, moatLevel, treeUnderWall, type Tower, type TowerId, type WallSide } from '../game/castle';
+import { MOAT_TILES, NEEDS, SIDES, TOWERS, WALLS, isRevealed, moatFill, moatLevel, moatPiece, treeUnderWall, type Tower, type TowerId, type WallSide } from '../game/castle';
 import { CART_SPOTS, FRAMES_SPOT, GATE_SPOT, roadStone } from '../game/castleSites';
 import { markedTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
@@ -90,7 +90,6 @@ function addBuilding(state: GameState, add: AddVisual): void {
   for (const side of SIDES) {
     const tiles = wallTiles(side);
     tiles.forEach((tile, i) => {
-      if (castle.gatehouse > 0 && tile.x === GATE_SPOT.x && tile.y === GATE_SPOT.y) return;
       const level = Math.ceil(Math.min(1, Math.max(0, castle.wall[side] * tiles.length / NEEDS.wallSide - i)) * 4);
       if (level > 0) add(`castle-wall-${side}-${i}`, `castleWall:${level}${snow}`, tile.x, tile.y);
     });
@@ -110,8 +109,7 @@ function addMoat(state: GameState, add: AddVisual): void {
   const snow = isWinter(state.day) ? 's' : '';
   MOAT_TILES.forEach((tile, i) => {
     if (tile.stretch >= stretches) return;
-    const across = tile.y === WALLS.top - 1 || tile.y === WALLS.bottom + 1;
-    add(`castle-moat-${i}`, `castleMoat:${across && tile.x > WALLS.left - 1 && tile.x < WALLS.right + 1 ? 'h' : 'v'}${level}${snow}`, tile.x, tile.y, GROUND_DECAL_DEPTH + 1);
+    add(`castle-moat-${i}`, `castleMoat:${moatPiece(tile)}${level}${snow}`, tile.x, tile.y, GROUND_DECAL_DEPTH + 1);
   });
 }
 

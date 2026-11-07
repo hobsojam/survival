@@ -196,8 +196,8 @@ function towerRule(id: TowerId): SiteRule {
 const TOWER_ASKS = { stones: 'Tower · bring stone to build it', beams: 'Tower · make oak beams at the workshop', fittings: 'Tower · make iron fittings at the forge' } as const;
 const TOWER_SHORTS = { stones: 'Bring stone to build the tower.', beams: 'Make oak beams at the workshop for the tower.', fittings: 'Make iron fittings at the forge for the tower.' } as const;
 
-/** Where the gatehouse stands: on the east wall, where the hills path crosses it. */
-export const GATE_SPOT = { area: 'hills' as AreaId, x: WALLS.right, y: 12 };
+/** Where the gatehouse stands: a squat gate block just east of the wall line, clear of the south-east tower's picture, where the hills path comes in. */
+export const GATE_SPOT = { area: 'hills' as AreaId, x: WALLS.right + 2.5, y: 13 };
 
 /** The gatehouse, once the wall is done: the portcullis made at the forge comes first, and then thirty stones. The last stone finishes it. */
 function gatehouseRule(): SiteRule {

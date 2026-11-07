@@ -308,13 +308,51 @@ function moatTile(g: Grid, across: boolean, level: number, winter: boolean): voi
   for (let x = 1; x < 16; x += 5) put(x, 4 + (x % 3) * 3, 2, 1, 'f');
   const thick = MOAT_WATER[level];
   if (thick === 0) {
-    if (winter) for (let x = 0; x < 16; x += 4) put(x, 7, 2, 1, 'n');
+    if (winter) for (let x = 2; x < 14; x += 4) put(x, 7, 2, 1, 'n');
     return;
   }
   const start = 3 + Math.floor((10 - thick) / 2);
   put(0, start, 16, thick, winter ? 'i' : 's');
   if (thick >= 5) put(0, start, 16, 1, 'g');
-  for (let x = 2; x < 16; x += 6) put(x, start + 1 + (x % 2), 3, 1, winter ? 'n' : 'l');
+  for (let x = 2; x < 14; x += 6) put(x, start + 1 + (x % 2), 3, 1, winter ? 'n' : 'l');
+}
+
+/** A corner tile: the bed and the water run in from one end and out of one side, with banks on the outer sides, made to meet the straight tiles pixel for pixel. */
+function moatCorner(g: Grid, down: boolean, east: boolean, level: number, winter: boolean): void {
+  const thick = MOAT_WATER[level];
+  const start = 3 + Math.floor((10 - thick) / 2);
+  const end = start + thick - 1;
+  const inBed = (x: number, y: number): boolean => (x >= 3 && x <= 12 && (down ? y >= 3 : y <= 12)) || (y >= 3 && y <= 12 && (east ? x >= 3 : x <= 12));
+  const arm = (x: number, y: number): boolean => (x >= start && x <= end && (down ? y >= start : y <= end)) || (y >= start && y <= end && (east ? x >= start : x <= end));
+  const isWater = (x: number, y: number): boolean => thick > 0 && arm(x, y);
+  // The vertical arm leaves through the top (or bottom) edge and the horizontal arm through the side edge.
+  const wet = (x: number, y: number): boolean => isWater(x, y) || (thick > 0 && (down ? y < start : y > end) && x >= start && x <= end) || (thick > 0 && (east ? x > end : x < start) && y >= start && y <= end);
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      let colour: string;
+      if (inBed(x, y) || [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inBed(x + dx, y + dy))) {
+        colour = inBed(x, y) ? 'e' : winter ? 'i' : 'c';
+      } else {
+        colour = winter ? 'n' : 'b';
+      }
+      dot(g, x, y, colour);
+    }
+  }
+  if (thick === 0) {
+    if (winter) {
+      for (let a = 2; a < 14; a += 4) {
+        for (let i = 0; i < 2; i++) { if (inBed(7, down ? 15 - a - i : a + i)) dot(g, 7, down ? 15 - a - i : a + i, 'n'); if (inBed(east ? 15 - a - i : a + i, 7)) dot(g, east ? 15 - a - i : a + i, 7, 'n'); }
+      }
+    }
+    return;
+  }
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      if (!wet(x, y)) continue;
+      const lit = thick >= 5 && ((x > 0 && !wet(x - 1, y)) || (y > 0 && !wet(x, y - 1)));
+      dot(g, x, y, lit ? 'g' : winter ? 'i' : 's');
+    }
+  }
 }
 
 const moatFrames: Record<string, (g: Grid) => void> = {};
@@ -322,6 +360,13 @@ for (const [orient, across] of [['h', true], ['v', false]] as const) {
   for (let level = 0; level <= 4; level++) {
     moatFrames[`${orient}${level}`] = g => moatTile(g, across, level, false);
     moatFrames[`${orient}${level}s`] = g => moatTile(g, across, level, true);
+  }
+}
+// A corner is named for the corner of the ring it sits at, and its arms run the other two ways.
+for (const [corner, down, east] of [['nw', true, true], ['ne', true, false], ['sw', false, true], ['se', false, false]] as const) {
+  for (let level = 0; level <= 4; level++) {
+    moatFrames[`${corner}${level}`] = g => moatCorner(g, down, east, level, false);
+    moatFrames[`${corner}${level}s`] = g => moatCorner(g, down, east, level, true);
   }
 }
 

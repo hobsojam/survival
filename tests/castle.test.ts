@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { Season } from '../src/game/calendar';
-import { MOAT_TILES, NEEDS, WALLS, emptyCastle, isRevealed, moatFill, moatLevel, treeUnderWall, type Tower } from '../src/game/castle';
+import { MOAT_TILES, NEEDS, moatPiece, WALLS, emptyCastle, isRevealed, moatFill, moatLevel, treeUnderWall, type Tower } from '../src/game/castle';
 import { rainWindow } from '../src/game/rain';
 import { season } from '../src/game/calendar';
 import { buildMap } from '../src/scene/map';
 import { moatAt } from '../src/scene/hillsGeometry';
 import { roadStone } from '../src/game/castleSites';
-import { castleSprites } from '../src/art/castleSprites';
+import { PASSAGE_H, castleSprites } from '../src/art/castleSprites';
 import { castleView } from '../src/scene/keepViewCamp';
-import { CART_SPOTS, cartFollows, cartRoom, castleNews, castlePrompt, castleSpots, castleWorkBlocker, castleWorkLine, nearestCastleSpot, siteNeed, spendCastleStone } from '../src/game/castleSites';
+import { CART_SPOTS, GATE_SPOT, cartFollows, cartRoom, castleNews, castlePrompt, castleSpots, castleWorkBlocker, castleWorkLine, nearestCastleSpot, siteNeed, spendCastleStone } from '../src/game/castleSites';
 import { availableStone, availableWood } from '../src/game/camp';
 import { pickTapTarget, targetAction } from '../src/scene/tapTarget';
 import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT } from '../src/game/hills';
@@ -1277,9 +1277,9 @@ describe('the gatehouse: where it stands', () => {
   const gate = (): { site: string; x: number; y: number } => spotOf(gateOpen(), 'gatehouse');
   const near = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 
-  it('stands on the east wall where the hills path crosses it', () => {
-    expect(gate()).toMatchObject({ area: 'hills', x: 24, y: 12 });
-    expect(gate().x).toBe(WALLS.right);
+  it('stands just east of the wall line where the hills path comes in', () => {
+    expect(gate()).toMatchObject({ area: 'hills', x: 26.5, y: 13 });
+    expect(gate().x).toBeGreaterThan(WALLS.right);
   });
 
   it('keeps clear of the keep, the outcrop, the exit and the cart, and never hides the east wall spot', () => {
@@ -1289,7 +1289,7 @@ describe('the gatehouse: where it stands', () => {
 
   it('is reachable from the path, outside the wall, and from the yard inside it', () => {
     const state = gateOpen();
-    for (const [x, y] of [[25.5, 12.5], [22.5, 12]]) {
+    for (const [x, y] of [[25.5, 12.5], [27.5, 13.5]]) {
       const there = { ...state, player: { ...state.player, x, y } };
       expect(castleWorkBlocker(there, 'gatehouse')).toBeNull();
     }
@@ -1309,7 +1309,7 @@ describe('the gatehouse: where it stands', () => {
   it('gives the prompt, E and a tap the same site wherever both are in reach', () => {
     const state = gateOpen();
     const both: [number, number][] = [];
-    for (let x = 21; x <= 26; x += 0.25) for (let y = 11; y <= 15; y += 0.25) both.push([x, y]);
+    for (let x = 21; x <= 28; x += 0.25) for (let y = 11; y <= 15; y += 0.25) both.push([x, y]);
     const sites = new Set<string>();
     for (const [x, y] of both) {
       const there = { ...state, player: { ...state.player, x, y } };
@@ -1324,14 +1324,14 @@ describe('the gatehouse: where it stands', () => {
       expect(targetAction(pickTapTarget(there, nearest.x, nearest.y)), `${x},${y}`).toEqual({ type: 'castleWork', site: nearest.site });
     }
     expect(sites).toEqual(new Set(['gatehouse', 'tower-se', 'moat']));
-    const straddle = { ...state, player: { ...state.player, x: 23.4, y: 12.9 } };
+    const straddle = { ...state, player: { ...state.player, x: 24.9, y: 13.5 } };
     expect(near(straddle.player, spotOf(state, 'gatehouse'))).toBeLessThanOrEqual(BALANCE.interactionRadius);
     expect(near(straddle.player, spotOf(state, 'tower-se'))).toBeLessThanOrEqual(BALANCE.interactionRadius);
   });
 
   it('is tapped at its own place and not the tower\'s', () => {
     const state = gateOpen();
-    expect(targetAction(pickTapTarget(state, 24, 12))).toEqual({ type: 'castleWork', site: 'gatehouse' });
+    expect(targetAction(pickTapTarget(state, 26.5, 13))).toEqual({ type: 'castleWork', site: 'gatehouse' });
     expect(targetAction(pickTapTarget(state, 23, 14))).toEqual({ type: 'castleWork', site: 'tower-se' });
   });
 });
@@ -1344,7 +1344,7 @@ describe('the gatehouse: the drop and rise of the portcullis', () => {
 
   it('plays on the finishing stone only, at the gatehouse', () => {
     const { before, after } = finishing();
-    expect(actionEffect({ type: 'castleWork', site: 'gatehouse' }, after)).toEqual({ kind: 'portcullis', x: 24, y: 12 });
+    expect(actionEffect({ type: 'castleWork', site: 'gatehouse' }, after)).toEqual({ kind: 'portcullis', x: 26.5, y: 13 });
     const middle = doWork(standAt(gateOpen({ gatehouse: 10 }), 'gatehouse'), 'gatehouse').state;
     expect(actionEffect({ type: 'castleWork', site: 'gatehouse' }, middle)).toEqual({ kind: 'dust', x: middle.player.x, y: middle.player.y });
     expect(actionEffect({ type: 'castleWork', site: 'tower-se' }, after)?.kind).toBe('dust');
@@ -1400,19 +1400,16 @@ describe('the gatehouse: drawn on the east wall', () => {
     expect(sceneVisuals({ ...gateOpen({ gatehouse: 10 }), area: 'camp' }, 0).some(visual => visual.id === 'castle-gatehouse')).toBe(false);
   });
 
-  it('stands in the place of the wall stretch at the gate, once begun', () => {
+  it('leaves the east wall whole once it is begun', () => {
     const ids = (laid: number) => sceneVisuals(gateOpen({ gatehouse: laid }), 0).map(visual => visual.id);
-    expect(ids(0)).toContain('castle-wall-east-6');
-    expect(ids(1)).not.toContain('castle-wall-east-6');
-    expect(ids(1)).toContain('castle-wall-east-5');
-    expect(ids(1)).toContain('castle-wall-east-7');
+    for (const laid of [0, 1]) for (let i = 0; i < 9; i++) expect(ids(laid)).toContain(`castle-wall-east-${i}`);
   });
 
   it('sorts the survivor against the gatehouse in front and behind', () => {
     const state = gateOpen({ gatehouse: 30 });
     const { depth } = gateVisual(state)!;
-    expect(playerVisualDepth({ ...state, player: { ...state.player, x: 24, y: 11 } })).toBeLessThan(depth);
-    expect(playerVisualDepth({ ...state, player: { ...state.player, x: 24, y: 13 } })).toBeGreaterThan(depth);
+    expect(playerVisualDepth({ ...state, player: { ...state.player, x: 26.5, y: 12 } })).toBeLessThan(depth);
+    expect(playerVisualDepth({ ...state, player: { ...state.player, x: 26.5, y: 14 } })).toBeGreaterThan(depth);
   });
 
   it('works whatever season it is', () => {
@@ -1837,7 +1834,8 @@ describe('the moat: drawn on the hills', () => {
     for (const day of [1, 5, 12, 22, 24, 26, 28, 33, 55, 63, 66, 70, 75, 100]) {
       for (const dugDay of [5, 25, 35]) for (const visual of moatVisuals(filled(day, dugDay))) seen.add(visual.texture);
     }
-    expect(seen.size).toBeLessThanOrEqual(20);
+    // Six pieces (two runs and four corners), at five levels, with and without snow.
+    expect(seen.size).toBeLessThanOrEqual(60);
     for (const texture of seen) expect(castleSprites.castleMoat.frames[texture.split(':')[1]], texture).toBeDefined();
   });
 
@@ -1845,5 +1843,98 @@ describe('the moat: drawn on the hills', () => {
     expect(castleView(dug(16, 33)).moat).toBe(true);
     expect(castleView(dug(15, 33)).moat).toBe(false);
     expect(castleView(moatOpen()).moat).toBe(false);
+  });
+});
+
+// ---- Fix round: the gatehouse stands clear of the tower, and the moat's corners join ----
+
+describe('the gatehouse stands east of the wall line, clear of the south-east tower', () => {
+  const sprite = castleSprites.castleGatehouse;
+  const towerSprite = castleSprites.castleTower;
+  const pixelLeft = (tileX: number, def: { size: number[]; anchor: number[] }) => Math.round((tileX + 0.5) * 16) - def.anchor[0];
+  const gateState = () => gateOpen({ gatehouse: 30, towers: { nw: FULL_TOWER, ne: FULL_TOWER, se: FULL_TOWER, sw: FULL_TOWER } });
+
+  it('has its picture start where the tower\'s ends, and stand lower than the tower', () => {
+    const spot = GATE_SPOT;
+    const towerRight = pixelLeft(WALLS.right, towerSprite) + towerSprite.size[0];
+    expect(pixelLeft(spot.x, sprite)).toBeGreaterThanOrEqual(towerRight);
+    expect(sprite.anchor[1]).toBeLessThan(towerSprite.anchor[1] - 20);
+    expect(spot.x).toBeGreaterThan(WALLS.right + 1);
+    expect(spot.x).toBeLessThanOrEqual(27);
+    expect(spot.y).toBeGreaterThanOrEqual(12.5);
+    expect(spot.y).toBeLessThanOrEqual(13.5);
+  });
+
+  it('leaves the east wall whole under it, and draws the block beside the tower', () => {
+    const ids = sceneVisuals(gateState(), 0).map(visual => visual.id);
+    for (let i = 0; i < 9; i++) expect(ids).toContain(`castle-wall-east-${i}`);
+    const gate = sceneVisuals(gateState(), 0).find(visual => visual.id === 'castle-gatehouse')!;
+    const tower = sceneVisuals(gateState(), 0).find(visual => visual.id === 'castle-tower-se')!;
+    expect(gate.x - sprite.anchor[0]).toBeGreaterThanOrEqual(tower.x - towerSprite.anchor[0] + towerSprite.size[0]);
+    expect(gate.y).toBeLessThan(tower.y);
+  });
+
+  it('plays the drop and rise in the block\'s arch, away from the tower', () => {
+    const gate = sceneVisuals(gateState(), 0).find(visual => visual.id === 'castle-gatehouse')!;
+    const tower = sceneVisuals(gateState(), 0).find(visual => visual.id === 'castle-tower-se')!;
+    const before = standAt(gateOpen({ gatehouse: 29 }), 'gatehouse');
+    const effect = actionEffect({ type: 'castleWork', site: 'gatehouse' }, doWork(before, 'gatehouse').state)!;
+    const grate = effectVisuals(gateState(), 1500, [{ kind: 'portcullis', startedAtMs: 1000, x: effect.x, y: effect.y }])[0];
+    expect(grate.x).toBe(gate.x);
+    expect(grate.y).toBeLessThan(gate.y);
+    expect(grate.y).toBeGreaterThan(gate.y - PASSAGE_H - 2);
+    expect(Math.abs(grate.x - tower.x)).toBeGreaterThan(towerSprite.size[0] / 2);
+  });
+
+  it('is worked from the block\'s own front, and the survivor sorts against it by y', () => {
+    const state = { ...gateState(), player: { ...gateState().player, ...GATE_SPOT } };
+    expect(spotOf(gateOpen(), 'gatehouse')).toMatchObject({ x: GATE_SPOT.x, y: GATE_SPOT.y });
+    const { depth } = sceneVisuals(state, 0).find(visual => visual.id === 'castle-gatehouse')!;
+    expect(playerVisualDepth({ ...state, player: { ...state.player, y: GATE_SPOT.y - 1 } })).toBeLessThan(depth);
+    expect(playerVisualDepth({ ...state, player: { ...state.player, y: GATE_SPOT.y + 1 } })).toBeGreaterThan(depth);
+  });
+});
+
+describe('the moat\'s corners join the runs', () => {
+  const frames = castleSprites.castleMoat.frames;
+  const at = (name: string, x: number, y: number): string => frames[name][y][x];
+  const ring = MOAT_TILES;
+  const side = (from: { x: number; y: number }, to: { x: number; y: number }): [string, string] | null => {
+    if (to.x === from.x + 1 && to.y === from.y) return ['e', 'w'];
+    if (to.x === from.x - 1 && to.y === from.y) return ['w', 'e'];
+    if (to.y === from.y + 1 && to.x === from.x) return ['s', 'n'];
+    if (to.y === from.y - 1 && to.x === from.x) return ['n', 's'];
+    return null;
+  };
+  const edge = (name: string, dir: string): string => {
+    const cells = Array.from({ length: 16 }, (_, i) => ({ e: [15, i], w: [0, i], s: [i, 15], n: [i, 0] }[dir] as number[]));
+    return cells.map(([x, y]) => at(name, x, y)).join('');
+  };
+  const name = (tile: (typeof MOAT_TILES)[number], level: number, snow: string): string => `${moatPiece(tile)}${level}${snow}`;
+
+  it('names a corner piece for each of the four corners, and straight pieces elsewhere', () => {
+    const pieces = ring.map(tile => [tile.x, tile.y, moatPiece(tile)]);
+    expect(pieces.filter(piece => !['h', 'v'].includes(piece[2] as string))).toEqual([[25, 16, 'se'], [12, 16, 'sw'], [12, 4, 'nw'], [25, 4, 'ne']]);
+  });
+
+  it.each([0, 1, 2, 3, 4])('meets its neighbour edge to edge all round the ring at level %i, in summer and winter', (level) => {
+    for (const snow of ['', 's']) {
+      ring.forEach((tile, i) => {
+        const next = ring[i + 1];
+        const dirs = next && side(tile, next);
+        if (!dirs) return;
+        expect(edge(name(tile, level, snow), dirs[0]), `${tile.x},${tile.y} to ${next.x},${next.y} level ${level}${snow}`).toBe(edge(name(next, level, snow), dirs[1]));
+      });
+    }
+  });
+
+  it('has a picture for every corner at every level, with the water running round the bend', () => {
+    for (const corner of ['nw', 'ne', 'sw', 'se']) {
+      for (const level of [0, 1, 2, 3, 4]) for (const snow of ['', 's']) expect(frames[`${corner}${level}${snow}`], `${corner}${level}${snow}`).toBeDefined();
+    }
+    expect(at('sw4', 7, 7)).toBe('s');
+    expect(at('sw4', 12, 7)).toBe('s');
+    expect(at('sw4', 7, 0)).toBe('s');
+    expect(at('sw4', 1, 15)).not.toBe('s');
   });
 });

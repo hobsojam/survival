@@ -127,6 +127,14 @@ export const MOAT_TILES: readonly { x: number; y: number; stretch: number }[] = 
   return ring.map((tile, i) => ({ ...tile, stretch: Math.floor(i * NEEDS.moat / ring.length) }));
 })();
 
+/** Which piece of moat a ring tile is: a run across (`h`) or up and down (`v`), or the corner it turns at. */
+export const moatPiece = (tile: { x: number; y: number }): 'h' | 'v' | 'nw' | 'ne' | 'sw' | 'se' => {
+  const ns = tile.y === WALLS.top - 1 ? 'n' : tile.y === WALLS.bottom + 1 ? 's' : null;
+  const we = tile.x === WALLS.left - 1 ? 'w' : tile.x === WALLS.right + 1 ? 'e' : null;
+  if (ns && we) return `${ns}${we}`;
+  return ns ? 'h' : 'v';
+};
+
 /** Where a stretch of the moat is dug from: the middle of its run of tiles. */
 export const moatStretchSpot = (stretch: number): { x: number; y: number } => {
   const run = MOAT_TILES.filter(tile => tile.stretch === stretch);
