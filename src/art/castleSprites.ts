@@ -322,52 +322,79 @@ function moatTile(g: Grid, across: boolean, level: number, winter: boolean): voi
   put(0, 3, 16, 10, 'e');
   for (let x = 1; x < 16; x += 5) put(x, 4 + (x % 3) * 3, 2, 1, 'f');
   const thick = MOAT_WATER[level];
-  if (thick === 0) {
-    if (winter) for (let x = 2; x < 14; x += 4) put(x, 7, 2, 1, 'n');
-    return;
-  }
+  if (thick > 0) moatTileWater(put, thick, winter);
+  else if (winter) for (let x = 2; x < 14; x += 4) put(x, 7, 2, 1, 'n');
+}
+
+/** The water along a straight tile, lit along its top once it runs deep, with ripples, or ice and snow in winter. */
+function moatTileWater(put: (a: number, b: number, w: number, h: number, c: string) => void, thick: number, winter: boolean): void {
   const start = 3 + Math.floor((10 - thick) / 2);
-  put(0, start, 16, thick, winter ? 'i' : 's');
+  put(0, start, 16, thick, winterWater(winter));
   if (thick >= 5) put(0, start, 16, 1, 'g');
   for (let x = 2; x < 14; x += 6) put(x, start + 1 + (x % 2), 3, 1, winter ? 'n' : 'l');
 }
+
+/** Which way a corner tile's arms run, and where its water lies across the bed. */
+interface CornerShape { down: boolean; east: boolean; thick: number; start: number; end: number }
+
+/** Whether a pixel of a corner tile lies in the earth bed: the arm up and down, or the arm across. */
+const inCornerBed = ({ down, east }: CornerShape, x: number, y: number): boolean =>
+  (x >= 3 && x <= 12 && (down ? y >= 3 : y <= 12)) || (y >= 3 && y <= 12 && (east ? x >= 3 : x <= 12));
+
+/** Whether a pixel of a corner tile holds water: the arm up and down leaves through the top or bottom edge, the arm across through the side. */
+function cornerWet({ down, east, thick, start, end }: CornerShape, x: number, y: number): boolean {
+  if (thick === 0) return false;
+  const inColumn = x >= start && x <= end;
+  const inRow = y >= start && y <= end;
+  const column = inColumn && ((down ? y >= start : y <= end) || (down ? y < start : y > end));
+  const row = inRow && ((east ? x >= start : x <= end) || (east ? x > end : x < start));
+  return column || row;
+}
+
+/** The ground of a corner tile: the bed, a lip of short grass round it, and the bank beyond, snowy in winter. */
+function cornerGround(g: Grid, shape: CornerShape, winter: boolean): void {
+  const nearBed = (x: number, y: number): boolean => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inCornerBed(shape, x + dx, y + dy));
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      if (inCornerBed(shape, x, y)) dot(g, x, y, 'e');
+      else if (nearBed(x, y)) dot(g, x, y, winter ? 'i' : 'c');
+      else dot(g, x, y, winter ? 'n' : 'b');
+    }
+  }
+}
+
+/** Snow lying in a dry corner's bed, along the middle of each arm. */
+function cornerSnow(g: Grid, shape: CornerShape): void {
+  for (let a = 2; a < 14; a += 4) {
+    for (let i = 0; i < 2; i++) {
+      const along = shape.down ? 15 - a - i : a + i;
+      const across = shape.east ? 15 - a - i : a + i;
+      if (inCornerBed(shape, 7, along)) dot(g, 7, along, 'n');
+      if (inCornerBed(shape, across, 7)) dot(g, across, 7, 'n');
+    }
+  }
+}
+
+/** The water in a corner, its near edges lit once it runs deep, and ice in winter. */
+function cornerWater(g: Grid, shape: CornerShape, winter: boolean): void {
+  const lit = (x: number, y: number): boolean => shape.thick >= 5 && ((x > 0 && !cornerWet(shape, x - 1, y)) || (y > 0 && !cornerWet(shape, x, y - 1)));
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      if (cornerWet(shape, x, y)) dot(g, x, y, lit(x, y) ? 'g' : winterWater(winter));
+    }
+  }
+}
+
+const winterWater = (winter: boolean): string => (winter ? 'i' : 's');
 
 /** A corner tile: the bed and the water run in from one end and out of one side, with banks on the outer sides, made to meet the straight tiles pixel for pixel. */
 function moatCorner(g: Grid, down: boolean, east: boolean, level: number, winter: boolean): void {
   const thick = MOAT_WATER[level];
   const start = 3 + Math.floor((10 - thick) / 2);
-  const end = start + thick - 1;
-  const inBed = (x: number, y: number): boolean => (x >= 3 && x <= 12 && (down ? y >= 3 : y <= 12)) || (y >= 3 && y <= 12 && (east ? x >= 3 : x <= 12));
-  const arm = (x: number, y: number): boolean => (x >= start && x <= end && (down ? y >= start : y <= end)) || (y >= start && y <= end && (east ? x >= start : x <= end));
-  const isWater = (x: number, y: number): boolean => thick > 0 && arm(x, y);
-  // The vertical arm leaves through the top (or bottom) edge and the horizontal arm through the side edge.
-  const wet = (x: number, y: number): boolean => isWater(x, y) || (thick > 0 && (down ? y < start : y > end) && x >= start && x <= end) || (thick > 0 && (east ? x > end : x < start) && y >= start && y <= end);
-  for (let y = 0; y < 16; y++) {
-    for (let x = 0; x < 16; x++) {
-      let colour: string;
-      if (inBed(x, y) || [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inBed(x + dx, y + dy))) {
-        colour = inBed(x, y) ? 'e' : winter ? 'i' : 'c';
-      } else {
-        colour = winter ? 'n' : 'b';
-      }
-      dot(g, x, y, colour);
-    }
-  }
-  if (thick === 0) {
-    if (winter) {
-      for (let a = 2; a < 14; a += 4) {
-        for (let i = 0; i < 2; i++) { if (inBed(7, down ? 15 - a - i : a + i)) dot(g, 7, down ? 15 - a - i : a + i, 'n'); if (inBed(east ? 15 - a - i : a + i, 7)) dot(g, east ? 15 - a - i : a + i, 7, 'n'); }
-      }
-    }
-    return;
-  }
-  for (let y = 0; y < 16; y++) {
-    for (let x = 0; x < 16; x++) {
-      if (!wet(x, y)) continue;
-      const lit = thick >= 5 && ((x > 0 && !wet(x - 1, y)) || (y > 0 && !wet(x, y - 1)));
-      dot(g, x, y, lit ? 'g' : winter ? 'i' : 's');
-    }
-  }
+  const shape: CornerShape = { down, east, thick, start, end: start + thick - 1 };
+  cornerGround(g, shape, winter);
+  if (thick > 0) cornerWater(g, shape, winter);
+  else if (winter) cornerSnow(g, shape);
 }
 
 const moatFrames: Record<string, (g: Grid) => void> = {};

@@ -1717,7 +1717,7 @@ describe('the moat: prompts, keys and taps beside the towers and the gatehouse',
       const sites = sweep(state, agree);
       expect(sites.has('moat'), `stretch ${n}`).toBe(true);
     }
-  });
+  }, 30000); // Thousands of positions for each of sixteen stretches: slow on a busy machine.
 
   it('never loses a tower or the gatehouse: each is E\'s choice on its own spot, however the moat stands', () => {
     for (let n = 0; n < NEEDS.moat; n++) for (const lastDugDay of [32, 33]) {
@@ -1800,10 +1800,10 @@ describe('the moat: drawn on the hills', () => {
   it('draws nothing before the first stretch, then only the stretches dug', () => {
     expect(moatVisuals(moatOpen())).toEqual([]);
     const one = moatVisuals(dug(1, 33));
-    expect(one.length).toBe(MOAT_TILES.filter(tile => tile.stretch === 0).length);
+    expect(one).toHaveLength(MOAT_TILES.filter(tile => tile.stretch === 0).length);
     const eight = moatVisuals(dug(8, 33));
-    expect(eight.length).toBe(MOAT_TILES.filter(tile => tile.stretch < 8).length);
-    expect(moatVisuals(dug(16, 33)).length).toBe(MOAT_TILES.length);
+    expect(eight).toHaveLength(MOAT_TILES.filter(tile => tile.stretch < 8).length);
+    expect(moatVisuals(dug(16, 33))).toHaveLength(MOAT_TILES.length);
   });
 
   it('draws only on the hills, on the ground under everything else', () => {

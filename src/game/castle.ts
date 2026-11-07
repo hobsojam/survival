@@ -127,10 +127,16 @@ export const MOAT_TILES: readonly { x: number; y: number; stretch: number }[] = 
   return ring.map((tile, i) => ({ ...tile, stretch: Math.floor(i * NEEDS.moat / ring.length) }));
 })();
 
+/** Which of two edges a coordinate lies on, if either. */
+function edgeOf<A extends string, B extends string>(at: number, low: number, high: number, lowName: A, highName: B): A | B | null {
+  if (at === low) return lowName;
+  return at === high ? highName : null;
+}
+
 /** Which piece of moat a ring tile is: a run across (`h`) or up and down (`v`), or the corner it turns at. */
 export const moatPiece = (tile: { x: number; y: number }): 'h' | 'v' | 'nw' | 'ne' | 'sw' | 'se' => {
-  const ns = tile.y === WALLS.top - 1 ? 'n' : tile.y === WALLS.bottom + 1 ? 's' : null;
-  const we = tile.x === WALLS.left - 1 ? 'w' : tile.x === WALLS.right + 1 ? 'e' : null;
+  const ns = edgeOf(tile.y, WALLS.top - 1, WALLS.bottom + 1, 'n', 's');
+  const we = edgeOf(tile.x, WALLS.left - 1, WALLS.right + 1, 'w', 'e');
   if (ns && we) return `${ns}${we}`;
   return ns ? 'h' : 'v';
 };
@@ -168,4 +174,7 @@ export const moatFill = (state: Pick<GameState, 'day' | 'castle'>): number => {
 };
 
 /** Which of five pictures a fill shows: dry, then three rising, then full. Any rain shows at least a little. */
-export const moatLevel = (fill: number): number => (fill <= 0 ? 0 : fill >= 1 ? 4 : Math.min(3, Math.max(1, Math.ceil(fill * 4))));
+export const moatLevel = (fill: number): number => {
+  if (fill <= 0) return 0;
+  return fill >= 1 ? 4 : Math.min(3, Math.max(1, Math.ceil(fill * 4)));
+};
