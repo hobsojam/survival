@@ -184,7 +184,7 @@ describe('the road: where it is', () => {
   });
 
   it('has no spot once the road is finished', () => {
-    expect(castleSpots(atRoad(29, { area: 'hills' })).length).toBe(1);
+    expect(castleSpots(atRoad(29, { area: 'hills' }))).toHaveLength(1);
     const done = { ...revealed(), castle: { ...revealed().castle, road: NEEDS.road } };
     expect(castleSpots(done)).toEqual([]);
     expect(siteNeed(done, 'road')).toBeNull();

@@ -126,33 +126,56 @@ const TOWER_HEIGHT = [0, 12, 24, 36, 48, 58, 66];
 const ROOF_HEIGHT = 26;
 
 /** The roof on its walls: bare rafters as each beam is set, planked once all four are up, then bound with iron. */
+const ROOF_EAVES = TOWER_BASE - TOWER_HEIGHT[6];
+const ROOF_APEX = ROOF_EAVES - ROOF_HEIGHT;
+/** Half the roof's width on a row counted down from its apex. */
+const roofHalf = (row: number): number => Math.round(3 + (row + 1) / ROOF_HEIGHT * 15);
+
+/** The bare rafters, one for each beam set, with a tie across once two are up. */
+function roofRafters(g: Grid, beams: number): void {
+  for (const offset of [-18, 18, -9, 9].slice(0, beams)) line(g, TOWER_CENTRE, ROOF_APEX, TOWER_CENTRE + offset, ROOF_EAVES - 1, 'q');
+  if (beams >= 2) box(g, TOWER_CENTRE - 12, ROOF_EAVES - 12, 24, 1, 'u');
+}
+
+/** The planked roof once all four beams are up. */
+function roofPlanks(g: Grid): void {
+  for (let row = 0; row < ROOF_HEIGHT; row++) {
+    const half = roofHalf(row);
+    box(g, TOWER_CENTRE - half, ROOF_APEX + row, half * 2, 1, row % 4 === 3 ? 't' : 'u');
+    dot(g, TOWER_CENTRE - half, ROOF_APEX + row, 'q');
+    dot(g, TOWER_CENTRE + half - 1, ROOF_APEX + row, 'p');
+  }
+}
+
+/** The iron: a band at the eaves for the first fitting, then a band high up and a finial for the second. */
+function roofIron(g: Grid, fittings: number): void {
+  if (fittings >= 1) box(g, TOWER_CENTRE - 16, ROOF_EAVES - 6, 32, 1, 'i');
+  if (fittings < 2) return;
+  box(g, TOWER_CENTRE - 9, ROOF_APEX + 10, 18, 1, 'i');
+  box(g, TOWER_CENTRE, ROOF_APEX - 3, 1, 4, 'i');
+  box(g, TOWER_CENTRE - 1, ROOF_APEX - 3, 3, 1, 'b');
+}
+
+/** The roof on its walls: bare rafters as each beam is set, planked once all four are up, then bound with iron. */
 function towerRoof(g: Grid, beams: number, fittings: number, winter: boolean): void {
-  const eaves = TOWER_BASE - TOWER_HEIGHT[6];
-  const apex = eaves - ROOF_HEIGHT;
-  box(g, TOWER_LEFT - 2, eaves - 1, TOWER_BODY + 4, 2, 't');
-  const rafters = [-18, 18, -9, 9];
-  if (beams < 4) {
-    for (const offset of rafters.slice(0, beams)) line(g, TOWER_CENTRE, apex, TOWER_CENTRE + offset, eaves - 1, 'q');
-    if (beams >= 2) box(g, TOWER_CENTRE - 12, eaves - 12, 24, 1, 'u');
-  } else {
-    for (let row = 0; row < ROOF_HEIGHT; row++) {
-      const half = Math.round(3 + (row + 1) / ROOF_HEIGHT * 15);
-      box(g, TOWER_CENTRE - half, apex + row, half * 2, 1, row % 4 === 3 ? 't' : 'u');
-      dot(g, TOWER_CENTRE - half, apex + row, 'q');
-      dot(g, TOWER_CENTRE + half - 1, apex + row, 'p');
-    }
-  }
-  if (fittings >= 1) for (const [row, half] of [[eaves - 6, 16]] as const) box(g, TOWER_CENTRE - half, row, half * 2, 1, 'i');
-  if (fittings >= 2) {
-    box(g, TOWER_CENTRE - 9, apex + 10, 18, 1, 'i');
-    box(g, TOWER_CENTRE, apex - 3, 1, 4, 'i');
-    box(g, TOWER_CENTRE - 1, apex - 3, 3, 1, 'b');
-  }
+  box(g, TOWER_LEFT - 2, ROOF_EAVES - 1, TOWER_BODY + 4, 2, 't');
+  if (beams < 4) roofRafters(g, beams);
+  else roofPlanks(g);
+  roofIron(g, fittings);
   if (!winter || beams < 4) return;
-  for (let row = 0; row < ROOF_HEIGHT; row += 3) {
-    const half = Math.round(3 + (row + 1) / ROOF_HEIGHT * 15);
-    box(g, TOWER_CENTRE - half, apex + row, half * 2, 1, 'W');
+  for (let row = 0; row < ROOF_HEIGHT; row += 3) box(g, TOWER_CENTRE - roofHalf(row), ROOF_APEX + row, roofHalf(row) * 2, 1, 'W');
+}
+
+/** The open top of a tower still going up: its merlons, darker once the last course is on, and snow on them in winter. */
+function towerTop(g: Grid, step: number, top: number, winter: boolean): void {
+  for (let x = TOWER_LEFT; x < TOWER_LEFT + TOWER_BODY; x += 8) {
+    box(g, x, top - 4, 5, 4, step === 6 ? 'd' : 'c');
+    if (step === 6) box(g, x, top - 4, 5, 1, 'e');
   }
+  box(g, TOWER_LEFT, top, TOWER_BODY, 1, 'e');
+  if (!winter) return;
+  box(g, TOWER_LEFT, top, TOWER_BODY, 2, 'W');
+  for (let x = TOWER_LEFT; x < TOWER_LEFT + TOWER_BODY; x += 8) box(g, x, top - 4, 5, 1, 'W');
 }
 
 /** One corner tower, a picture for every four stones, then for each beam and fitting. */
@@ -164,21 +187,13 @@ function tower(g: Grid, step: number, winter: boolean): void {
   courses(g, TOWER_LEFT, TOWER_BODY, TOWER_BASE, height);
   box(g, TOWER_LEFT, top + 1, 1, height - 1, 'd');
   box(g, TOWER_LEFT + TOWER_BODY - 1, top + 1, 1, height - 1, 'a');
-  if (step >= 3) for (const x of [TOWER_CENTRE - 2]) box(g, x, TOWER_BASE - Math.min(height - 8, 40), 3, 8, 'a');
+  if (step >= 3) box(g, TOWER_CENTRE - 2, TOWER_BASE - Math.min(height - 8, 40), 3, 8, 'a');
   if (step <= 6) {
-    for (let x = TOWER_LEFT; x < TOWER_LEFT + TOWER_BODY; x += 8) {
-      box(g, x, top - 4, 5, 4, step === 6 ? 'd' : 'c');
-      if (step === 6) box(g, x, top - 4, 5, 1, 'e');
-    }
-    box(g, TOWER_LEFT, top, TOWER_BODY, 1, 'e');
-    if (winter) {
-      box(g, TOWER_LEFT, top, TOWER_BODY, 2, 'W');
-      for (let x = TOWER_LEFT; x < TOWER_LEFT + TOWER_BODY; x += 8) box(g, x, top - 4, 5, 1, 'W');
-    }
-  } else {
-    towerRoof(g, Math.min(step - 6, 4), Math.max(0, step - 10), winter);
-    if (winter) box(g, TOWER_LEFT, top, TOWER_BODY, 1, 'W');
+    towerTop(g, step, top, winter);
+    return;
   }
+  towerRoof(g, Math.min(step - 6, 4), Math.max(0, step - 10), winter);
+  if (winter) box(g, TOWER_LEFT, top, TOWER_BODY, 1, 'W');
 }
 
 const towerFrames: Record<string, (g: Grid) => void> = {};
