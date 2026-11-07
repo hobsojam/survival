@@ -286,6 +286,18 @@ export function cartChoice(state: GameState): Choice | null {
   return { label: `Take stone from the cart (${load})`, action: { type: 'takeCartStone' } };
 }
 
+/** EASTER EGG: the cart's load as a plain label, when it is made and stands in the survivor's area, so work near it shows it filling. */
+export function cartLoadNote(state: GameState): string | null {
+  const { stone, at } = state.castle.cart;
+  return state.progress.workshop.stoneCart && at === state.area ? `Cart ${stone}/${NEEDS.cartStone}` : null;
+}
+
+/** The load beside the work it follows: the quarry face, the rubble or an open castle site, but not at the cart, which names its own load. */
+function withCartLoad(state: GameState, prompt: string, nearWork: boolean): string {
+  const note = cartLoadNote(state);
+  return note && nearWork && !cartWithin(state) ? `${prompt} · ${note}` : prompt;
+}
+
 function hillsChoices(state: GameState): Choice[] {
   const found = closestGatherable(state);
   const keep = keepChoice(state);
@@ -310,7 +322,7 @@ function hillsChoices(state: GameState): Choice[] {
 
 function hillsPrompt(state: GameState): string {
   const labels = choiceLabels(hillsChoices(state));
-  if (labels.length) return labels.join(' · ');
+  if (labels.length) return withCartLoad(state, labels.join(' · '), castleChoice(state) !== null);
   if (within(state, HILLS_EXIT)) return 'Walk east to go back down';
   return 'WASD / arrows  Move';
 }
@@ -326,6 +338,11 @@ function quarryChoices(state: GameState): Choice[] {
 
 /** The quarry's prompt, with the road's beside it when the survivor is at the road. */
 function quarryPrompt(state: GameState): string {
+  const nearWork = within(state, QUARRY_SITE) || within(state, RUBBLE_SITE);
+  return withCartLoad(state, quarryRoadPrompt(state), nearWork || castleChoice(state) !== null);
+}
+
+function quarryRoadPrompt(state: GameState): string {
   const base = quarryBasePrompt(state);
   const castle = castleChoice(state) ?? cartChoice(state);
   if (!castle) return base;

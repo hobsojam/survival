@@ -606,3 +606,54 @@ describe('the stone cart: in the scene', () => {
     expect(cartVisual({ ...unmade, progress: { ...unmade.progress, workshop: { ...unmade.progress.workshop, stoneCart: false } } })).toBeUndefined();
   });
 });
+
+describe('the stone cart: its load beside the work', () => {
+  const atRubbleSpot = (state: GameState): GameState => atRubble(state);
+  const onHillsRoad = (state: GameState): GameState => {
+    const base = { ...cartAt(state, 'hills'), castle: { ...state.castle, road: 29, cart: { stone: 12, at: 'hills' as const } } };
+    const spot = castleSpots(base)[0];
+    return { ...base, area: 'hills', player: { ...base.player, x: spot.x, y: spot.y } };
+  };
+
+  it('shows the load at the quarry face, worked out or not, and keeps E on the dig', () => {
+    const state = withCart(12);
+    expect(promptFor(state)).toContain('E  Dig the quarry');
+    expect(promptFor(state)).toContain('Cart 12/40');
+    expect(useKeyAction(state)).toEqual({ type: 'digQuarry' });
+    const spent = { ...state, quarryReadyDay: state.day + 1 };
+    expect(promptFor(spent)).toContain('Cart 12/40');
+    expect(useKeyAction(spent)).toBeUndefined();
+  });
+
+  it('shows the load at the rubble, and keeps E on the rubble', () => {
+    const state = atRubbleSpot(withCart(3));
+    expect(promptFor(state)).toContain('Cart 3/40');
+    expect(useKeyAction(state)).toEqual({ type: 'gatherRubble' });
+  });
+
+  it('shows the load at an open site on the hills, and keeps E on the work', () => {
+    const state = { ...onHillsRoad(withCart(12)), inventory: { ...game.inventory, stone: 2 } };
+    expect(promptFor(state)).toContain('Lay a road stone (29/30)');
+    expect(promptFor(state)).toContain('Cart 12/40');
+    expect(useKeyAction(state)).toEqual({ type: 'castleWork', site: 'road' });
+  });
+
+  it('is absent before the cart is made', () => {
+    const unmade = withCart(0);
+    const state = { ...unmade, progress: { ...unmade.progress, workshop: { ...unmade.progress.workshop, stoneCart: false } } };
+    expect(promptFor(state)).not.toContain('Cart ');
+    expect(promptFor(atRubble(state))).not.toContain('Cart ');
+  });
+
+  it('is absent when the cart stands in the other area', () => {
+    expect(promptFor(cartAt(withCart(12), 'hills'))).not.toContain('Cart ');
+    const hills = { ...onHillsRoad(withCart(12)), inventory: { ...game.inventory, stone: 2 }, castle: { ...onHillsRoad(withCart(12)).castle, cart: { stone: 12, at: 'quarry' as const } } };
+    expect(promptFor(hills)).toContain('Lay a road stone');
+    expect(promptFor(hills)).not.toContain('Cart ');
+  });
+
+  it('is not repeated at the cart, which names its own load', () => {
+    const state = { ...withCart(12), player: { ...withCart(12).player, ...CART_SPOTS.quarry } };
+    expect(promptFor(state).match(/12\/40/g)).toHaveLength(1);
+  });
+});
