@@ -832,7 +832,7 @@ describe('the castle in the save', () => {
       castle.towers = { nw: { ...fullTower }, ne: { ...fullTower }, se: { ...fullTower }, sw: { ...fullTower } };
       castle.doneDays = { ...castle.doneDays, 'tower-nw': 8, 'tower-ne': 8, 'tower-se': 8, 'tower-sw': 8 };
       castle.gatehouse = 30; castle.doneDays['gatehouse'] = 8; castle.moat = { stretches: 16, lastDugDay: 8, dugDay: 8 }; castle.doneDays['moat'] = 8;
-      castle.hall = { stones: 40, beams: 12, fittings: 6, hangings: 2 };
+      castle.hall = { stones: 40, beams: 12, fittings: 6, hangings: 2 }; castle.doneDays['hall'] = 8;
       castle.feast = { ...NEEDS.feast };
       castle.finishedDay = 9; castle.home = 'hall'; castle.offeredHome = true;
     })).toBe(true);
@@ -841,6 +841,13 @@ describe('the castle in the save', () => {
   it('accepts a gatehouse part-laid and one finished, each with its portcullis', () => {
     expect(accepts(state => { cartMade(state); wallDone(state.castle); state.progress.workshop.portcullis = true; state.castle.gatehouse = 12; })).toBe(true);
     expect(accepts(state => { cartMade(state); wallDone(state.castle); state.progress.workshop.portcullis = true; state.castle.gatehouse = 30; state.castle.doneDays.gatehouse = 9; })).toBe(true);
+  });
+
+  it('accepts a hall part-built in its order, and one finished with its day', () => {
+    expect(accepts(state => { framesDone(state); state.castle.hall = { stones: 12, beams: 0, fittings: 0, hangings: 0 }; })).toBe(true);
+    expect(accepts(state => { framesDone(state); state.castle.hall = { stones: 40, beams: 5, fittings: 0, hangings: 0 }; })).toBe(true);
+    expect(accepts(state => { framesDone(state); state.castle.hall = { stones: 40, beams: 12, fittings: 6, hangings: 1 }; })).toBe(true);
+    expect(accepts(state => { framesDone(state); state.castle.hall = { stones: 40, beams: 12, fittings: 6, hangings: 2 }; state.castle.doneDays.hall = 9; })).toBe(true);
   });
 
   it('accepts frames part-raised, a wall begun, and towers part-built in their order', () => {
@@ -885,6 +892,12 @@ describe('the castle in the save', () => {
     ['a moat day that is not the day it was dug', state => { cartMade(state); wallDone(state.castle); state.castle.moat = { stretches: 16, lastDugDay: 8, dugDay: 8 }; state.castle.doneDays.moat = 7; }],
     ['a dug moat day with the moat unfinished', state => { cartMade(state); wallDone(state.castle); state.castle.moat = { stretches: 15, lastDugDay: 8, dugDay: 8 }; }],
     ['moat stretches before the wall is done', state => { state.castle.moat = { stretches: 1, lastDugDay: 8, dugDay: null }; }],
+    ['hall beams before its stones are done', state => { framesDone(state); state.castle.hall = { stones: 39, beams: 1, fittings: 0, hangings: 0 }; }],
+    ['hall fittings before its beams are done', state => { framesDone(state); state.castle.hall = { stones: 40, beams: 11, fittings: 1, hangings: 0 }; }],
+    ['hall hangings before its fittings are done', state => { framesDone(state); state.castle.hall = { stones: 40, beams: 12, fittings: 5, hangings: 1 }; }],
+    ['a hall day with the hall unfinished', state => { framesDone(state); state.castle.hall = { stones: 40, beams: 12, fittings: 6, hangings: 1 }; state.castle.doneDays.hall = 9; }],
+    ['a finished hall with no day', state => { framesDone(state); state.castle.hall = { stones: 40, beams: 12, fittings: 6, hangings: 2 }; }],
+    ['a hall over its hangings', state => { framesDone(state); state.castle.hall = { stones: 40, beams: 12, fittings: 6, hangings: 3 }; }],
     ['bread over the feast\'s need', state => { state.castle.feast.bread = 5; }],
     ['a finish with every section short', state => { state.castle.finishedDay = 9; }],
     ['moving into the hall before the finish', state => { state.castle.home = 'hall'; }],

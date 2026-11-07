@@ -13,7 +13,7 @@ import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 import { OUTCROP_SITE, outcropLeft } from '../game/hills';
 import { KEEP_SITE, KEEP_STONES, keepFinished, keepOpen } from '../game/keep';
 import { MOAT_TILES, NEEDS, SIDES, TOWERS, WALLS, isRevealed, moatFill, moatLevel, moatPiece, treeUnderWall, type Tower, type TowerId, type WallSide } from '../game/castle';
-import { CART_SPOTS, FRAMES_SPOT, GATE_SPOT, roadStone } from '../game/castleSites';
+import { CART_SPOTS, FRAMES_SPOT, GATE_SPOT, HALL_SPOT, roadStone } from '../game/castleSites';
 import { markedTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
 import { fireplaceBurning, woodStoreCapacity } from '../game/home';
@@ -82,7 +82,15 @@ export const towerStep = (tower: Tower): number => {
 /** Which picture of the gatehouse these stones show: one for every five, six in all. */
 export const gatehouseStep = (stones: number): number => Math.ceil(stones / 5);
 
-/** The frames, the wall, the towers and the gatehouse as far as they are built, drawn on the hills with the same snow as the keep. EASTER EGG: the castle, see src/game/castle.ts. */
+/** Which picture of the hall this much work shows: one for every eight stones, one for the finished walls, then one for every four beams, three fittings and hanging. */
+export const hallStep = (hall: GameState['castle']['hall']): number => {
+  if (hall.hangings > 0) return 11 + hall.hangings;
+  if (hall.fittings > 0) return 9 + Math.ceil(hall.fittings / 3);
+  if (hall.beams > 0) return 6 + Math.ceil(hall.beams / 4);
+  return hall.stones === NEEDS.hallStones ? 6 : Math.ceil(hall.stones / 8);
+};
+
+/** The frames, the wall, the towers, the gatehouse and the hall as far as they are built, drawn on the hills with the same snow as the keep. EASTER EGG: the castle, see src/game/castle.ts. */
 function addBuilding(state: GameState, add: AddVisual): void {
   const { castle } = state;
   const snow = isWinter(state.day) ? 's' : '';
@@ -95,6 +103,8 @@ function addBuilding(state: GameState, add: AddVisual): void {
     });
   }
   if (castle.gatehouse > 0) add('castle-gatehouse', `castleGatehouse:${gatehouseStep(castle.gatehouse)}${snow}`, GATE_SPOT.x, GATE_SPOT.y);
+  const hall = hallStep(castle.hall);
+  if (hall > 0) add('castle-hall', `castleHall:${hall}${snow}`, HALL_SPOT.x, HALL_SPOT.y);
   for (const id of TOWERS) {
     const step = towerStep(castle.towers[id]);
     if (step > 0) add(`castle-tower-${id}`, `castleTower:${step}${snow}`, TOWER_CORNERS[id].x, TOWER_CORNERS[id].y);

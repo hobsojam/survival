@@ -892,11 +892,21 @@ describe('the castle goods panel', () => {
   };
   const rows = (state: GameState) => Object.fromEntries(castleGoodsView(state).map(row => [row.good, row]));
 
-  it('shows beams and fittings with their costs and what is made, and keeps hangings hidden', () => {
-    const view = rows({ ...camp, castle: { ...camp.castle, goods: { beams: 4, fittings: 1, hangings: 0 } } });
+  it('shows beams, fittings and hangings with their costs and what is made', () => {
+    const view = rows({ ...camp, structures: { ...camp.structures, loom: true }, sheep: { ...camp.sheep, lastShornYear: 1, wool: 4 }, castle: { ...camp.castle, goods: { beams: 4, fittings: 1, hangings: 1 } } });
     expect(view.beams).toMatchObject({ shown: true, cost: '8 wood', have: 4, disabled: false });
     expect(view.fittings).toMatchObject({ shown: true, cost: '1 wood · 1 ore', have: 1, disabled: false });
-    expect(view.hangings.shown).toBe(false);
+    expect(view.hangings).toMatchObject({ shown: true, title: 'Wool hangings', cost: '3 wool', have: 1, disabled: false });
+    expect(view.hangings.copy).toMatch(/hall/);
+  });
+
+  it('shows why a hanging cannot be made, and hides the row once the castle has both', () => {
+    const loom = { ...camp, structures: { ...camp.structures, loom: true }, sheep: { ...camp.sheep, lastShornYear: 1, wool: 2 } };
+    expect(rows(loom).hangings).toMatchObject({ shown: true, disabled: true, copy: 'You need 3 wool for the hanging.' });
+    expect(rows(camp).hangings).toMatchObject({ shown: true, disabled: true, copy: 'Build the loom first.' });
+    expect(rows({ ...loom, castle: { ...loom.castle, goods: { beams: 0, fittings: 0, hangings: 1 }, hall: { ...loom.castle.hall, hangings: 1 } } }).hangings.shown).toBe(false);
+    expect(rows({ ...loom, castle: { ...loom.castle, revealedDay: null } }).hangings.shown).toBe(false);
+    expect(rows({ ...loom, castle: { ...loom.castle, frames: 0 } }).hangings.shown).toBe(false);
   });
 
   it('is hidden before the reveal and before the frames are begun', () => {

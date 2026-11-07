@@ -75,6 +75,10 @@ export const isRevealed = (state: GameState): boolean => state.castle.revealedDa
 /** Whether a tower has its stones, its roof beams and its iron. */
 export const towerFinished = (tower: Tower): boolean => tower.stones === NEEDS.towerStones && tower.beams === NEEDS.towerBeams && tower.fittings === NEEDS.towerFittings;
 
+/** Whether the hall has its stones, its roof beams, its iron and its hangings. */
+export const hallFinished = (hall: CastleState['hall']): boolean =>
+  hall.stones === NEEDS.hallStones && hall.beams === NEEDS.hallBeams && hall.fittings === NEEDS.hallFittings && hall.hangings === NEEDS.hallHangings;
+
 /** Whether all four sides of the curtain wall are done. */
 export const wallFinished = (castle: CastleState): boolean => SIDES.every(side => castle.wall[side] === NEEDS.wallSide);
 

@@ -9,7 +9,7 @@ import { FOOD_ITEMS, availableFood, foodCount, keptFoodTotal } from '../../src/g
 import { HILLS_EXIT, OUTCROP_SITE, availableOre, outcropLeft } from '../../src/game/hills';
 import { HOUSE_SPOT, fuelLeft, hasWoodStore, livesInHouse, woodStoreCapacity } from '../../src/game/home';
 import { recordJournal } from '../../src/game/journalEntries';
-import { NEEDS, TOWERS, isRevealed, moatFill, towerFinished, wallFinished } from '../../src/game/castle';
+import { NEEDS, TOWERS, hallFinished, isRevealed, moatFill, towerFinished, wallFinished } from '../../src/game/castle';
 import { CART_SPOTS, GOODS, castleSpots, type CastleGood } from '../../src/game/castleSites';
 import { KEEP_DOOR_AT, KEEP_DOOR_WOOD, KEEP_SITE, keepFinished, keepOpen } from '../../src/game/keep';
 import { ORCHARD_SPOTS, spotAction } from '../../src/game/orchard';
@@ -430,13 +430,16 @@ export class Player {
       // Then timber frames, the four sides of the wall, and the towers, with the beams and iron the towers are roofed with.
       { id: 'castle-frames', shown: state => state.progress.workshop.stoneCart, done: state => state.castle.frames >= NEEDS.frames, step: () => this.raiseFrames() },
       { id: 'castle-wall', shown: state => state.castle.frames >= NEEDS.frames, done: state => wallFinished(state.castle), step: () => this.layCastleStone('wall-') },
-      this.goodTask('beams', { wood: GOODS.beams.cost.wood, fiber: 0, stone: 0 }, NEEDS.towerBeams),
-      this.goodTask('fittings', { wood: GOODS.fittings.cost.wood, fiber: 0, stone: 0, ore: GOODS.fittings.cost.ore }, NEEDS.towerFittings),
+      this.goodTask('beams', { wood: GOODS.beams.cost.wood, fiber: 0, stone: 0 }, NEEDS.towerBeams * TOWERS.length + NEEDS.hallBeams),
+      this.goodTask('fittings', { wood: GOODS.fittings.cost.wood, fiber: 0, stone: 0, ore: GOODS.fittings.cost.ore }, NEEDS.towerFittings * TOWERS.length + NEEDS.hallFittings),
       { id: 'castle-towers', shown: state => wallFinished(state.castle), done: state => TOWERS.every(id => towerFinished(state.castle.towers[id])), step: () => this.buildTower() },
       // The portcullis is made at the forge once the wall is done, and the gatehouse then takes its stones.
       { id: 'castle-gatehouse', shown: state => state.progress.workshop.portcullis, done: state => state.castle.gatehouse >= NEEDS.gatehouse, step: () => this.layCastleStone('gatehouse') },
       // The moat is dug a stretch a day once the wall is done, never in winter, then waits for the next spring's rain to fill it.
       { id: 'castle-moat', shown: state => wallFinished(state.castle), done: state => state.castle.moat.stretches >= NEEDS.moat, step: () => this.digMoat() },
+      // The great hall opens with the frames and is built at any point after them, with the hangings woven at the loom from the year's wool.
+      { id: 'castle-hangings', shown: state => state.castle.frames > 0 && state.structures.loom, done: state => state.castle.goods.hangings + state.castle.hall.hangings >= NEEDS.hallHangings, step: () => this.weaveHanging() },
+      { id: 'castle-hall', shown: state => state.castle.frames >= NEEDS.frames, done: state => hallFinished(state.castle.hall), step: () => this.buildHall() },
       { id: 'castle-moat-fills', shown: state => state.castle.moat.stretches >= NEEDS.moat, done: state => moatFill(state) === 1, step: () => false },
       { id: 'mine', shown: state => progress(state).pickaxeCrafted, done: state => progress(state).mineBuilt, step: () => this.buildMine() },
       ...(['basket', 'cairn'] as const).map(site => ({
@@ -558,13 +561,30 @@ export class Player {
     return this.goTo(spot.area) && this.walkTo(spot) && this.act({ type: 'castleWork', site: spot.site });
   }
 
-  /** Oak beams from the workshop, or iron fittings from the forge, enough for the four towers. */
-  private goodTask(good: Exclude<CastleGood, 'hangings'>, cost: Cost, perTower: number): Task {
-    const built = (state: GameState): number => state.castle.goods[good] + TOWERS.reduce((sum, id) => sum + state.castle.towers[id][good], 0);
+  /** The hall's stones, then the beams, iron and hangings made at camp, which are set from where the survivor stands. */
+  private buildHall(): boolean {
+    const spot = castleSpots(this.state).find(each => each.site === 'hall');
+    if (!spot) return false;
+    const { hall, goods } = this.state.castle;
+    if (hall.stones < NEEDS.hallStones) return this.layCastleStone('hall');
+    const good = hall.beams < NEEDS.hallBeams ? 'beams' : hall.fittings < NEEDS.hallFittings ? 'fittings' : 'hangings';
+    if (goods[good] === 0) return false;
+    return this.goTo(spot.area) && this.walkTo(spot) && this.act({ type: 'castleWork', site: 'hall' });
+  }
+
+  /** A hanging woven in the clearing, once the basket holds the wool for it. The weaving chore may have used it on something warm first. */
+  private weaveHanging(): boolean {
+    if (this.state.sheep.wool < GOODS.hangings.wool) return false;
+    return this.goTo('camp') && this.walkTo(CAMP, 2) && this.act({ type: 'makeCastleGood', good: 'hangings' });
+  }
+
+  /** Oak beams from the workshop, or iron fittings from the forge, enough for the four towers and the hall. */
+  private goodTask(good: Exclude<CastleGood, 'hangings'>, cost: Cost, total: number): Task {
+    const built = (state: GameState): number => state.castle.goods[good] + state.castle.hall[good] + TOWERS.reduce((sum, id) => sum + state.castle.towers[id][good], 0);
     return {
       id: `castle-${good}`,
       shown: state => state.castle.frames > 0 && state.structures.workshop && (good === 'beams' || state.progress.workshop.forge),
-      done: state => built(state) >= perTower * TOWERS.length,
+      done: state => built(state) >= total,
       step: () => this.payFor(cost, { type: 'makeCastleGood', good })
     };
   }
