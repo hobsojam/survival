@@ -1,7 +1,7 @@
 import { season } from '../game/calendar';
 import { STEP_IDS } from '../game/clearing';
 import { treeStage, type TreeStage } from '../game/orchard';
-import { isRevealed } from '../game/castle';
+import { NEEDS, SIDES, TOWERS, isRevealed, towerFinished } from '../game/castle';
 import type { GameState } from '../game/state';
 
 // What the camp looks like from the top of the keep, read one landmark at a time from what the player has really built.
@@ -25,12 +25,22 @@ export interface CampView {
 /** What the castle adds to the view. EASTER EGG: nothing of it shows before the line of stones has been seen. */
 export interface CastleView {
   line: boolean;
+  /** How many sides of the wall are finished, and how many towers. */
+  walls: number;
+  towers: number;
 }
 
 const SMALLEST_CLEARING = 15;
 const SHEEP_IN_THE_FLOCK = 3;
 
-export const castleView = (state: GameState): CastleView => ({ line: isRevealed(state) });
+export const castleView = (state: GameState): CastleView => {
+  const { wall, towers } = state.castle;
+  return {
+    line: isRevealed(state),
+    walls: SIDES.filter(side => wall[side] === NEEDS.wallSide).length,
+    towers: TOWERS.filter(id => towerFinished(towers[id])).length
+  };
+};
 
 export function campView(state: GameState): CampView {
   const built = state.structures;

@@ -1,6 +1,6 @@
 import type { Season } from '../game/calendar';
 import { journalEntry, type JournalId } from '../game/journalEntries';
-import type { CampView } from './keepViewCamp';
+import type { CampView, CastleView } from './keepViewCamp';
 
 // The view from the top of the keep, painted as rectangles on a small grid so it can be looked at without Phaser.
 // It's composed to feel right, not to be accurate: the game's areas don't line up on any real map.
@@ -177,8 +177,8 @@ function paintHills(p: Painter, look: SeasonLook): void {
   }
 }
 
-/** The line of stones the survivor has seen in the hills, off to the left of the camp: a dashed outline of old stone. */
-function paintLine(p: Painter, look: SeasonLook): void {
+/** The line of stones the survivor has seen in the hills, off to the left of the camp: a dashed outline of old stone, with the wall and towers built on it. */
+function paintLine(p: Painter, look: SeasonLook, castle: CastleView): void {
   const stone = look.snow ? '#8b8f92' : '#a8a292';
   for (let x = 20; x < 100; x += 5) {
     p.rect(x, 150, 3, 1, stone);
@@ -187,6 +187,18 @@ function paintLine(p: Painter, look: SeasonLook): void {
   for (let y = 150; y < 168; y += 5) {
     p.rect(20, y, 1, 3, stone);
     p.rect(98, y, 1, 3, stone);
+  }
+  const wall = look.snow ? '#8b8f92' : '#77736a';
+  const top = look.snow ?? '#928d81';
+  const sides = [[20, 148, 79, 3], [97, 148, 3, 22], [20, 167, 79, 3], [20, 148, 3, 22]] as const;
+  for (const [x, y, w, h] of sides.slice(0, castle.walls)) {
+    p.rect(x, y, w, h, wall);
+    p.rect(x, y, w, 1, top);
+  }
+  const roof = look.snow ?? '#8a4f3a';
+  for (const [x, y] of ([[20, 150], [97, 150], [97, 168], [20, 168]] as const).slice(0, castle.towers)) {
+    p.rect(x - 1, y - 8, 6, 10, wall);
+    p.rect(x - 2, y - 11, 8, 3, roof);
   }
 }
 
@@ -219,7 +231,7 @@ export function stillRects(season: Season, camp: CampView): PictureRect[] {
   paintCamp(p, look, camp);
   paintCliff(p, look);
   paintHills(p, look);
-  if (camp.castle.line) paintLine(p, look);
+  if (camp.castle.line) paintLine(p, look, camp.castle);
   paintBattlements(p, look);
   return p.rects;
 }

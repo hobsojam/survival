@@ -789,7 +789,13 @@ describe('the castle in the save', () => {
     return state;
   };
   const accepts = (change?: (state: GameState) => void) => saveGame(new MemoryStorage(), camp(change)).ok;
-  const wallDone = (castle: CastleState) => { castle.wall = { north: 30, east: 30, south: 30, west: 30 }; castle.frames = NEEDS.frames; };
+  const wallDone = (castle: CastleState) => {
+    castle.wall = { north: 30, east: 30, south: 30, west: 30 }; castle.frames = NEEDS.frames;
+    castle.doneDays = { ...castle.doneDays, frames: 7, 'wall-north': 8, 'wall-east': 8, 'wall-south': 8, 'wall-west': 8 };
+  };
+  const cartMade = (state: GameState) => { state.castle.road = 30; state.castle.doneDays = { road: 6 }; state.progress.workshop.stoneCart = true; };
+  const framesDone = (state: GameState) => { cartMade(state); state.castle.frames = NEEDS.frames; state.castle.doneDays.frames = 7; };
+  const fullTower = { stones: 20, beams: 4, fittings: 2 };
 
   it('accepts a revealed castle, and one still hidden', () => {
     expect(accepts()).toBe(true);
@@ -802,7 +808,8 @@ describe('the castle in the save', () => {
     expect(accepts(state => {
       const castle = state.castle;
       castle.road = 30; castle.doneDays = { road: 6 }; state.progress.workshop.stoneCart = true; state.progress.workshop.portcullis = true; wallDone(castle);
-      castle.towers = { nw: { stones: 20, beams: 4, fittings: 2 }, ne: { stones: 20, beams: 4, fittings: 2 }, se: { stones: 20, beams: 4, fittings: 2 }, sw: { stones: 20, beams: 4, fittings: 2 } };
+      castle.towers = { nw: { ...fullTower }, ne: { ...fullTower }, se: { ...fullTower }, sw: { ...fullTower } };
+      castle.doneDays = { ...castle.doneDays, 'tower-nw': 8, 'tower-ne': 8, 'tower-se': 8, 'tower-sw': 8 };
       castle.gatehouse = 30; castle.moat = { stretches: 16, lastDugDay: 8, dugDay: 8 };
       castle.hall = { stones: 40, beams: 12, fittings: 6, hangings: 2 };
       castle.feast = { ...NEEDS.feast };
@@ -810,7 +817,22 @@ describe('the castle in the save', () => {
     })).toBe(true);
   });
 
+  it('accepts frames part-raised, a wall begun, and towers part-built in their order', () => {
+    expect(accepts(state => { cartMade(state); state.castle.frames = 4; })).toBe(true);
+    expect(accepts(state => { framesDone(state); state.castle.wall = { north: 30, east: 12, south: 0, west: 0 }; state.castle.doneDays['wall-north'] = 8; })).toBe(true);
+    expect(accepts(state => { cartMade(state); wallDone(state.castle); state.castle.towers.nw = { stones: 20, beams: 2, fittings: 0 }; state.castle.towers.ne = { ...fullTower }; state.castle.doneDays['tower-ne'] = 9; })).toBe(true);
+  });
+
   it.each<[string, (state: GameState) => void]>([
+    ['frames before the cart is made', state => { state.castle.frames = 2; }],
+    ['a frames day with the frames unfinished', state => { cartMade(state); state.castle.frames = 10; state.castle.doneDays.frames = 7; }],
+    ['finished frames with no day', state => { cartMade(state); state.castle.frames = 12; }],
+    ['a wall day with its side unfinished', state => { framesDone(state); state.castle.wall.east = 29; state.castle.doneDays['wall-east'] = 8; }],
+    ['a finished wall side with no day', state => { framesDone(state); state.castle.wall.east = 30; }],
+    ['a tower day with the tower unfinished', state => { cartMade(state); wallDone(state.castle); state.castle.towers.se = { stones: 20, beams: 4, fittings: 1 }; state.castle.doneDays['tower-se'] = 9; }],
+    ['a finished tower with no day', state => { cartMade(state); wallDone(state.castle); state.castle.towers.se = { ...fullTower }; }],
+    ['tower beams before its stones are done', state => { cartMade(state); wallDone(state.castle); state.castle.towers.nw = { stones: 19, beams: 1, fittings: 0 }; }],
+    ['tower fittings before its beams are done', state => { cartMade(state); wallDone(state.castle); state.castle.towers.nw = { stones: 20, beams: 3, fittings: 1 }; }],
     ['a road day with the road unfinished', state => { state.castle.road = 29; state.castle.doneDays = { road: 5 }; }],
     ['a finished road with no day', state => { state.castle.road = 30; state.castle.doneDays = {}; }],
     ['a done day in the future', state => { state.castle.road = 30; state.castle.doneDays = { road: 9999 }; }],

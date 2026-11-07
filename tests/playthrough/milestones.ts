@@ -1,4 +1,4 @@
-import { NEEDS, isRevealed } from '../../src/game/castle';
+import { NEEDS, TOWERS, isRevealed, towerFinished, wallFinished } from '../../src/game/castle';
 import { KEEP_DOOR_AT, keepFinished } from '../../src/game/keep';
 import type { GameState, StructureId } from '../../src/game/state';
 
@@ -51,5 +51,8 @@ export const MILESTONES: readonly Milestone[] = [
   // EASTER EGG: the castle, see src/game/castle.ts.
   { id: 'castle-line', label: 'Saw the line of stones', reached: isRevealed },
   { id: 'road', label: 'Laid the road to the keep', reached: state => state.castle.road >= NEEDS.road },
-  { id: 'cart', label: 'Made the stone cart', reached: state => state.progress.workshop.stoneCart }
+  { id: 'cart', label: 'Made the stone cart', reached: state => state.progress.workshop.stoneCart },
+  { id: 'frames', label: 'Raised the timber frames', reached: state => state.castle.frames >= NEEDS.frames },
+  { id: 'wall', label: 'Finished the curtain wall', reached: state => wallFinished(state.castle) },
+  { id: 'towers', label: 'Roofed and fitted the four towers', reached: state => TOWERS.every(id => towerFinished(state.castle.towers[id])) }
 ];

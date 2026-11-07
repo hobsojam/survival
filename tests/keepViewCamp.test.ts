@@ -22,7 +22,7 @@ const withTrees = (day: number, ...trees: ReturnType<typeof planted>[]): GameSta
 describe('what the camp shows from the keep', () => {
   it('a new camp shows only its clearing and fire', () => {
     expect(campView(game)).toEqual({
-      clearingRadius: 15, shelter: 'none', campfire: true, house: false, beds: false, well: false, workshop: false, field: false, windmill: false, bakery: false, sheep: 0, orchard: null, castle: { line: false }
+      clearingRadius: 15, shelter: 'none', campfire: true, house: false, beds: false, well: false, workshop: false, field: false, windmill: false, bakery: false, sheep: 0, orchard: null, castle: { line: false, walls: 0, towers: 0 }
     });
   });
 
@@ -69,11 +69,11 @@ describe('what the camp shows from the keep', () => {
 
 describe('what the castle shows from the keep', () => {
   it('shows nothing before the line of stones has shown', () => {
-    expect(castleView(game)).toEqual({ line: false });
+    expect(castleView(game)).toEqual({ line: false, walls: 0, towers: 0 });
   });
 
   it('shows the line once revealed', () => {
-    expect(castleView({ ...game, castle: { ...emptyCastle(), revealedDay: 5 } })).toEqual({ line: true });
-    expect(campView({ ...game, castle: { ...emptyCastle(), revealedDay: 5 } }).castle).toEqual({ line: true });
+    expect(castleView({ ...game, castle: { ...emptyCastle(), revealedDay: 5 } })).toEqual({ line: true, walls: 0, towers: 0 });
+    expect(campView({ ...game, castle: { ...emptyCastle(), revealedDay: 5 } }).castle).toEqual({ line: true, walls: 0, towers: 0 });
   });
 });
