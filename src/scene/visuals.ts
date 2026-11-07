@@ -56,9 +56,14 @@ function addRoad(state: GameState, add: AddVisual): void {
 function addCart(state: GameState, add: AddVisual): void {
   const { stone, at } = state.castle.cart;
   if (!state.progress.workshop.stoneCart || at !== state.area) return;
-  const load = stone === 0 ? 'empty' : stone <= NEEDS.cartStone / 2 ? 'some' : 'full';
-  add('castle-cart', `castleCart:${load}`, CART_SPOTS[at].x, CART_SPOTS[at].y);
+  add('castle-cart', `castleCart:${cartLoadLook(stone)}`, CART_SPOTS[at].x, CART_SPOTS[at].y);
 }
+
+/** How full the cart looks: empty, some, or full once it holds more than half. */
+const cartLoadLook = (stone: number): 'empty' | 'some' | 'full' => {
+  if (stone === 0) return 'empty';
+  return stone <= NEEDS.cartStone / 2 ? 'some' : 'full';
+};
 
 /** Where each side of the wall runs, as the tiles between the corner towers. */
 const wallTiles = (side: WallSide): { x: number; y: number }[] => {

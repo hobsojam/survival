@@ -194,7 +194,7 @@ describe('the road: where it is', () => {
   });
 
   it('has no spot once the road is finished', () => {
-    expect(castleSpots(atRoad(29, { area: 'hills' })).length).toBe(1);
+    expect(castleSpots(atRoad(29, { area: 'hills' }))).toHaveLength(1);
     const done = { ...revealed(), castle: { ...revealed().castle, road: NEEDS.road } };
     expect(castleSpots(done)).toEqual([]);
     expect(siteNeed(done, 'road')).toBeNull();
@@ -1324,7 +1324,7 @@ describe('the gatehouse: where it stands', () => {
       }
       sites.add(nearest.site);
       expect(useKeyAction(there), `${x},${y}`).toEqual({ type: 'castleWork', site: nearest.site });
-      expect(promptFor(there), `${x},${y}`).toMatch(new RegExp(`^E  ${castlePrompt(there, nearest).replace(/[()/]/g, '\\$&')}`));
+      expect(promptFor(there).startsWith(`E  ${castlePrompt(there, nearest)}`), `${x},${y}: ${promptFor(there)}`).toBe(true);
       expect(targetAction(pickTapTarget(there, nearest.x, nearest.y)), `${x},${y}`).toEqual({ type: 'castleWork', site: nearest.site });
     }
     expect(sites).toEqual(new Set(['gatehouse', 'tower-se', 'moat', 'hall']));
@@ -1727,7 +1727,7 @@ describe('the moat: prompts, keys and taps beside the towers and the gatehouse',
       const sites = sweep(state, agree);
       expect(sites.has('moat'), `stretch ${n}`).toBe(true);
     }
-  }, 30000);
+  }, 30000); // Thousands of positions for each of sixteen stretches: slow on a busy machine.
 
   it('never loses a tower or the gatehouse: each is E\'s choice on its own spot, however the moat stands', () => {
     for (let n = 0; n < NEEDS.moat; n++) for (const lastDugDay of [32, 33]) {
@@ -1810,10 +1810,10 @@ describe('the moat: drawn on the hills', () => {
   it('draws nothing before the first stretch, then only the stretches dug', () => {
     expect(moatVisuals(moatOpen())).toEqual([]);
     const one = moatVisuals(dug(1, 33));
-    expect(one.length).toBe(MOAT_TILES.filter(tile => tile.stretch === 0).length);
+    expect(one).toHaveLength(MOAT_TILES.filter(tile => tile.stretch === 0).length);
     const eight = moatVisuals(dug(8, 33));
-    expect(eight.length).toBe(MOAT_TILES.filter(tile => tile.stretch < 8).length);
-    expect(moatVisuals(dug(16, 33)).length).toBe(MOAT_TILES.length);
+    expect(eight).toHaveLength(MOAT_TILES.filter(tile => tile.stretch < 8).length);
+    expect(moatVisuals(dug(16, 33))).toHaveLength(MOAT_TILES.length);
   });
 
   it('draws only on the hills, on the ground under everything else', () => {

@@ -42,7 +42,7 @@ const along = (corners: readonly { x: number; y: number }[], fraction: number): 
     }
     left -= lengths[i];
   }
-  return corners[corners.length - 1];
+  return corners.at(-1) ?? corners[0];
 };
 
 /** Where the nth stone of the road (counting from 1) lies. */

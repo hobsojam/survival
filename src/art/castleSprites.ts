@@ -126,33 +126,56 @@ const TOWER_HEIGHT = [0, 12, 24, 36, 48, 58, 66];
 const ROOF_HEIGHT = 26;
 
 /** The roof on its walls: bare rafters as each beam is set, planked once all four are up, then bound with iron. */
+const ROOF_EAVES = TOWER_BASE - TOWER_HEIGHT[6];
+const ROOF_APEX = ROOF_EAVES - ROOF_HEIGHT;
+/** Half the roof's width on a row counted down from its apex. */
+const roofHalf = (row: number): number => Math.round(3 + (row + 1) / ROOF_HEIGHT * 15);
+
+/** The bare rafters, one for each beam set, with a tie across once two are up. */
+function roofRafters(g: Grid, beams: number): void {
+  for (const offset of [-18, 18, -9, 9].slice(0, beams)) line(g, TOWER_CENTRE, ROOF_APEX, TOWER_CENTRE + offset, ROOF_EAVES - 1, 'q');
+  if (beams >= 2) box(g, TOWER_CENTRE - 12, ROOF_EAVES - 12, 24, 1, 'u');
+}
+
+/** The planked roof once all four beams are up. */
+function roofPlanks(g: Grid): void {
+  for (let row = 0; row < ROOF_HEIGHT; row++) {
+    const half = roofHalf(row);
+    box(g, TOWER_CENTRE - half, ROOF_APEX + row, half * 2, 1, row % 4 === 3 ? 't' : 'u');
+    dot(g, TOWER_CENTRE - half, ROOF_APEX + row, 'q');
+    dot(g, TOWER_CENTRE + half - 1, ROOF_APEX + row, 'p');
+  }
+}
+
+/** The iron: a band at the eaves for the first fitting, then a band high up and a finial for the second. */
+function roofIron(g: Grid, fittings: number): void {
+  if (fittings >= 1) box(g, TOWER_CENTRE - 16, ROOF_EAVES - 6, 32, 1, 'i');
+  if (fittings < 2) return;
+  box(g, TOWER_CENTRE - 9, ROOF_APEX + 10, 18, 1, 'i');
+  box(g, TOWER_CENTRE, ROOF_APEX - 3, 1, 4, 'i');
+  box(g, TOWER_CENTRE - 1, ROOF_APEX - 3, 3, 1, 'b');
+}
+
+/** The roof on its walls: bare rafters as each beam is set, planked once all four are up, then bound with iron. */
 function towerRoof(g: Grid, beams: number, fittings: number, winter: boolean): void {
-  const eaves = TOWER_BASE - TOWER_HEIGHT[6];
-  const apex = eaves - ROOF_HEIGHT;
-  box(g, TOWER_LEFT - 2, eaves - 1, TOWER_BODY + 4, 2, 't');
-  const rafters = [-18, 18, -9, 9];
-  if (beams < 4) {
-    for (const offset of rafters.slice(0, beams)) line(g, TOWER_CENTRE, apex, TOWER_CENTRE + offset, eaves - 1, 'q');
-    if (beams >= 2) box(g, TOWER_CENTRE - 12, eaves - 12, 24, 1, 'u');
-  } else {
-    for (let row = 0; row < ROOF_HEIGHT; row++) {
-      const half = Math.round(3 + (row + 1) / ROOF_HEIGHT * 15);
-      box(g, TOWER_CENTRE - half, apex + row, half * 2, 1, row % 4 === 3 ? 't' : 'u');
-      dot(g, TOWER_CENTRE - half, apex + row, 'q');
-      dot(g, TOWER_CENTRE + half - 1, apex + row, 'p');
-    }
-  }
-  if (fittings >= 1) for (const [row, half] of [[eaves - 6, 16]] as const) box(g, TOWER_CENTRE - half, row, half * 2, 1, 'i');
-  if (fittings >= 2) {
-    box(g, TOWER_CENTRE - 9, apex + 10, 18, 1, 'i');
-    box(g, TOWER_CENTRE, apex - 3, 1, 4, 'i');
-    box(g, TOWER_CENTRE - 1, apex - 3, 3, 1, 'b');
-  }
+  box(g, TOWER_LEFT - 2, ROOF_EAVES - 1, TOWER_BODY + 4, 2, 't');
+  if (beams < 4) roofRafters(g, beams);
+  else roofPlanks(g);
+  roofIron(g, fittings);
   if (!winter || beams < 4) return;
-  for (let row = 0; row < ROOF_HEIGHT; row += 3) {
-    const half = Math.round(3 + (row + 1) / ROOF_HEIGHT * 15);
-    box(g, TOWER_CENTRE - half, apex + row, half * 2, 1, 'W');
+  for (let row = 0; row < ROOF_HEIGHT; row += 3) box(g, TOWER_CENTRE - roofHalf(row), ROOF_APEX + row, roofHalf(row) * 2, 1, 'W');
+}
+
+/** The open top of a tower still going up: its merlons, darker once the last course is on, and snow on them in winter. */
+function towerTop(g: Grid, step: number, top: number, winter: boolean): void {
+  for (let x = TOWER_LEFT; x < TOWER_LEFT + TOWER_BODY; x += 8) {
+    box(g, x, top - 4, 5, 4, step === 6 ? 'd' : 'c');
+    if (step === 6) box(g, x, top - 4, 5, 1, 'e');
   }
+  box(g, TOWER_LEFT, top, TOWER_BODY, 1, 'e');
+  if (!winter) return;
+  box(g, TOWER_LEFT, top, TOWER_BODY, 2, 'W');
+  for (let x = TOWER_LEFT; x < TOWER_LEFT + TOWER_BODY; x += 8) box(g, x, top - 4, 5, 1, 'W');
 }
 
 /** One corner tower, a picture for every four stones, then for each beam and fitting. */
@@ -164,21 +187,13 @@ function tower(g: Grid, step: number, winter: boolean): void {
   courses(g, TOWER_LEFT, TOWER_BODY, TOWER_BASE, height);
   box(g, TOWER_LEFT, top + 1, 1, height - 1, 'd');
   box(g, TOWER_LEFT + TOWER_BODY - 1, top + 1, 1, height - 1, 'a');
-  if (step >= 3) for (const x of [TOWER_CENTRE - 2]) box(g, x, TOWER_BASE - Math.min(height - 8, 40), 3, 8, 'a');
+  if (step >= 3) box(g, TOWER_CENTRE - 2, TOWER_BASE - Math.min(height - 8, 40), 3, 8, 'a');
   if (step <= 6) {
-    for (let x = TOWER_LEFT; x < TOWER_LEFT + TOWER_BODY; x += 8) {
-      box(g, x, top - 4, 5, 4, step === 6 ? 'd' : 'c');
-      if (step === 6) box(g, x, top - 4, 5, 1, 'e');
-    }
-    box(g, TOWER_LEFT, top, TOWER_BODY, 1, 'e');
-    if (winter) {
-      box(g, TOWER_LEFT, top, TOWER_BODY, 2, 'W');
-      for (let x = TOWER_LEFT; x < TOWER_LEFT + TOWER_BODY; x += 8) box(g, x, top - 4, 5, 1, 'W');
-    }
-  } else {
-    towerRoof(g, Math.min(step - 6, 4), Math.max(0, step - 10), winter);
-    if (winter) box(g, TOWER_LEFT, top, TOWER_BODY, 1, 'W');
+    towerTop(g, step, top, winter);
+    return;
   }
+  towerRoof(g, Math.min(step - 6, 4), Math.max(0, step - 10), winter);
+  if (winter) box(g, TOWER_LEFT, top, TOWER_BODY, 1, 'W');
 }
 
 const towerFrames: Record<string, (g: Grid) => void> = {};
@@ -390,52 +405,79 @@ function moatTile(g: Grid, across: boolean, level: number, winter: boolean): voi
   put(0, 3, 16, 10, 'e');
   for (let x = 1; x < 16; x += 5) put(x, 4 + (x % 3) * 3, 2, 1, 'f');
   const thick = MOAT_WATER[level];
-  if (thick === 0) {
-    if (winter) for (let x = 2; x < 14; x += 4) put(x, 7, 2, 1, 'n');
-    return;
-  }
+  if (thick > 0) moatTileWater(put, thick, winter);
+  else if (winter) for (let x = 2; x < 14; x += 4) put(x, 7, 2, 1, 'n');
+}
+
+/** The water along a straight tile, lit along its top once it runs deep, with ripples, or ice and snow in winter. */
+function moatTileWater(put: (a: number, b: number, w: number, h: number, c: string) => void, thick: number, winter: boolean): void {
   const start = 3 + Math.floor((10 - thick) / 2);
-  put(0, start, 16, thick, winter ? 'i' : 's');
+  put(0, start, 16, thick, winterWater(winter));
   if (thick >= 5) put(0, start, 16, 1, 'g');
   for (let x = 2; x < 14; x += 6) put(x, start + 1 + (x % 2), 3, 1, winter ? 'n' : 'l');
 }
+
+/** Which way a corner tile's arms run, and where its water lies across the bed. */
+interface CornerShape { down: boolean; east: boolean; thick: number; start: number; end: number }
+
+/** Whether a pixel of a corner tile lies in the earth bed: the arm up and down, or the arm across. */
+const inCornerBed = ({ down, east }: CornerShape, x: number, y: number): boolean =>
+  (x >= 3 && x <= 12 && (down ? y >= 3 : y <= 12)) || (y >= 3 && y <= 12 && (east ? x >= 3 : x <= 12));
+
+/** Whether a pixel of a corner tile holds water: the arm up and down leaves through the top or bottom edge, the arm across through the side. */
+function cornerWet({ down, east, thick, start, end }: CornerShape, x: number, y: number): boolean {
+  if (thick === 0) return false;
+  const inColumn = x >= start && x <= end;
+  const inRow = y >= start && y <= end;
+  const column = inColumn && ((down ? y >= start : y <= end) || (down ? y < start : y > end));
+  const row = inRow && ((east ? x >= start : x <= end) || (east ? x > end : x < start));
+  return column || row;
+}
+
+/** The ground of a corner tile: the bed, a lip of short grass round it, and the bank beyond, snowy in winter. */
+function cornerGround(g: Grid, shape: CornerShape, winter: boolean): void {
+  const nearBed = (x: number, y: number): boolean => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inCornerBed(shape, x + dx, y + dy));
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      if (inCornerBed(shape, x, y)) dot(g, x, y, 'e');
+      else if (nearBed(x, y)) dot(g, x, y, winter ? 'i' : 'c');
+      else dot(g, x, y, winter ? 'n' : 'b');
+    }
+  }
+}
+
+/** Snow lying in a dry corner's bed, along the middle of each arm. */
+function cornerSnow(g: Grid, shape: CornerShape): void {
+  for (let a = 2; a < 14; a += 4) {
+    for (let i = 0; i < 2; i++) {
+      const along = shape.down ? 15 - a - i : a + i;
+      const across = shape.east ? 15 - a - i : a + i;
+      if (inCornerBed(shape, 7, along)) dot(g, 7, along, 'n');
+      if (inCornerBed(shape, across, 7)) dot(g, across, 7, 'n');
+    }
+  }
+}
+
+/** The water in a corner, its near edges lit once it runs deep, and ice in winter. */
+function cornerWater(g: Grid, shape: CornerShape, winter: boolean): void {
+  const lit = (x: number, y: number): boolean => shape.thick >= 5 && ((x > 0 && !cornerWet(shape, x - 1, y)) || (y > 0 && !cornerWet(shape, x, y - 1)));
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      if (cornerWet(shape, x, y)) dot(g, x, y, lit(x, y) ? 'g' : winterWater(winter));
+    }
+  }
+}
+
+const winterWater = (winter: boolean): string => (winter ? 'i' : 's');
 
 /** A corner tile: the bed and the water run in from one end and out of one side, with banks on the outer sides, made to meet the straight tiles pixel for pixel. */
 function moatCorner(g: Grid, down: boolean, east: boolean, level: number, winter: boolean): void {
   const thick = MOAT_WATER[level];
   const start = 3 + Math.floor((10 - thick) / 2);
-  const end = start + thick - 1;
-  const inBed = (x: number, y: number): boolean => (x >= 3 && x <= 12 && (down ? y >= 3 : y <= 12)) || (y >= 3 && y <= 12 && (east ? x >= 3 : x <= 12));
-  const arm = (x: number, y: number): boolean => (x >= start && x <= end && (down ? y >= start : y <= end)) || (y >= start && y <= end && (east ? x >= start : x <= end));
-  const isWater = (x: number, y: number): boolean => thick > 0 && arm(x, y);
-  // The vertical arm leaves through the top (or bottom) edge and the horizontal arm through the side edge.
-  const wet = (x: number, y: number): boolean => isWater(x, y) || (thick > 0 && (down ? y < start : y > end) && x >= start && x <= end) || (thick > 0 && (east ? x > end : x < start) && y >= start && y <= end);
-  for (let y = 0; y < 16; y++) {
-    for (let x = 0; x < 16; x++) {
-      let colour: string;
-      if (inBed(x, y) || [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inBed(x + dx, y + dy))) {
-        colour = inBed(x, y) ? 'e' : winter ? 'i' : 'c';
-      } else {
-        colour = winter ? 'n' : 'b';
-      }
-      dot(g, x, y, colour);
-    }
-  }
-  if (thick === 0) {
-    if (winter) {
-      for (let a = 2; a < 14; a += 4) {
-        for (let i = 0; i < 2; i++) { if (inBed(7, down ? 15 - a - i : a + i)) dot(g, 7, down ? 15 - a - i : a + i, 'n'); if (inBed(east ? 15 - a - i : a + i, 7)) dot(g, east ? 15 - a - i : a + i, 7, 'n'); }
-      }
-    }
-    return;
-  }
-  for (let y = 0; y < 16; y++) {
-    for (let x = 0; x < 16; x++) {
-      if (!wet(x, y)) continue;
-      const lit = thick >= 5 && ((x > 0 && !wet(x - 1, y)) || (y > 0 && !wet(x, y - 1)));
-      dot(g, x, y, lit ? 'g' : winter ? 'i' : 's');
-    }
-  }
+  const shape: CornerShape = { down, east, thick, start, end: start + thick - 1 };
+  cornerGround(g, shape, winter);
+  if (thick > 0) cornerWater(g, shape, winter);
+  else if (winter) cornerSnow(g, shape);
 }
 
 const moatFrames: Record<string, (g: Grid) => void> = {};
