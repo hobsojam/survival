@@ -1,6 +1,7 @@
 import { JOBS, openJob } from './jobs';
 import type { GameState } from './state';
 import { TOWN_NAMES, townStarted } from './town';
+import { houseNews } from './townSites';
 
 // EASTER EGG: the town, see src/game/town.ts. A lost traveller turns up at the hall door at nightfall, sleeps by the fire,
 // and from the next morning asks if there is any work. A yes and they stay; a no and they ask again the next morning,
@@ -49,9 +50,9 @@ export function answeredTraveller(state: GameState, yes: boolean): { state: Game
   return { state: { ...state, town: { ...state.town, traveller: { ...traveller, refusals, askedDay: state.day } } }, message: `${name} will ask again tomorrow.` };
 }
 
-/** The morning after someone came to the door. */
+/** The morning after someone came to the door, and after a house was finished. */
 export function townNews(before: GameState, after: GameState): string[] {
   const { traveller } = after.town;
-  if (after.day <= before.day || traveller === null || traveller.arrivedDay !== after.day - 1) return [];
-  return [`${traveller.name}, a lost traveller, came to the hall door at nightfall and slept by the fire.`];
+  const arrived = after.day > before.day && traveller !== null && traveller.arrivedDay === after.day - 1;
+  return [...(arrived ? [`${traveller.name}, a lost traveller, came to the hall door at nightfall and slept by the fire.`] : []), ...houseNews(before, after)];
 }

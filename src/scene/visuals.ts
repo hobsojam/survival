@@ -22,6 +22,7 @@ import { ORCHARD_SPOTS, treeFrame } from '../game/orchard';
 import { sheepStage, type SheepStage } from '../game/sheep';
 import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
 import type { StockLevel } from '../art/phase3Sprites';
+import { HOUSE_PLOTS, houseStage } from '../game/townSites';
 
 export const NIGHT_DEPTH = BALANCE.mapHeight * TILE + 1;
 export const LIGHT_DEPTH = NIGHT_DEPTH + 1;
@@ -119,6 +120,16 @@ function addBuilding(state: GameState, add: AddVisual): void {
   }
 }
 
+/** The town's houses as far as they are built, with the same snow as the castle. EASTER EGG: the town, see src/game/town.ts. */
+function addTown(state: GameState, add: AddVisual): void {
+  const snow = isWinter(state.day) ? 's' : '';
+  state.town.houses.forEach((house, plot) => {
+    const spot = HOUSE_PLOTS[plot];
+    const stage = houseStage(house);
+    if (spot && spot.area === state.area && stage > 0) add(`town-house-${plot}`, `townHouse:${stage}${snow}`, spot.x, spot.y);
+  });
+}
+
 /** The moat's dug stretches as flat water on the ground: dry until the spring rain, then rising, and frozen in winter. EASTER EGG: the castle, see src/game/castle.ts. */
 function addMoat(state: GameState, add: AddVisual): void {
   const { stretches } = state.castle.moat;
@@ -175,6 +186,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     addCart(state, add);
     addMoat(state, add);
     addBuilding(state, add);
+    addTown(state, add);
     if (isRevealed(state)) add('castle-line', 'castleLine:still', WALLS.left, WALLS.top, GROUND_DECAL_DEPTH);
     HILL_TREES.forEach((tree, index) => treeUnderWall(state.castle, tree) || add(`hill-tree-${index}`, `${tree.sprite}:${frame}`, tree.x, tree.y));
     addPiles(state, visuals, add);

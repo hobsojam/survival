@@ -46,3 +46,13 @@ export const townStarted = (state: GameState): boolean => state.town.traveller !
 /** Whether every part of a house is laid. */
 export const houseFinished = (house: HouseState): boolean =>
   house.stone === HOUSE_NEEDS.stone && house.beams === HOUSE_NEEDS.beams && house.fittings === HOUSE_NEEDS.fittings;
+
+/** Whether a house is open to build: someone who has stayed is waiting for a house, and it isn't finished yet. */
+export const houseOpen = (state: GameState, plot: number): boolean => {
+  const house = state.town.houses[plot];
+  return house !== undefined && house.doneDay === null && state.town.people.some(person => person.house === null);
+};
+
+/** How many more beams or fittings the open houses still take. */
+export const townGoodNeed = (state: GameState, good: 'beams' | 'fittings'): number =>
+  state.town.houses.reduce((total, house, plot) => total + (houseOpen(state, plot) ? HOUSE_NEEDS[good] - house[good] : 0), 0);

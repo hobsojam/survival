@@ -359,7 +359,7 @@ export function castleGoodsView(state: GameState): CastleGoodRow[] {
   return (['beams', 'fittings', 'hangings'] as const).map(good => {
     const { title, copy, cost } = GOOD_COPY[good];
     const blocker = goodBlocker(state, good);
-    const shown = isRevealed(state) && state.castle.frames > 0 && goodRoom(state.castle, good) > 0;
+    const shown = isRevealed(state) && state.castle.frames > 0 && goodRoom(state, good) > 0;
     return { good, shown, title, copy: blocker ?? copy, cost, have: state.castle.goods[good], disabled: Boolean(blocker) };
   });
 }

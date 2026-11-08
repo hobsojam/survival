@@ -6,6 +6,7 @@ import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
 import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, outcropNote } from '../game/hills';
 import { NEEDS, isRevealed, lineDistance } from '../game/castle';
 import { GATE_SPOT, cartWithin, castleNeedsStone, castlePrompt, castleWorkBlocker, nearestCastleSpot } from '../game/castleSites';
+import { townPrompt, townSpots, townWorkBlocker } from '../game/townSites';
 import { KEEP_DOOR_WOOD, KEEP_SITE, KEEP_STONES, atHallDoor, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor } from '../game/keep';
 import { ponyNote, ponyOfferLabel } from '../game/pony';
 import { availableWood } from '../game/wood';
@@ -28,7 +29,7 @@ export const KEY_ACTIONS: readonly [string, GameAction][] = [
 
 const ACTION_POSES: Partial<Record<GameAction['type'], SurvivorAction>> = {
   gather: 'gather', rest: 'rest', cook: 'cook', stargaze: 'stargaze',
-  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', takeCartStone: 'gather', digOre: 'gather', layStone: 'gather', castleWork: 'gather', hangDoor: 'gather', offerPony: 'gather', fish: 'gather',
+  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', takeCartStone: 'gather', digOre: 'gather', layStone: 'gather', castleWork: 'gather', townWork: 'gather', hangDoor: 'gather', offerPony: 'gather', fish: 'gather',
   gatherApples: 'gather', plantPip: 'gather', pickOrchardApple: 'gather', searchShed: 'gather', takeEgg: 'gather'
 };
 
@@ -143,7 +144,7 @@ export function actionEffect(action: GameAction, after: GameState): { kind: 'dus
   if (action.type === 'digOre') return { kind: 'dust', ...OUTCROP_SITE };
   if (action.type === 'layStone' || action.type === 'hangDoor') return { kind: 'dust', ...KEEP_SITE };
   if (action.type === 'castleWork' && action.site === 'gatehouse' && after.castle.gatehouse === NEEDS.gatehouse) return { kind: 'portcullis', x: GATE_SPOT.x, y: GATE_SPOT.y };
-  if (action.type === 'castleWork') return { kind: 'dust', x: after.player.x, y: after.player.y };
+  if (action.type === 'castleWork' || action.type === 'townWork') return { kind: 'dust', x: after.player.x, y: after.player.y };
   if (action.type === 'cook' || action.type === 'stargaze') return { kind: action.type, x: after.player.x, y: after.player.y };
   return undefined;
 }
@@ -281,6 +282,14 @@ function castleChoice(state: GameState): Choice | null {
   return castleWorkBlocker(state, spot.site) === null ? { label, action: { type: 'castleWork', site: spot.site } } : { label };
 }
 
+/** EASTER EGG: the town's house plot the survivor is at, see src/game/town.ts. */
+function townChoice(state: GameState): Choice | null {
+  const spot = townSpots(state).find(each => each.area === state.area && within(state, each));
+  if (!spot) return null;
+  const label = townPrompt(state, spot.plot);
+  return townWorkBlocker(state, spot.plot) === null ? { label, action: { type: 'townWork', plot: spot.plot } } : { label };
+}
+
 /** EASTER EGG: the stone cart, when the survivor is at it: what it holds, and a load to take from it. */
 export function cartChoice(state: GameState): Choice | null {
   if (!cartWithin(state)) return null;
@@ -312,6 +321,7 @@ function hillsChoices(state: GameState): Choice[] {
   const found = closestGatherable(state);
   const keep = keepChoice(state) ?? (atHallDoor(state) ? doorChoice(state, 'hall') : null);
   const castle = castleChoice(state);
+  const town = townChoice(state);
   const cart = cartChoice(state);
   // EASTER EGG: the castle's line of old stones, named only once it has been seen.
   const stones = isRevealed(state) && state.castle.frames === 0 && !castle && lineDistance(state.player) <= BALANCE.interactionRadius;
@@ -323,6 +333,7 @@ function hillsChoices(state: GameState): Choice[] {
     ...(outcrop ? [{ label: outcrop }] : []),
     ...(keep ? [keep] : []),
     ...(castle ? [castle] : []),
+    ...(town ? [town] : []),
     ...(cart ? [cart] : []),
     ...(stones ? [{ label: 'Old stones · a wall could run here' }] : []),
     ...(offer ? [{ label: offer, action: { type: 'offerPony' as const } }] : []),
