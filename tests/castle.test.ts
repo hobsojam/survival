@@ -23,7 +23,7 @@ import { hallStep } from '../src/scene/visuals';
 import { JOURNAL_PAGES, journalEntry, recordJournal } from '../src/game/journalEntries';
 import { JOURNAL_ICONS } from '../src/art/journalIcons';
 import { emptyFood, foodCount, spoil } from '../src/game/food';
-import { HALL_WINDOW_OFFSET, hallWindowGlow } from '../src/scene/lighting';
+import { HALL_LANTERN, HALL_WINDOW_OFFSET, hallWindowGlow } from '../src/scene/lighting';
 import { KEEP_SITE, KEEP_STONES } from '../src/game/keep';
 import { FULL_BAG_MESSAGE, applyAction, type GameAction } from '../src/game/rules';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
@@ -2576,14 +2576,15 @@ describe('the hall at night once the castle is finished', () => {
     expect(glow(finished({ day: 44 }))?.texture).toBe('castleHallGlow:lit');
   });
 
-  it('draws its light inside the hall\'s picture, over the window between the iron bars', () => {
+  it('draws its light inside the hall\'s picture, over the window between the iron bars and the lantern by the door', () => {
     const def = castleSprites.castleHallGlow;
     expect(def.size).toEqual(castleSprites.castleHall.size);
     expect(def.anchor).toEqual(castleSprites.castleHall.anchor);
     expect(def.frames.lit.some(row => row.trim() !== '' && /[^.\s]/.test(row))).toBe(true);
     const lit = def.frames.lit.flatMap((row, y) => [...row].map((pixel, x) => ({ pixel, x, y }))).filter(({ pixel }) => pixel !== '.' && pixel !== ' ');
     expect(lit.length).toBeGreaterThan(0);
-    for (const { x, y } of lit) {
+    const inLantern = ({ x, y }: { x: number; y: number }) => x >= HALL_LANTERN.x && x < HALL_LANTERN.x + HALL_LANTERN.w && y >= HALL_LANTERN.y && y < HALL_LANTERN.y + HALL_LANTERN.h;
+    for (const { x, y } of lit.filter(pixel => !inLantern(pixel))) {
       expect(x).toBeGreaterThanOrEqual(36);
       expect(x).toBeLessThanOrEqual(41);
       expect(y).toBeGreaterThanOrEqual(34);

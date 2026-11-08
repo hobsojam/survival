@@ -7,7 +7,7 @@ import { HALL_SPOT } from '../game/castleSites';
 import { FIREFLY_HOMES, fireflyGlow, fireflyOffset } from './ambient';
 import { firefliesOut } from '../game/calendar';
 import { worldX, worldY } from './art';
-import { HALL_WINDOW_OFFSET, HOUSE_WINDOW_OFFSET, KEEP_WINDOW_OFFSET, fireGlow, hallWindowGlow, keepWindowGlow, houseGlow, lightMaskPixels, lightScreenPosition, lightingTint, withSunrise, type LightRadii } from './lighting';
+import { HOUSE_WINDOW_OFFSET, KEEP_WINDOW_OFFSET, fireGlow, hallLights, keepWindowGlow, houseGlow, lightMaskPixels, lightScreenPosition, lightingTint, withSunrise, type LightRadii } from './lighting';
 import { NIGHT_DEPTH } from './visuals';
 
 /** One screen-sized tint with palette-aware, stepped light holes erased from it. */
@@ -54,9 +54,8 @@ export class SceneLighting {
       const position = lightScreenPosition(worldX(KEEP_SITE.x) + KEEP_WINDOW_OFFSET.x, worldY(KEEP_SITE.y) + KEEP_WINDOW_OFFSET.y, camera.scrollX, camera.scrollY);
       this.layer.erase(this.mask(keep), position.x, position.y);
     }
-    const hall = hallWindowGlow(state);
-    if (hall) {
-      const position = lightScreenPosition(worldX(HALL_SPOT.x) + HALL_WINDOW_OFFSET.x, worldY(HALL_SPOT.y) + HALL_WINDOW_OFFSET.y, camera.scrollX, camera.scrollY);
+    for (const { radii: hall, offset } of hallLights(state)) {
+      const position = lightScreenPosition(worldX(HALL_SPOT.x) + offset.x, worldY(HALL_SPOT.y) + offset.y, camera.scrollX, camera.scrollY);
       this.layer.erase(this.mask(hall), position.x, position.y);
     }
     // Fireflies live at camp and only come out in summer.
