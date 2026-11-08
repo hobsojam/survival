@@ -1446,9 +1446,12 @@ const climbKeep = (state: GameState): ActionResult => {
   return { state: advanceTime({ ...state, castle: castleSeen(state.castle, state.day) }, BALANCE.stargazeSeconds, 'resting'), message: '' };
 };
 
-/** In at the door: to bed or up to the top. The first time through the hall's door, the hall is offered as a home. */
-const enterKeep = (state: GameState): ActionResult => {
-  const result = withKeepDoor(state, { type: 'enterKeep' }).type === 'sleep' ? sleep(state) : climbKeep(state);
+const enterKeep = (state: GameState): ActionResult =>
+  withKeepDoor(state, { type: 'enterKeep' }).type === 'sleep' ? sleep(state) : climbKeep(state);
+
+/** The first time through the hall's door, to bed or up to the top, the hall is offered as a home. The scene sends the sleep or the climb itself, so both carry it. */
+const offeringHall = (handler: (state: GameState) => ActionResult) => (state: GameState): ActionResult => {
+  const result = handler(state);
   if (result.state === state || !atHallDoor(state) || result.state.castle.offeredHome) return result;
   return { ...result, state: { ...result.state, castle: { ...result.state.castle, offeredHome: true } } };
 };
@@ -1469,7 +1472,7 @@ const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   weave,
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, takeCartStone, digOre, dropOre, offerPony, buildMine, chopTree, markClearing, clearGround, visitSite,
   storeFood, takeFood, dropStone, dropPineNeedles, pickUpStone, burnFiber, burnPineNeedles, eat, eatTrailFood, prepareTrailFood,
-  cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, makeCastleGood, layStone, castleWork, hangDoor, climbKeep, enterKeep, rest, sleep, befriend, meetChickens, leadChickens, takeEgg, gatherApples, plantPip, pickOrchardApple, searchShed, craftPillow, craftCloak,
+  cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, makeCastleGood, layStone, castleWork, hangDoor, climbKeep: offeringHall(climbKeep), enterKeep: offeringHall(enterKeep), rest, sleep: offeringHall(sleep), befriend, meetChickens, leadChickens, takeEgg, gatherApples, plantPip, pickOrchardApple, searchShed, craftPillow, craftCloak,
   makeFishingLine, fish
 };
 

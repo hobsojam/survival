@@ -103,6 +103,12 @@ describe('the offer to make the hall home', () => {
     expect(homeChoiceView(at(climbed, HOUSE_SPOT, 'camp')).shown).toBe(true);
   });
 
+  it('is made by the sleep or the climb the scene sends for the door, as well as by the door itself', () => {
+    expect(applyAction(finished({}, { timeOfDay: NIGHT }), { type: 'sleep' }).state.castle.offeredHome).toBe(true);
+    expect(applyAction(finished(), { type: 'climbKeep' }).state.castle.offeredHome).toBe(true);
+    expect(applyAction(finished({}, { timeOfDay: NIGHT }), { type: 'climbKeep' }).state.castle.offeredHome).toBe(false);
+  });
+
   it('is not made at the keep door', () => {
     expect(applyAction(at(finished(), KEEP_SITE), { type: 'enterKeep' }).state.castle.offeredHome).toBe(false);
   });
