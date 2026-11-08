@@ -764,6 +764,61 @@ describe('the larder in the save', () => {
   });
 });
 
+describe('the town in the save', () => {
+  const TOWER = { stones: 20, beams: 4, fittings: 2 };
+  /** A finished castle with the hall home, and the town changed as given. */
+  const finished = (change: (state: GameState) => void = () => {}): GameState => {
+    const state = createGame();
+    state.day = 60;
+    state.progress.quarryFound = true; state.progress.hillsFound = true; state.progress.oreFoundDay = 2;
+    state.clearing = { cleared: [...STEP_IDS], marked: null, felled: [] };
+    state.nodes = placeBranches(state.nodes, [...STEP_IDS]);
+    Object.assign(state.structures, { shelter: true, toolshed: true, workshop: true });
+    state.progress.nextStormDay = null; state.progress.hearthUnlocked = true; state.progress.packWoven = true;
+    Object.assign(state.progress.workshop, { forge: true, hinges: true, stoneCart: true, portcullis: true });
+    state.keep = { stones: 60, door: true, startedDay: 1, finishedDay: 2, ponyNight: null };
+    state.castle = { ...emptyCastle(), firstClimbDay: 4, revealedDay: 5, road: 30, frames: NEEDS.frames,
+      wall: { north: 30, east: 30, south: 30, west: 30 }, towers: { nw: TOWER, ne: TOWER, se: TOWER, sw: TOWER }, gatehouse: 30,
+      moat: { stretches: 16, lastDugDay: 8, dugDay: 8 }, hall: { stones: 40, beams: 12, fittings: 6, hangings: 2 }, feast: { ...NEEDS.feast },
+      doneDays: { road: 6, frames: 7, 'wall-north': 8, 'wall-east': 8, 'wall-south': 8, 'wall-west': 8, 'tower-nw': 8, 'tower-ne': 8, 'tower-se': 8, 'tower-sw': 8, gatehouse: 8, moat: 8, hall: 8 },
+      finishedDay: 9, home: 'hall', offeredHome: true };
+    change(state);
+    return state;
+  };
+  const accepts = (change?: (state: GameState) => void) => saveGame(new MemoryStorage(), finished(change)).ok;
+  const ada = { name: 'Ada', job: 'hens' as const, house: null, arrivedDay: 20 };
+  const built = { stone: 30, beams: 4, fittings: 1, doneDay: 30 };
+
+  it('accepts no town, a traveller, a person in the hall, and a person in a finished house', () => {
+    expect(accepts()).toBe(true);
+    expect(accepts(state => { state.town.traveller = { name: 'Ada', arrivedDay: 20, refusals: 2, askedDay: 22 }; state.town.namesUsed = 1; })).toBe(true);
+    expect(accepts(state => { state.town.people = [ada]; state.town.namesUsed = 1; })).toBe(true);
+    expect(accepts(state => { state.town.people = [{ ...ada, house: 0 }]; state.town.houses = [built]; state.town.namesUsed = 1; })).toBe(true);
+    expect(accepts(state => { state.town.people = [ada]; state.town.houses = [{ stone: 30, beams: 2, fittings: 0, doneDay: null }]; state.town.namesUsed = 1; })).toBe(true);
+    expect(accepts(state => { state.town.goneDay = 30; state.town.namesUsed = 1; })).toBe(true);
+  });
+
+  it.each([
+    ['a town before the castle is finished', (state: GameState) => { state.castle.finishedDay = null; state.castle.feast.honey = 2; state.castle.home = 'house'; state.castle.offeredHome = false; state.town.people = [ada]; state.town.namesUsed = 1; }],
+    ['a person with an unknown job', (state: GameState) => { state.town.people = [{ ...ada, job: 'pigs' as 'hens' }]; state.town.namesUsed = 1; }],
+    ['two people on one job', (state: GameState) => { state.town.people = [ada, { ...ada, name: 'Tomas' }]; state.town.namesUsed = 2; }],
+    ['a person in a house that is not finished', (state: GameState) => { state.town.people = [{ ...ada, house: 0 }]; state.town.houses = [{ ...built, fittings: 0, doneDay: null }]; state.town.namesUsed = 1; }],
+    ['a person in a house that does not exist', (state: GameState) => { state.town.people = [{ ...ada, house: 3 }]; state.town.namesUsed = 1; }],
+    ['two people in one house', (state: GameState) => { state.town.people = [{ ...ada, house: 0 }, { name: 'Tomas', job: 'honey', house: 0, arrivedDay: 21 }]; state.town.houses = [built]; state.town.namesUsed = 2; }],
+    ['a traveller named like a person', (state: GameState) => { state.town.people = [ada]; state.town.traveller = { name: 'Ada', arrivedDay: 25, refusals: 0, askedDay: null }; state.town.namesUsed = 2; }],
+    ['three refusals still waiting', (state: GameState) => { state.town.traveller = { name: 'Ada', arrivedDay: 20, refusals: 3, askedDay: 23 }; state.town.namesUsed = 1; }],
+    ['a house over its stone', (state: GameState) => { state.town.houses = [{ stone: 31, beams: 0, fittings: 0, doneDay: null }]; }],
+    ['beams before the stone is laid', (state: GameState) => { state.town.houses = [{ stone: 29, beams: 1, fittings: 0, doneDay: null }]; }],
+    ['a fitting before the beams', (state: GameState) => { state.town.houses = [{ stone: 30, beams: 3, fittings: 1, doneDay: null }]; }],
+    ['a finished day on an unfinished house', (state: GameState) => { state.town.houses = [{ stone: 30, beams: 4, fittings: 0, doneDay: 30 }]; }],
+    ['a finished house with no day', (state: GameState) => { state.town.houses = [{ ...built, doneDay: null }]; }],
+    ['fewer names used than people', (state: GameState) => { state.town.people = [ada]; state.town.namesUsed = 0; }],
+    ['a town that is not an object', (state: GameState) => { (state as unknown as Record<string, unknown>).town = null; }]
+  ])('rejects %s', (_, change) => {
+    expect(accepts(change)).toBe(false);
+  });
+});
+
 describe('the castle in the save', () => {
   /** A camp with the keep finished on day 2 and the castle revealed on day 5. */
   const camp = (change: (state: GameState) => void = () => {}): GameState => {

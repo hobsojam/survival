@@ -1,5 +1,6 @@
+import { emptyTown } from '../src/game/town';
 import { describe, expect, it } from 'vitest';
-import { createGame } from '../src/game/state';
+import { createGame, type GameState } from '../src/game/state';
 import { loadGame, saveGame, SAVE_KEY, SAVE_VERSION } from '../src/game/save';
 import { emptyField } from '../src/game/field';
 import { STEP_IDS, placeBranches } from '../src/game/clearing';
@@ -320,5 +321,17 @@ describe('the version 39 upgrade: the castle', () => {
     expect(loaded.state.castle).toEqual(emptyCastle());
     expect(loaded.state.progress.workshop).toMatchObject({ forge: true, hinges: true, stoneCart: false, portcullis: false });
     expect(loaded.state.keep.stones).toBe(60);
+  });
+
+  it('brings a version 39 save up with no town yet, its castle and home as they were', () => {
+    const old = JSON.parse(JSON.stringify(createGame())) as Omit<GameState, 'town'> & { town?: unknown };
+    delete old.town;
+    const storage = new MemoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 39, state: old }));
+    const loaded = loadGame(storage);
+    expect(loaded.kind).toBe('loaded');
+    if (loaded.kind !== 'loaded') return;
+    expect(loaded.state.town).toEqual(emptyTown());
+    expect(loaded.state.castle).toEqual(old.castle);
   });
 });

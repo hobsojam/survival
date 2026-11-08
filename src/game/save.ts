@@ -19,6 +19,7 @@ import { ORCHARD_SPOTS } from './orchard';
 import { KEEP_DOOR_AT, KEEP_STONES } from './keep';
 import { CASTLE_SECTIONS, FEAST_ITEMS, NEEDS, allSectionsBuilt, SIDES, TOWERS, hallFinished, towerFinished, wallFinished, type CastleState } from './castle';
 import { SAVE_VERSION, upgradeSave } from './saveUpgrades';
+import { HOUSE_NEEDS, JOB_IDS, TOWN_NAMES, houseFinished, type HouseState } from './town';
 
 export { SAVE_VERSION };
 export const SAVE_KEY = 'hearthwild.save';
@@ -473,6 +474,46 @@ function validCastle(shape: SaveShape): boolean {
 
 const upTo = (value: unknown, max: number): value is number => count(value) && value <= max;
 
+/** Each house is laid in order, stone then beams then its fitting, and is finished on a day exactly when all of it is laid. */
+function validHouse(house: unknown, day: number): house is HouseState {
+  if (!object(house)) return false;
+  const { stone, beams, fittings, doneDay } = house;
+  if (!upTo(stone, HOUSE_NEEDS.stone) || !upTo(beams, HOUSE_NEEDS.beams) || !upTo(fittings, HOUSE_NEEDS.fittings)) return false;
+  if ((beams > 0 && stone < HOUSE_NEEDS.stone) || (fittings > 0 && beams < HOUSE_NEEDS.beams)) return false;
+  if (doneDay !== null && !(whole(doneDay) && doneDay >= 1 && doneDay <= day)) return false;
+  return (doneDay !== null) === houseFinished(house as unknown as HouseState);
+}
+
+/** The town starts only after the castle is finished. Everyone has one of the names given out so far, no two share a name, a job or a house, and anyone with a house has a finished one. */
+function validTown(shape: SaveShape): boolean {
+  if (!object(shape.town) || !object(shape.castle)) return false;
+  const { traveller, goneDay, namesUsed, people, houses } = shape.town;
+  const day = shape.day as number;
+  const dayOk = (value: unknown): boolean => whole(value) && value >= 1 && value <= day;
+  if (!Array.isArray(people) || !Array.isArray(houses) || !upTo(namesUsed, TOWN_NAMES.length)) return false;
+  if (!houses.every(house => validHouse(house, day))) return false;
+  if (goneDay !== null && !dayOk(goneDay)) return false;
+  const given = TOWN_NAMES.slice(0, namesUsed);
+  const names: unknown[] = [];
+  for (const person of people) {
+    if (!object(person) || !JOB_IDS.includes(person.job as never) || !dayOk(person.arrivedDay)) return false;
+    const { house } = person;
+    if (house !== null && !(whole(house) && house >= 0 && house < houses.length && (houses[house] as HouseState).doneDay !== null)) return false;
+    names.push(person.name);
+  }
+  const jobs = people.map(person => (person as ObjectValue).job);
+  const homes = people.map(person => (person as ObjectValue).house).filter(house => house !== null);
+  if (traveller !== null) {
+    if (!object(traveller) || !dayOk(traveller.arrivedDay) || !upTo(traveller.refusals, 2)) return false;
+    if (traveller.askedDay !== null && !dayOk(traveller.askedDay)) return false;
+    names.push(traveller.name);
+  }
+  if (!names.every(name => given.includes(name as string)) || new Set(names).size !== names.length) return false;
+  if (new Set(jobs).size !== jobs.length || new Set(homes).size !== homes.length) return false;
+  const started = namesUsed > 0 || houses.some(house => (house as HouseState).stone > 0);
+  return !started || shape.castle.finishedDay !== null;
+}
+
 /** Every count in the castle is whole and no more than its section needs. */
 function castleCountsOk(castle: ObjectValue, cart: ObjectValue, wall: ObjectValue, towers: ObjectValue, moat: ObjectValue, hall: ObjectValue, goods: ObjectValue, feast: ObjectValue): boolean {
   if (!bool(castle.offeredHome) || (castle.home !== 'house' && castle.home !== 'hall') || (cart.at !== 'quarry' && cart.at !== 'hills')) return false;
@@ -547,7 +588,7 @@ function castleFinishOk(castle: CastleState, made: ObjectValue): boolean {
 /** Checks a version 24 save, with the survivor's sickness and whether their story has ended, and: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, the workshop and its handcart, shelter upgrades, garden plots, vegetable beds, tools, quarry timers, the year journal and companion. */
 function validState(value: unknown): value is GameState {
   if (!hasShape(value)) return false;
-  const checks = [validHills, validKeep, validCastle, validClock, validSurvivor, validProgress, validDecorations, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validBeehive, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validChickens, validSickness, validSheep, validNames, validOrchard];
+  const checks = [validHills, validKeep, validCastle, validTown, validClock, validSurvivor, validProgress, validDecorations, validStorm, validDiscoveries, validStone, validWoodStore, validFireplace, validFibreStack, validGarden, validBeds, validField, validBakehouse, validBeehive, validClearing, validLarder, validWorld, validWolf, validSpoiled, validJournal, validCompanion, validChickens, validSickness, validSheep, validNames, validOrchard];
   return checks.every(check => check(value)) && carriedCount(value as unknown as GameState) <= fullCapacity(value as unknown as GameState);
 }
 
