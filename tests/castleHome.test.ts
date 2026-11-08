@@ -12,6 +12,7 @@ import { createGame, type GameState } from '../src/game/state';
 import { promptFor, useKeyAction } from '../src/scene/prompts';
 import { pickTapTarget, targetAction } from '../src/scene/tapTarget';
 import { homeChoiceView } from '../src/ui/panels';
+import { homeChoiceAction, renderHomePanel } from '../src/ui/homePanel';
 
 // EASTER EGG: the castle, see src/game/castle.ts. Moving into the finished hall.
 
@@ -195,5 +196,38 @@ describe('the hall as home', () => {
     for (const part of ['structures', 'field', 'beds', 'sheep', 'chickens', 'orchard', 'beehive', 'larder', 'storedWood'] as const) {
       expect(hall[part as keyof GameState], part).toEqual(house[part as keyof GameState]);
     }
+  });
+});
+
+describe('the Home panel on the page', () => {
+  const page = () => {
+    const elements = {
+      '.home-panel': { hidden: true, textContent: null, dataset: {} },
+      '#home-copy': { hidden: false, textContent: null, dataset: {} },
+      '#home-button': { hidden: false, textContent: null, dataset: {} }
+    } as Record<string, { hidden: boolean; textContent: string | null; dataset: DOMStringMap }>;
+    return { elements, root: { querySelector: (selector: string) => elements[selector] ?? null } };
+  };
+
+  it('stays hidden until the hall is offered', () => {
+    const { elements, root } = page();
+    renderHomePanel(root, homeChoiceView(finished()));
+    expect(elements['.home-panel'].hidden).toBe(true);
+  });
+
+  it('shows the copy and a button that asks for the other home, and the button asks for what it says', () => {
+    const { elements, root } = page();
+    renderHomePanel(root, homeChoiceView(finished({ offeredHome: true })));
+    expect(elements['.home-panel'].hidden).toBe(false);
+    expect(elements['#home-copy'].textContent).toBe(homeChoiceView(finished({ offeredHome: true })).copy);
+    expect(elements['#home-button'].textContent).toBe('Make the hall your home');
+    expect(homeChoiceAction(elements['#home-button'].dataset)).toEqual({ type: 'chooseHome', home: 'hall' });
+    renderHomePanel(root, homeChoiceView(hallHome()));
+    expect(elements['#home-button'].textContent).toBe('Make the house your home again');
+    expect(homeChoiceAction(elements['#home-button'].dataset)).toEqual({ type: 'chooseHome', home: 'house' });
+  });
+
+  it('copes with a page missing its parts', () => {
+    expect(() => renderHomePanel({ querySelector: () => null }, homeChoiceView(hallHome()))).not.toThrow();
   });
 });

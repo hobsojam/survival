@@ -28,6 +28,7 @@ import type { UpgradeId } from '../game/workshop';
 import type { CastleGood } from '../game/castleSites';
 import { Soundscape } from '../game/soundscape';
 import { isAtHome } from '../game/home';
+import { homeChoiceAction, renderHomePanel } from './homePanel';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
 
@@ -151,10 +152,7 @@ export class App {
         } else this.scene?.perform({ type } as GameAction);
       });
     });
-    this.root.querySelector<HTMLButtonElement>('#home-button')?.addEventListener('click', event => {
-      const home = (event.currentTarget as HTMLButtonElement).dataset.homeChoice === 'house' ? 'house' : 'hall';
-      this.scene?.perform({ type: 'chooseHome', home });
-    });
+    this.root.querySelector<HTMLButtonElement>('#home-button')?.addEventListener('click', event => this.scene?.perform(homeChoiceAction((event.currentTarget as HTMLButtonElement).dataset)));
     this.root.addEventListener('click', event => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-action="plantGarden"], [data-action="harvestGarden"]');
       if (!button) return;
@@ -690,20 +688,7 @@ export class App {
     }
     this.setText('grind-hint', granary.grind.hint);
     this.renderBakehouse();
-    this.renderHome();
-  }
-
-  /** The choice of home, laid out by its tested view. */
-  private renderHome(): void {
-    const view = homeChoiceView(this.state);
-    const panel = this.root.querySelector<HTMLElement>('.home-panel');
-    if (panel) panel.hidden = !view.shown;
-    this.setText('home-copy', view.copy);
-    const button = this.root.querySelector<HTMLButtonElement>('#home-button');
-    if (button) {
-      button.textContent = view.button;
-      button.dataset.homeChoice = view.choose;
-    }
+    renderHomePanel(this.root, homeChoiceView(this.state));
   }
 
   /** The Windmill, Bakery and Beehive panels, laid out by their tested views. */
