@@ -23,6 +23,9 @@ import { sheepStage, type SheepStage } from '../game/sheep';
 import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
 import type { StockLevel } from '../art/phase3Sprites';
 import { HOUSE_PLOTS, houseStage } from '../game/townSites';
+import { townsfolkHere } from '../game/townsfolk';
+import { TOWN_NAMES } from '../game/town';
+import { TOWNSFOLK_DRESSES } from '../art/townsfolkSprites';
 
 export const NIGHT_DEPTH = BALANCE.mapHeight * TILE + 1;
 export const LIGHT_DEPTH = NIGHT_DEPTH + 1;
@@ -130,6 +133,15 @@ function addTown(state: GameState, add: AddVisual): void {
   });
 }
 
+/** The town's people out in this area: at work, walking home, or the traveller waiting by the hall door. Each name keeps its own colours. */
+function addTownsfolk(state: GameState, timeMs: number, add: AddVisual): void {
+  for (const each of townsfolkHere(state)) {
+    const dress = Math.max(0, TOWN_NAMES.indexOf(each.name)) % TOWNSFOLK_DRESSES;
+    const frame = each.traveller ? 'stand' : each.walking ? `walk${Math.floor(timeMs / 250) % 2}` : 'work';
+    add(each.traveller ? 'townsfolk-traveller' : `townsfolk-${each.index}`, `townsfolk${dress}:${frame}`, each.x, each.y);
+  }
+}
+
 /** The moat's dug stretches as flat water on the ground: dry until the spring rain, then rising, and frozen in winter. EASTER EGG: the castle, see src/game/castle.ts. */
 function addMoat(state: GameState, add: AddVisual): void {
   const { stretches } = state.castle.moat;
@@ -158,6 +170,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     const y = Math.round(worldY(tileY));
     visuals.push({ id, texture, x, y, depth: depth ?? y });
   };
+  addTownsfolk(state, timeMs, add);
   if (state.area === 'quarry') {
     let quarryTexture = state.quarryReadyDay <= state.day ? 'quarry:ready' : 'quarry:spent';
     if (state.progress.mineBuilt) {

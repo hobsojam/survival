@@ -7,6 +7,7 @@ import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, outcropNote } from '../gam
 import { NEEDS, isRevealed, lineDistance } from '../game/castle';
 import { GATE_SPOT, cartWithin, castleNeedsStone, castlePrompt, castleWorkBlocker, nearestCastleSpot } from '../game/castleSites';
 import { townPrompt, townSpots, townWorkBlocker } from '../game/townSites';
+import { greetingHere } from '../game/townsfolk';
 import { KEEP_DOOR_WOOD, KEEP_SITE, KEEP_STONES, atHallDoor, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor } from '../game/keep';
 import { ponyNote, ponyOfferLabel } from '../game/pony';
 import { availableWood } from '../game/wood';
@@ -187,6 +188,13 @@ export function closestSite(state: GameState): { id: SiteId; name: string; x: nu
 
 /** The hint line under the game: what the keys would do here, now. */
 export function promptFor(state: GameState): string {
+  const prompt = basePrompt(state);
+  // EASTER EGG: the town, see src/game/town.ts. Someone passing says hello; it never changes what E or a tap does.
+  const hello = greetingHere(state);
+  return hello ? `${prompt} · ${hello}` : prompt;
+}
+
+function basePrompt(state: GameState): string {
   if (state.area === 'quarry') return quarryPrompt(state);
   if (state.area === 'hills') return hillsPrompt(state);
   if (state.area === 'homestead') {
