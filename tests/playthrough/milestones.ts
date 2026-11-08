@@ -60,5 +60,6 @@ export const MILESTONES: readonly Milestone[] = [
   { id: 'moat-full', label: 'The spring rain filled the moat', reached: state => moatFill(state) === 1 },
   { id: 'hall', label: 'Built, roofed and hung the great hall', reached: state => hallFinished(state.castle.hall) },
   { id: 'feast', label: 'Set the first dish on the hall\'s table', reached: state => Object.values(state.castle.feast).some(count => count > 0) },
-  { id: 'castle-finished', label: 'Finished the castle with the feast', reached: castleFinished }
+  { id: 'castle-finished', label: 'Finished the castle with the feast', reached: castleFinished },
+  { id: 'castle-home', label: 'Made the great hall home', reached: state => state.castle.home === 'hall' }
 ];

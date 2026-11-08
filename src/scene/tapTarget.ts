@@ -1,3 +1,4 @@
+import { HALL_DOOR_SPOT, castleFinished } from '../game/castle';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceNode, type SiteId, type StonePile } from '../game/state';
 import { isAtCamp, type GameAction } from '../game/rules';
 import { choppableTrees } from '../game/clearing';
@@ -92,6 +93,11 @@ function keepTargets(state: GameState): { target: TapTarget; sprite?: string; fr
   return [{ target: { kind, ...KEEP_SITE }, sprite: 'keep', frame: shown.split(':')[1] }];
 }
 
+/** The great hall's door once the castle is finished, which works as the keep's does. EASTER EGG: the castle, see src/game/castle.ts. */
+function hallDoorTargets(state: GameState): { target: TapTarget }[] {
+  return castleFinished(state) ? [{ target: { kind: 'keepDoor' as const, ...HALL_DOOR_SPOT } }] : [];
+}
+
 /** The castle's open sites in this area, each tapped where its next piece goes. */
 function castleTargets(state: GameState): { target: TapTarget }[] {
   return castleSpots(state).filter(spot => spot.area === state.area).map(({ site, x, y }) => ({ target: { kind: 'castleSite' as const, site, x, y } }));
@@ -121,6 +127,7 @@ export function pickTapTarget(state: GameState, x: number, y: number): TapTarget
     candidates = [...piles,
       { target: { kind: 'outcrop', ...OUTCROP_SITE }, sprite: 'outcrop' },
       ...keepTargets(state),
+      ...hallDoorTargets(state),
       ...castleTargets(state),
       ...cartTargets(state),
       ...(wild ? [{ target: { kind: 'pony' as const, ...wild }, sprite: 'pony' }] : []),

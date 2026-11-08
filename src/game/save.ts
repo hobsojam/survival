@@ -534,14 +534,14 @@ function moatOrderOk(castle: CastleState): boolean {
   return moat.dugDay === null || castle.doneDays.moat === moat.dugDay;
 }
 
-/** The feast is laid only once everything is built, the castle is finished exactly when it is set, and the hall is home only after that. */
+/** The feast is laid only once everything is built, the castle is finished exactly when it is set, and the hall is offered and made home only after that. */
 function castleFinishOk(castle: CastleState, made: ObjectValue): boolean {
   const { feast } = castle;
   const allBuilt = allSectionsBuilt(castle, made.stoneCart === true);
   const feastSet = FEAST_ITEMS.every(item => feast[item] === NEEDS.feast[item]);
   if (FEAST_ITEMS.some(item => feast[item] > 0) && !allBuilt) return false;
   if ((castle.finishedDay !== null) !== (allBuilt && feastSet)) return false;
-  return castle.home === 'house' || castle.finishedDay !== null;
+  return castle.finishedDay !== null || (castle.home === 'house' && !castle.offeredHome);
 }
 
 /** Checks a version 24 save, with the survivor's sickness and whether their story has ended, and: the clearing, the larder, the wood store and the fibre stack, the house and its fireplace, the workshop and its handcart, shelter upgrades, garden plots, vegetable beds, tools, quarry timers, the year journal and companion. */
