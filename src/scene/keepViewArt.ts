@@ -177,8 +177,8 @@ function paintHills(p: Painter, look: SeasonLook): void {
   }
 }
 
-/** The line of stones the survivor has seen in the hills, off to the left of the camp: a dashed outline of old stone, with the wall and towers built on it. */
-function paintLine(p: Painter, look: SeasonLook, castle: CastleView): void {
+/** The line of stones the survivor has seen in the hills, off to the left of the camp: a dashed outline of old stone, until the first side of the wall rises on it. */
+function paintLine(p: Painter, look: SeasonLook): void {
   const stone = look.snow ? '#8b8f92' : '#a8a292';
   for (let x = 20; x < 100; x += 5) {
     p.rect(x, 150, 3, 1, stone);
@@ -188,41 +188,51 @@ function paintLine(p: Painter, look: SeasonLook, castle: CastleView): void {
     p.rect(20, y, 1, 3, stone);
     p.rect(98, y, 1, 3, stone);
   }
-  if (castle.moat) {
-    const water = look.snow ? '#b9c8d2' : '#4f7f95';
-    p.rect(17, 145, 85, 2, water);
-    p.rect(17, 171, 85, 2, water);
-    p.rect(17, 145, 2, 28, water);
-    p.rect(100, 145, 2, 13, water);
-    p.rect(100, 164, 2, 9, water);
-  }
-  const wall = look.snow ? '#8b8f92' : '#77736a';
-  const top = look.snow ?? '#928d81';
-  const sides = [[20, 148, 79, 3], [97, 148, 3, 22], [20, 167, 79, 3], [20, 148, 3, 22]] as const;
-  for (const [x, y, w, h] of sides.slice(0, castle.walls)) {
-    p.rect(x, y, w, h, wall);
-    p.rect(x, y, w, 1, top);
-  }
+}
+
+/** Where each finished side of the wall shows across the picture, left to right, and where each tower stands on it. */
+const WALL_RUNS = [[0, 80], [80, 160], [160, 240], [240, PICTURE_WIDTH]] as const;
+const TOWER_XS = [2, 92, 236, 304] as const;
+const WALL_TOP = 154;
+/** The gatehouse stands where the path comes up to the wall. */
+const GATE_X = 194;
+
+/** The castle as it is seen from the top of the keep, standing inside it: the far side of the curtain wall runs across the foot of the view, just beyond the keep's own battlements, with its towers, the gatehouse on the path, the moat beyond and the hall's roof in the yard below. */
+function paintCastle(p: Painter, look: SeasonLook, castle: CastleView): void {
+  // A shade lighter than the keep's own battlements, so the wall reads as further off.
+  const wall = look.snow ? '#9a9ea1' : '#868176';
+  const top = look.snow ?? '#a29c8f';
+  const shade = look.snow ? '#7c8083' : '#6a665d';
+  const dark = look.snow ? '#5d6164' : '#3b372f';
   const roof = look.snow ?? '#8a4f3a';
-  for (const [x, y] of ([[20, 150], [97, 150], [97, 168], [20, 168]] as const).slice(0, castle.towers)) {
-    p.rect(x - 1, y - 8, 6, 10, wall);
-    p.rect(x - 2, y - 11, 8, 3, roof);
+  if (castle.moat) p.rect(0, WALL_TOP - 5, PICTURE_WIDTH, 4, look.snow ? '#b9c8d2' : '#4f7f95');
+  // Inside the wall, the yard is grass down to the keep's foot, not the heather outside.
+  if (castle.walls > 0) p.rect(0, WALL_TOP + 16, PICTURE_WIDTH, 14, look.ground);
+  for (const [from, to] of WALL_RUNS.slice(0, castle.walls)) {
+    p.rect(from, WALL_TOP, to - from, 16, wall);
+    p.rect(from, WALL_TOP, to - from, 1, top);
+    for (let x = from; x < to; x += 6) p.rect(x, WALL_TOP - 2, 3, 2, wall);
+    for (let x = from + 3; x < to; x += 14) p.rect(x, WALL_TOP + 6 + (x % 3), 7, 1, shade);
   }
-  if (castle.hall) {
-    p.rect(66, 158, 24, 9, wall);
-    p.rect(66, 158, 24, 1, top);
-    p.rect(65, 154, 26, 4, roof);
-    p.rect(68, 151, 20, 3, roof);
-    p.rect(77, 162, 4, 5, look.snow ? '#5d6164' : '#3b372f');
-    p.rect(70, 161, 2, 2, look.snow ? '#5d6164' : '#3b372f');
-    p.rect(85, 161, 2, 2, look.snow ? '#5d6164' : '#3b372f');
+  for (const x of TOWER_XS.slice(0, castle.towers)) {
+    p.rect(x, WALL_TOP - 14, 14, 30, wall);
+    p.rect(x + 12, WALL_TOP - 14, 2, 30, shade);
+    p.rect(x + 6, WALL_TOP - 6, 2, 4, dark);
+    for (let row = 0; row < 6; row++) p.rect(x - 1 + row, WALL_TOP - 15 - row * 2, 16 - row * 2, 2, roof);
   }
   if (castle.gatehouse) {
-    p.rect(95, 156, 7, 12, wall);
-    p.rect(95, 156, 7, 1, top);
-    p.rect(97, 161, 3, 7, look.snow ? '#5d6164' : '#3b372f');
-    p.rect(94, 153, 2, 3, roof);
-    p.rect(100, 153, 2, 3, roof);
+    p.rect(GATE_X, WALL_TOP - 9, 22, 25, wall);
+    p.rect(GATE_X, WALL_TOP - 9, 22, 1, top);
+    for (let x = GATE_X; x < GATE_X + 22; x += 5) p.rect(x, WALL_TOP - 11, 3, 2, wall);
+    p.rect(GATE_X + 7, WALL_TOP + 2, 8, 14, dark);
+    p.rect(GATE_X + 8, WALL_TOP + 1, 6, 1, dark);
+  }
+  if (castle.hall) {
+    p.rect(30, WALL_TOP + 7, 56, 3, roof);
+    p.rect(34, WALL_TOP + 4, 48, 3, roof);
+    p.rect(38, WALL_TOP + 2, 40, 2, roof);
+    p.rect(30, WALL_TOP + 10, 56, 10, wall);
+    p.rect(30, WALL_TOP + 10, 56, 1, top);
   }
 }
 
@@ -255,7 +265,8 @@ export function stillRects(season: Season, camp: CampView): PictureRect[] {
   paintCamp(p, look, camp);
   paintCliff(p, look);
   paintHills(p, look);
-  if (camp.castle.line) paintLine(p, look, camp.castle);
+  if (camp.castle.line && camp.castle.walls === 0) paintLine(p, look);
+  if (camp.castle.line) paintCastle(p, look, camp.castle);
   paintBattlements(p, look);
   return p.rects;
 }

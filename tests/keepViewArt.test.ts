@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Season } from '../src/game/calendar';
-import { APPLE_COLOR, CLIFF_SHADES, SAIL_COLOR, movingRects, pictureFit, stillRects, viewLine, type PictureRect } from '../src/scene/keepViewArt';
+import { APPLE_COLOR, CLIFF_SHADES, PICTURE_WIDTH, SAIL_COLOR, movingRects, pictureFit, stillRects, viewLine, type PictureRect } from '../src/scene/keepViewArt';
 import type { CampView } from '../src/scene/keepViewCamp';
 
 const SEASONS: readonly Season[] = ['autumn', 'winter', 'spring', 'summer'];
@@ -96,6 +96,26 @@ describe('the picture', () => {
       expect(rect.x + rect.w).toBeLessThan(98);
     }
     expect(movingRects(season, { ...bare, castle: { line: true, walls: 4, towers: 4, gatehouse: true, moat: false, hall: true } }, 3)).toEqual(movingRects(season, bare, 3));
+  });
+
+  it.each(SEASONS)('once a side of the wall stands, the castle fills the foot of the view in %s, as seen from inside it', (season) => {
+    const picture = (castle: Partial<CampView['castle']>): PictureRect[] => stillRects(season, { ...bare, castle: { line: true, walls: 0, towers: 0, gatehouse: false, moat: false, hall: false, ...castle } });
+    const dashes = (rects: PictureRect[]) => rects.filter(rect => rect.w === 3 && rect.h === 1 && (rect.y === 150 || rect.y === 168) && ['#a8a292', '#8b8f92'].includes(rect.color));
+    expect(dashes(picture({})).length).toBeGreaterThan(0);
+    expect(dashes(picture({ walls: 1 }))).toEqual([]);
+    const wall = added(picture({ walls: 4 }), picture({}));
+    expect(Math.min(...wall.map(rect => rect.x))).toBeLessThanOrEqual(0);
+    expect(Math.max(...wall.map(rect => rect.x + rect.w))).toBeGreaterThanOrEqual(PICTURE_WIDTH);
+    const towers = added(picture({ walls: 4, towers: 4 }), picture({ walls: 4 }));
+    const wallTop = Math.min(...wall.filter(rect => rect.w > 20).map(rect => rect.y));
+    expect(Math.min(...towers.map(rect => rect.y))).toBeLessThan(wallTop);
+  });
+
+  it('keeps the yard inside the wall green, not heather, from the first side on', () => {
+    const picture = (walls: number): PictureRect[] => stillRects('summer', { ...bare, castle: { line: true, walls, towers: 0, gatehouse: false, moat: false, hall: false } });
+    const yard = added(picture(1), picture(0)).filter(rect => rect.w === PICTURE_WIDTH);
+    expect(yard.length).toBe(1);
+    expect(yard[0].y).toBeGreaterThanOrEqual(165);
   });
 
   it('an unbuilt windmill turns nothing, and a built one turns', () => {
