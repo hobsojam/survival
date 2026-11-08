@@ -3,18 +3,22 @@ import { MILESTONES } from './playthrough/milestones';
 import { Player, type RunResult, type Style } from './playthrough/player';
 import { reportTables } from './playthrough/report';
 
-// Plays whole games through the real rules, from a new camp to the finished keep, so a change that strands a player somewhere
+// Plays whole games through the real rules, from a new camp to the finished keep and on to the castle made home, so a change that strands a player somewhere
 // fails here. To regenerate the tables in docs/playthrough: VITE_PLAYTHROUGH_REPORT=1 npx vitest run tests/playthrough.test.ts --disable-console-intercept --silent=false
 
 // A whole game is many thousands of actions, and the first test to ask for one plays it, so the usual limit would fail on a busy machine.
 vi.setConfig({ testTimeout: 120000 });
 
 const GAMES: ReadonlyArray<readonly [number, Style]> = [[1, 'orderly'], [2, 'wandering'], [3, 'wandering'], [4, 'unhurried'], [7, 'unhurried']];
-/** Over four years: well past any of these games, so this only trips on a real stall. */
-const MOST_DAYS = 170;
+/** Over twelve years: well past any of these games to the castle made home, so this only trips on a real stall. */
+const MOST_DAYS = 500;
 /** The animal houses wait on a wild animal choosing to stay, which is chance, so a game may end without them. */
 const UP_TO_CHANCE = new Set(['build:birdhouse', 'build:wolfHouse', 'build:foxDen']);
-const ENDS_THE_GAME = ['keep-finished', 'keep-night', 'keep-climbed'];
+const ENDS_THE_GAME = ['keep-finished', 'keep-night', 'keep-climbed', 'castle-finished', 'castle-home'];
+/** The castle's days, from the keep's last stone to the feast's last dish: about 200 of steady play. The orderly game is quickest at about 130. */
+const CASTLE_DAYS = [110, 280] as const;
+/** The longest wait between one of the castle's finishes and the next: the cart, each section, the moat filling, the first dish and the last. The wall's first side and the hall's wool are the long ones, at about 30 to 40. */
+const LONGEST_WAIT = 45;
 
 const played = new Map<string, RunResult>();
 function game(seed: number, style: Style): RunResult {
@@ -24,7 +28,7 @@ function game(seed: number, style: Style): RunResult {
 }
 
 describe.each(GAMES)('a whole game, seed %i, played in a %s way', (seed, style) => {
-  it('reaches the finished keep, sleeps in it and climbs it', () => {
+  it('reaches the finished keep, sleeps in it and climbs it, and finishes the castle and moves in', () => {
     const run = game(seed, style);
     expect(run.ended).toBe('finished');
     expect(run.hits.map(hit => hit.id)).toEqual(expect.arrayContaining(ENDS_THE_GAME));
@@ -41,6 +45,18 @@ describe.each(GAMES)('a whole game, seed %i, played in a %s way', (seed, style) 
 
   it('leaves nothing undone that isn\'t up to chance', () => {
     expect(game(seed, style).neverDone.filter(id => !UP_TO_CHANCE.has(id))).toEqual([]);
+  });
+
+  it('raises the castle in about the days it was meant to take, with a finish never far off', () => {
+    const run = game(seed, style);
+    const day = (id: string) => run.hits.find(hit => hit.id === id)?.day;
+    const [keep, castle] = [day('keep-finished')!, day('castle-finished')!];
+    expect(castle - keep).toBeGreaterThanOrEqual(CASTLE_DAYS[0]);
+    expect(castle - keep).toBeLessThanOrEqual(CASTLE_DAYS[1]);
+    const finishes = [keep, castle, day('cart'), day('moat-full'), day('feast'), ...Object.values(run.castleDoneDays)]
+      .filter((each): each is number => each !== undefined && each <= castle).sort((a, b) => a - b);
+    const waits = finishes.slice(1).map((each, i) => each - finishes[i]);
+    expect(Math.max(...waits)).toBeLessThanOrEqual(LONGEST_WAIT);
   });
 
   it('never falls sick', () => {

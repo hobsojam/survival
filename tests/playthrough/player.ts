@@ -10,9 +10,9 @@ import { FOOD_ITEMS, availableFood, foodCount, keptFoodTotal, type FoodItem } fr
 import { HILLS_EXIT, OUTCROP_SITE, availableOre, outcropLeft } from '../../src/game/hills';
 import { HOUSE_SPOT, fuelLeft, hasWoodStore, livesInHouse, woodStoreCapacity } from '../../src/game/home';
 import { recordJournal } from '../../src/game/journalEntries';
-import { FEAST_ITEMS, NEEDS, TOWERS, castleFinished, everyOtherSectionDone, feastWants, hallFinished, isRevealed, moatFill, towerFinished, wallFinished } from '../../src/game/castle';
+import { FEAST_ITEMS, HALL_DOOR_SPOT, NEEDS, TOWERS, castleFinished, everyOtherSectionDone, feastWants, hallFinished, isRevealed, moatFill, towerFinished, wallFinished } from '../../src/game/castle';
 import { CART_SPOTS, GOODS, castleSpots, type CastleGood } from '../../src/game/castleSites';
-import { KEEP_DOOR_AT, KEEP_DOOR_WOOD, KEEP_SITE, keepFinished, keepOpen } from '../../src/game/keep';
+import { KEEP_DOOR_AT, KEEP_DOOR_WOOD, KEEP_SITE, atHallDoor, keepFinished, keepOpen } from '../../src/game/keep';
 import { ORCHARD_SPOTS, spotAction } from '../../src/game/orchard';
 import { PONY_SPOTS, ponyOfferBlocker, ponyWith, wildPonyAt } from '../../src/game/pony';
 import { MINE_COST, advanceLiveTime, applyAction, type GameAction } from '../../src/game/rules';
@@ -58,6 +58,8 @@ export interface RunResult {
   /** Dawns when the build list said none were left while one still wasn't built, with the ones it left out. */
   noneLeftDays: number;
   unbuiltWhenNoneLeft: string[];
+  /** The day each of the castle's sections was finished, as the game ended. */
+  castleDoneDays: GameState['castle']['doneDays'];
 }
 
 type Material = 'wood' | 'fiber' | 'stone';
@@ -183,7 +185,7 @@ export class Player {
     const before = this.state;
     const result = applyAction(before, action);
     if (result.state === before) return false;
-    if (action.type === 'enterKeep') this.noteKeep(result.state.day > before.day);
+    if (action.type === 'enterKeep' && !atHallDoor(before)) this.noteKeep(result.state.day > before.day);
     if (action.type !== 'move') this.log.push(`d${before.day} t${Math.round(before.timeOfDay)} ${JSON.stringify(action)} ${result.message}`);
     // An action's own time passes in a moment on screen, a night's sleep included; only a key press is really spent.
     this.spend(recordJournal(before, result.state, action).state, action.type === 'move' ? 0 : KEY_PRESS_SECONDS);
@@ -379,7 +381,8 @@ export class Player {
     const { cost } = WORKSHOP_UPGRADES[id];
     return {
       id: `upgrade:${id}`,
-      shown: state => state.structures.workshop && workshopView(state).rows[id].shown,
+      // The row stays clickable while it says what it waits on; the cart's says the road and a shod pony, so a reader waits for those.
+      shown: state => state.structures.workshop && workshopView(state).rows[id].shown && (id !== 'stoneCart' || (state.castle.road >= NEEDS.road && state.pony.shod !== null)),
       done: state => state.progress.workshop[id],
       step: () => this.payFor(cost, { type: 'makeUpgrade', upgrade: id })
     };
@@ -443,6 +446,8 @@ export class Player {
       { id: 'castle-hall', shown: state => state.castle.frames >= NEEDS.frames, done: state => hallFinished(state.castle.hall), step: () => this.buildHall() },
       // With every other section done, the feast is laid on the hall's table from the camp's kitchen, and that finishes the castle.
       { id: 'castle-feast', shown: everyOtherSectionDone, done: castleFinished, step: () => this.layFeast() },
+      // Once the castle is finished, the first time through the hall's door offers it as home, and the player takes it.
+      { id: 'castle-home', shown: castleFinished, done: state => state.castle.home === 'hall', step: () => this.moveIn() },
       { id: 'castle-moat-fills', shown: state => state.castle.moat.stretches >= NEEDS.moat, done: state => moatFill(state) === 1, step: () => false },
       { id: 'mine', shown: state => progress(state).pickaxeCrafted, done: state => progress(state).mineBuilt, step: () => this.buildMine() },
       ...(['basket', 'cairn'] as const).map(site => ({
@@ -588,6 +593,12 @@ export class Player {
     if (wants.includes('roastedHazelnuts') && bagHolds('roastedHazelnuts') + foodCount(this.state.larder, 'roastedHazelnuts') < left('roastedHazelnuts') && this.roastHazelnuts()) return true;
     if (!wants.some(item => bagHolds(item) > 0)) return false;
     return this.goTo(spot.area) && this.walkTo(spot) && this.act({ type: 'castleWork', site: 'table' });
+  }
+
+  /** Through the hall's door once, by day or night, then the hall made home from wherever the player stands. */
+  private moveIn(): boolean {
+    if (this.state.castle.offeredHome) return this.act({ type: 'chooseHome', home: 'hall' });
+    return this.goTo('hills') && this.walkTo(HALL_DOOR_SPOT) && this.act({ type: 'enterKeep' });
   }
 
   /** Roasted hazelnuts for the feast: two hazelnuts at the fire in the pot, gathering them first when there are none. */
@@ -831,8 +842,8 @@ export class Player {
     return MILESTONES_THAT_END.every(id => this.hits.has(id));
   }
 
-  /** Plays to the finished keep, then on for a while, so whatever else the game offers gets a chance to be taken up. */
-  run(maxDays: number, daysAfter = DAYS_AFTER_THE_KEEP): RunResult {
+  /** Plays to the finished keep and on to the castle made home, then on for a while, so whatever else the game offers gets a chance to be taken up. */
+  run(maxDays: number, daysAfter = DAYS_AFTER_THE_END): RunResult {
     let stopAt = maxDays;
     let turnsLeft = maxDays * 4000;
     while (!this.state.ending && this.state.day <= stopAt && turnsLeft-- > 0) {
@@ -862,13 +873,14 @@ export class Player {
       neverShown: this.tasks.filter(task => !task.done(this.state) && !task.shown(this.state)).map(task => task.id),
       journalHints: this.journalHints,
       noneLeftDays: this.noneLeftDays,
-      unbuiltWhenNoneLeft: [...this.unbuiltWhenNoneLeft]
+      unbuiltWhenNoneLeft: [...this.unbuiltWhenNoneLeft],
+      castleDoneDays: this.state.castle.doneDays
     };
   }
 }
 
 const isFeastItem = (item: FoodItem): item is FeastItem => (FEAST_ITEMS as readonly FoodItem[]).includes(item);
 
-/** Long enough for the whole castle, through the spring rain that fills the moat to the feast that finishes it: the slowest of the test games sets its last dish about 215 days after the keep. */
-const DAYS_AFTER_THE_KEEP = 240;
-const MILESTONES_THAT_END = ['keep-finished', 'keep-night', 'keep-climbed'];
+/** A little longer once the castle is finished and home, so whatever else the game offers gets a chance to be taken up. */
+const DAYS_AFTER_THE_END = 40;
+const MILESTONES_THAT_END = ['keep-finished', 'keep-night', 'keep-climbed', 'castle-finished', 'castle-home'];
