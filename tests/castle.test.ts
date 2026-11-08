@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Season } from '../src/game/calendar';
-import { MOAT_TILES, NEEDS, moatPiece, WALLS, emptyCastle, isRevealed, moatFill, moatLevel, treeUnderWall, type Tower } from '../src/game/castle';
+import { MOAT_TILES, NEEDS, castleFinished, everyOtherSectionDone, hallFinished, moatPiece, WALLS, emptyCastle, isRevealed, moatFill, moatLevel, treeUnderWall, type Tower } from '../src/game/castle';
 import { rainWindow } from '../src/game/rain';
 import { season } from '../src/game/calendar';
 import { buildMap } from '../src/scene/map';
@@ -16,10 +16,16 @@ import { QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
 import { TOO_TIRED_MESSAGE, workSeconds } from '../src/game/needs';
 import { newsBetween } from '../src/game/news';
 import { upgradeBlocker } from '../src/game/workshop';
-import { GOODS, goodBlocker, goodRoom } from '../src/game/castleSites';
-import { recordJournal } from '../src/game/journalEntries';
+import { FRAMES_SPOT, GOODS, HALL_SPOT, goodBatch, goodBlocker, goodRoom } from '../src/game/castleSites';
+import { HALL_DOOR, HALL_STEPS } from '../src/art/castleSprites';
+import { keepSprites } from '../src/art/keepSprites';
+import { hallStep } from '../src/scene/visuals';
+import { JOURNAL_PAGES, journalEntry, recordJournal } from '../src/game/journalEntries';
+import { JOURNAL_ICONS } from '../src/art/journalIcons';
+import { emptyFood, foodCount, spoil } from '../src/game/food';
+import { HALL_WINDOW_OFFSET, hallWindowGlow } from '../src/scene/lighting';
 import { KEEP_SITE, KEEP_STONES } from '../src/game/keep';
-import { FULL_BAG_MESSAGE, applyAction } from '../src/game/rules';
+import { FULL_BAG_MESSAGE, applyAction, type GameAction } from '../src/game/rules';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { actionEffect, actionPose, promptFor, useKeyAction } from '../src/scene/prompts';
 import { HILL_TREES, playerVisualDepth, sceneVisuals } from '../src/scene/visuals';
@@ -756,10 +762,7 @@ describe('making beams and fittings', () => {
     expect(goodBlocker(built, 'beams')).toMatch(/enough/);
   });
 
-  it('cannot yet make hangings', () => {
-    expect(goodBlocker(atCamp(), 'hangings')).not.toBeNull();
   });
-});
 
 // ---- Frames, wall and towers ----
 
@@ -856,7 +859,7 @@ describe('the wall', () => {
     expect(SIDE_LIST.map(side => siteNeed(built({ frames: 10 }), `wall-${side}`))).toEqual([null, null, null, null]);
     const open = framesUp();
     expect(SIDE_LIST.map(side => siteNeed(open, `wall-${side}`))).toEqual(SIDE_LIST.map(() => ({ kind: 'stone' })));
-    expect(castleSpots(open).map(spot => spot.site)).toEqual(SIDE_LIST.map(side => `wall-${side}`));
+    expect(castleSpots(open).map(spot => spot.site)).toEqual([...SIDE_LIST.map(side => `wall-${side}`), 'hall']);
     const south = standAt(framesUp({}, { inventory: { ...game.inventory, stone: 3 } }), 'wall-south');
     expect(doWork(south, 'wall-south').state.castle.wall).toEqual({ north: 0, east: 0, south: 1, west: 0 });
   });
@@ -963,7 +966,7 @@ describe('the towers', () => {
     expect(open).toEqual(TOWER_LIST.map(() => ({ kind: 'stone' })));
     const short = framesUp({ wall: { ...ALL_WALL, west: 29 } });
     expect(TOWER_LIST.map(id => siteNeed(short, `tower-${id}`))).toEqual([null, null, null, null]);
-    expect(castleSpots(wallsUp()).map(spot => spot.site)).toEqual([...TOWER_LIST.map(id => `tower-${id}`), 'gatehouse', 'moat']);
+    expect(castleSpots(wallsUp()).map(spot => spot.site)).toEqual([...TOWER_LIST.map(id => `tower-${id}`), 'gatehouse', 'moat', 'hall']);
   });
 
   it('ask for stones, then four beams, then two fittings, in that order', () => {
@@ -1085,12 +1088,16 @@ describe('where the frames, the wall and the towers stand', () => {
       expect(spot.x, spot.site).toBeLessThan(BALANCE.mapWidth);
       expect(spot.y, spot.site).toBeGreaterThan(0);
       expect(spot.y, spot.site).toBeLessThan(BALANCE.mapHeight);
-      for (const other of OTHERS) expect(Math.hypot(spot.x - other.x, spot.y - other.y), `${spot.site} from ${other.x},${other.y}`).toBeGreaterThan(BALANCE.interactionRadius * 2);
+      // The hall stands within reach of the keep's door on purpose: its sweep below shows the door keeps working there.
+      for (const other of OTHERS) {
+        const apart = spot.site === 'hall' && other === KEEP_SITE ? 3 : BALANCE.interactionRadius * 2;
+        expect(Math.hypot(spot.x - other.x, spot.y - other.y), `${spot.site} from ${other.x},${other.y}`).toBeGreaterThan(apart);
+      }
     }
   });
 
   it('keeps each side and each corner out of reach of the others, so E takes the one the prompt names', () => {
-    const spots = [...castleSpots(framesUp()), ...castleSpots(wallsUp()).filter(spot => spot.site !== 'gatehouse' && spot.site !== 'moat')];
+    const spots = [...castleSpots(framesUp()), ...castleSpots(wallsUp()).filter(spot => spot.site !== 'gatehouse' && spot.site !== 'moat')].filter(spot => spot.site !== 'hall');
     expect(spots).toHaveLength(8);
     for (const a of spots) for (const b of spots) {
       if (a !== b) expect(Math.hypot(a.x - b.x, a.y - b.y), `${a.site} and ${b.site}`).toBeGreaterThan(BALANCE.interactionRadius * 2);
@@ -1150,10 +1157,10 @@ describe('where the frames, the wall and the towers stand', () => {
 
 describe('the view from the keep, with the wall and towers', () => {
   it('counts the sides and the towers done', () => {
-    expect(castleView(revealed())).toEqual({ line: true, walls: 0, towers: 0, gatehouse: false, moat: false });
-    expect(castleView(framesUp({ wall: { north: 30, east: 29, south: 30, west: 0 } }))).toEqual({ line: true, walls: 2, towers: 0, gatehouse: false, moat: false });
-    expect(castleView(wallsUp({ towers: { ...emptyCastle().towers, nw: FULL_TOWER, se: { ...FULL_TOWER, fittings: 1 } } }))).toEqual({ line: true, walls: 4, towers: 1, gatehouse: false, moat: false });
-    expect(castleView(finishedKeep())).toEqual({ line: false, walls: 0, towers: 0, gatehouse: false, moat: false });
+    expect(castleView(revealed())).toEqual({ line: true, walls: 0, towers: 0, gatehouse: false, moat: false, hall: false });
+    expect(castleView(framesUp({ wall: { north: 30, east: 29, south: 30, west: 0 } }))).toEqual({ line: true, walls: 2, towers: 0, gatehouse: false, moat: false, hall: false });
+    expect(castleView(wallsUp({ towers: { ...emptyCastle().towers, nw: FULL_TOWER, se: { ...FULL_TOWER, fittings: 1 } } }))).toEqual({ line: true, walls: 4, towers: 1, gatehouse: false, moat: false, hall: false });
+    expect(castleView(finishedKeep())).toEqual({ line: false, walls: 0, towers: 0, gatehouse: false, moat: false, hall: false });
     expect(castleView(wallsUp({ gatehouse: 29 })).gatehouse).toBe(false);
     expect(castleView(wallsUp({ gatehouse: 30 })).gatehouse).toBe(true);
   });
@@ -1323,7 +1330,7 @@ describe('the gatehouse: where it stands', () => {
       expect(promptFor(there).startsWith(`E  ${castlePrompt(there, nearest)}`), `${x},${y}: ${promptFor(there)}`).toBe(true);
       expect(targetAction(pickTapTarget(there, nearest.x, nearest.y)), `${x},${y}`).toEqual({ type: 'castleWork', site: nearest.site });
     }
-    expect(sites).toEqual(new Set(['gatehouse', 'tower-se', 'moat']));
+    expect(sites).toEqual(new Set(['gatehouse', 'tower-se', 'moat', 'hall']));
     const straddle = { ...state, player: { ...state.player, x: 24.9, y: 13.5 } };
     expect(near(straddle.player, spotOf(state, 'gatehouse'))).toBeLessThanOrEqual(BALANCE.interactionRadius);
     expect(near(straddle.player, spotOf(state, 'tower-se'))).toBeLessThanOrEqual(BALANCE.interactionRadius);
@@ -1683,6 +1690,12 @@ describe('the moat: prompts, keys and taps beside the towers and the gatehouse',
         continue;
       }
       sites.add(nearest.site);
+      // Where the keep's door is in reach too, E is the door's, as it always was.
+      if (near(there.player, KEEP_SITE) <= BALANCE.interactionRadius) {
+        expect(useKeyAction(there), `${x},${y}`).toEqual({ type: 'enterKeep' });
+        expect(targetAction(pickTapTarget(there, nearest.x, nearest.y)), `${x},${y}`).toEqual({ type: 'castleWork', site: nearest.site });
+        continue;
+      }
       check(there, nearest);
     }
     return sites;
@@ -1776,7 +1789,7 @@ describe('the moat: prompts, keys and taps beside the towers and the gatehouse',
   it('keeps a frozen moat from taking the tower\'s E, and sweeps clean in winter', () => {
     const state = all({}, { day: 15 });
     const sites = sweep(state, agree);
-    expect(sites).toEqual(new Set(['moat', 'gatehouse', 'tower-nw', 'tower-ne', 'tower-se', 'tower-sw']));
+    expect(sites).toEqual(new Set(['moat', 'gatehouse', 'tower-nw', 'tower-ne', 'tower-se', 'tower-sw', 'hall']));
   });
 
   it('digs by key and by tap, from a place reached on foot, in every season but winter', () => {
@@ -1936,5 +1949,756 @@ describe('the moat\'s corners join the runs', () => {
     expect(at('sw4', 12, 7)).toBe('s');
     expect(at('sw4', 7, 0)).toBe('s');
     expect(at('sw4', 1, 15)).not.toBe('s');
+  });
+});
+
+// ---- The hall and its hangings ----
+
+const FULL_HALL = { stones: NEEDS.hallStones, beams: NEEDS.hallBeams, fittings: NEEDS.hallFittings, hangings: NEEDS.hallHangings };
+const hallOpen = (hall: Partial<GameState['castle']['hall']> = {}, castle: Partial<GameState['castle']> = {}, changes: Partial<GameState> = {}): GameState =>
+  framesUp({ hall: { ...emptyCastle().hall, ...hall }, ...castle }, { inventory: { ...game.inventory, stone: 3 }, ...changes });
+
+describe('the hall: when it opens and what it asks for', () => {
+  it('opens once the frames are done, with the wall untouched, and not before', () => {
+    expect(siteNeed(built({ frames: 10 }), 'hall')).toBeNull();
+    expect(siteNeed(hallOpen(), 'hall')).toEqual({ kind: 'stone' });
+    expect(castleSpots(hallOpen()).map(spot => spot.site)).toEqual([...SIDE_LIST.map(side => `wall-${side}`), 'hall']);
+    expect(siteNeed(wallsUp(), 'hall')).toEqual({ kind: 'stone' });
+  });
+
+  it('asks for forty stones, then twelve beams, six fittings and two hangings, in that order', () => {
+    const need = (hall: Partial<GameState['castle']['hall']>) => siteNeed(hallOpen({ ...FULL_HALL, ...hall }), 'hall');
+    expect(need({ stones: 0, beams: 0, fittings: 0, hangings: 0 })).toEqual({ kind: 'stone' });
+    expect(need({ stones: 39, beams: 0, fittings: 0, hangings: 0 })).toEqual({ kind: 'stone' });
+    expect(need({ beams: 0, fittings: 0, hangings: 0 })).toEqual({ kind: 'good', good: 'beams' });
+    expect(need({ beams: 11, fittings: 0, hangings: 0 })).toEqual({ kind: 'good', good: 'beams' });
+    expect(need({ fittings: 0, hangings: 0 })).toEqual({ kind: 'good', good: 'fittings' });
+    expect(need({ fittings: 5, hangings: 0 })).toEqual({ kind: 'good', good: 'fittings' });
+    expect(need({ hangings: 0 })).toEqual({ kind: 'good', good: 'hangings' });
+    expect(need({ hangings: 1 })).toEqual({ kind: 'good', good: 'hangings' });
+    expect(need({})).toBeNull();
+    expect(hallFinished(FULL_HALL)).toBe(true);
+    expect(hallFinished({ ...FULL_HALL, hangings: 1 })).toBe(false);
+  });
+
+  it('lays a stone from the cart first, then the bag, and says so', () => {
+    const state = standAt(hallOpen({}, { cart: { stone: 1, at: 'hills' } }, { inventory: { ...game.inventory, stone: 1 } }), 'hall');
+    expect(promptFor(state)).toMatch(/^E  Lay a hall stone \(0\/40\)( ·|$)/);
+    const first = doWork(state, 'hall');
+    expect(first.state.castle.hall.stones).toBe(1);
+    expect(first.state.castle.cart.stone).toBe(0);
+    expect(first.state.inventory.stone).toBe(1);
+    expect(first.message).toBe('You lay the first stone of the great hall.');
+    expect(first.state.player.energy).toBeLessThan(state.player.energy);
+    const half = standAt(hallOpen({ stones: 19 }), 'hall');
+    expect(doWork(half, 'hall').message).toBe('The hall walls are halfway.');
+    const last = standAt(hallOpen({ stones: 39 }), 'hall');
+    expect(doWork(last, 'hall').message).toBe('You lay the last stone of the hall. It wants a roof.');
+  });
+
+  it('moves a beam, a fitting and a hanging from the goods into the hall', () => {
+    const goods = { beams: 3, fittings: 3, hangings: 1 };
+    const beam = standAt(hallOpen({ stones: 40, beams: 5 }, { goods }), 'hall');
+    expect(promptFor(beam)).toMatch(/^E  Set a hall beam \(5\/12\)( ·|$)/);
+    const beamed = doWork(beam, 'hall');
+    expect(beamed.state.castle.hall.beams).toBe(6);
+    expect(beamed.state.castle.goods.beams).toBe(2);
+    expect(beamed.message).toBe('You set a beam in the hall roof.');
+    const fit = standAt(hallOpen({ stones: 40, beams: 12, fittings: 2 }, { goods }), 'hall');
+    expect(promptFor(fit)).toMatch(/^E  Fit iron to the hall \(2\/6\)( ·|$)/);
+    const fitted = doWork(fit, 'hall');
+    expect(fitted.state.castle.hall.fittings).toBe(3);
+    expect(fitted.state.castle.goods.fittings).toBe(2);
+    expect(fitted.message).toBe('You fit iron to the hall.');
+    const hang = standAt(hallOpen({ stones: 40, beams: 12, fittings: 6, hangings: 0 }, { goods }), 'hall');
+    expect(promptFor(hang)).toMatch(/^E  Hang a hall hanging \(0\/2\)( ·|$)/);
+    const hung = doWork(hang, 'hall');
+    expect(hung.state.castle.hall.hangings).toBe(1);
+    expect(hung.state.castle.goods.hangings).toBe(0);
+    expect(hung.message).toBe('You hang a wool hanging on the hall wall.');
+  });
+
+  it('refuses what has not been made, saying where to make it, and spends nothing', () => {
+    const ask = (hall: Partial<GameState['castle']['hall']>) => standAt(hallOpen(hall), 'hall');
+    const beams = ask({ stones: 40 });
+    expect(castleWorkBlocker(beams, 'hall')).toBe('Make oak beams at the workshop for the hall.');
+    expect(promptFor(beams)).toMatch(/^Hall · make oak beams at the workshop( ·|$)/);
+    expect(useKeyAction(beams)).toBeUndefined();
+    expect(doWork(beams, 'hall').state).toBe(beams);
+    expect(castleWorkBlocker(ask({ stones: 40, beams: 12 }), 'hall')).toBe('Make iron fittings at the forge for the hall.');
+    const hangings = ask({ stones: 40, beams: 12, fittings: 6 });
+    expect(castleWorkBlocker(hangings, 'hall')).toBe('Weave a hanging at the loom for the hall.');
+    expect(promptFor(hangings)).toMatch(/^Hall · weave a hanging at the loom( ·|$)/);
+    expect(castleWorkBlocker(ask({}), 'hall')).toBeNull();
+    const noStone = standAt(hallOpen({}, {}, { inventory: { ...game.inventory, stone: 0 } }), 'hall');
+    expect(castleWorkBlocker(noStone, 'hall')).toBe('Bring stone to build the hall.');
+    expect(promptFor(noStone)).toMatch(/^Hall · bring stone to build it( ·|$)/);
+  });
+
+  it('refuses a tired survivor with the usual line at every stage, with the goods in hand', () => {
+    const goods = { beams: 2, fittings: 2, hangings: 2 };
+    for (const hall of [{}, { stones: 40 }, { stones: 40, beams: 12 }, { stones: 40, beams: 12, fittings: 6 }]) {
+      const state = standAt(hallOpen(hall, { goods }), 'hall');
+      const tired = { ...state, player: { ...state.player, energy: 0 } };
+      expect(doWork(tired, 'hall').message).toBe(TOO_TIRED_MESSAGE);
+      expect(doWork(tired, 'hall').state).toBe(tired);
+    }
+  });
+
+  it('can stop at any point: nothing else waits on the hall, and finishing it leaves the castle unfinished', () => {
+    const half = hallOpen({ stones: 20, beams: 0 });
+    expect(siteNeed(wallsUp({ hall: { ...emptyCastle().hall, stones: 20 } }), 'wall-north')).toBeNull();
+    expect(siteNeed(half, 'wall-north')).toEqual({ kind: 'stone' });
+    expect(siteNeed(wallsUp({ hall: { stones: 20, beams: 0, fittings: 0, hangings: 0 } }), 'moat')).toEqual({ kind: 'dig' });
+    const before = standAt(hallOpen({ ...FULL_HALL, hangings: 1 }, { goods: { beams: 0, fittings: 0, hangings: 1 } }), 'hall');
+    const after = doWork(before, 'hall');
+    expect(hallFinished(after.state.castle.hall)).toBe(true);
+    expect(after.state.castle.doneDays.hall).toBe(before.day);
+    expect(after.state.castle.finishedDay).toBeNull();
+    expect(castleWorkLine(before, after.state)).toBe('The great hall is roofed, fitted and hung. It wants a feast.');
+    expect(siteNeed(after.state, 'hall')).toBeNull();
+    expect(castleNews(after.state, { ...after.state, day: after.state.day + 1 })).toEqual(['The great hall stands finished.']);
+    expect(castleNews(before, { ...before, day: before.day + 1 })).toEqual([]);
+    expect(doWork(after.state, 'hall').message).toBe('The great hall is finished.');
+  });
+});
+
+describe('the hall: where it stands and how it is drawn', () => {
+  const px = (spot: { x: number; y: number }, def: { anchor: number[]; size: number[] }) => {
+    const left = Math.round((spot.x + 0.5) * 16) - def.anchor[0];
+    const top = Math.round((spot.y + 0.5) * 16) - def.anchor[1];
+    return { left, top, right: left + def.size[0], bottom: top + def.size[1] };
+  };
+  const overlap = (a: ReturnType<typeof px>, b: ReturnType<typeof px>) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  const hall = castleSprites.castleHall;
+
+  it('stands in the yard at (21, 9), inside the wall, between the keep and the east wall', () => {
+    expect(spotOf(hallOpen(), 'hall')).toMatchObject({ area: 'hills', x: 21, y: 9 });
+    expect(HALL_SPOT).toMatchObject({ x: 21, y: 9 });
+    expect(HALL_SPOT.x).toBeGreaterThan(KEEP_SITE.x);
+    expect(HALL_SPOT.x).toBeLessThan(WALLS.right);
+  });
+
+  it('keeps its picture off the keep, the east wall, the frames, the outcrop and the towers', () => {
+    const box = px(HALL_SPOT, hall);
+    expect(overlap(box, px(KEEP_SITE, keepSprites.keep))).toBe(false);
+    expect(box.left).toBeGreaterThanOrEqual(px(KEEP_SITE, keepSprites.keep).right);
+    expect(overlap(box, px({ x: FRAMES_SPOT.x, y: FRAMES_SPOT.y }, castleSprites.castleFrames))).toBe(false);
+    expect(overlap(box, px(OUTCROP_SITE, { anchor: [8, 15], size: [16, 16] }))).toBe(false);
+    for (let y = WALLS.top; y <= WALLS.bottom; y++) expect(overlap(box, px({ x: WALLS.right, y }, castleSprites.castleWall)), `east wall ${y}`).toBe(false);
+    for (const [x, y] of [[WALLS.right, WALLS.top], [WALLS.left, WALLS.top]]) expect(overlap(box, px({ x, y }, castleSprites.castleTower))).toBe(false);
+    for (let x = WALLS.left + 1; x < WALLS.right; x++) expect(overlap(box, px({ x, y: WALLS.top }, castleSprites.castleWall)), `north wall ${x}`).toBe(false);
+  });
+
+  it('leaves its door clear of the frames and the south wall, and the survivor at the spot stands at the door', () => {
+    const box = px(HALL_SPOT, hall);
+    const door = { left: box.left + HALL_DOOR.x, top: box.top + HALL_DOOR.y, right: box.left + HALL_DOOR.x + HALL_DOOR.w, bottom: box.top + HALL_DOOR.y + HALL_DOOR.h };
+    expect(door.left).toBeLessThanOrEqual(Math.round((HALL_SPOT.x + 0.5) * 16));
+    expect(door.right).toBeGreaterThanOrEqual(Math.round((HALL_SPOT.x + 0.5) * 16));
+    expect(door.bottom).toBeLessThanOrEqual(Math.round((HALL_SPOT.y + 0.5) * 16) + 1);
+    expect(overlap(door, px({ x: FRAMES_SPOT.x, y: FRAMES_SPOT.y }, castleSprites.castleFrames))).toBe(false);
+    for (let x = WALLS.left; x <= WALLS.right; x++) expect(overlap(door, px({ x, y: WALLS.bottom }, castleSprites.castleWall)), `south wall ${x}`).toBe(false);
+    for (const [x, y] of [[WALLS.right, WALLS.bottom], [WALLS.left, WALLS.bottom]]) expect(overlap(door, px({ x, y }, castleSprites.castleTower))).toBe(false);
+    expect(overlap(door, px(GATE_SPOT, castleSprites.castleGatehouse))).toBe(false);
+  });
+
+  it('sorts by its own foot against the survivor, and the frames sort after it', () => {
+    const state = hallOpen({ stones: 5 });
+    const visual = sceneVisuals(state, 0).find(each => each.id === 'castle-hall')!;
+    const frames = sceneVisuals(framesUp({ hall: { ...emptyCastle().hall, stones: 5 } }), 0).find(each => each.id === 'castle-frames')!;
+    expect(playerVisualDepth({ ...state, player: { ...state.player, y: HALL_SPOT.y - 1 } })).toBeLessThan(visual.depth);
+    expect(playerVisualDepth({ ...state, player: { ...state.player, y: HALL_SPOT.y + 1 } })).toBeGreaterThan(visual.depth);
+    expect(frames.depth).toBeGreaterThan(visual.depth);
+  });
+
+  it('is not drawn before the first stone, then rises through its stones, roof, iron and hangings, with snow in winter', () => {
+    const texture = (hall: Partial<GameState['castle']['hall']>, day = 5) => sceneVisuals(hallOpen(hall, {}, { day }), 0).find(visual => visual.id === 'castle-hall')?.texture;
+    expect(texture({})).toBeUndefined();
+    const steps = [
+      { stones: 1 }, { stones: 9 }, { stones: 17 }, { stones: 25 }, { stones: 33 }, { stones: 40 },
+      { stones: 40, beams: 4 }, { stones: 40, beams: 8 }, { stones: 40, beams: 12 },
+      { stones: 40, beams: 12, fittings: 3 }, { stones: 40, beams: 12, fittings: 6 },
+      { stones: 40, beams: 12, fittings: 6, hangings: 1 }, FULL_HALL
+    ];
+    const names = steps.map(step => texture(step));
+    expect(new Set(names).size).toBe(steps.length);
+    expect(steps.map(step => hallStep({ ...emptyCastle().hall, ...step }))).toEqual(Array.from({ length: steps.length }, (_, i) => i + 1));
+    expect(HALL_STEPS).toBe(steps.length);
+    expect(texture({ stones: 9 }, 12)).toBe(`${names[1]}s`);
+    for (const name of names.concat(texture(FULL_HALL, 12))) expect(hall.frames[name!.split(':')[1]], name).toBeDefined();
+    expect(sceneVisuals(hallOpen({ stones: 3 }), 0).find(visual => visual.id === 'castle-hall')).toMatchObject({ x: Math.round((HALL_SPOT.x + 0.5) * 16), y: Math.round((HALL_SPOT.y + 0.5) * 16) });
+  });
+
+  it('shows in the keep\'s view only once the hall has everything', () => {
+    expect(castleView(hallOpen()).hall).toBe(false);
+    expect(castleView(hallOpen({ ...FULL_HALL, hangings: 1 })).hall).toBe(false);
+    expect(castleView(hallOpen(FULL_HALL)).hall).toBe(true);
+    expect(castleView(finishedKeep()).hall).toBe(false);
+  });
+});
+
+describe('the hall: prompt, key and tap agree beside the keep and the east wall', () => {
+  const near = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
+  const stages: [string, Partial<GameState['castle']['hall']>][] = [['stones', {}], ['beams', { stones: 40 }], ['hangings', { stones: 40, beams: 12, fittings: 6 }]];
+
+  it('has the keep\'s door first where both are in reach, and the hall where only it is', () => {
+    for (const [name, hall] of stages) {
+      const state = hallOpen(hall, { goods: { beams: 12, fittings: 6, hangings: 2 } }, { day: 33 });
+      let both = 0, hallOnly = 0;
+      for (let x = 16; x <= 25; x += 0.25) for (let y = 6; y <= 13; y += 0.25) {
+        const there = { ...state, player: { ...state.player, x, y } };
+        const nearest = nearestCastleSpot(there);
+        const inKeep = near(there.player, KEEP_SITE) <= BALANCE.interactionRadius;
+        const where = `${name} ${x},${y}`;
+        if (inKeep) {
+          expect(useKeyAction(there), where).toEqual({ type: 'enterKeep' });
+          if (nearest && near(there.player, nearest) <= BALANCE.interactionRadius) both++;
+        } else if (nearest && near(there.player, nearest) <= BALANCE.interactionRadius) {
+          if (nearest.site === 'hall') hallOnly++;
+          expect(useKeyAction(there), where).toEqual({ type: 'castleWork', site: nearest.site });
+          expect(promptFor(there).startsWith(`E  ${castlePrompt(there, nearest)}`), `${where}: ${promptFor(there)}`).toBe(true);
+        } else {
+          expect(useKeyAction(there)?.type, where).not.toBe('castleWork');
+        }
+        if (nearest) expect(targetAction(pickTapTarget(there, nearest.x, nearest.y)), where).toEqual({ type: 'castleWork', site: nearest.site });
+      }
+      expect(both, name).toBeGreaterThan(0);
+      expect(hallOnly, name).toBeGreaterThan(0);
+    }
+  });
+
+  it('is the survivor\'s only choice at its own spot, by key and by tap, in every season', () => {
+    for (const day of [5, 25, 33, 45]) for (const [name, hall] of stages) {
+      const state = standAt(hallOpen(hall, { goods: { beams: 12, fittings: 6, hangings: 2 } }, { day }), 'hall');
+      expect(nearestCastleSpot(state)?.site, `${name} ${day}`).toBe('hall');
+      expect(useKeyAction(state), `${name} ${day}`).toEqual({ type: 'castleWork', site: 'hall' });
+      expect(targetAction(pickTapTarget(state, HALL_SPOT.x, HALL_SPOT.y)), `${name} ${day}`).toEqual({ type: 'castleWork', site: 'hall' });
+    }
+  });
+
+  it('leaves every other open site reachable at its own spot, with the hall open', () => {
+    const state = wallsUp({ hall: { ...emptyCastle().hall, stones: 3 } }, { inventory: { ...game.inventory, stone: 3 } });
+    for (const spot of castleSpots(state)) {
+      const there = { ...state, player: { ...state.player, x: spot.x, y: spot.y } };
+      expect(nearestCastleSpot(there)?.site, spot.site).toBe(spot.site);
+      expect(targetAction(pickTapTarget(there, spot.x, spot.y)), spot.site).toEqual({ type: 'castleWork', site: spot.site });
+    }
+  });
+
+  it('plays dust where the survivor laid', () => {
+    const after = doWork(standAt(hallOpen(), 'hall'), 'hall').state;
+    expect(actionEffect({ type: 'castleWork', site: 'hall' }, after)).toEqual({ kind: 'dust', x: after.player.x, y: after.player.y });
+  });
+});
+
+describe('hangings: made at the loom from wool', () => {
+  const atLoom = (wool: number, castle: Partial<GameState['castle']> = {}, changes: Partial<GameState> = {}): GameState => {
+    const base = revealed();
+    return {
+      ...base, area: 'camp', player: { ...base.player, x: BALANCE.campX, y: BALANCE.campY, energy: 100 },
+      structures: { ...base.structures, loom: true },
+      sheep: { ...base.sheep, lastShornYear: 1, wool },
+      castle: { ...base.castle, frames: 1, ...castle }, ...changes
+    };
+  };
+  const make = (state: GameState) => applyAction(state, { type: 'makeCastleGood', good: 'hangings' });
+
+  it('costs three wool a hanging, one at a time, from the basket', () => {
+    expect(GOODS.hangings).toEqual({ batch: 1, wool: 3 });
+    const { state: after, message } = make(atLoom(4));
+    expect(after.castle.goods.hangings).toBe(1);
+    expect(after.sheep.wool).toBe(1);
+    expect(message).toBe('You wove a hanging for the hall.');
+    expect(after.player.energy).toBeLessThan(100);
+  });
+
+  it('needs the loom, the frames begun and the clearing, and says so plainly', () => {
+    expect(goodBlocker(atLoom(8), 'hangings')).toBeNull();
+    const noLoom = atLoom(8);
+    expect(goodBlocker({ ...noLoom, structures: { ...noLoom.structures, loom: false } }, 'hangings')).toBe('Build the loom first.');
+    expect(goodBlocker(atLoom(8, { frames: 0 }), 'hangings')).toMatch(/frames/);
+    expect(goodBlocker({ ...atLoom(8), area: 'hills' }, 'hangings')).toBe('Return to camp to use the loom.');
+    expect(goodBlocker({ ...atLoom(8), castle: { ...revealed().castle, revealedDay: null, frames: 1 } }, 'hangings')).not.toBeNull();
+  });
+
+  it('can be made anywhere in the clearing, not only beside the loom', () => {
+    const state = atLoom(8);
+    for (const [dx, dy] of [[0, 0], [3, 0], [-3, 2]]) expect(goodBlocker({ ...state, player: { ...state.player, x: BALANCE.campX + dx, y: BALANCE.campY + dy } }, 'hangings'), `${dx},${dy}`).toBeNull();
+  });
+
+  it('says exactly how much wool is missing, and spends nothing', () => {
+    expect(goodBlocker(atLoom(2), 'hangings')).toBe('You need 3 wool for the hanging.');
+    const poor = atLoom(2);
+    const result = make(poor);
+    expect(result.message).toBe('You need 3 wool for the hanging.');
+    expect(result.state).toBe(poor);
+    expect(goodBlocker(atLoom(3), 'hangings')).toBeNull();
+  });
+
+  it('refuses a tired survivor with the usual line', () => {
+    const state = atLoom(8);
+    const tired = { ...state, player: { ...state.player, energy: 0 } };
+    expect(make(tired).message).toBe(TOO_TIRED_MESSAGE);
+    expect(make(tired).state).toBe(tired);
+  });
+
+  it('takes a second shearing for the second hanging when one shearing gives four wool', () => {
+    expect(BALANCE.woolPerShearing).toBe(4);
+    const first = make(atLoom(BALANCE.woolPerShearing)).state;
+    expect(first.castle.goods.hangings).toBe(1);
+    expect(goodBlocker(first, 'hangings')).toBe('You need 3 wool for the hanging.');
+    const second = make({ ...first, sheep: { ...first.sheep, wool: first.sheep.wool + BALANCE.woolPerShearing } }).state;
+    expect(second.castle.goods.hangings).toBe(2);
+    expect(second.sheep.wool).toBe(2);
+  });
+
+  it('stops at two in all, counting what is already hung in the hall', () => {
+    expect(goodRoom(atLoom(8).castle, 'hangings')).toBe(2);
+    expect(goodBatch(atLoom(8).castle, 'hangings')).toBe(1);
+    expect(goodBlocker(atLoom(8, { goods: { beams: 0, fittings: 0, hangings: 2 } }), 'hangings')).toBe('The castle has enough hangings now.');
+    expect(goodBlocker(atLoom(8, { goods: { beams: 0, fittings: 0, hangings: 1 }, hall: { ...emptyCastle().hall, hangings: 1 } }), 'hangings')).toBe('The castle has enough hangings now.');
+    expect(goodBlocker(atLoom(8, { goods: { beams: 0, fittings: 0, hangings: 1 } }), 'hangings')).toBeNull();
+    const hung = atLoom(8, { goods: { beams: 0, fittings: 0, hangings: 0 }, hall: { ...emptyCastle().hall, hangings: 2 } });
+    expect(goodBlocker(hung, 'hangings')).toBe('The castle has enough hangings now.');
+  });
+
+  it('leaves the cap unchanged when a hanging moves from the goods into the hall', () => {
+    const state = standAt(hallOpen({ stones: 40, beams: 12, fittings: 6 }, { goods: { beams: 0, fittings: 0, hangings: 2 } }), 'hall');
+    const hung = doWork(state, 'hall').state;
+    expect(goodRoom(hung.castle, 'hangings')).toBe(goodRoom(state.castle, 'hangings'));
+    expect(goodRoom(hung.castle, 'beams')).toBe(goodRoom(state.castle, 'beams'));
+  });
+
+  it('counts the hall\'s beams and fittings in the cap too', () => {
+    // 4 per tower and 12 for the hall is 28 beams, and 14 fittings: a hall that has them all has room for none.
+    const full = atLoom(8, { hall: { ...emptyCastle().hall, beams: 12, fittings: 6 }, goods: { beams: 16, fittings: 8, hangings: 0 } });
+    expect(goodRoom(full.castle, 'beams')).toBe(0);
+    expect(goodRoom(full.castle, 'fittings')).toBe(0);
+  });
+});
+
+// ---- The feast and the finish ----
+
+const gap = (a: { x: number; y: number }, b: { x: number; y: number }): number => Math.hypot(a.x - b.x, a.y - b.y);
+const ALL_TOWERS = { nw: FULL_TOWER, ne: FULL_TOWER, se: FULL_TOWER, sw: FULL_TOWER };
+const ALL_DONE_DAYS = { road: 3, frames: 2, 'wall-north': 2, 'wall-east': 2, 'wall-south': 2, 'wall-west': 2, 'tower-nw': 4, 'tower-ne': 4, 'tower-se': 4, 'tower-sw': 4, gatehouse: 5, moat: 20, hall: 6 };
+const WHOLE_FEAST = { ...NEEDS.feast };
+/** Every section built, the moat dug on day 20, and the survivor on the hills with the bag holding the food given. */
+const feastReady = (castle: Partial<GameState['castle']> = {}, food: Partial<ReturnType<typeof emptyFood>> = {}, changes: Partial<GameState> = {}): GameState =>
+  built({
+    frames: NEEDS.frames, wall: ALL_WALL, towers: ALL_TOWERS, gatehouse: NEEDS.gatehouse, moat: { stretches: NEEDS.moat, lastDugDay: 20, dugDay: 20 },
+    hall: FULL_HALL, doneDays: ALL_DONE_DAYS, ...castle
+  }, { day: 34, progress: { ...built().progress, workshop: { ...built().progress.workshop, stoneCart: true, portcullis: true } }, inventory: { ...game.inventory, stone: 0, wood: 0, food: { ...emptyFood(), ...food } }, ...changes });
+const atTable = (state: GameState): GameState => standAt(state, 'table');
+const setDown = (state: GameState) => applyAction(state, { type: 'castleWork', site: 'table' });
+
+describe('the feast: when the table opens', () => {
+  it('names the sections, finished and unfinished, and says when every other one is done', () => {
+    expect(everyOtherSectionDone(feastReady())).toBe(true);
+    expect(everyOtherSectionDone(feastReady({ gatehouse: 29 }))).toBe(false);
+    expect(everyOtherSectionDone(feastReady({ hall: { ...FULL_HALL, hangings: 1 } }))).toBe(false);
+    expect(everyOtherSectionDone(feastReady({ towers: { ...ALL_TOWERS, se: { ...FULL_TOWER, fittings: 1 } } }))).toBe(false);
+    expect(everyOtherSectionDone(feastReady({ moat: { stretches: 15, lastDugDay: 20, dugDay: null } }))).toBe(false);
+    expect(everyOtherSectionDone(feastReady({ wall: { ...ALL_WALL, west: 29 } }))).toBe(false);
+    expect(everyOtherSectionDone(feastReady({ road: 29 }))).toBe(false);
+    const noCart = feastReady();
+    expect(everyOtherSectionDone({ ...noCart, progress: { ...noCart.progress, workshop: { ...noCart.progress.workshop, stoneCart: false } } })).toBe(false);
+  });
+
+  it('opens the table only then, and the table asks for the first food that is still wanted', () => {
+    expect(siteNeed(feastReady({ gatehouse: 29 }), 'table')).toBeNull();
+    expect(castleSpots(feastReady({ gatehouse: 29 })).map(spot => spot.site)).not.toContain('table');
+    expect(siteNeed(feastReady(), 'table')).toEqual({ kind: 'food', item: 'bread' });
+    expect(castleSpots(feastReady()).map(spot => spot.site)).toEqual(['table']);
+  });
+
+  it('counts a moat fully dug and still empty as done', () => {
+    const dry = feastReady({ moat: { stretches: NEEDS.moat, lastDugDay: 34, dugDay: 34 } });
+    expect(moatFill(dry)).toBe(0);
+    expect(everyOtherSectionDone(dry)).toBe(true);
+    expect(siteNeed(dry, 'table')).not.toBeNull();
+  });
+
+  it('stays hidden until the line of stones has shown', () => {
+    const hidden = feastReady({ revealedDay: null });
+    expect(castleSpots(hidden)).toEqual([]);
+    expect(castleWorkBlocker(atTable(feastReady()), 'table')).not.toBeNull();
+    expect(castleWorkBlocker({ ...atTable(feastReady()), castle: { ...feastReady().castle, revealedDay: null } }, 'table')).toBe('There is nothing to build here yet.');
+  });
+
+  it('is open no longer once the castle is finished', () => {
+    const finished = feastReady({ feast: WHOLE_FEAST, finishedDay: 34 });
+    expect(castleFinished(finished)).toBe(true);
+    expect(castleFinished(feastReady())).toBe(false);
+    expect(siteNeed(finished, 'table')).toBeNull();
+    expect(castleSpots(finished)).toEqual([]);
+  });
+});
+
+describe('the feast: setting food down', () => {
+  const stocked = (extra: Partial<ReturnType<typeof emptyFood>> = {}, castle: Partial<GameState['castle']> = {}, changes: Partial<GameState> = {}): GameState =>
+    atTable(feastReady(castle, { bread: [30, 31], roastedHazelnuts: 1, honey: 2, apple: [33], vegetables: 5, ...extra }, changes));
+
+  it('sets down one of the first food the table wants that the bag holds, in the order of the feast', () => {
+    let state = stocked();
+    const seen: string[] = [];
+    for (let go = 0; go < 4; go++) {
+      const before = state;
+      const result = setDown(state);
+      state = result.state;
+      seen.push(Object.entries(NEEDS.feast).filter(([item]) => state.castle.feast[item as keyof typeof NEEDS.feast] > before.castle.feast[item as keyof typeof NEEDS.feast]).map(([item]) => item).join());
+    }
+    expect(seen).toEqual(['bread', 'bread', 'roastedHazelnuts', 'honey']);
+    expect(state.castle.feast).toEqual({ bread: 2, roastedHazelnuts: 1, honey: 1, apple: 0, vegetables: 0 });
+  });
+
+  it('spends the food from the bag only, and not from the larder', () => {
+    const state = stocked({ bread: [31] }, {}, { larder: { ...emptyFood(), bread: [30, 30, 30], honey: 4 }, structures: { ...feastReady().structures, larder: true } });
+    const first = setDown(state).state;
+    expect(first.inventory.food.bread).toEqual([]);
+    expect(first.larder.bread).toEqual([30, 30, 30]);
+    const second = setDown(first).state;
+    expect(second.castle.feast).toMatchObject({ bread: 1, roastedHazelnuts: 1 });
+    expect(second.larder).toEqual(first.larder);
+    expect(foodCount(second.inventory.food, 'roastedHazelnuts')).toBe(0);
+  });
+
+  it('spends the oldest fresh piece first, and takes a go of time and a little energy', () => {
+    const state = stocked();
+    const result = setDown(state);
+    expect(result.state.inventory.food.bread).toEqual([31]);
+    expect(result.state.player.energy).toBeLessThan(state.player.energy);
+    expect(result.state.timeOfDay).toBeGreaterThan(state.timeOfDay);
+  });
+
+  it('leaves a food the table has all it wants of in the bag', () => {
+    const state = stocked({ bread: [31], roastedHazelnuts: 0, honey: 0, vegetables: 0, apple: [33] }, { feast: { ...NEEDS.feast, roastedHazelnuts: 0, honey: 0, vegetables: 0, bread: NEEDS.feast.bread - 1 } });
+    const result = setDown(state);
+    expect(result.state.castle.feast.bread).toBe(NEEDS.feast.bread);
+    expect(result.state.inventory.food.apple).toEqual([33]);
+    const again = setDown(result.state);
+    expect(again.message).toBe(`The table still wants roasted hazelnuts, honey and vegetables.`);
+  });
+
+  it('names what the table still wants in the prompt, whether it can be fed or not', () => {
+    const fed = stocked();
+    expect(castlePrompt(fed, spotOf(fed, 'table'))).toBe('Set down a loaf (the table still wants bread, roasted hazelnuts, honey, apples and vegetables)');
+    const short = stocked({ bread: [], roastedHazelnuts: 0, honey: 0, apple: [], vegetables: 0 }, { feast: { ...NEEDS.feast, bread: 1, honey: 1 } });
+    expect(castlePrompt(short, spotOf(short, 'table'))).toBe('Table · bring bread and honey');
+  });
+
+  it('is the survivor\'s choice at the table, by key and by tap, with the keep\'s door out of reach', () => {
+    const state = stocked();
+    expect(gap(state.player, KEEP_SITE)).toBeGreaterThan(BALANCE.interactionRadius);
+    expect(nearestCastleSpot(state)?.site).toBe('table');
+    expect(useKeyAction(state)).toEqual({ type: 'castleWork', site: 'table' });
+    expect(promptFor(state).startsWith('E  Set down a loaf')).toBe(true);
+    expect(targetAction(pickTapTarget(state, state.player.x, state.player.y))).toEqual({ type: 'castleWork', site: 'table' });
+  });
+
+  it('says which food is short, and spends nothing, when none that is wanted is in the bag', () => {
+    const state = stocked({ bread: [], roastedHazelnuts: 0, honey: 0, apple: [33], vegetables: 5 }, { feast: { ...NEEDS.feast, bread: 0, honey: 0 } });
+    expect(castleWorkBlocker(state, 'table')).toBe('The table still wants bread and honey.');
+    const refused = setDown(state);
+    expect(refused.message).toBe('The table still wants bread and honey.');
+    expect(refused.state).toBe(state);
+    expect(useKeyAction(state)?.type).not.toBe('castleWork');
+  });
+
+  it('names every food when the table has none yet and the bag is empty', () => {
+    const bare = atTable(feastReady());
+    expect(setDown(bare).message).toBe('The table still wants bread, roasted hazelnuts, honey, apples and vegetables.');
+  });
+
+  it('refuses a tired survivor with the usual line and spends nothing', () => {
+    const state = stocked();
+    const tired = { ...state, player: { ...state.player, energy: 0 } };
+    expect(setDown(tired).message).toBe(TOO_TIRED_MESSAGE);
+    expect(setDown(tired).state).toBe(tired);
+  });
+
+  it('refuses from afar, in the usual way', () => {
+    const state = { ...stocked(), player: { ...stocked().player, x: 15, y: 12 } };
+    expect(setDown(state).message).toBe('Move closer to the table.');
+    expect(setDown(state).state).toBe(state);
+  });
+
+  it('keeps set-down food counted on the castle, safe from spoiling and not to be taken back', () => {
+    let state = stocked({ bread: [30, 31, 32, 33], apple: [33] });
+    for (let go = 0; go < 4; go++) state = setDown(state).state;
+    expect(state.castle.feast.bread).toBe(4);
+    expect(state.inventory.food.bread).toEqual([]);
+    expect(spoil(state.inventory.food, state.day + 100, BALANCE.larderFreshDays).lost.bread).toBe(0);
+    const later = { ...state, day: state.day + 100 };
+    expect(later.castle.feast.bread).toBe(4);
+    expect(applyAction(state, { type: 'takeFood', item: 'bread' }).state.castle.feast).toEqual(state.castle.feast);
+    expect(applyAction(state, { type: 'eat', item: 'bread' }).state.castle.feast).toEqual(state.castle.feast);
+  });
+
+  it('plays dust where the survivor laid', () => {
+    const state = stocked();
+    expect(actionEffect({ type: 'castleWork', site: 'table' }, setDown(state).state)).toEqual({ kind: 'dust', x: state.player.x, y: state.player.y });
+  });
+
+  it('sits at the hall, clear of the keep door and every other site\'s reach', () => {
+    const table = spotOf(feastReady(), 'table');
+    expect(table.area).toBe('hills');
+    expect(table.x).toBeGreaterThan(HALL_SPOT.x - 1);
+    expect(table.x).toBeLessThan(HALL_SPOT.x + 3);
+    expect(table.y).toBeGreaterThan(HALL_SPOT.y - 2);
+    expect(table.y).toBeLessThan(HALL_SPOT.y + 2);
+    expect(gap(table, KEEP_SITE)).toBeGreaterThan(BALANCE.interactionRadius * 2);
+    expect(gap(table, OUTCROP_SITE)).toBeGreaterThan(BALANCE.interactionRadius * 2);
+    expect(gap(table, HILLS_EXIT)).toBeGreaterThan(BALANCE.interactionRadius * 2);
+  });
+});
+
+describe('the feast: prompt, key and tap agree around the table, the hall and the keep', () => {
+  const sweepTable = (state: GameState): { table: number; keep: number } => {
+    const count = { table: 0, keep: 0 };
+    for (let x = 14; x <= 27; x += 0.25) for (let y = 4; y <= 14; y += 0.25) {
+      const there = { ...state, player: { ...state.player, x, y } };
+      const nearest = nearestCastleSpot(there);
+      const where = `${x},${y}`;
+      const reach = nearest !== null && gap(there.player, nearest) <= BALANCE.interactionRadius;
+      if (gap(there.player, KEEP_SITE) <= BALANCE.interactionRadius) {
+        expect(useKeyAction(there), where).toEqual({ type: 'enterKeep' });
+        count.keep++;
+        continue;
+      }
+      if (!reach) {
+        expect(useKeyAction(there)?.type, where).not.toBe('castleWork');
+        continue;
+      }
+      count.table++;
+      expect(nearest.site, where).toBe('table');
+      expect(targetAction(pickTapTarget(there, nearest.x, nearest.y)), where).toEqual({ type: 'castleWork', site: 'table' });
+      expect(promptFor(there), where).toContain(castlePrompt(there, nearest));
+      if (castleWorkBlocker(there, 'table') === null) expect(useKeyAction(there), where).toEqual({ type: 'castleWork', site: 'table' });
+      else expect(useKeyAction(there)?.type, where).not.toBe('castleWork');
+    }
+    return count;
+  };
+
+  it('agrees with food in the bag, with none, and with a tired survivor, in summer and in winter', () => {
+    for (const day of [34, 44]) {
+      for (const food of [{ bread: [day - 1], honey: 1 }, {}]) {
+        const count = sweepTable(feastReady({}, food, { day }));
+        expect(count.table, `day ${day}`).toBeGreaterThan(0);
+        expect(count.keep).toBeGreaterThan(0);
+      }
+      const tired = feastReady({}, { bread: [day - 1] }, { day });
+      sweepTable({ ...tired, player: { ...tired.player, energy: 0 } });
+    }
+  }, 30000);
+
+  it('lets the survivor reach the table from the hall\'s own doorstep', () => {
+    const state = { ...feastReady({}, { bread: [33] }), player: { ...feastReady().player, x: HALL_SPOT.x, y: HALL_SPOT.y } };
+    expect(nearestCastleSpot(state)?.site).toBe('table');
+    expect(useKeyAction(state)).toEqual({ type: 'castleWork', site: 'table' });
+  });
+});
+
+describe('the finish', () => {
+  const almost = (): GameState => atTable(feastReady({ feast: { ...NEEDS.feast, vegetables: NEEDS.feast.vegetables - 1 } }, { vegetables: 2 }));
+
+  it('sets finishedDay with the last dish, and says so plainly', () => {
+    const before = almost();
+    const result = setDown(before);
+    expect(result.message).toBe('You set down the last dish. The castle is finished.');
+    expect(result.state.castle.finishedDay).toBe(before.day);
+    expect(result.state.castle.feast).toEqual(WHOLE_FEAST);
+    expect(castleFinished(result.state)).toBe(true);
+    expect(foodCount(result.state.inventory.food, 'vegetables')).toBe(1);
+  });
+
+  it('does not finish on any dish before the last', () => {
+    let state = atTable(feastReady({}, { bread: [30, 31, 32, 33], roastedHazelnuts: 4, honey: 3, apple: [31, 32, 33], vegetables: 4 }));
+    const total = Object.values(NEEDS.feast).reduce((sum, count) => sum + count, 0);
+    for (let go = 1; go < total; go++) {
+      state = setDown(state).state;
+      expect(state.castle.finishedDay, `dish ${go}`).toBeNull();
+    }
+    const last = setDown(state);
+    expect(last.state.castle.finishedDay).toBe(state.day);
+    expect(last.message).toBe('You set down the last dish. The castle is finished.');
+  });
+
+  it('is a plain finished table afterwards, taking nothing', () => {
+    const done = setDown(almost()).state;
+    expect(castleWorkBlocker(done, 'table')).toBe('The castle is finished.');
+    expect(setDown(done).state).toBe(done);
+  });
+
+  it('leaves a morning note once, the day after', () => {
+    const done = setDown(almost()).state;
+    const morning = { ...done, day: done.day + 1 };
+    expect(castleNews(done, morning)).toEqual(['The castle stands finished. At night the hall windows glow.']);
+    expect(castleNews(morning, { ...morning, day: morning.day + 1 })).toEqual([]);
+    expect(castleNews(done, done)).toEqual([]);
+    expect(newsBetween(done, morning)).toContain('The castle stands finished. At night the hall windows glow.');
+    expect(castleNews(almost(), { ...almost(), day: almost().day + 1 })).toEqual([]);
+  });
+
+  it('writes nothing about anything after it, in any line it can show', () => {
+    const lines = [
+      ...Object.values(JOURNAL_PAGES).flat().filter(entry => entry.id.startsWith('castle')).flatMap(entry => entry.lines),
+      setDown(almost()).message, 'The castle stands finished. At night the hall windows glow.', setDown(atTable(feastReady())).message
+    ];
+    for (const line of lines) {
+      expect(line, line).not.toMatch(/town|palace|village|next|another|more to|begin again|beyond|ahead|new goal/i);
+      expect(line, line).not.toContain('!');
+    }
+  });
+});
+
+describe('the hall at night once the castle is finished', () => {
+  const NIGHT = 190;
+  const finished = (changes: Partial<GameState> = {}): GameState => feastReady({ feast: WHOLE_FEAST, finishedDay: 34 }, {}, { timeOfDay: NIGHT, ...changes });
+  const glow = (state: GameState) => sceneVisuals(state, 0).find(visual => visual.id === 'castle-hall-glow');
+
+  it('is lit whether or not anyone is in, wherever on the hills the survivor stands', () => {
+    expect(hallWindowGlow(finished())).not.toBeNull();
+    expect(hallWindowGlow(finished({ player: { ...finished().player, x: 14, y: 14 } }))).not.toBeNull();
+    expect(hallWindowGlow(finished({ player: { ...finished().player, x: 21, y: 9 } }))).not.toBeNull();
+    expect(glow(finished())?.texture).toBe('castleHallGlow:lit');
+    expect(glow(finished({ player: { ...finished().player, x: 30, y: 15 } }))?.texture).toBe('castleHallGlow:lit');
+  });
+
+  it('is dark by day, before the finish, in winter snow too, and away from the hills', () => {
+    expect(hallWindowGlow(finished({ timeOfDay: 40 }))).toBeNull();
+    expect(glow(finished({ timeOfDay: 40 }))).toBeUndefined();
+    const unfinished = feastReady({ feast: { ...NEEDS.feast, vegetables: 0 } }, {}, { timeOfDay: NIGHT });
+    expect(hallWindowGlow(unfinished)).toBeNull();
+    expect(glow(unfinished)).toBeUndefined();
+    expect(hallWindowGlow({ ...finished(), area: 'quarry' })).toBeNull();
+    expect(glow({ ...finished(), area: 'camp' })).toBeUndefined();
+    expect(glow(finished({ day: 44 }))?.texture).toBe('castleHallGlow:lit');
+  });
+
+  it('draws its light inside the hall\'s picture, over the window between the iron bars', () => {
+    const def = castleSprites.castleHallGlow;
+    expect(def.size).toEqual(castleSprites.castleHall.size);
+    expect(def.anchor).toEqual(castleSprites.castleHall.anchor);
+    expect(def.frames.lit.some(row => row.trim() !== '' && /[^.\s]/.test(row))).toBe(true);
+    const lit = def.frames.lit.flatMap((row, y) => [...row].map((pixel, x) => ({ pixel, x, y }))).filter(({ pixel }) => pixel !== '.' && pixel !== ' ');
+    expect(lit.length).toBeGreaterThan(0);
+    for (const { x, y } of lit) {
+      expect(x).toBeGreaterThanOrEqual(36);
+      expect(x).toBeLessThanOrEqual(41);
+      expect(y).toBeGreaterThanOrEqual(34);
+      expect(y).toBeLessThanOrEqual(43);
+    }
+    expect(HALL_WINDOW_OFFSET.x).toBeGreaterThan(0);
+    expect(HALL_WINDOW_OFFSET.y).toBeLessThan(0);
+  });
+});
+
+describe('the journal: each castle moment appears only once it happens', () => {
+  const doneIds = (before: GameState, after: GameState, action?: GameAction): string[] =>
+    recordJournal(before, after, action).state.journal.filter(entry => entry.id.startsWith('castle') && !entry.id.startsWith('castleLine')).map(entry => entry.id);
+  const lineOf = (before: GameState, after: GameState, action?: GameAction): string | undefined => {
+    const written = recordJournal(before, after, action).state.journal.find(entry => entry.id.startsWith('castle') && !entry.id.startsWith('castleLine'));
+    return written && journalEntry(written.id)?.lines[written.variant];
+  };
+  const spring = { day: 22 };
+  const lay = (state: GameState, site: string): GameState => doWork(standAt(state, site), site).state;
+
+  it('writes the road\'s on the last road stone, and not on any before', () => {
+    const before = standAt(built({ road: 29, doneDays: {} }, { ...spring, inventory: { ...game.inventory, stone: 2 } }), 'road');
+    const after = lay(before, 'road');
+    expect(after.castle.road).toBe(30);
+    expect(doneIds(before, after, { type: 'castleWork', site: 'road' })).toEqual(['castleRoadSpring']);
+    expect(lineOf(before, after, { type: 'castleWork', site: 'road' })).toBe('Laid the last stone of the road from the quarry to the keep.');
+    const early = standAt(built({ road: 10, doneDays: {} }, { ...spring, inventory: { ...game.inventory, stone: 2 } }), 'road');
+    expect(doneIds(early, lay(early, 'road'), { type: 'castleWork', site: 'road' })).toEqual([]);
+  });
+
+  it('writes the wall\'s when the fourth side is done, not the first', () => {
+    const state = (west: number, east: number) => standAt(framesUp({ wall: { north: 30, south: 30, east, west } }, { ...spring, inventory: { ...game.inventory, stone: 3 } }), 'wall-west');
+    const first = state(29, 29);
+    expect(doneIds(first, lay(first, 'wall-west'), { type: 'castleWork', site: 'wall-west' })).toEqual([]);
+    const last = state(29, 30);
+    expect(doneIds(last, lay(last, 'wall-west'), { type: 'castleWork', site: 'wall-west' })).toEqual(['castleWallSpring']);
+    expect(lineOf(last, lay(last, 'wall-west'), { type: 'castleWork', site: 'wall-west' })).toBe('The curtain wall is closed all the way round.');
+  });
+
+  it('writes the towers\' when the fourth is finished, not the first', () => {
+    const almostTower = { ...FULL_TOWER, fittings: NEEDS.towerFittings - 1 };
+    const goods = { beams: 0, fittings: 1, hangings: 0 };
+    const state = (others: Tower) => standAt(wallsUp({ towers: { nw: others, ne: others, se: FULL_TOWER, sw: almostTower }, goods }, { ...spring }), 'tower-sw');
+    const notYet = state({ ...FULL_TOWER, fittings: 0 });
+    expect(doneIds(notYet, lay(notYet, 'tower-sw'), { type: 'castleWork', site: 'tower-sw' })).toEqual([]);
+    const last = state(FULL_TOWER);
+    expect(doneIds(last, lay(last, 'tower-sw'), { type: 'castleWork', site: 'tower-sw' })).toEqual(['castleTowersSpring']);
+    expect(lineOf(last, lay(last, 'tower-sw'), { type: 'castleWork', site: 'tower-sw' })).toBe('All four towers have their roofs.');
+  });
+
+  it('writes the gatehouse\'s on its last stone', () => {
+    const state = standAt(wallsUp({ gatehouse: 29 }, { ...spring, inventory: { ...game.inventory, stone: 2 }, progress: { ...wallsUp().progress, workshop: { ...wallsUp().progress.workshop, portcullis: true } } }), 'gatehouse');
+    const mid = standAt(wallsUp({ gatehouse: 10 }, { ...spring, inventory: { ...game.inventory, stone: 2 }, progress: state.progress }), 'gatehouse');
+    expect(doneIds(mid, lay(mid, 'gatehouse'), { type: 'castleWork', site: 'gatehouse' })).toEqual([]);
+    expect(doneIds(state, lay(state, 'gatehouse'), { type: 'castleWork', site: 'gatehouse' })).toEqual(['castleGatehouseSpring']);
+    expect(lineOf(state, lay(state, 'gatehouse'), { type: 'castleWork', site: 'gatehouse' })).toBe('The gatehouse is up, and the portcullis works.');
+  });
+
+  it('writes the moat full on the dawn the rain has filled it, never on the day it was dug', () => {
+    const dug = feastReady({ moat: { stretches: NEEDS.moat, lastDugDay: 5, dugDay: 5 } }, {}, { day: 22 });
+    const full = { ...dug, day: 31 };
+    expect(moatFill(dug)).toBeLessThan(1);
+    expect(moatFill(full)).toBe(1);
+    expect(doneIds(dug, full)).toEqual(['castleMoatFullSummer']);
+    expect(lineOf(dug, full)).toBe('Rain filled the moat. There is water all the way round.');
+    expect(doneIds(dug, { ...dug, day: 25 })).toEqual([]);
+    expect(doneIds(full, { ...full, day: 32 })).toEqual([]);
+    const justDug = feastReady({ moat: { stretches: NEEDS.moat, lastDugDay: 5, dugDay: 5 } }, {}, { day: 5 });
+    expect(doneIds({ ...justDug, castle: { ...justDug.castle, moat: { stretches: 15, lastDugDay: 4, dugDay: null } } }, justDug)).toEqual([]);
+    const notDug = feastReady({ moat: { stretches: 3, lastDugDay: 20, dugDay: null } }, {}, { day: 30 });
+    expect(doneIds(notDug, { ...notDug, day: 31 })).toEqual([]);
+  });
+
+  it('writes the feast\'s on the first dish and the finish\'s on the last, each once', () => {
+    const first = atTable(feastReady({}, { bread: [33] }, spring));
+    const laid = setDown(first).state;
+    expect(doneIds(first, laid, { type: 'castleWork', site: 'table' })).toEqual(['castleFeastSpring']);
+    expect(lineOf(first, laid, { type: 'castleWork', site: 'table' })).toBe('Set the first dish on the table in the great hall.');
+    const second = setDown({ ...laid, inventory: { ...laid.inventory, food: { ...laid.inventory.food, bread: [33] } } }).state;
+    expect(doneIds(laid, second, { type: 'castleWork', site: 'table' })).toEqual([]);
+    const almost = atTable(feastReady({ feast: { ...NEEDS.feast, honey: 2 } }, { honey: 1 }, spring));
+    const done = setDown(almost).state;
+    expect(done.castle.finishedDay).toBe(22);
+    expect(doneIds(almost, done, { type: 'castleWork', site: 'table' })).toEqual(['castleFinishedSpring']);
+    expect(lineOf(almost, done, { type: 'castleWork', site: 'table' })).toBe('Set down the last dish. The castle is finished.');
+    const [twice] = [recordJournal(almost, done, { type: 'castleWork', site: 'table' }).state];
+    expect(recordJournal(almost, done, { type: 'castleWork', site: 'table' }).state.journal).toEqual(twice.journal);
+  });
+
+  it.each([[2, 'Autumn'], [12, 'Winter'], [22, 'Spring'], [32, 'Summer']])('writes each on its own season\'s page, day %i', (day, name) => {
+    const state = atTable(feastReady({}, { bread: [day] }, { day }));
+    expect(doneIds(state, setDown(state).state, { type: 'castleWork', site: 'table' })).toEqual([`castleFeast${name}`]);
+  });
+
+  it('never shows a blank for any of them before it happens, and a line once it is written', () => {
+    for (const day of [2, 12, 22, 32]) {
+      const page = Math.floor((day - 1) / 10);
+      const ready = feastReady({}, {}, { day });
+      const plain = { ...ready, castle: emptyCastle() };
+      expect(journalPageView(ready, page).blanks, `day ${day}`).toBe(journalPageView(plain, page).blanks);
+      expect(journalPageView(ready, page).entries).toHaveLength(journalPageView(plain, page).entries.length);
+    }
+    const state = atTable(feastReady({}, { bread: [22] }, spring));
+    const written = recordJournal(state, setDown(state).state, { type: 'castleWork', site: 'table' }).state;
+    const view = journalPageView(written, 2);
+    expect(view.entries.map(entry => entry.line)).toContain('Set the first dish on the table in the great hall.');
+    expect(view.blanks).toBe(journalPageView({ ...written, castle: emptyCastle(), journal: written.journal.filter(entry => !entry.id.startsWith('castle')) }, 2).blanks);
+  });
+
+  it('gives every one a picture and a line, with no mention of anything after the castle', () => {
+    const ids = Object.values(JOURNAL_PAGES).flat().map(entry => entry.id).filter(id => /^castle(Road|Wall|Towers|Gatehouse|MoatFull|Feast|Finished)/.test(id));
+    expect(ids).toHaveLength(28);
+    for (const id of ids) {
+      expect(JOURNAL_ICONS[id], id).toBeDefined();
+      expect(journalEntry(id)?.lines[0], id).toBeTruthy();
+    }
   });
 });

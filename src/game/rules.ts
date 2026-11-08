@@ -1387,13 +1387,16 @@ const makeUpgrade: ActionHandler<'makeUpgrade'> = (state, action) => {
   };
 };
 
-/** Beams from the workshop and fittings from the forge, made at camp for the castle: they count from anywhere. */
+/** Beams from the workshop, fittings from the forge and hangings from the loom, made at camp for the castle: they count from anywhere. */
 const makeCastleGood: ActionHandler<'makeCastleGood'> = (state, action) => {
   const blocker = goodBlocker(state, action.good);
   if (blocker) return refuse(state, blocker);
   const { good } = action;
-  if (good === 'hangings') return refuse(state, 'Hangings are made at the loom.');
   const made = goodBatch(state.castle, good);
+  if (good === 'hangings') {
+    const woven = { ...state, sheep: { ...state.sheep, wool: state.sheep.wool - GOODS.hangings.wool }, castle: { ...state.castle, goods: { ...state.castle.goods, hangings: state.castle.goods.hangings + made } } };
+    return { state: advanceTime({ ...woven, player: tire(state, BALANCE.buildEnergyCost) }, workSeconds(state, BALANCE.buildSeconds), 'working'), message: 'You wove a hanging for the hall.' };
+  }
   const cost: { wood: number; ore?: number } = GOODS[good].cost;
   return {
     state: payAndBuild(spendOre(state, cost.ore ?? 0), { wood: cost.wood, fiber: 0, stone: 0 }, {

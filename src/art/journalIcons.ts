@@ -1,4 +1,4 @@
-import type { JournalId } from '../game/journalEntries';
+import type { CastleJournalId, JournalId } from '../game/journalEntries';
 import { palette, type PaletteKey } from './palette';
 
 // The year journal's little pictures, drawn in the game's own palette so they look the same on every machine.
@@ -47,7 +47,27 @@ const castleLineIcon = (grass: PaletteKey, mark: PaletteKey, top: string): Journ
   rows: [top, '....bb....', '....bd....', 'ssssssssss', 'ssssssssss', 's.b.bb.b.s', 'ssssssssss', 'ssssssssss', 'sstssssts.', '..........']
 });
 
+/** The castle's moments in pictures: a small scene for each, with a touch of the season in the top row. */
+const CASTLE_SCENES = {
+  castleRoad: ['..........', '..........', '..........', 'bb.bb.bb..', 'bbbbbbbbbb', '.dbbdbbdb.', '..........', '..........', '..........'],
+  castleWall: ['..........', '..........', 'b.b.b.b.b.', 'bbbbbbbbbb', 'bdbbbdbbbd', 'bbbbbbbbbb', 'bbdbbbbdbb', '..........', '..........'],
+  castleTowers: ['..b.....b.', '.bbb...bbb', '.bbb...bbb', '.bdb...bdb', '.bbb...bbb', '.bbb...bbb', '.bdb...bdb', 'bbbb..bbbb', '..........'],
+  castleGatehouse: ['..........', '.bbbbbbbb.', '.bbbbbbbb.', '.bb.dd.bb.', '.bb.dd.bb.', '.bb.dd.bb.', '.bb.dd.bb.', '..........', '..........'],
+  castleMoatFull: ['..........', '..........', 'bbbbbbbbbb', 'bdbbbbbbdb', 'wwwwwwwwww', 'wvwwwwvwww', 'wwwwwwwwww', '..........', '..........'],
+  castleFeast: ['..........', '..........', '..y..y....', '.rrrrrrrr.', '.kkkkkkkk.', '..k....k..', '..k....k..', '..........', '..........'],
+  castleFinished: ['..y.b.y...', '..bbbbb...', '..bdbdb...', '..bbbbb...', '.bbbbbbb..', '.bbydybb..', '.bbbdbbb..', '..........', '..........']
+} as const;
+const CASTLE_SEASONS = { Autumn: ['fox3', '.......x..'], Winter: ['paper', '.x.....x..'], Spring: ['flower1', '.x........'], Summer: ['flower3', 'x........x'] } as const;
+const castleMomentIcon = (moment: keyof typeof CASTLE_SCENES, season: keyof typeof CASTLE_SEASONS): JournalIcon => ({
+  legend: { x: CASTLE_SEASONS[season][0], b: 'stone2', d: 'stone0', w: 'storm', v: 'frost', y: 'scarf3', r: 'berry2', k: 'wood1' },
+  rows: [CASTLE_SEASONS[season][1], ...CASTLE_SCENES[moment]]
+});
+const castleMomentIcons: Record<CastleJournalId, JournalIcon> = Object.fromEntries(
+  (Object.keys(CASTLE_SEASONS) as (keyof typeof CASTLE_SEASONS)[]).flatMap(season => (Object.keys(CASTLE_SCENES) as (keyof typeof CASTLE_SCENES)[]).map(moment => [`${moment}${season}`, castleMomentIcon(moment, season)]))
+) as Record<CastleJournalId, JournalIcon>;
+
 export const JOURNAL_ICONS: Record<JournalId, JournalIcon> = {
+  ...castleMomentIcons,
   keepViewAutumn: keepViewIcon('fox1', 'fox3', '.......t..'),
   keepViewWinter: keepViewIcon('frost', 'paper', '.t.....t..'),
   keepViewSpring: keepViewIcon('leaf2', 'flower1', '.t........'),

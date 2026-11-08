@@ -202,6 +202,94 @@ for (let step = 1; step <= 12; step++) {
   towerFrames[`${step}s`] = g => tower(g, step, true);
 }
 
+const HALL_W = 56;
+const HALL_H = 60;
+const HALL_BASE = 56;
+/** The hall's door, in pixels from the picture's corner: its front is the picture's anchor, which stands on the spot the survivor works from. */
+export const HALL_DOOR = { x: 10, y: HALL_BASE - 16, w: 12, h: 17 };
+/** How high the hall walls stand at each of its six stone steps, in pixels. */
+const HALL_HEIGHT = [0, 5, 10, 16, 22, 26, 30];
+const HALL_ROOF = 18;
+/** The pictures of the hall: five for its stones, one for the finished walls, three for the beams, two for the iron and two for the hangings. */
+export const HALL_STEPS = 13;
+
+const hallLegend: Record<string, PaletteKey> = { ...buildLegend, r: 'berry2', R: 'berry1', y: 'scarf3' };
+
+/** A hall hanging: a rod, a length of red wool with a gold edge, and a fringe. */
+function hanging(g: Grid, x: number, top: number): void {
+  box(g, x - 1, top, 8, 1, 'i');
+  box(g, x, top + 1, 6, 13, 'r');
+  box(g, x, top + 1, 1, 13, 'R');
+  box(g, x + 5, top + 1, 1, 13, 'R');
+  box(g, x, top + 11, 6, 1, 'y');
+  for (let fringe = 0; fringe < 6; fringe += 2) dot(g, x + fringe, top + 14, 'y');
+}
+
+/** The roof over the hall's walls: bare trusses as the beams are set, planked once all twelve are up, then bound with iron. */
+function hallRoof(g: Grid, beams: number, fittings: number, winter: boolean): void {
+  const eaves = HALL_BASE - HALL_HEIGHT[6];
+  const apex = eaves - HALL_ROOF;
+  const inset = (row: number): number => 1 + Math.round(8 * (HALL_ROOF - 1 - row) / (HALL_ROOF - 1));
+  box(g, 0, eaves - 1, HALL_W, 2, 't');
+  if (beams < 3) {
+    for (const x of [28, 14, 42].slice(0, beams)) box(g, x, apex, 1, HALL_ROOF, 'q');
+    if (beams >= 2) box(g, inset(0), apex, HALL_W - inset(0) * 2, 1, 'u');
+  } else {
+    for (let row = 0; row < HALL_ROOF; row++) {
+      const left = inset(row);
+      box(g, left, apex + row, HALL_W - left * 2, 1, row % 4 === 3 ? 't' : 'u');
+      dot(g, left, apex + row, 'q');
+      dot(g, HALL_W - left - 1, apex + row, 'p');
+    }
+  }
+  if (fittings >= 1) box(g, 1, eaves - 5, HALL_W - 2, 1, 'i');
+  if (fittings >= 2) {
+    box(g, inset(0), apex - 1, HALL_W - inset(0) * 2, 1, 'i');
+    box(g, 27, apex - 4, 1, 4, 'i');
+    box(g, 26, apex - 4, 3, 1, 'y');
+  }
+  if (!winter || beams < 3) return;
+  for (let row = 0; row < HALL_ROOF; row += 3) {
+    const left = inset(row);
+    box(g, left, apex + row, HALL_W - left * 2, 1, 'W');
+  }
+}
+
+/** The great hall: walls rising stone by stone with a door in the left third, then its roof, its iron and its two hangings. */
+function hall(g: Grid, step: number, winter: boolean): void {
+  const height = HALL_HEIGHT[Math.min(step, 6)];
+  const top = HALL_BASE - height + 1;
+  box(g, 0, HALL_BASE + 1, HALL_W, 3, 'k');
+  courses(g, 0, HALL_W, HALL_BASE, height);
+  box(g, 0, top + 1, 1, height - 1, 'd');
+  box(g, HALL_W - 1, top + 1, 1, height - 1, 'a');
+  const open = Math.min(height, HALL_DOOR.h);
+  box(g, HALL_DOOR.x, HALL_BASE - open + 1, HALL_DOOR.w, open, 'k');
+  if (height > HALL_DOOR.h) box(g, HALL_DOOR.x - 1, HALL_BASE - HALL_DOOR.h, HALL_DOOR.w + 2, 1, 'e');
+  if (step >= 11) for (const row of [3, 11]) box(g, HALL_DOOR.x, HALL_DOOR.y + row, HALL_DOOR.w, 1, 'i');
+  if (height >= 26) for (const x of [36, 40]) box(g, x, HALL_BASE - 22, 2, 10, 'i');
+  if (step >= 12) hanging(g, 25, HALL_BASE - 26);
+  if (step >= 13) hanging(g, 45, HALL_BASE - 26);
+  if (step <= 6) {
+    box(g, 0, top, HALL_W, 1, step === 6 ? 'e' : 'd');
+    if (winter) box(g, 0, top, HALL_W, 2, 'W');
+    return;
+  }
+  hallRoof(g, Math.min(step - 6, 3), Math.min(Math.max(step - 9, 0), 2), winter);
+  if (winter) box(g, 0, top, HALL_W, 1, 'W');
+}
+
+const hallFrames: Record<string, (g: Grid) => void> = {};
+for (let step = 1; step <= HALL_STEPS; step++) {
+  hallFrames[`${step}`] = g => hall(g, step, false);
+  hallFrames[`${step}s`] = g => hall(g, step, true);
+}
+
+/** The hall's window at night, between its two iron bars: a pane of lamplight over the same picture as the hall, drawn on top of it. */
+function hallGlow(g: Grid): void {
+  box(g, 38, HALL_BASE - 20, 2, 6, 'y');
+}
+
 const FRAMES_W = 48;
 const FRAMES_H = 64;
 const FRAMES_BASE = 58;
@@ -416,6 +504,8 @@ export const castleSprites: Record<string, SpriteDef> = {
   castleFrames: define(FRAMES_W, FRAMES_H, frameFrames, [24, FRAMES_BASE + 1], buildLegend),
   castleWall: define(WALL_W, WALL_H, wallFrames, [8, WALL_BASE + 1], buildLegend),
   castleTower: define(TOWER_W, TOWER_H, towerFrames, [TOWER_CENTRE, TOWER_BASE + 1], buildLegend),
+  castleHall: define(HALL_W, HALL_H, hallFrames, [16, HALL_BASE + 1], hallLegend),
+  castleHallGlow: define(HALL_W, HALL_H, { lit: hallGlow }, [16, HALL_BASE + 1], hallLegend),
   castleGatehouse: define(GATE_W, GATE_H, gateFrames, [GATE_CENTRE, GATE_BASE + 1], buildLegend),
   castlePortcullis: define(PASSAGE_W, PASSAGE_H + 1, grateFrames, [PASSAGE_W / 2, 0], buildLegend),
   castleLine: define(LINE_W, LINE_H, { still }, [1, 1], legend),

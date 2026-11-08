@@ -7,6 +7,7 @@ import { palette } from '../art/palette';
 import { darkness } from './ambient';
 import { fireplaceBurning } from '../game/home';
 import { keepFinished } from '../game/keep';
+import { castleFinished } from '../game/castle';
 
 export interface LightingTint { color: number; alpha: number }
 export interface LightRadii { inner: number; middle: number; outer: number }
@@ -92,6 +93,15 @@ export function keepWindowGlow(state: GameState): LightRadii | null {
   if (state.area !== 'hills' || !keepFinished(state) || state.timeOfDay < nightStart(state.day)) return null;
   return { inner: 3, middle: 6, outer: 10 };
 }
+
+/** The great hall's lit window once the castle is finished, whether or not anyone is in, seen from anywhere on the hills at night. EASTER EGG: the castle, see src/game/castle.ts. */
+export function hallWindowGlow(state: GameState): LightRadii | null {
+  if (state.area !== 'hills' || !castleFinished(state) || state.timeOfDay < nightStart(state.day)) return null;
+  return { inner: 4, middle: 8, outer: 13 };
+}
+
+/** Where the hall's light sits, in world pixels from the hall's door spot: the window between the iron bars, 23 across and 18 up. */
+export const HALL_WINDOW_OFFSET = { x: 23, y: -18 } as const;
 
 /** Where the keep's light sits, in world pixels from the door: the middle window, straight up the wall. */
 export const KEEP_WINDOW_OFFSET = { x: 0, y: -65 } as const;

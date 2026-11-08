@@ -1,4 +1,5 @@
 import { inKeep } from './keep';
+import { NEEDS, TOWERS, moatFill, towerFinished, wallFinished } from './castle';
 import { duskLength, nightStart, season, seasonMessage, yearOf, type Season } from './calendar';
 import { defaultDish, type DishId } from './cooking';
 import { keepsakeStock } from './companion';
@@ -25,9 +26,26 @@ export type JournalId =
   | 'hillsAutumn' | 'hillsWinter' | 'hillsSpring' | 'hillsSummer'
   | 'keepViewAutumn' | 'keepViewWinter' | 'keepViewSpring' | 'keepViewSummer'
   | 'keepFinishedAutumn' | 'keepFinishedWinter' | 'keepFinishedSpring' | 'keepFinishedSummer'
-  | 'castleLineAutumn' | 'castleLineWinter' | 'castleLineSpring' | 'castleLineSummer'
+  | 'castleLineAutumn' | 'castleLineWinter' | 'castleLineSpring' | 'castleLineSummer' | CastleJournalId
   | 'autumnKeepsake' | 'winterKeepsake' | 'springKeepsake' | 'summerKeepsake'
   | 'namedAutumn' | 'namedWinter' | 'namedSpring' | 'namedSummer';
+
+/** What the castle's progress leaves in the journal, each told once and on the page of the season it happened in. EASTER EGG: the castle, see src/game/castle.ts. */
+type CastleMoment = 'castleRoad' | 'castleWall' | 'castleTowers' | 'castleGatehouse' | 'castleMoatFull' | 'castleFeast' | 'castleFinished';
+type SeasonWord = 'Autumn' | 'Winter' | 'Spring' | 'Summer';
+export type CastleJournalId = `${CastleMoment}${SeasonWord}`;
+const CASTLE_MOMENTS: readonly CastleMoment[] = ['castleRoad', 'castleWall', 'castleTowers', 'castleGatehouse', 'castleMoatFull', 'castleFeast', 'castleFinished'];
+const SEASON_WORDS: readonly SeasonWord[] = ['Autumn', 'Winter', 'Spring', 'Summer'];
+const CASTLE_LINES: Record<CastleMoment, string> = {
+  castleRoad: 'Laid the last stone of the road from the quarry to the keep.',
+  castleWall: 'The curtain wall is closed all the way round.',
+  castleTowers: 'All four towers have their roofs.',
+  castleGatehouse: 'The gatehouse is up, and the portcullis works.',
+  castleMoatFull: 'Rain filled the moat. There is water all the way round.',
+  castleFeast: 'Set the first dish on the table in the great hall.',
+  castleFinished: 'Set down the last dish. The castle is finished.'
+};
+const castlePage = (word: SeasonWord): PageEntry[] => CASTLE_MOMENTS.map(moment => ({ id: `${moment}${word}` as CastleJournalId, lines: [CASTLE_LINES[moment]] }));
 
 /** `name` is the animal's name when the line was written, so naming one later never changes old lines. */
 export interface JournalEntry { year: number; id: JournalId; day: number; variant: number; name?: string }
@@ -47,6 +65,7 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'keepViewAutumn', lines: ['From the top of the keep, the woods have all turned.'] },
     { id: 'keepFinishedAutumn', lines: ['Laid the last stone on the keep.'] },
     { id: 'castleLineAutumn', lines: ['A line of old stones showed in the grass below the keep.'] },
+    ...castlePage('Autumn'),
     { id: 'fox', lines: ['A fox nosed around the berry bushes at dusk.'] },
     { id: 'coldFront', lines: ['The cold night came. I kept the fire through it.', 'The cold night came, and it got the better of me.',
       'A cold autumn night, and the fire kept me warm.'] },
@@ -70,6 +89,7 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'keepViewWinter', lines: ['Snow as far as I can see from the top of the keep.'] },
     { id: 'keepFinishedWinter', lines: ['Laid the last stone on the keep.'] },
     { id: 'castleLineWinter', lines: ['A line of old stones showed in the grass below the keep.'] },
+    ...castlePage('Winter'),
     { id: 'winterBread', lines: ['Bread from my own field, warm by the fire.'] },
     { id: 'winterKeepsake', lines: ['A feather by the fire, bright against the snow.', 'A tuft of fur by the fire, frost on its tips.'] },
     { id: 'namedWinter', lines: ['{name} and I agreed that it was cold.'] }
@@ -81,6 +101,7 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'keepViewSpring', lines: ['From the top of the keep, the gorse is out all the way down.'] },
     { id: 'keepFinishedSpring', lines: ['Laid the last stone on the keep.'] },
     { id: 'castleLineSpring', lines: ['A line of old stones showed in the grass below the keep.'] },
+    ...castlePage('Spring'),
     { id: 'bushesFull', lines: ['The bushes are full again.'] },
     { id: 'stumpGrowing', lines: ['A stump I cut is growing back already.'] },
     { id: 'springRest', lines: ['Sat a while at the spring, now that it\'s thawed.'] },
@@ -104,6 +125,7 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'keepViewSummer', lines: ['Heather as far as I can see from the top of the keep.'] },
     { id: 'keepFinishedSummer', lines: ['Laid the last stone on the keep.'] },
     { id: 'castleLineSummer', lines: ['A line of old stones showed in the grass below the keep.'] },
+    ...castlePage('Summer'),
     { id: 'summerKeepsake', lines: ['A feather by the fire on a warm morning.', 'A wisp of fur by the fire on a warm morning.'] },
     { id: 'namedSummer', lines: ['A long warm evening with {name}. Neither of us did much.'] }
   ]
@@ -176,7 +198,24 @@ function winterMealLine(m: Moment): number {
   return cooked(m, 'fish') ? 1 : 2;
 }
 
+/** A section finished by this moment, as the day it was marked done shows. */
+const sectionDone = (m: Moment, section: keyof GameState['castle']['doneDays']): boolean =>
+  m.before.castle.doneDays[section] === undefined && m.after.castle.doneDays[section] !== undefined;
+const dishesLaid = (state: GameState): number => Object.values(state.castle.feast).reduce((total, count) => total + count, 0);
+const CASTLE_RULES: Record<CastleMoment, (m: Moment) => Noticed | null> = {
+  castleRoad: m => onBefore(m, sectionDone(m, 'road')),
+  castleWall: m => onBefore(m, wallFinished(m.after.castle) && !wallFinished(m.before.castle)),
+  castleTowers: m => onBefore(m, TOWERS.every(id => towerFinished(m.after.castle.towers[id])) && !TOWERS.every(id => towerFinished(m.before.castle.towers[id]))),
+  castleGatehouse: m => onBefore(m, sectionDone(m, 'gatehouse')),
+  // The dawn the spring's rain has filled a dug moat.
+  castleMoatFull: m => onAfter(m, m.after.castle.moat.stretches === NEEDS.moat && moatFill(m.before) < 1 && moatFill(m.after) >= 1),
+  castleFeast: m => onBefore(m, dishesLaid(m.before) === 0 && dishesLaid(m.after) > 0),
+  castleFinished: m => onBefore(m, m.before.castle.finishedDay === null && m.after.castle.finishedDay !== null)
+};
+const castleRules = Object.fromEntries(SEASON_WORDS.flatMap(word => CASTLE_MOMENTS.map(moment => [`${moment}${word}`, CASTLE_RULES[moment]]))) as Record<CastleJournalId, (m: Moment) => Noticed | null>;
+
 const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
+  ...castleRules,
   // Not in the day's first moments, so the morning's own message (a new game, a waking) stays on screen.
   leaves: m => onAfter(m, awake(m) && m.before.timeOfDay >= 30 && isInClearing(m.after) && daylight(m.after)),
   fox: m => onAfter(m, awake(m) && isInClearing(m.after) && atDusk(m.after)),

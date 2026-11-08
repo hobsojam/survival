@@ -75,8 +75,27 @@ export const isRevealed = (state: GameState): boolean => state.castle.revealedDa
 /** Whether a tower has its stones, its roof beams and its iron. */
 export const towerFinished = (tower: Tower): boolean => tower.stones === NEEDS.towerStones && tower.beams === NEEDS.towerBeams && tower.fittings === NEEDS.towerFittings;
 
+/** Whether the hall has its stones, its roof beams, its iron and its hangings. */
+export const hallFinished = (hall: CastleState['hall']): boolean =>
+  hall.stones === NEEDS.hallStones && hall.beams === NEEDS.hallBeams && hall.fittings === NEEDS.hallFittings && hall.hangings === NEEDS.hallHangings;
+
 /** Whether all four sides of the curtain wall are done. */
 export const wallFinished = (castle: CastleState): boolean => SIDES.every(side => castle.wall[side] === NEEDS.wallSide);
+
+/** Whether every section but the feast is built: the road and cart, frames, wall, towers, gatehouse, a moat fully dug (full or still waiting for rain) and the hall. */
+export const allSectionsBuilt = (castle: CastleState, stoneCart: boolean): boolean =>
+  castle.road === NEEDS.road && stoneCart && castle.frames === NEEDS.frames && wallFinished(castle)
+  && TOWERS.every(id => towerFinished(castle.towers[id]))
+  && castle.gatehouse === NEEDS.gatehouse && castle.moat.stretches === NEEDS.moat && hallFinished(castle.hall);
+
+/** Whether the table can be laid: everything else is done. */
+export const everyOtherSectionDone = (state: GameState): boolean => allSectionsBuilt(state.castle, state.progress.workshop.stoneCart);
+
+/** Whether the feast is complete and the castle is finished. */
+export const castleFinished = (state: GameState): boolean => state.castle.finishedDay !== null;
+
+/** What the table still wants, in the order of the feast. */
+export const feastWants = (castle: CastleState): FeastItem[] => FEAST_ITEMS.filter(item => castle.feast[item] < NEEDS.feast[item]);
 
 /** The curtain wall's corners on the hills, in tiles, with the keep standing inside. */
 export const WALLS = { left: 13, right: 24, top: 5, bottom: 15 } as const;

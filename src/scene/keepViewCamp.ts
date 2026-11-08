@@ -1,7 +1,7 @@
 import { season } from '../game/calendar';
 import { STEP_IDS } from '../game/clearing';
 import { treeStage, type TreeStage } from '../game/orchard';
-import { NEEDS, SIDES, TOWERS, isRevealed, towerFinished } from '../game/castle';
+import { NEEDS, SIDES, TOWERS, hallFinished, isRevealed, towerFinished } from '../game/castle';
 import type { GameState } from '../game/state';
 
 // What the camp looks like from the top of the keep, read one landmark at a time from what the player has really built.
@@ -32,6 +32,8 @@ export interface CastleView {
   gatehouse: boolean;
   /** Whether the moat is dug all the way round. */
   moat: boolean;
+  /** Whether the great hall has its stones, roof, iron and hangings. */
+  hall: boolean;
 }
 
 const SMALLEST_CLEARING = 15;
@@ -44,7 +46,8 @@ export const castleView = (state: GameState): CastleView => {
     walls: SIDES.filter(side => wall[side] === NEEDS.wallSide).length,
     towers: TOWERS.filter(id => towerFinished(towers[id])).length,
     gatehouse: state.castle.gatehouse === NEEDS.gatehouse,
-    moat: state.castle.moat.stretches === NEEDS.moat
+    moat: state.castle.moat.stretches === NEEDS.moat,
+    hall: hallFinished(state.castle.hall)
   };
 };
 

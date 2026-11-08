@@ -1,8 +1,9 @@
 import { QUARRY_SITE } from './areas';
-import { CASTLE_SECTIONS, NEEDS, SIDES, TOWERS, WALLS, isRevealed, moatStretchSpot, towerFinished, wallFinished, type CastleSection, type CastleState, type FeastItem, type TowerId, type WallSide } from './castle';
+import { CASTLE_SECTIONS, FEAST_ITEMS, NEEDS, SIDES, TOWERS, WALLS, everyOtherSectionDone, feastWants, hallFinished, isRevealed, moatStretchSpot, towerFinished, wallFinished, type CastleSection, type CastleState, type FeastItem, type TowerId, type WallSide } from './castle';
 import { HILLS_EXIT, QUARRY_HILLS_EXIT, availableOre } from './hills';
 import { availableWood, freeSpaces, isInClearing, spaceFor, spendWood } from './camp';
 import { isWinter } from './calendar';
+import { foodCount, takeFromBag } from './food';
 import { KEEP_SITE } from './keep';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { ponyWith } from './pony';
@@ -59,14 +60,14 @@ interface SiteRule {
   spot: (castle: CastleState) => { area: AreaId; x: number; y: number };
   far: string;
   done: string;
-  /** The castle with one more piece laid. */
-  lay: (castle: CastleState, day: number) => CastleState;
+  /** The castle with one more piece laid, for the need it met. */
+  lay: (castle: CastleState, day: number, need: SiteNeed) => CastleState;
   /** What the piece just laid says, read from the castle after it. */
   line: (castle: CastleState) => string;
   /** How much of the section is laid, so a piece of work can be told from what it changed. */
   count: (castle: CastleState) => number;
   /** The prompt for a spot that can be worked now, and for one that is short of something. */
-  label: (castle: CastleState) => string;
+  label: (castle: CastleState, need?: SiteNeed) => string;
   ask: (castle: CastleState, need: SiteNeed) => string;
   /** The refusal for the same shortage. */
   short: (castle: CastleState, need: SiteNeed) => string;
@@ -257,6 +258,105 @@ function moatRule(): SiteRule {
   };
 }
 
+/** Where the great hall stands: in the yard between the keep and the east wall, with its door at the spot. */
+export const HALL_SPOT = { area: 'hills' as AreaId, x: 21, y: 9 };
+
+/** What the hall asks for next: its stones, then its roof beams, its iron and its hangings. */
+const hallStage = (castle: CastleState): 'stones' | 'beams' | 'fittings' | 'hangings' | null => {
+  const { hall } = castle;
+  if (hall.stones < NEEDS.hallStones) return 'stones';
+  if (hall.beams < NEEDS.hallBeams) return 'beams';
+  if (hall.fittings < NEEDS.hallFittings) return 'fittings';
+  return hall.hangings < NEEDS.hallHangings ? 'hangings' : null;
+};
+
+const HALL_NEEDS = { stones: NEEDS.hallStones, beams: NEEDS.hallBeams, fittings: NEEDS.hallFittings, hangings: NEEDS.hallHangings } as const;
+const HALL_LABELS = { stones: 'Lay a hall stone', beams: 'Set a hall beam', fittings: 'Fit iron to the hall', hangings: 'Hang a hall hanging' } as const;
+const HALL_ASKS = { stones: 'Hall · bring stone to build it', beams: 'Hall · make oak beams at the workshop', fittings: 'Hall · make iron fittings at the forge', hangings: 'Hall · weave a hanging at the loom' } as const;
+const HALL_SHORTS = {
+  stones: 'Bring stone to build the hall.', beams: 'Make oak beams at the workshop for the hall.',
+  fittings: 'Make iron fittings at the forge for the hall.', hangings: 'Weave a hanging at the loom for the hall.'
+} as const;
+
+/** The great hall, once the frames are up. It can be started at any point after them and left at any point: nothing waits on it until the feast. */
+function hallRule(): SiteRule {
+  const stage = (castle: CastleState) => hallStage(castle) ?? 'hangings';
+  return {
+    need: ({ castle }) => {
+      const next = castle.frames === NEEDS.frames ? hallStage(castle) : null;
+      if (next === null) return null;
+      return next === 'stones' ? { kind: 'stone' } : { kind: 'good', good: next };
+    },
+    finished: castle => hallFinished(castle.hall),
+    spot: () => HALL_SPOT,
+    far: 'Move closer to the hall.',
+    done: 'The great hall is finished.',
+    lay: (castle, day) => {
+      const next = stage(castle);
+      const hall = { ...castle.hall, [next]: castle.hall[next] + 1 };
+      const goods = next === 'stones' ? castle.goods : { ...castle.goods, [next]: castle.goods[next] - 1 };
+      return { ...castle, goods, hall, doneDays: hallFinished(hall) ? { ...castle.doneDays, hall: day } : castle.doneDays };
+    },
+    line: castle => {
+      const { hall } = castle;
+      if (hallFinished(hall)) return 'The great hall is roofed, fitted and hung. It wants a feast.';
+      if (hall.hangings > 0) return 'You hang a wool hanging on the hall wall.';
+      if (hall.fittings > 0) return 'You fit iron to the hall.';
+      if (hall.beams > 0) return 'You set a beam in the hall roof.';
+      if (hall.stones === NEEDS.hallStones) return 'You lay the last stone of the hall. It wants a roof.';
+      if (hall.stones === NEEDS.hallStones / 2) return 'The hall walls are halfway.';
+      return hall.stones === 1 ? 'You lay the first stone of the great hall.' : 'You lay another stone of the hall.';
+    },
+    count: castle => castle.hall.stones + castle.hall.beams + castle.hall.fittings + castle.hall.hangings,
+    label: castle => `${HALL_LABELS[stage(castle)]} (${castle.hall[stage(castle)]}/${HALL_NEEDS[stage(castle)]})`,
+    ask: castle => HALL_ASKS[stage(castle)],
+    short: castle => HALL_SHORTS[stage(castle)]
+  };
+}
+
+/** Where the table stands: inside the hall's right-hand side, a tile and more from its door, and out of reach of the keep's door. */
+export const TABLE_SPOT = { area: 'hills' as AreaId, x: 22, y: 9 };
+
+/** How each food reads: set down singly in a prompt, and in a list of what the table still wants. */
+const FEAST_WORDS: Record<FeastItem, { one: string; list: string }> = {
+  bread: { one: 'a loaf', list: 'bread' }, roastedHazelnuts: { one: 'roasted hazelnuts', list: 'roasted hazelnuts' },
+  honey: { one: 'some honey', list: 'honey' }, apple: { one: 'an apple', list: 'apples' }, vegetables: { one: 'some vegetables', list: 'vegetables' }
+};
+
+/** "bread", "bread and honey" or "bread, honey and apples". */
+const inWords = (words: string[]): string => (words.length > 1 ? `${words.slice(0, -1).join(', ')} and ${words.at(-1)}` : words.join(''));
+const wantedWords = (castle: CastleState): string => inWords(feastWants(castle).map(item => FEAST_WORDS[item].list));
+const dishesLaid = (castle: CastleState): number => FEAST_ITEMS.reduce((total, item) => total + castle.feast[item], 0);
+
+/** The feast on the hall's table, once everything else is done: a dish a go from the bag, in the order of the feast. The last one finishes the castle. */
+function tableRule(): SiteRule {
+  return {
+    need: state => {
+      const wants = feastWants(state.castle);
+      if (!everyOtherSectionDone(state) || state.castle.finishedDay !== null || wants.length === 0) return null;
+      return { kind: 'food', item: wants.find(item => foodCount(state.inventory.food, item) > 0) ?? wants[0] };
+    },
+    finished: castle => castle.finishedDay !== null,
+    spot: () => TABLE_SPOT,
+    far: 'Move closer to the table.',
+    done: 'The castle is finished.',
+    lay: (castle, day, need) => {
+      if (need.kind !== 'food') return castle;
+      const feast = { ...castle.feast, [need.item]: castle.feast[need.item] + 1 };
+      return { ...castle, feast, finishedDay: FEAST_ITEMS.every(item => feast[item] === NEEDS.feast[item]) ? day : castle.finishedDay };
+    },
+    line: castle => {
+      if (castle.finishedDay !== null) return 'You set down the last dish. The castle is finished.';
+      return dishesLaid(castle) === 1 ? 'You set the first dish on the table.' : 'You set another dish on the table.';
+    },
+    count: dishesLaid,
+    label: (castle, need) => `Set down ${need?.kind === 'food' ? FEAST_WORDS[need.item].one : 'a dish'} (the table still wants ${wantedWords(castle)})`,
+    ask: castle => `Table · bring ${wantedWords(castle)}`,
+    short: castle => `The table still wants ${wantedWords(castle)}.`,
+    effort: 0.25
+  };
+}
+
 const SITE_RULES: Partial<Record<CastleSite, SiteRule>> = {
   road: {
     need: ({ castle }) => (castle.road < NEEDS.road ? { kind: 'stone' } : null),
@@ -275,7 +375,9 @@ const SITE_RULES: Partial<Record<CastleSite, SiteRule>> = {
   ...Object.fromEntries(SIDES.map(side => [`wall-${side}`, wallRule(side)])),
   ...Object.fromEntries(TOWERS.map(id => [`tower-${id}`, towerRule(id)])),
   gatehouse: gatehouseRule(),
-  moat: moatRule()
+  moat: moatRule(),
+  hall: hallRule(),
+  table: tableRule()
 };
 
 /** The sites that can be worked on now, once the line of stones has shown. */
@@ -363,6 +465,7 @@ const lacking = (state: GameState, need: SiteNeed, rule: SiteRule): string | nul
     stone: state.inventory.stone + cartLoad(state) >= 1,
     wood: need.kind === 'wood' && availableWood(state) >= need.amount,
     good: need.kind === 'good' && state.castle.goods[need.good] >= 1,
+    food: need.kind === 'food' && foodCount(state.inventory.food, need.item) >= 1,
     portcullis: state.progress.workshop.portcullis
   };
   return need.kind in covered && !covered[need.kind as keyof typeof covered] ? rule.short(state.castle, need) : null;
@@ -391,12 +494,13 @@ export const castlePrompt = (state: GameState, spot: SiteSpot): string => {
   const waiting = need ? rule.wait?.(state) : null;
   if (waiting) return waiting.label;
   const short = need ? lacking(state, need, rule) : null;
-  return short && need ? rule.ask(state.castle, need) : rule.label(state.castle);
+  return short && need ? rule.ask(state.castle, need) : rule.label(state.castle, need ?? undefined);
 };
 
-/** The state with a need paid: stone from the cart and the bag, wood from the stores and the bag. Goods are moved by the piece laid. */
+/** The state with a need paid: stone from the cart and the bag, wood from the stores and the bag, a food from the bag alone. Goods are moved by the piece laid. */
 const payFor = (state: GameState, need: SiteNeed): GameState | null => {
   if (need.kind === 'stone') return spendCastleStone(state);
+  if (need.kind === 'food') return takeFromBag(state, need.item, 1);
   return need.kind === 'wood' ? spendWood(state, need.amount) : state;
 };
 
@@ -410,7 +514,7 @@ export const doCastleWork = (state: GameState, site: CastleSite): GameState => {
   if (!rule || !need) return state;
   const paid = payFor(state, need);
   if (!paid) return state;
-  return { ...paid, castle: rule.lay(paid.castle, state.day) };
+  return { ...paid, castle: rule.lay(paid.castle, state.day, need) };
 };
 
 /** What a piece of work says, read from the castle before and after it. */
@@ -426,13 +530,18 @@ const NEWS: Partial<Record<CastleSection, string>> = {
   ...Object.fromEntries(SIDES.map(side => [`wall-${side}`, `The ${side} wall stands finished.`])),
   ...Object.fromEntries(TOWERS.map(id => [`tower-${id}`, `The ${TOWER_NAMES[id]} tower stands finished.`])),
   gatehouse: 'The gatehouse stands finished.',
-  moat: 'The moat is dug. The spring rain will fill it.'
+  moat: 'The moat is dug. The spring rain will fill it.',
+  hall: 'The great hall stands finished.'
 };
+
+/** The morning after the castle is finished. */
+const FINISHED_NEWS = 'The castle stands finished. At night the hall windows glow.';
 
 /** The mornings after a section is finished. Each is worked out from the saved day, so it comes once. */
 export const castleNews = (before: GameState, after: GameState): string[] => {
   if (after.day <= before.day) return [];
-  return CASTLE_SECTIONS.filter(section => NEWS[section] && after.castle.doneDays[section] === before.day).map(section => NEWS[section] as string);
+  const sections = CASTLE_SECTIONS.filter(section => NEWS[section] && after.castle.doneDays[section] === before.day).map(section => NEWS[section] as string);
+  return after.castle.finishedDay === before.day ? [...sections, FINISHED_NEWS] : sections;
 };
 
 export type CastleGood = 'beams' | 'fittings' | 'hangings';
@@ -462,10 +571,20 @@ export const goodRoom = (castle: CastleState, good: CastleGood): number => {
 /** How many of a good one making gives: a full batch, or what is left if less. */
 export const goodBatch = (castle: CastleState, good: CastleGood): number => Math.min(GOODS[good].batch, goodRoom(castle, good));
 
+/** Why a hanging can't be woven right now, or null if it can. Hangings need the loom and its wool, not the workshop, and are made anywhere in the clearing. */
+function hangingBlocker(state: GameState): string | null {
+  if (!state.structures.loom) return 'Build the loom first.';
+  if (state.castle.frames === 0) return 'Begin the timber frames first.';
+  if (goodRoom(state.castle, 'hangings') === 0) return 'The castle has enough hangings now.';
+  if (!isInClearing(state)) return 'Return to camp to use the loom.';
+  if (isExhausted(state)) return TOO_TIRED_MESSAGE;
+  return state.sheep.wool < GOODS.hangings.wool ? `You need ${GOODS.hangings.wool} wool for the hanging.` : null;
+}
+
 /** Why a good can't be made right now, or null if it can. The cost can come from the bag and the camp stores. */
 export function goodBlocker(state: GameState, good: CastleGood): string | null {
   if (!isRevealed(state)) return 'There is nothing to make that for yet.';
-  if (good === 'hangings') return 'Hangings are made at the loom.';
+  if (good === 'hangings') return hangingBlocker(state);
   if (!state.structures.workshop) return 'Build a workshop first.';
   if (good === 'fittings' && !state.progress.workshop.forge) return 'Add a forge to the workshop first.';
   if (state.castle.frames === 0) return 'Begin the timber frames first.';

@@ -5,11 +5,12 @@ import { CLEARING_STEPS, STEP_IDS, nextStep, type Side, type StepId, choppableTr
 import { availableFiber, availableStone, availableWood, carriedCount, fullCapacity, isAtCamp, isInClearing } from '../../src/game/camp';
 import { offerFor } from '../../src/game/companion';
 import { BUILDINGS } from '../../src/game/state';
-import { FOOD_ITEMS, availableFood, foodCount, keptFoodTotal } from '../../src/game/food';
+import type { FeastItem } from '../../src/game/castle';
+import { FOOD_ITEMS, availableFood, foodCount, keptFoodTotal, type FoodItem } from '../../src/game/food';
 import { HILLS_EXIT, OUTCROP_SITE, availableOre, outcropLeft } from '../../src/game/hills';
 import { HOUSE_SPOT, fuelLeft, hasWoodStore, livesInHouse, woodStoreCapacity } from '../../src/game/home';
 import { recordJournal } from '../../src/game/journalEntries';
-import { NEEDS, TOWERS, isRevealed, moatFill, towerFinished, wallFinished } from '../../src/game/castle';
+import { FEAST_ITEMS, NEEDS, TOWERS, castleFinished, everyOtherSectionDone, feastWants, hallFinished, isRevealed, moatFill, towerFinished, wallFinished } from '../../src/game/castle';
 import { CART_SPOTS, GOODS, castleSpots, type CastleGood } from '../../src/game/castleSites';
 import { KEEP_DOOR_AT, KEEP_DOOR_WOOD, KEEP_SITE, keepFinished, keepOpen } from '../../src/game/keep';
 import { ORCHARD_SPOTS, spotAction } from '../../src/game/orchard';
@@ -430,13 +431,18 @@ export class Player {
       // Then timber frames, the four sides of the wall, and the towers, with the beams and iron the towers are roofed with.
       { id: 'castle-frames', shown: state => state.progress.workshop.stoneCart, done: state => state.castle.frames >= NEEDS.frames, step: () => this.raiseFrames() },
       { id: 'castle-wall', shown: state => state.castle.frames >= NEEDS.frames, done: state => wallFinished(state.castle), step: () => this.layCastleStone('wall-') },
-      this.goodTask('beams', { wood: GOODS.beams.cost.wood, fiber: 0, stone: 0 }, NEEDS.towerBeams),
-      this.goodTask('fittings', { wood: GOODS.fittings.cost.wood, fiber: 0, stone: 0, ore: GOODS.fittings.cost.ore }, NEEDS.towerFittings),
+      this.goodTask('beams', { wood: GOODS.beams.cost.wood, fiber: 0, stone: 0 }, NEEDS.towerBeams * TOWERS.length + NEEDS.hallBeams),
+      this.goodTask('fittings', { wood: GOODS.fittings.cost.wood, fiber: 0, stone: 0, ore: GOODS.fittings.cost.ore }, NEEDS.towerFittings * TOWERS.length + NEEDS.hallFittings),
       { id: 'castle-towers', shown: state => wallFinished(state.castle), done: state => TOWERS.every(id => towerFinished(state.castle.towers[id])), step: () => this.buildTower() },
       // The portcullis is made at the forge once the wall is done, and the gatehouse then takes its stones.
       { id: 'castle-gatehouse', shown: state => state.progress.workshop.portcullis, done: state => state.castle.gatehouse >= NEEDS.gatehouse, step: () => this.layCastleStone('gatehouse') },
       // The moat is dug a stretch a day once the wall is done, never in winter, then waits for the next spring's rain to fill it.
       { id: 'castle-moat', shown: state => wallFinished(state.castle), done: state => state.castle.moat.stretches >= NEEDS.moat, step: () => this.digMoat() },
+      // The great hall opens with the frames and is built at any point after them, with the hangings woven at the loom from the year's wool.
+      { id: 'castle-hangings', shown: state => state.castle.frames > 0 && state.structures.loom, done: state => state.castle.goods.hangings + state.castle.hall.hangings >= NEEDS.hallHangings, step: () => this.weaveHanging() },
+      { id: 'castle-hall', shown: state => state.castle.frames >= NEEDS.frames, done: state => hallFinished(state.castle.hall), step: () => this.buildHall() },
+      // With every other section done, the feast is laid on the hall's table from the camp's kitchen, and that finishes the castle.
+      { id: 'castle-feast', shown: everyOtherSectionDone, done: castleFinished, step: () => this.layFeast() },
       { id: 'castle-moat-fills', shown: state => state.castle.moat.stretches >= NEEDS.moat, done: state => moatFill(state) === 1, step: () => false },
       { id: 'mine', shown: state => progress(state).pickaxeCrafted, done: state => progress(state).mineBuilt, step: () => this.buildMine() },
       ...(['basket', 'cairn'] as const).map(site => ({
@@ -558,13 +564,55 @@ export class Player {
     return this.goTo(spot.area) && this.walkTo(spot) && this.act({ type: 'castleWork', site: spot.site });
   }
 
-  /** Oak beams from the workshop, or iron fittings from the forge, enough for the four towers. */
-  private goodTask(good: Exclude<CastleGood, 'hangings'>, cost: Cost, perTower: number): Task {
-    const built = (state: GameState): number => state.castle.goods[good] + TOWERS.reduce((sum, id) => sum + state.castle.towers[id][good], 0);
+  /** The hall's stones, then the beams, iron and hangings made at camp, which are set from where the survivor stands. */
+  private buildHall(): boolean {
+    const spot = castleSpots(this.state).find(each => each.site === 'hall');
+    if (!spot) return false;
+    const { hall, goods } = this.state.castle;
+    if (hall.stones < NEEDS.hallStones) return this.layCastleStone('hall');
+    const good = hall.beams < NEEDS.hallBeams ? 'beams' : hall.fittings < NEEDS.hallFittings ? 'fittings' : 'hangings';
+    if (goods[good] === 0) return false;
+    return this.goTo(spot.area) && this.walkTo(spot) && this.act({ type: 'castleWork', site: 'hall' });
+  }
+
+  /** The feast: room is made for a harvest, since stone left over from the building can fill the bag, then whatever the table wants that the larder holds is taken from it at camp, roasted hazelnuts are made when short, and what the bag carries is set down. */
+  private layFeast(): boolean {
+    const spot = castleSpots(this.state).find(each => each.site === 'table');
+    if (!spot) return false;
+    if (this.free() < ROOM_FOR_HARVEST && this.state.inventory.stone > 0 && this.makeRoom(ROOM_FOR_HARVEST)) return true;
+    const wants = feastWants(this.state.castle);
+    const bagHolds = (item: FeastItem): number => foodCount(this.state.inventory.food, item);
+    const left = (item: FeastItem): number => NEEDS.feast[item] - this.state.castle.feast[item];
+    const fetchable = wants.filter(item => bagHolds(item) < left(item) && foodCount(this.state.larder, item) > 0);
+    if (fetchable.length > 0 && this.free() > 0 && this.goTo('camp') && this.walkTo(CAMP, 2) && this.act({ type: 'takeFood', item: fetchable[0] })) return true;
+    if (wants.includes('roastedHazelnuts') && bagHolds('roastedHazelnuts') + foodCount(this.state.larder, 'roastedHazelnuts') < left('roastedHazelnuts') && this.roastHazelnuts()) return true;
+    if (!wants.some(item => bagHolds(item) > 0)) return false;
+    return this.goTo(spot.area) && this.walkTo(spot) && this.act({ type: 'castleWork', site: 'table' });
+  }
+
+  /** Roasted hazelnuts for the feast: two hazelnuts at the fire in the pot, gathering them first when there are none. */
+  private roastHazelnuts(): boolean {
+    if (availableFood(this.state, 'hazelnut') >= 2) {
+      if (!this.goHome()) return false;
+      if (fuelLeft(this.state) <= 0 && !this.act({ type: 'stokeFire' })) return this.fetchWood();
+      return this.act({ type: 'cook', dish: 'roastedHazelnuts' });
+    }
+    return this.makeRoom(1) && this.gatherNode('hazel');
+  }
+
+  /** A hanging woven in the clearing, once the basket holds the wool for it. The weaving chore may have used it on something warm first. */
+  private weaveHanging(): boolean {
+    if (this.state.sheep.wool < GOODS.hangings.wool) return false;
+    return this.goTo('camp') && this.walkTo(CAMP, 2) && this.act({ type: 'makeCastleGood', good: 'hangings' });
+  }
+
+  /** Oak beams from the workshop, or iron fittings from the forge, enough for the four towers and the hall. */
+  private goodTask(good: Exclude<CastleGood, 'hangings'>, cost: Cost, total: number): Task {
+    const built = (state: GameState): number => state.castle.goods[good] + state.castle.hall[good] + TOWERS.reduce((sum, id) => sum + state.castle.towers[id][good], 0);
     return {
       id: `castle-${good}`,
       shown: state => state.castle.frames > 0 && state.structures.workshop && (good === 'beams' || state.progress.workshop.forge),
-      done: state => built(state) >= perTower * TOWERS.length,
+      done: state => built(state) >= total,
       step: () => this.payFor(cost, { type: 'makeCastleGood', good })
     };
   }
@@ -621,12 +669,16 @@ export class Player {
     return this.makeRoom(1) && (this.gatherNode('hazel') || this.gatherNode('berry'));
   }
 
-  /** Food beyond a little for the road goes in the larder, as far as it holds. */
+  /** Food beyond a little for the road goes in the larder, as far as it holds. What the feast still wants stays in the bag, or fetching it just undoes itself. */
   private putFoodBy(): void {
     if (!this.state.structures.larder) return;
     const carried = (): number => FOOD_ITEMS.reduce((total, item) => total + foodCount(this.state.inventory.food, item), 0);
+    const forTheTable = (item: FoodItem): number => {
+      if (!isFeastItem(item) || !everyOtherSectionDone(this.state) || castleFinished(this.state)) return 0;
+      return NEEDS.feast[item] - this.state.castle.feast[item];
+    };
     for (const item of FOOD_ITEMS) {
-      while (carried() > FOOD_TO_CARRY && this.act({ type: 'storeFood', item })) { /* put it by */ }
+      while (carried() > FOOD_TO_CARRY && foodCount(this.state.inventory.food, item) > forTheTable(item) && this.act({ type: 'storeFood', item })) { /* put it by */ }
     }
   }
 
@@ -815,6 +867,8 @@ export class Player {
   }
 }
 
-/** Long enough for the road, cart, frames, wall, towers, gatehouse and moat, with the spring rain that fills it: the slowest of the test games has the moat full about 150 days after the keep. */
-const DAYS_AFTER_THE_KEEP = 200;
+const isFeastItem = (item: FoodItem): item is FeastItem => (FEAST_ITEMS as readonly FoodItem[]).includes(item);
+
+/** Long enough for the whole castle, through the spring rain that fills the moat to the feast that finishes it: the slowest of the test games sets its last dish about 215 days after the keep. */
+const DAYS_AFTER_THE_KEEP = 240;
 const MILESTONES_THAT_END = ['keep-finished', 'keep-night', 'keep-climbed'];

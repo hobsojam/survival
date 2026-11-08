@@ -330,15 +330,15 @@ export interface CastleGoodRow { good: CastleGood; shown: boolean; title: string
 const GOOD_COPY: Record<CastleGood, { title: string; copy: string; cost: string }> = {
   beams: { title: 'Oak beams', copy: 'Four at a time, cut and dressed for the towers and the hall.', cost: costLabel({ ...GOODS.beams.cost, fiber: 0, stone: 0 }) },
   fittings: { title: 'Iron fittings', copy: 'One at a time, to fit the beams.', cost: costLabel({ ...GOODS.fittings.cost, fiber: 0, stone: 0 }) },
-  hangings: { title: 'Wool hangings', copy: '', cost: '' }
+  hangings: { title: 'Wool hangings', copy: 'One at a time, woven from wool for the hall walls.', cost: `${GOODS.hangings.wool} wool` }
 };
 
-/** The castle's goods, made at camp: a row shows once the frames are begun and the castle still wants more of it. Hangings stay hidden until the loom makes them. */
+/** The castle's goods, made at camp: a row shows once the frames are begun and the castle still wants more of it. Hangings are woven at the loom from wool. */
 export function castleGoodsView(state: GameState): CastleGoodRow[] {
   return (['beams', 'fittings', 'hangings'] as const).map(good => {
     const { title, copy, cost } = GOOD_COPY[good];
     const blocker = goodBlocker(state, good);
-    const shown = good !== 'hangings' && isRevealed(state) && state.castle.frames > 0 && goodRoom(state.castle, good) > 0;
+    const shown = isRevealed(state) && state.castle.frames > 0 && goodRoom(state.castle, good) > 0;
     return { good, shown, title, copy: blocker ?? copy, cost, have: state.castle.goods[good], disabled: Boolean(blocker) };
   });
 }
