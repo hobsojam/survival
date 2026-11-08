@@ -100,8 +100,17 @@ export function hallWindowGlow(state: GameState): LightRadii | null {
   return { inner: 4, middle: 8, outer: 13 };
 }
 
-/** Where the hall's light sits, in world pixels from the hall's door spot: the window between the iron bars, 23 across and 18 up. */
-export const HALL_WINDOW_OFFSET = { x: 23, y: -18 } as const;
+/** Where the hall's lights sit, in world pixels from the hall's door spot: the window between the iron bars, 23 across and 18 up, and the lantern by the door, 7 across and 15 up. */
+export const HALL_LIGHTS_OFFSETS = { window: { x: 23, y: -18 }, lantern: { x: 7, y: -15 } } as const;
+export const HALL_WINDOW_OFFSET = HALL_LIGHTS_OFFSETS.window;
+export { HALL_LANTERN } from '../art/castleSprites';
+
+/** The hall's lights at night once the castle is finished: the window, and the lantern by the door, whose light pools wider on the yard. */
+export function hallLights(state: GameState): { radii: LightRadii; offset: { x: number; y: number } }[] {
+  const window = hallWindowGlow(state);
+  if (!window) return [];
+  return [{ radii: window, offset: HALL_LIGHTS_OFFSETS.window }, { radii: { inner: 5, middle: 11, outer: 18 }, offset: HALL_LIGHTS_OFFSETS.lantern }];
+}
 
 /** Where the keep's light sits, in world pixels from the door: the middle window, straight up the wall. */
 export const KEEP_WINDOW_OFFSET = { x: 0, y: -65 } as const;

@@ -12,7 +12,7 @@ import { TILE, worldX, worldY } from './art';
 import { QUARRY_SITE, RUBBLE_SITE } from '../game/areas';
 import { OUTCROP_SITE, outcropLeft } from '../game/hills';
 import { KEEP_SITE, KEEP_STONES, keepFinished, keepOpen } from '../game/keep';
-import { MOAT_TILES, NEEDS, SIDES, TOWERS, WALLS, isRevealed, moatFill, moatLevel, moatPiece, treeUnderWall, type Tower, type TowerId, type WallSide } from '../game/castle';
+import { MOAT_TILES, NEEDS, SIDES, TOWERS, WALLS, everyOtherSectionDone, isRevealed, moatFill, moatLevel, moatPiece, treeUnderWall, type Tower, type TowerId, type WallSide } from '../game/castle';
 import { CART_SPOTS, FRAMES_SPOT, GATE_SPOT, HALL_SPOT, roadStone } from '../game/castleSites';
 import { markedTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
@@ -95,11 +95,12 @@ export const hallStep = (hall: GameState['castle']['hall']): number => {
   return hall.stones === NEEDS.hallStones ? 6 : Math.ceil(hall.stones / 8);
 };
 
-/** The frames, the wall, the towers, the gatehouse and the hall as far as they are built, drawn on the hills with the same snow as the keep. EASTER EGG: the castle, see src/game/castle.ts. */
+/** The frames while there is building to do, the wall, the towers, the gatehouse and the hall as far as they are built, drawn on the hills with the same snow as the keep. EASTER EGG: the castle, see src/game/castle.ts. */
 function addBuilding(state: GameState, add: AddVisual): void {
   const { castle } = state;
   const snow = isWinter(state.day) ? 's' : '';
-  if (castle.frames > 0) add('castle-frames', `castleFrames:${Math.ceil(castle.frames / 2)}${snow}`, FRAMES_SPOT.x, FRAMES_SPOT.y);
+  // The scaffolding comes down once there is nothing left to build, as the keep's does at its last stone.
+  if (castle.frames > 0 && !everyOtherSectionDone(state)) add('castle-frames', `castleFrames:${Math.ceil(castle.frames / 2)}${snow}`, FRAMES_SPOT.x, FRAMES_SPOT.y);
   for (const side of SIDES) {
     const tiles = wallTiles(side);
     tiles.forEach((tile, i) => {

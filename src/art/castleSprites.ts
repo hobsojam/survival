@@ -270,6 +270,7 @@ function hall(g: Grid, step: number, winter: boolean): void {
   if (height >= 26) for (const x of [36, 40]) box(g, x, HALL_BASE - 22, 2, 10, 'i');
   if (step >= 12) hanging(g, 25, HALL_BASE - 26);
   if (step >= 13) hanging(g, 45, HALL_BASE - 26);
+  if (step >= 13) lantern(g, 'k');
   if (step <= 6) {
     box(g, 0, top, HALL_W, 1, step === 6 ? 'e' : 'd');
     if (winter) box(g, 0, top, HALL_W, 2, 'W');
@@ -285,9 +286,19 @@ for (let step = 1; step <= HALL_STEPS; step++) {
   hallFrames[`${step}s`] = g => hall(g, step, true);
 }
 
-/** The hall's window at night, between its two iron bars: a pane of lamplight over the same picture as the hall, drawn on top of it. */
+/** The lantern on the wall beside the hall's door, in pixels from the picture's corner: an iron cap and base around its glass. It hangs once the hall is finished. */
+export const HALL_LANTERN = { x: 22, y: HALL_BASE - 16, w: 2, h: 4 };
+
+function lantern(g: Grid, glass: string): void {
+  box(g, HALL_LANTERN.x, HALL_LANTERN.y, HALL_LANTERN.w, 1, 'i');
+  box(g, HALL_LANTERN.x, HALL_LANTERN.y + 1, HALL_LANTERN.w, HALL_LANTERN.h - 2, glass);
+  box(g, HALL_LANTERN.x, HALL_LANTERN.y + HALL_LANTERN.h - 1, HALL_LANTERN.w, 1, 'i');
+}
+
+/** The hall at night, drawn on top of the hall: a pane of lamplight in the window between its two iron bars, and the lantern by the door lit. */
 function hallGlow(g: Grid): void {
   box(g, 38, HALL_BASE - 20, 2, 6, 'y');
+  lantern(g, 'y');
 }
 
 const FRAMES_W = 48;
