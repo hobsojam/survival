@@ -1,5 +1,5 @@
 import { QUARRY_SITE } from './areas';
-import { CASTLE_SECTIONS, FEAST_ITEMS, NEEDS, SIDES, TOWERS, WALLS, everyOtherSectionDone, feastWants, hallFinished, isRevealed, moatStretchSpot, towerFinished, wallFinished, type CastleSection, type CastleState, type FeastItem, type TowerId, type WallSide } from './castle';
+import { CASTLE_SECTIONS, FEAST_ITEMS, HALL_DOOR_SPOT, NEEDS, SIDES, TOWERS, WALLS, everyOtherSectionDone, feastWants, hallFinished, isRevealed, moatStretchSpot, towerFinished, wallFinished, type CastleSection, type CastleState, type FeastItem, type TowerId, type WallSide } from './castle';
 import { HILLS_EXIT, QUARRY_HILLS_EXIT, availableOre } from './hills';
 import { availableWood, freeSpaces, isInClearing, spaceFor, spendWood } from './camp';
 import { isWinter } from './calendar';
@@ -259,7 +259,7 @@ function moatRule(): SiteRule {
 }
 
 /** Where the great hall stands: in the yard between the keep and the east wall, with its door at the spot. */
-export const HALL_SPOT = { area: 'hills' as AreaId, x: 21, y: 9 };
+export const HALL_SPOT = { area: 'hills' as AreaId, ...HALL_DOOR_SPOT };
 
 /** What the hall asks for next: its stones, then its roof beams, its iron and its hangings. */
 const hallStage = (castle: CastleState): 'stones' | 'beams' | 'fittings' | 'hangings' | null => {

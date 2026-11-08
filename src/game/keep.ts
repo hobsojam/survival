@@ -3,6 +3,7 @@ import type { GameAction } from './rules';
 import { availableWood } from './wood';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { BALANCE, type GameState } from './state';
+import { HALL_DOOR_SPOT, castleFinished } from './castle';
 
 // The keep: one stone tower at the top of the hills path, raised a stone at a time once the forge stands. Nothing changes
 // until the last stone is laid; after that its door is a place to sleep at night and a way up to the top by day.
@@ -75,8 +76,12 @@ export function withStoneLaid(keep: KeepState, day: number): KeepState {
   return { ...keep, stones, startedDay: keep.startedDay ?? day, finishedDay: stones === KEEP_STONES ? day : null };
 }
 
-/** At the door of the finished keep. Worked out from where the survivor stands, so nothing about a night here is saved. */
-export const inKeep = (state: GameState): boolean => keepFinished(state) && byKeep(state);
+/** At the great hall's door once the castle is finished. EASTER EGG: the castle, see src/game/castle.ts. */
+export const atHallDoor = (state: GameState): boolean =>
+  castleFinished(state) && state.area === 'hills' && Math.hypot(state.player.x - HALL_DOOR_SPOT.x, state.player.y - HALL_DOOR_SPOT.y) <= BALANCE.interactionRadius;
+
+/** At the door of the finished keep, or of the finished castle's hall, which works the same. Worked out from where the survivor stands, so nothing about a night here is saved. */
+export const inKeep = (state: GameState): boolean => (keepFinished(state) && byKeep(state)) || atHallDoor(state);
 
 /** What going in at the door means now: to bed from nightfall on, otherwise up to the top. Read as the survivor arrives, not when they set off. */
 export function withKeepDoor(state: GameState, action: GameAction): GameAction {

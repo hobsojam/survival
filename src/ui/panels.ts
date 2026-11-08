@@ -156,6 +156,17 @@ export function granaryPanelView(state: GameState): { shown: boolean; stored: st
   };
 }
 
+export interface HomeChoiceView { shown: boolean; home: 'house' | 'hall'; choose: 'house' | 'hall'; button: string; copy: string }
+
+/** The choice of home, once the hall has been offered: what it would mean, and the one button that changes it. EASTER EGG: the castle, see src/game/castle.ts. */
+export function homeChoiceView(state: GameState): HomeChoiceView {
+  const { home, offeredHome } = state.castle;
+  if (home === 'hall') {
+    return { shown: offeredHome, home, choose: 'house', button: 'Make the house your home again', copy: 'The hall is your home. The camp carries on below, and the house is still yours.' };
+  }
+  return { shown: offeredHome, home, choose: 'hall', button: 'Make the hall your home', copy: 'You could make the hall your home. The camp will carry on below, and the house stays yours.' };
+}
+
 /** The Windmill panel, once built: the flour in its bin against its room, and whether milling can go ahead. */
 export function windmillPanelView(state: GameState): { shown: boolean; stored: string; mill: { disabled: boolean; hint: string } } {
   const blocker = millGrainBlocker(state);

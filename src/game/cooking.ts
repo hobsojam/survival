@@ -1,5 +1,5 @@
 import { availableStone, availableWood, freeSpaces, isAtCamp, isInClearing } from './camp';
-import { fuelLeft, isAtHome, livesInHouse } from './home';
+import { atHallHome, fuelLeft, isAtHome, livesInHouse } from './home';
 import { addFood, availableFood, spendFood, type FoodItem } from './food';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { BALANCE, type GameState } from './state';
@@ -40,8 +40,9 @@ export function potBlocker(state: GameState): string | null {
   return null;
 }
 
-/** Why there is no fire to cook at here: in the house it is the fireplace, otherwise the campfire. */
+/** Why there is no fire to cook at here: the hall's once it is home, in the house the fireplace, otherwise the campfire. */
 function cookingFireBlocker(state: GameState): string | null {
+  if (atHallHome(state)) return null;
   if (livesInHouse(state)) {
     if (!isAtHome(state)) return 'Go home to cook.';
     return fuelLeft(state) <= 0 ? 'The fireplace is out. Stock the wood store.' : null;

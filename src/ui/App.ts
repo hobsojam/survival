@@ -23,7 +23,7 @@ import { browserDownloadDoc, downloadText } from './download';
 import { showBuildList, showCampStores } from './showPanels';
 import type { WovenId } from '../game/sheep';
 import { NameDialog, wireNameDialog } from './nameDialog';
-import { cookBerryView, supplyCount, axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, decorationMarkup, decorationButtonView, DECORATION_CHOICES, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, chickenCoopPanelView, friendRosterView, sheepPanelView, loomPanelView, pipsLine, loomItemMarkup, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, castleGoodsView, type ActionPanelView } from './panels';
+import { homeChoiceView, cookBerryView, supplyCount, axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, decorationMarkup, decorationButtonView, DECORATION_CHOICES, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, chickenCoopPanelView, friendRosterView, sheepPanelView, loomPanelView, pipsLine, loomItemMarkup, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, castleGoodsView, type ActionPanelView } from './panels';
 import type { UpgradeId } from '../game/workshop';
 import type { CastleGood } from '../game/castleSites';
 import { Soundscape } from '../game/soundscape';
@@ -100,6 +100,7 @@ export class App {
                   <p class="journal-subhead">Places along camp paths</p><ul id="journal-places" class="journal-list"></ul>
                   <p id="journal-milestones-head" class="journal-subhead">Camp milestones</p><ul id="journal-milestones" class="journal-list"></ul>
                 </details></section>
+              <section class="panel home-panel" data-tab="camp" hidden><p class="eyebrow">THE GREAT HALL</p><h2>Home</h2><p class="garden-hint" id="home-copy"></p><div class="tool-row"><button type="button" id="home-button" data-home-choice="hall"></button></div></section>
               <section class="panel year-journal-panel" data-tab="camp"><p class="eyebrow">THE YEAR SO FAR</p><div class="year-wheel"><span class="year-dial" aria-hidden="true"><span id="year-hand" class="year-hand"></span></span><p id="year-label" class="year-label"></p><ul class="visually-hidden" aria-label="Seasons"><li id="year-season-0">Autumn</li><li id="year-season-1">Winter</li><li id="year-season-2">Spring</li><li id="year-season-3">Summer</li></ul></div><div class="year-journal-page"><div class="year-journal-head"><button type="button" id="year-journal-previous" class="year-journal-turn" aria-label="Earlier page">‹</button><div><h2 id="year-journal-title"></h2><p id="year-journal-days" class="year-journal-days"></p></div><button type="button" id="year-journal-next" class="year-journal-turn" aria-label="Later page">›</button></div><ul id="year-journal-entries" class="year-journal-entries"></ul></div></section>
               <section class="panel bag-panel" data-tab="bag"><p class="eyebrow">IN YOUR BAG</p><div class="supplies">
                 <div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small><small id="wood-stored" class="supply-note"></small><button type="button" class="supply-action" data-action="stokeFire" data-supply="wood" aria-label="Burn one wood">Burn</button></div>
@@ -149,6 +150,10 @@ export class App {
           this.scene?.perform(item ? { type, item } : { type });
         } else this.scene?.perform({ type } as GameAction);
       });
+    });
+    this.root.querySelector<HTMLButtonElement>('#home-button')?.addEventListener('click', event => {
+      const home = (event.currentTarget as HTMLButtonElement).dataset.homeChoice === 'house' ? 'house' : 'hall';
+      this.scene?.perform({ type: 'chooseHome', home });
     });
     this.root.addEventListener('click', event => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-action="plantGarden"], [data-action="harvestGarden"]');
@@ -685,6 +690,20 @@ export class App {
     }
     this.setText('grind-hint', granary.grind.hint);
     this.renderBakehouse();
+    this.renderHome();
+  }
+
+  /** The choice of home, laid out by its tested view. */
+  private renderHome(): void {
+    const view = homeChoiceView(this.state);
+    const panel = this.root.querySelector<HTMLElement>('.home-panel');
+    if (panel) panel.hidden = !view.shown;
+    this.setText('home-copy', view.copy);
+    const button = this.root.querySelector<HTMLButtonElement>('#home-button');
+    if (button) {
+      button.textContent = view.button;
+      button.dataset.homeChoice = view.choose;
+    }
   }
 
   /** The Windmill, Bakery and Beehive panels, laid out by their tested views. */

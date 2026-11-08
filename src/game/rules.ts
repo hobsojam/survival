@@ -21,7 +21,7 @@ import { logsInStore } from './wood';
 import { settleStores } from './stores';
 import { castleSeen } from './castle';
 import { GOODS, cartFollows, castleEffort, castleWorkBlocker, castleWorkLine, doCastleWork, goodBatch, goodBlocker, intakeNote, stoneIntake, takeCartBlocker, withStoneIntake, type CastleGood, type CastleSite } from './castleSites';
-import { KEEP_DOOR_WOOD, climbKeepBlocker, hangDoorBlocker, inKeep, keepFinished, layStoneBlocker, stoneLine, withKeepDoor, withStoneLaid } from './keep';
+import { KEEP_DOOR_WOOD, atHallDoor, climbKeepBlocker, hangDoorBlocker, inKeep, keepFinished, layStoneBlocker, stoneLine, withKeepDoor, withStoneLaid } from './keep';
 import { UPGRADE_MESSAGES, WORKSHOP_UPGRADES, cartSpace, countWord, fellingWood, upgradeBlocker, type UpgradeId } from './workshop';
 import { FISHING_LINE_COST, catches, fishingBlocker, fishingLineBlocker, fishingSecondsFor, validRoll } from './fishing';
 import { ENDED_MESSAGE, GAVE_OUT_MESSAGE, judgeSickDay, markWarmMeal, markWarmRest, sicknessTick } from './sickness';
@@ -56,6 +56,7 @@ export type GameAction =
   | { type: 'weave'; item: WovenId }
   | { type: 'takeLoaf' }
   | { type: 'castleWork'; site: CastleSite }
+  | { type: 'chooseHome'; home: 'house' | 'hall' }
   | { type: 'makeCastleGood'; good: CastleGood }
   | { type: 'takeHoney' }
   | { type: 'drawWater' }
@@ -1445,10 +1446,23 @@ const climbKeep = (state: GameState): ActionResult => {
   return { state: advanceTime({ ...state, castle: castleSeen(state.castle, state.day) }, BALANCE.stargazeSeconds, 'resting'), message: '' };
 };
 
-const enterKeep = (state: GameState): ActionResult =>
-  withKeepDoor(state, { type: 'enterKeep' }).type === 'sleep' ? sleep(state) : climbKeep(state);
+/** In at the door: to bed or up to the top. The first time through the hall's door, the hall is offered as a home. */
+const enterKeep = (state: GameState): ActionResult => {
+  const result = withKeepDoor(state, { type: 'enterKeep' }).type === 'sleep' ? sleep(state) : climbKeep(state);
+  if (result.state === state || !atHallDoor(state) || result.state.castle.offeredHome) return result;
+  return { ...result, state: { ...result.state, castle: { ...result.state.castle, offeredHome: true } } };
+};
+
+const HOME_LINES = { hall: 'The hall is your home now.', house: 'The house is your home again.' } as const;
+
+/** Making the hall home, or the house again: at once and from anywhere, once the hall has been offered. EASTER EGG: the castle, see src/game/castle.ts. */
+const chooseHome = (state: GameState, action: ActionOf<'chooseHome'>): ActionResult => {
+  if (!state.castle.offeredHome || state.castle.home === action.home) return { state, message: '' };
+  return { state: { ...state, castle: { ...state.castle, home: action.home } }, message: HOME_LINES[action.home] };
+};
 
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
+  chooseHome,
   feedSheep,
   nameAnimal,
   shearFlock,
