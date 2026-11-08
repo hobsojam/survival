@@ -941,6 +941,7 @@ describe('the castle in the save', () => {
     ['bread over the feast\'s need', state => { state.castle.feast.bread = 5; }],
     ['a finish with every section short', state => { state.castle.finishedDay = 9; }],
     ['moving into the hall before the finish', state => { state.castle.home = 'hall'; }],
+    ['the hall offered as a home before the finish', state => { state.castle.offeredHome = true; }],
     ['a reveal with the keep not finished', state => { state.keep = { stones: 59, door: true, startedDay: 1, finishedDay: null, ponyNight: null }; }],
     ['a castle that is not an object', state => { (state as unknown as Record<string, unknown>).castle = null; }]
   ])('rejects %s', (_, change) => {

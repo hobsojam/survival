@@ -2,6 +2,7 @@ import { nightStart } from './calendar';
 import { isAtCamp } from './camp';
 import { BALANCE, type GameState } from './state';
 import { logsInStore } from './wood';
+import { atHallDoor } from './keep';
 
 // Living in the house: where it stands, whether the survivor has moved in, the wood store it adds,
 // and the fireplace that feeds itself from that store at night and takes over the campfire's work.
@@ -26,8 +27,12 @@ export function woodStoreCapacity(state: GameState): number {
     + (state.structures.house ? BALANCE.woodshedCapacity : 0);
 }
 
-/** Where the survivor sleeps, rests and cooks: by the house once they live there, otherwise by the campfire. */
+/** At the great hall's door with the hall made home, where its fire burns without wood. EASTER EGG: the castle, see src/game/castle.ts. */
+export const atHallHome = (state: GameState): boolean => state.castle.home === 'hall' && atHallDoor(state);
+
+/** Where the survivor sleeps, rests and cooks: by the house once they live there, otherwise by the campfire. The hall, once made home, is home too, and the house stays so. */
 export function isAtHome(state: GameState): boolean {
+  if (atHallHome(state)) return true;
   if (!livesInHouse(state)) return isAtCamp(state);
   return state.area === 'camp' && Math.hypot(state.player.x - HOUSE_SPOT.x, state.player.y - HOUSE_SPOT.y) <= BALANCE.homeRadius;
 }
@@ -37,8 +42,9 @@ export function warmFuel(state: GameState): number {
   return livesInHouse(state) ? state.fireplaceFuel : state.fireFuel;
 }
 
-/** Seconds of fire still to come: for the house, the fireplace and every log it will draw from the store and the cart; otherwise the campfire's fuel. */
+/** Seconds of fire still to come: for the house, the fireplace and every log it will draw from the store and the cart; otherwise the campfire's fuel. The hall's fire, once it is home, never runs out. */
 export function fuelLeft(state: GameState): number {
+  if (atHallHome(state)) return Infinity;
   return livesInHouse(state) ? state.fireplaceFuel + logsInStore(state) * BALANCE.fireplaceSecondsPerWood : state.fireFuel;
 }
 

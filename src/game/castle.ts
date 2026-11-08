@@ -97,6 +97,9 @@ export const castleFinished = (state: GameState): boolean => state.castle.finish
 /** What the table still wants, in the order of the feast. */
 export const feastWants = (castle: CastleState): FeastItem[] => FEAST_ITEMS.filter(item => castle.feast[item] < NEEDS.feast[item]);
 
+/** The great hall's door on the hills, in tiles: where it was built from, and the way in once the castle is finished. */
+export const HALL_DOOR_SPOT = { x: 21, y: 9 } as const;
+
 /** The curtain wall's corners on the hills, in tiles, with the keep standing inside. */
 export const WALLS = { left: 13, right: 24, top: 5, bottom: 15 } as const;
 

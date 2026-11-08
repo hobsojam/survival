@@ -6,7 +6,7 @@ import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
 import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, outcropNote } from '../game/hills';
 import { NEEDS, isRevealed, lineDistance } from '../game/castle';
 import { GATE_SPOT, cartWithin, castleNeedsStone, castlePrompt, castleWorkBlocker, nearestCastleSpot } from '../game/castleSites';
-import { KEEP_DOOR_WOOD, KEEP_SITE, KEEP_STONES, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor } from '../game/keep';
+import { KEEP_DOOR_WOOD, KEEP_SITE, KEEP_STONES, atHallDoor, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor } from '../game/keep';
 import { ponyNote, ponyOfferLabel } from '../game/pony';
 import { availableWood } from '../game/wood';
 import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
@@ -256,10 +256,14 @@ export function lineToSay(before: GameState, after: GameState, message: string, 
   return announce || before.area !== after.area ? message : '';
 }
 
+/** Going in at the finished keep's door, or the finished hall's: to bed at night, otherwise up to the top. */
+const doorChoice = (state: GameState, building: 'keep' | 'hall'): Choice =>
+  ({ label: withKeepDoor(state, { type: 'enterKeep' }).type === 'sleep' ? `Sleep in the ${building} until morning` : 'Climb to the top', action: { type: 'enterKeep' } });
+
 /** The keep, when the survivor is at it: what it wants next, or what they can do with it once it is finished. */
 function keepChoice(state: GameState): Choice | null {
   if (!keepOpen(state) || !within(state, KEEP_SITE)) return null;
-  if (keepFinished(state)) return { label: withKeepDoor(state, { type: 'enterKeep' }).type === 'sleep' ? 'Sleep in the keep until morning' : 'Climb to the top', action: { type: 'enterKeep' } };
+  if (keepFinished(state)) return doorChoice(state, 'keep');
   if (!keepNeedsDoor(state)) {
     return state.inventory.stone > 0
       ? { label: `Lay a stone (${state.keep.stones}/${KEEP_STONES})`, action: { type: 'layStone' } }
@@ -306,7 +310,7 @@ function withCartLoad(state: GameState, prompt: string, nearWork: boolean): stri
 
 function hillsChoices(state: GameState): Choice[] {
   const found = closestGatherable(state);
-  const keep = keepChoice(state);
+  const keep = keepChoice(state) ?? (atHallDoor(state) ? doorChoice(state, 'hall') : null);
   const castle = castleChoice(state);
   const cart = cartChoice(state);
   // EASTER EGG: the castle's line of old stones, named only once it has been seen.
