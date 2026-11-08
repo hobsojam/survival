@@ -26,7 +26,7 @@ export type JournalId =
   | 'hillsAutumn' | 'hillsWinter' | 'hillsSpring' | 'hillsSummer'
   | 'keepViewAutumn' | 'keepViewWinter' | 'keepViewSpring' | 'keepViewSummer'
   | 'keepFinishedAutumn' | 'keepFinishedWinter' | 'keepFinishedSpring' | 'keepFinishedSummer'
-  | 'castleLineAutumn' | 'castleLineWinter' | 'castleLineSpring' | 'castleLineSummer' | CastleJournalId
+  | 'castleLineAutumn' | 'castleLineWinter' | 'castleLineSpring' | 'castleLineSummer' | CastleJournalId | TownJournalId
   | 'autumnKeepsake' | 'winterKeepsake' | 'springKeepsake' | 'summerKeepsake'
   | 'namedAutumn' | 'namedWinter' | 'namedSpring' | 'namedSummer';
 
@@ -47,6 +47,16 @@ const CASTLE_LINES: Record<CastleMoment, string> = {
 };
 const castlePage = (word: SeasonWord): PageEntry[] => CASTLE_MOMENTS.map(moment => ({ id: `${moment}${word}` as CastleJournalId, lines: [CASTLE_LINES[moment]] }));
 
+/** What the town leaves in the journal: the first traveller at the door, and each neighbour who stays, by name. EASTER EGG: the town, see src/game/town.ts. */
+type TownMoment = 'traveller' | 'neighbour';
+export type TownJournalId = `${TownMoment}${SeasonWord}`;
+const TOWN_MOMENTS: readonly TownMoment[] = ['traveller', 'neighbour'];
+const TOWN_LINES: Record<TownMoment, string> = {
+  traveller: 'A lost traveller came to the hall door. The first face I have seen in years.',
+  neighbour: '{name} is staying on.'
+};
+const townPage = (word: SeasonWord): PageEntry[] => TOWN_MOMENTS.map(moment => ({ id: `${moment}${word}` as TownJournalId, lines: [TOWN_LINES[moment]] }));
+
 /** `name` is the animal's name when the line was written, so naming one later never changes old lines. */
 export interface JournalEntry { year: number; id: JournalId; day: number; variant: number; name?: string }
 
@@ -66,6 +76,7 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'keepFinishedAutumn', lines: ['Laid the last stone on the keep.'] },
     { id: 'castleLineAutumn', lines: ['A line of old stones showed in the grass below the keep.'] },
     ...castlePage('Autumn'),
+    ...townPage('Autumn'),
     { id: 'fox', lines: ['A fox nosed around the berry bushes at dusk.'] },
     { id: 'coldFront', lines: ['The cold night came. I kept the fire through it.', 'The cold night came, and it got the better of me.',
       'A cold autumn night, and the fire kept me warm.'] },
@@ -90,6 +101,7 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'keepFinishedWinter', lines: ['Laid the last stone on the keep.'] },
     { id: 'castleLineWinter', lines: ['A line of old stones showed in the grass below the keep.'] },
     ...castlePage('Winter'),
+    ...townPage('Winter'),
     { id: 'winterBread', lines: ['Bread from my own field, warm by the fire.'] },
     { id: 'winterKeepsake', lines: ['A feather by the fire, bright against the snow.', 'A tuft of fur by the fire, frost on its tips.'] },
     { id: 'namedWinter', lines: ['{name} and I agreed that it was cold.'] }
@@ -102,6 +114,7 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'keepFinishedSpring', lines: ['Laid the last stone on the keep.'] },
     { id: 'castleLineSpring', lines: ['A line of old stones showed in the grass below the keep.'] },
     ...castlePage('Spring'),
+    ...townPage('Spring'),
     { id: 'bushesFull', lines: ['The bushes are full again.'] },
     { id: 'stumpGrowing', lines: ['A stump I cut is growing back already.'] },
     { id: 'springRest', lines: ['Sat a while at the spring, now that it\'s thawed.'] },
@@ -126,6 +139,7 @@ export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
     { id: 'keepFinishedSummer', lines: ['Laid the last stone on the keep.'] },
     { id: 'castleLineSummer', lines: ['A line of old stones showed in the grass below the keep.'] },
     ...castlePage('Summer'),
+    ...townPage('Summer'),
     { id: 'summerKeepsake', lines: ['A feather by the fire on a warm morning.', 'A wisp of fur by the fire on a warm morning.'] },
     { id: 'namedSummer', lines: ['A long warm evening with {name}. Neither of us did much.'] }
   ]
@@ -212,10 +226,21 @@ const CASTLE_RULES: Record<CastleMoment, (m: Moment) => Noticed | null> = {
   castleFeast: m => onBefore(m, dishesLaid(m.before) === 0 && dishesLaid(m.after) > 0),
   castleFinished: m => onBefore(m, m.before.castle.finishedDay === null && m.after.castle.finishedDay !== null)
 };
+const newcomer = (m: Moment): Noticed | null => {
+  const { people } = m.after.town;
+  return people.length > m.before.town.people.length ? { day: m.before.day, name: people[people.length - 1].name } : null;
+};
+const TOWN_RULES: Record<TownMoment, (m: Moment) => Noticed | null> = {
+  // Only the first: the first face in years.
+  traveller: m => onAfter(m, m.before.town.namesUsed === 0 && m.after.town.namesUsed > 0),
+  neighbour: newcomer
+};
+const townRules = Object.fromEntries(SEASON_WORDS.flatMap(word => TOWN_MOMENTS.map(moment => [`${moment}${word}`, TOWN_RULES[moment]]))) as Record<TownJournalId, (m: Moment) => Noticed | null>;
 const castleRules = Object.fromEntries(SEASON_WORDS.flatMap(word => CASTLE_MOMENTS.map(moment => [`${moment}${word}`, CASTLE_RULES[moment]]))) as Record<CastleJournalId, (m: Moment) => Noticed | null>;
 
 const RULES: Record<JournalId, (m: Moment) => Noticed | null> = {
   ...castleRules,
+  ...townRules,
   // Not in the day's first moments, so the morning's own message (a new game, a waking) stays on screen.
   leaves: m => onAfter(m, awake(m) && m.before.timeOfDay >= 30 && isInClearing(m.after) && daylight(m.after)),
   fox: m => onAfter(m, awake(m) && isInClearing(m.after) && atDusk(m.after)),

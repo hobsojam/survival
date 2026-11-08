@@ -15,6 +15,7 @@ import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
 import { bakeryDawn, millGrainBlocker, milledState, takeLoafBlocker, takenLoaf } from './bakehouse';
 import { beehiveDawn, takeHoneyBlocker, takenHoney } from './beehive';
 import { jobsDawn } from './jobs';
+import { answeredTraveller, travellerArrives } from './traveller';
 import { cutField, cutStripBlocker, grindGrainBlocker, seededField, sowStripBlocker, sownField, threshStripBlocker, threshedField, wildGrainBlocker } from './field';
 import { BED_CROPS, bedsDawn, drawWaterBlocker, emptyBed, harvestBedBlocker, needsWater, sowBedBlocker } from './beds';
 import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
@@ -58,6 +59,7 @@ export type GameAction =
   | { type: 'takeLoaf' }
   | { type: 'castleWork'; site: CastleSite }
   | { type: 'chooseHome'; home: 'house' | 'hall' }
+  | { type: 'answerTraveller'; yes: boolean }
   | { type: 'makeCastleGood'; good: CastleGood }
   | { type: 'takeHoney' }
   | { type: 'drawWater' }
@@ -253,7 +255,10 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
     const dusk = next.timeOfDay < nightStart(next.day);
     next.timeOfDay += step;
     remaining -= step;
-    if (dusk && next.timeOfDay >= nightStart(next.day)) ponyStaysAtKeep(next);
+    if (dusk && next.timeOfDay >= nightStart(next.day)) {
+      ponyStaysAtKeep(next);
+      travellerArrives(next);
+    }
     wolfVisit(next);
     startleFox(next);
     startlePony(next);
@@ -1466,8 +1471,12 @@ const chooseHome = (state: GameState, action: ActionOf<'chooseHome'>): ActionRes
   return { state: { ...state, castle: { ...state.castle, home: action.home } }, message: HOME_LINES[action.home] };
 };
 
+/** Answering the traveller at the hall door. EASTER EGG: the town, see src/game/town.ts. */
+const answerTraveller = (state: GameState, action: ActionOf<'answerTraveller'>): ActionResult => answeredTraveller(state, action.yes);
+
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   chooseHome,
+  answerTraveller,
   feedSheep,
   nameAnimal,
   shearFlock,
