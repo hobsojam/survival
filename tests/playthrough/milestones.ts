@@ -1,4 +1,4 @@
-import { NEEDS, TOWERS, hallFinished, isRevealed, moatFill, towerFinished, wallFinished } from '../../src/game/castle';
+import { NEEDS, TOWERS, castleFinished, hallFinished, isRevealed, moatFill, towerFinished, wallFinished } from '../../src/game/castle';
 import { KEEP_DOOR_AT, keepFinished } from '../../src/game/keep';
 import type { GameState, StructureId } from '../../src/game/state';
 
@@ -58,5 +58,7 @@ export const MILESTONES: readonly Milestone[] = [
   { id: 'gatehouse', label: 'Finished the gatehouse', reached: state => state.castle.gatehouse >= NEEDS.gatehouse },
   { id: 'moat-dug', label: 'Dug the moat', reached: state => state.castle.moat.stretches >= NEEDS.moat },
   { id: 'moat-full', label: 'The spring rain filled the moat', reached: state => moatFill(state) === 1 },
-  { id: 'hall', label: 'Built, roofed and hung the great hall', reached: state => hallFinished(state.castle.hall) }
+  { id: 'hall', label: 'Built, roofed and hung the great hall', reached: state => hallFinished(state.castle.hall) },
+  { id: 'feast', label: 'Set the first dish on the hall\'s table', reached: state => Object.values(state.castle.feast).some(count => count > 0) },
+  { id: 'castle-finished', label: 'Finished the castle with the feast', reached: castleFinished }
 ];

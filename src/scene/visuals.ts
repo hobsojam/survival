@@ -110,6 +110,8 @@ function addBuilding(state: GameState, add: AddVisual): void {
   if (castle.gatehouse > 0) add('castle-gatehouse', `castleGatehouse:${gatehouseStep(castle.gatehouse)}${snow}`, GATE_SPOT.x, GATE_SPOT.y);
   const hall = hallStep(castle.hall);
   if (hall > 0) add('castle-hall', `castleHall:${hall}${snow}`, HALL_SPOT.x, HALL_SPOT.y);
+  // The hall's window is lit at night once the castle is finished, whether or not anybody is in.
+  if (castle.finishedDay !== null && state.timeOfDay >= nightStart(state.day)) add('castle-hall-glow', 'castleHallGlow:lit', HALL_SPOT.x, HALL_SPOT.y, Math.round(worldY(HALL_SPOT.y)) + 2);
   for (const id of TOWERS) {
     const step = towerStep(castle.towers[id]);
     if (step > 0) add(`castle-tower-${id}`, `castleTower:${step}${snow}`, TOWER_CORNERS[id].x, TOWER_CORNERS[id].y);

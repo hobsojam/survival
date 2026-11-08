@@ -17,7 +17,7 @@ import { FIELD_STRIPS, ripeDay } from './field';
 import { ORCHARD_SPOTS } from './orchard';
 
 import { KEEP_DOOR_AT, KEEP_STONES } from './keep';
-import { CASTLE_SECTIONS, FEAST_ITEMS, NEEDS, SIDES, TOWERS, hallFinished, towerFinished, wallFinished, type CastleState } from './castle';
+import { CASTLE_SECTIONS, FEAST_ITEMS, NEEDS, allSectionsBuilt, SIDES, TOWERS, hallFinished, towerFinished, wallFinished, type CastleState } from './castle';
 import { SAVE_VERSION, upgradeSave } from './saveUpgrades';
 
 export { SAVE_VERSION };
@@ -536,10 +536,8 @@ function moatOrderOk(castle: CastleState): boolean {
 
 /** The feast is laid only once everything is built, the castle is finished exactly when it is set, and the hall is home only after that. */
 function castleFinishOk(castle: CastleState, made: ObjectValue): boolean {
-  const { moat, hall, feast } = castle;
-  const allBuilt = castle.road === NEEDS.road && made.stoneCart === true && castle.frames === NEEDS.frames && wallFinished(castle)
-    && TOWERS.every(id => towerFinished(castle.towers[id]))
-    && castle.gatehouse === NEEDS.gatehouse && moat.stretches === NEEDS.moat && hallFinished(hall);
+  const { feast } = castle;
+  const allBuilt = allSectionsBuilt(castle, made.stoneCart === true);
   const feastSet = FEAST_ITEMS.every(item => feast[item] === NEEDS.feast[item]);
   if (FEAST_ITEMS.some(item => feast[item] > 0) && !allBuilt) return false;
   if ((castle.finishedDay !== null) !== (allBuilt && feastSet)) return false;

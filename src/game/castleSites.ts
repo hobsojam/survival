@@ -1,8 +1,9 @@
 import { QUARRY_SITE } from './areas';
-import { CASTLE_SECTIONS, NEEDS, SIDES, TOWERS, WALLS, hallFinished, isRevealed, moatStretchSpot, towerFinished, wallFinished, type CastleSection, type CastleState, type FeastItem, type TowerId, type WallSide } from './castle';
+import { CASTLE_SECTIONS, FEAST_ITEMS, NEEDS, SIDES, TOWERS, WALLS, everyOtherSectionDone, feastWants, hallFinished, isRevealed, moatStretchSpot, towerFinished, wallFinished, type CastleSection, type CastleState, type FeastItem, type TowerId, type WallSide } from './castle';
 import { HILLS_EXIT, QUARRY_HILLS_EXIT, availableOre } from './hills';
 import { availableWood, freeSpaces, isInClearing, spaceFor, spendWood } from './camp';
 import { isWinter } from './calendar';
+import { foodCount, takeFromBag } from './food';
 import { KEEP_SITE } from './keep';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { ponyWith } from './pony';
@@ -59,14 +60,14 @@ interface SiteRule {
   spot: (castle: CastleState) => { area: AreaId; x: number; y: number };
   far: string;
   done: string;
-  /** The castle with one more piece laid. */
-  lay: (castle: CastleState, day: number) => CastleState;
+  /** The castle with one more piece laid, for the need it met. */
+  lay: (castle: CastleState, day: number, need: SiteNeed) => CastleState;
   /** What the piece just laid says, read from the castle after it. */
   line: (castle: CastleState) => string;
   /** How much of the section is laid, so a piece of work can be told from what it changed. */
   count: (castle: CastleState) => number;
   /** The prompt for a spot that can be worked now, and for one that is short of something. */
-  label: (castle: CastleState) => string;
+  label: (castle: CastleState, need?: SiteNeed) => string;
   ask: (castle: CastleState, need: SiteNeed) => string;
   /** The refusal for the same shortage. */
   short: (castle: CastleState, need: SiteNeed) => string;
@@ -313,6 +314,49 @@ function hallRule(): SiteRule {
   };
 }
 
+/** Where the table stands: inside the hall's right-hand side, a tile and more from its door, and out of reach of the keep's door. */
+export const TABLE_SPOT = { area: 'hills' as AreaId, x: 22, y: 9 };
+
+/** How each food reads: set down singly in a prompt, and in a list of what the table still wants. */
+const FEAST_WORDS: Record<FeastItem, { one: string; list: string }> = {
+  bread: { one: 'a loaf', list: 'bread' }, roastedHazelnuts: { one: 'roasted hazelnuts', list: 'roasted hazelnuts' },
+  honey: { one: 'some honey', list: 'honey' }, apple: { one: 'an apple', list: 'apples' }, vegetables: { one: 'some vegetables', list: 'vegetables' }
+};
+
+/** "bread", "bread and honey" or "bread, honey and apples". */
+const inWords = (words: string[]): string => (words.length > 1 ? `${words.slice(0, -1).join(', ')} and ${words.at(-1)}` : words.join(''));
+const wantedWords = (castle: CastleState): string => inWords(feastWants(castle).map(item => FEAST_WORDS[item].list));
+const dishesLaid = (castle: CastleState): number => FEAST_ITEMS.reduce((total, item) => total + castle.feast[item], 0);
+
+/** The feast on the hall's table, once everything else is done: a dish a go from the bag, in the order of the feast. The last one finishes the castle. */
+function tableRule(): SiteRule {
+  return {
+    need: state => {
+      const wants = feastWants(state.castle);
+      if (!everyOtherSectionDone(state) || state.castle.finishedDay !== null || wants.length === 0) return null;
+      return { kind: 'food', item: wants.find(item => foodCount(state.inventory.food, item) > 0) ?? wants[0] };
+    },
+    finished: castle => castle.finishedDay !== null,
+    spot: () => TABLE_SPOT,
+    far: 'Move closer to the table.',
+    done: 'The castle is finished.',
+    lay: (castle, day, need) => {
+      if (need.kind !== 'food') return castle;
+      const feast = { ...castle.feast, [need.item]: castle.feast[need.item] + 1 };
+      return { ...castle, feast, finishedDay: FEAST_ITEMS.every(item => feast[item] === NEEDS.feast[item]) ? day : castle.finishedDay };
+    },
+    line: castle => {
+      if (castle.finishedDay !== null) return 'You set down the last dish. The castle is finished.';
+      return dishesLaid(castle) === 1 ? 'You set the first dish on the table.' : 'You set another dish on the table.';
+    },
+    count: dishesLaid,
+    label: (castle, need) => `Set down ${need?.kind === 'food' ? FEAST_WORDS[need.item].one : 'a dish'} (the table still wants ${wantedWords(castle)})`,
+    ask: castle => `Table · bring ${wantedWords(castle)}`,
+    short: castle => `The table still wants ${wantedWords(castle)}.`,
+    effort: 0.25
+  };
+}
+
 const SITE_RULES: Partial<Record<CastleSite, SiteRule>> = {
   road: {
     need: ({ castle }) => (castle.road < NEEDS.road ? { kind: 'stone' } : null),
@@ -332,7 +376,8 @@ const SITE_RULES: Partial<Record<CastleSite, SiteRule>> = {
   ...Object.fromEntries(TOWERS.map(id => [`tower-${id}`, towerRule(id)])),
   gatehouse: gatehouseRule(),
   moat: moatRule(),
-  hall: hallRule()
+  hall: hallRule(),
+  table: tableRule()
 };
 
 /** The sites that can be worked on now, once the line of stones has shown. */
@@ -420,6 +465,7 @@ const lacking = (state: GameState, need: SiteNeed, rule: SiteRule): string | nul
     stone: state.inventory.stone + cartLoad(state) >= 1,
     wood: need.kind === 'wood' && availableWood(state) >= need.amount,
     good: need.kind === 'good' && state.castle.goods[need.good] >= 1,
+    food: need.kind === 'food' && foodCount(state.inventory.food, need.item) >= 1,
     portcullis: state.progress.workshop.portcullis
   };
   return need.kind in covered && !covered[need.kind as keyof typeof covered] ? rule.short(state.castle, need) : null;
@@ -448,12 +494,13 @@ export const castlePrompt = (state: GameState, spot: SiteSpot): string => {
   const waiting = need ? rule.wait?.(state) : null;
   if (waiting) return waiting.label;
   const short = need ? lacking(state, need, rule) : null;
-  return short && need ? rule.ask(state.castle, need) : rule.label(state.castle);
+  return short && need ? rule.ask(state.castle, need) : rule.label(state.castle, need ?? undefined);
 };
 
-/** The state with a need paid: stone from the cart and the bag, wood from the stores and the bag. Goods are moved by the piece laid. */
+/** The state with a need paid: stone from the cart and the bag, wood from the stores and the bag, a food from the bag alone. Goods are moved by the piece laid. */
 const payFor = (state: GameState, need: SiteNeed): GameState | null => {
   if (need.kind === 'stone') return spendCastleStone(state);
+  if (need.kind === 'food') return takeFromBag(state, need.item, 1);
   return need.kind === 'wood' ? spendWood(state, need.amount) : state;
 };
 
@@ -467,7 +514,7 @@ export const doCastleWork = (state: GameState, site: CastleSite): GameState => {
   if (!rule || !need) return state;
   const paid = payFor(state, need);
   if (!paid) return state;
-  return { ...paid, castle: rule.lay(paid.castle, state.day) };
+  return { ...paid, castle: rule.lay(paid.castle, state.day, need) };
 };
 
 /** What a piece of work says, read from the castle before and after it. */
@@ -487,10 +534,14 @@ const NEWS: Partial<Record<CastleSection, string>> = {
   hall: 'The great hall stands finished.'
 };
 
+/** The morning after the castle is finished. */
+const FINISHED_NEWS = 'The castle stands finished. At night the hall windows glow.';
+
 /** The mornings after a section is finished. Each is worked out from the saved day, so it comes once. */
 export const castleNews = (before: GameState, after: GameState): string[] => {
   if (after.day <= before.day) return [];
-  return CASTLE_SECTIONS.filter(section => NEWS[section] && after.castle.doneDays[section] === before.day).map(section => NEWS[section] as string);
+  const sections = CASTLE_SECTIONS.filter(section => NEWS[section] && after.castle.doneDays[section] === before.day).map(section => NEWS[section] as string);
+  return after.castle.finishedDay === before.day ? [...sections, FINISHED_NEWS] : sections;
 };
 
 export type CastleGood = 'beams' | 'fittings' | 'hangings';

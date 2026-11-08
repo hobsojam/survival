@@ -285,6 +285,11 @@ for (let step = 1; step <= HALL_STEPS; step++) {
   hallFrames[`${step}s`] = g => hall(g, step, true);
 }
 
+/** The hall's window at night, between its two iron bars: a pane of lamplight over the same picture as the hall, drawn on top of it. */
+function hallGlow(g: Grid): void {
+  box(g, 38, HALL_BASE - 20, 2, 6, 'y');
+}
+
 const FRAMES_W = 48;
 const FRAMES_H = 64;
 const FRAMES_BASE = 58;
@@ -500,6 +505,7 @@ export const castleSprites: Record<string, SpriteDef> = {
   castleWall: define(WALL_W, WALL_H, wallFrames, [8, WALL_BASE + 1], buildLegend),
   castleTower: define(TOWER_W, TOWER_H, towerFrames, [TOWER_CENTRE, TOWER_BASE + 1], buildLegend),
   castleHall: define(HALL_W, HALL_H, hallFrames, [16, HALL_BASE + 1], hallLegend),
+  castleHallGlow: define(HALL_W, HALL_H, { lit: hallGlow }, [16, HALL_BASE + 1], hallLegend),
   castleGatehouse: define(GATE_W, GATE_H, gateFrames, [GATE_CENTRE, GATE_BASE + 1], buildLegend),
   castlePortcullis: define(PASSAGE_W, PASSAGE_H + 1, grateFrames, [PASSAGE_W / 2, 0], buildLegend),
   castleLine: define(LINE_W, LINE_H, { still }, [1, 1], legend),

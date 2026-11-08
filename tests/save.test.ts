@@ -838,6 +838,46 @@ describe('the castle in the save', () => {
     })).toBe(true);
   });
 
+  const everythingBuilt = (state: GameState): void => {
+    const castle = state.castle;
+    castle.road = 30; state.progress.workshop.stoneCart = true; state.progress.workshop.portcullis = true; wallDone(castle);
+    castle.towers = { nw: { ...fullTower }, ne: { ...fullTower }, se: { ...fullTower }, sw: { ...fullTower } };
+    castle.gatehouse = 30; castle.moat = { stretches: 16, lastDugDay: 8, dugDay: 8 }; castle.hall = { stones: 40, beams: 12, fittings: 6, hangings: 2 };
+    castle.doneDays = { ...castle.doneDays, road: 6, 'tower-nw': 8, 'tower-ne': 8, 'tower-se': 8, 'tower-sw': 8, gatehouse: 8, moat: 8, hall: 8 };
+  };
+
+  it('accepts the feast part-laid, whole and unfinished, and whole and finished, once everything is built', () => {
+    expect(accepts(state => { everythingBuilt(state); })).toBe(true);
+    expect(accepts(state => { everythingBuilt(state); state.castle.feast = { bread: 2, roastedHazelnuts: 0, honey: 1, apple: 0, vegetables: 0 }; })).toBe(true);
+    expect(accepts(state => { everythingBuilt(state); state.castle.feast = { ...NEEDS.feast, vegetables: 3 }; })).toBe(true);
+    expect(accepts(state => { everythingBuilt(state); state.castle.feast = { ...NEEDS.feast }; state.castle.finishedDay = 9; })).toBe(true);
+    expect(accepts(state => { everythingBuilt(state); state.castle.feast = { ...NEEDS.feast }; state.castle.finishedDay = state.day; })).toBe(true);
+  });
+
+  it('accepts a moat dug whole and still empty as built, for the feast', () => {
+    expect(accepts(state => { everythingBuilt(state); state.castle.moat = { stretches: 16, lastDugDay: state.day, dugDay: state.day }; state.castle.doneDays.moat = state.day; state.castle.feast = { ...NEEDS.feast }; state.castle.finishedDay = state.day; })).toBe(true);
+  });
+
+  it.each<[string, (state: GameState) => void]>([
+    ['a whole feast with no finished day', state => { everythingBuilt(state); state.castle.feast = { ...NEEDS.feast }; }],
+    ['a finished day with the feast one dish short', state => { everythingBuilt(state); state.castle.feast = { ...NEEDS.feast, honey: 2 }; state.castle.finishedDay = 9; }],
+    ['a finished day with no feast laid', state => { everythingBuilt(state); state.castle.finishedDay = 9; }],
+    ['a finished day with the moat one stretch short', state => { everythingBuilt(state); state.castle.moat = { stretches: 15, lastDugDay: 8, dugDay: null }; delete state.castle.doneDays.moat; state.castle.feast = { ...NEEDS.feast }; state.castle.finishedDay = 9; }],
+    ['a finished day with the hall one hanging short', state => { everythingBuilt(state); state.castle.hall.hangings = 1; delete state.castle.doneDays.hall; state.castle.feast = { ...NEEDS.feast }; state.castle.finishedDay = 9; }],
+    ['a finished day with a tower unfinished', state => { everythingBuilt(state); state.castle.towers.nw = { ...fullTower, fittings: 1 }; delete state.castle.doneDays['tower-nw']; state.castle.feast = { ...NEEDS.feast }; state.castle.finishedDay = 9; }],
+    ['a finished day with no portcullis or gatehouse', state => { cartMade(state); wallDone(state.castle); state.castle.feast = { ...NEEDS.feast }; state.castle.finishedDay = 9; }],
+    ['a finished day in the future', state => { everythingBuilt(state); state.castle.feast = { ...NEEDS.feast }; state.castle.finishedDay = 9999; }],
+    ['a finished day of zero', state => { everythingBuilt(state); state.castle.feast = { ...NEEDS.feast }; state.castle.finishedDay = 0; }],
+    ['a finished day that is not whole', state => { everythingBuilt(state); state.castle.feast = { ...NEEDS.feast }; state.castle.finishedDay = 9.5; }],
+    ['a finished day that is a string', state => { everythingBuilt(state); state.castle.feast = { ...NEEDS.feast }; (state.castle as unknown as Record<string, unknown>).finishedDay = '9'; }],
+    ['a dish laid before everything is built', state => { cartMade(state); state.castle.feast.bread = 1; }],
+    ['a dish laid with the hall one hanging short', state => { everythingBuilt(state); state.castle.hall.hangings = 1; delete state.castle.doneDays.hall; state.castle.feast.bread = 1; }],
+    ['a negative dish count', state => { everythingBuilt(state); state.castle.feast.honey = -1; }],
+    ['a fractional dish count', state => { everythingBuilt(state); state.castle.feast.honey = 1.5; }]
+  ])('rejects %s', (_, change) => {
+    expect(accepts(change)).toBe(false);
+  });
+
   it('accepts a gatehouse part-laid and one finished, each with its portcullis', () => {
     expect(accepts(state => { cartMade(state); wallDone(state.castle); state.progress.workshop.portcullis = true; state.castle.gatehouse = 12; })).toBe(true);
     expect(accepts(state => { cartMade(state); wallDone(state.castle); state.progress.workshop.portcullis = true; state.castle.gatehouse = 30; state.castle.doneDays.gatehouse = 9; })).toBe(true);
