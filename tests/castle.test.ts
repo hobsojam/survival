@@ -2156,7 +2156,7 @@ describe('the hall: prompt, key and tap agree beside the keep and the east wall'
         } else if (nearest && near(there.player, nearest) <= BALANCE.interactionRadius) {
           if (nearest.site === 'hall') hallOnly++;
           expect(useKeyAction(there), where).toEqual({ type: 'castleWork', site: nearest.site });
-          expect(promptFor(there), where).toMatch(new RegExp(`^E  ${castlePrompt(there, nearest).replace(/[()/]/g, '\\$&')}`));
+          expect(promptFor(there).startsWith(`E  ${castlePrompt(there, nearest)}`), `${where}: ${promptFor(there)}`).toBe(true);
         } else {
           expect(useKeyAction(there)?.type, where).not.toBe('castleWork');
         }
