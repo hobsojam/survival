@@ -1,6 +1,8 @@
 import type { JobId } from './town';
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isSummer, isWinter, nightStart, yearOf } from './calendar';
-import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, hillsPathOpen, pathOpen } from './areas';
+import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HILLS_BRIDGE_EXIT, HOMESTEAD_EXIT, MEADOW_ENTRY, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, hillsPathOpen, lowestY, pathOpen } from './areas';
+import { bridgeDone } from './bridge';
+import { MEADOW_FOUND_MESSAGE } from './meadow';
 import { offerToPony, ponyArrives, ponyOfferBlocker, startlePony, ponyStaysAtKeep } from './pony';
 import { HILLS_EXIT, HILLS_FOUND_MESSAGE, OUTCROP_MESSAGES, QUARRY_HILLS_EXIT, digOreBlocker, outcropLeft, spendOre } from './hills';
 import { TOO_TIRED_MESSAGE, isExhausted, isHungry, isLowMeter, recovery, workSeconds } from './needs';
@@ -149,6 +151,7 @@ export function movementFactor(state: GameState): number {
 export function sleepBlocker(state: GameState): string | null {
   if (state.timeOfDay < nightStart(state.day)) return 'You can sleep once night falls. Rest (R) for a short break.';
   if (inKeep(state)) return null;
+  if (state.area === 'meadow') return 'Cross back to the hills to sleep.';
   if (state.area === 'hills' && keepFinished(state)) return 'Go to the keep door to sleep.';
   // In the house the bed is indoors, so home is the only thing asked for.
   if (livesInHouse(state)) return isAtHome(state) ? null : 'Go home to sleep.';
@@ -397,6 +400,12 @@ function hillsFoundOnArrival(moved: GameState): ActionResult {
   return { state: { ...moved, progress: { ...moved.progress, hillsFound: true } }, message: HILLS_FOUND_MESSAGE };
 }
 
+/** Coming out in the meadow over the bridge for the first time. EASTER EGG: the town, see src/game/town.ts. */
+function meadowFoundOnArrival(moved: GameState): ActionResult {
+  if (moved.area !== 'meadow' || moved.progress.meadowFound) return { state: moved, message: '' };
+  return { state: { ...moved, progress: { ...moved.progress, meadowFound: true } }, message: MEADOW_FOUND_MESSAGE };
+}
+
 function quarryFoundOnArrival(moved: GameState): ActionResult {
   if (moved.area === 'quarry' && !moved.progress.quarryFound && near(moved.player.x, moved.player.y, QUARRY_SITE.x, QUARRY_SITE.y, 2)) {
     return { state: { ...moved, progress: { ...moved.progress, quarryFound: true } }, message: 'You found an old quarry. A pickaxe could work this stone.' };
@@ -409,6 +418,7 @@ function walkedArrival(moved: GameState): ActionResult {
     return { state: { ...moved, progress: { ...moved.progress, homesteadFound: true } }, message: 'You found an abandoned homestead.' };
   }
   if (moved.area === 'hills') return hillsFoundOnArrival(moved);
+  if (moved.area === 'meadow') return meadowFoundOnArrival(moved);
   return quarryFoundOnArrival(moved);
 }
 
@@ -425,7 +435,7 @@ const move: ActionHandler<'move'> = (state, action) => {
   const crossed = crossing(state, rawX, rawY);
   const player = crossed
     ? { ...state.player, x: crossed.x, y: crossed.y }
-    : { ...state.player, x: Math.max(0, Math.min(BALANCE.mapWidth - 1, rawX)), y: Math.max(0, Math.min(BALANCE.mapHeight - 1, rawY)) };
+    : { ...state.player, x: Math.max(0, Math.min(BALANCE.mapWidth - 1, rawX)), y: Math.max(0, Math.min(lowestY(state, rawX), rawY)) };
   const moved = settleChickens(pickUpKeepsake({ ...state, ...(crossed ? { area: crossed.area } : {}), player }));
   const startled = { ...moved };
   startlePony(startled);
@@ -441,6 +451,13 @@ const crossOver: ActionHandler<'cross'> = state => {
     if (west) return { state: { ...state, area: 'quarry', player: { ...state.player, x: BALANCE.mapWidth - 1.5, y: CAMP_EXIT.y } }, message: '' };
     return { state: { ...state, area: 'homestead', player: { ...state.player, x: 0.5, y: CAMP_HOMESTEAD_EXIT.y },
       progress: { ...state.progress, homesteadFound: true } }, message: state.progress.homesteadFound ? '' : 'You found an abandoned homestead.' };
+  }
+  if (state.area === 'meadow') {
+    if (!near(state.player.x, state.player.y, MEADOW_ENTRY.x, MEADOW_ENTRY.y, 0.5)) return refuse(state, 'Walk up to the bridge to cross.');
+    return { state: { ...state, area: 'hills', player: { ...state.player, x: HILLS_BRIDGE_EXIT.x, y: BALANCE.mapHeight - 1.5 } }, message: '' };
+  }
+  if (state.area === 'hills' && bridgeDone(state.town.bridge) && near(state.player.x, state.player.y, HILLS_BRIDGE_EXIT.x, HILLS_BRIDGE_EXIT.y, 0.5)) {
+    return meadowFoundOnArrival({ ...state, area: 'meadow', player: { ...state.player, ...MEADOW_ENTRY } });
   }
   if (state.area === 'hills') {
     if (!near(state.player.x, state.player.y, HILLS_EXIT.x, HILLS_EXIT.y, 0.5)) return refuse(state, 'Walk to the path down.');

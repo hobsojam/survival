@@ -1,7 +1,8 @@
 import { isWinter, nightStart } from '../game/calendar';
 import { BALANCE, LOOKOUT, SITES, type GameState, type ResourceKind, type SiteId, type TreeNode } from '../game/state';
 import { isAtCamp, isInClearing, mineBlocker, sleepBlocker, freeSpaces, spaceFor, type GameAction } from '../game/rules';
-import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, hillsPathOpen, pathOpen } from '../game/areas';
+import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HILLS_BRIDGE_EXIT, HOMESTEAD_EXIT, MEADOW_ENTRY, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, hillsPathOpen, pathOpen } from '../game/areas';
+import { bridgeDone } from '../game/bridge';
 import { CHICKEN_SITE, COOP_SITE } from '../game/chickens';
 import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, outcropNote } from '../game/hills';
 import { NEEDS, isRevealed, lineDistance } from '../game/castle';
@@ -137,6 +138,7 @@ export function useKeyAction(state: GameState): GameAction | undefined {
   if (state.area === 'quarry') choices = quarryChoices(state);
   else if (state.area === 'homestead') choices = homesteadChoices(state);
   else if (state.area === 'hills') choices = hillsChoices(state);
+  else if (state.area === 'meadow') choices = meadowChoices(state);
   else choices = campChoices(state);
   return choices.find(choice => choice.action)?.action ?? (isAtHome(state) ? { type: 'rest' } : undefined);
 }
@@ -199,6 +201,7 @@ export function promptFor(state: GameState): string {
 function basePrompt(state: GameState): string {
   if (state.area === 'quarry') return quarryPrompt(state);
   if (state.area === 'hills') return hillsPrompt(state);
+  if (state.area === 'meadow') return meadowPrompt(state);
   if (state.area === 'homestead') {
     const labels = choiceLabels(homesteadChoices(state));
     if (labels.length) return labels.join(' · ');
@@ -376,6 +379,20 @@ function hillsPrompt(state: GameState): string {
   const labels = choiceLabels(hillsChoices(state));
   if (labels.length) return withCartLoad(state, labels.join(' · '), stoneWork(state));
   if (within(state, HILLS_EXIT)) return 'Walk east to go back down';
+  if (bridgeDone(state.town.bridge) && within(state, HILLS_BRIDGE_EXIT)) return 'Walk south to cross the bridge';
+  return 'WASD / arrows  Move';
+}
+
+/** EASTER EGG: everything in reach in the meadow over the bridge, see src/game/town.ts. */
+function meadowChoices(state: GameState): Choice[] {
+  const town = townChoice(state);
+  return town ? [town] : [];
+}
+
+function meadowPrompt(state: GameState): string {
+  const labels = choiceLabels(meadowChoices(state));
+  if (labels.length) return labels.join(' · ');
+  if (within(state, MEADOW_ENTRY)) return 'Walk north to cross back over the bridge';
   return 'WASD / arrows  Move';
 }
 

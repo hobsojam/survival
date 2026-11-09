@@ -1,6 +1,9 @@
 // EASTER EGG: the town, see src/game/town.ts. The meadow over the bridge, and the old traders' road through it: cleared
 // a section at a time, then marked with a milestone, for whoever comes this way.
 
+/** What the survivor sees the first time they cross the bridge. */
+export const MEADOW_FOUND_MESSAGE = 'Over the bridge, the meadow runs down to an old road, half lost in the grass.';
+
 /** How many sections of the old road there are to clear, and how much work each takes. */
 export const ROAD_SECTIONS = 6;
 export const ROAD_WORK = 4;

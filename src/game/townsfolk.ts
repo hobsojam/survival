@@ -1,4 +1,4 @@
-import { CAMP_EXIT, HOMESTEAD_EXIT } from './areas';
+import { CAMP_EXIT, HOMESTEAD_EXIT, MEADOW_ENTRY } from './areas';
 import { afternoonStart, duskLength, nightStart, season, type Season } from './calendar';
 import { HALL_DOOR_SPOT } from './castle';
 import { HILLS_EXIT } from './hills';
@@ -14,7 +14,7 @@ import { HOUSE_PLOTS } from './townSites';
 export interface PersonSpot { area: AreaId; x: number; y: number; walking: boolean }
 
 /** The way out of each area toward the hills. */
-const EXITS: Partial<Record<AreaId, { x: number; y: number }>> = { camp: CAMP_EXIT, homestead: HOMESTEAD_EXIT, quarry: { x: 0, y: 15 } };
+const EXITS: Partial<Record<AreaId, { x: number; y: number }>> = { camp: CAMP_EXIT, homestead: HOMESTEAD_EXIT, quarry: { x: 0, y: 15 }, meadow: { x: MEADOW_ENTRY.x, y: 0 } };
 
 const between = (from: { x: number; y: number }, to: { x: number; y: number }, f: number) => ({ x: from.x + (to.x - from.x) * f, y: from.y + (to.y - from.y) * f });
 

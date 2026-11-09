@@ -230,6 +230,12 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     addPiles(state, visuals, add);
     return visuals;
   }
+  // EASTER EGG: the town, see src/game/town.ts. The meadow over the bridge, with its houses.
+  if (state.area === 'meadow') {
+    addTown(state, add);
+    addPiles(state, visuals, add);
+    return visuals;
+  }
   if (state.area === 'homestead') {
     add('homestead-shed', 'homesteadShed:still', HOMESTEAD_SHED.x, HOMESTEAD_SHED.y);
     const full = season(state.day) === 'autumn' && state.homestead.applesReadyDay <= state.day;
