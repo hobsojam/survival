@@ -15,7 +15,8 @@ export const TRAVELLER_REFUSALS = 3;
 /** At nightfall: someone comes to the hall door, once the hall is home and there is work to offer. */
 export function travellerArrives(next: GameState): void {
   const { town, castle } = next;
-  if (castle.home !== 'hall' || castle.finishedDay === null || townStarted(next) || town.namesUsed >= TOWN_NAMES.length || openJob(next) === null) return;
+  // Only the very first traveller needs the hall to be home; after that, word has got around.
+  if ((castle.home !== 'hall' && town.namesUsed === 0) || castle.finishedDay === null || townStarted(next) || town.namesUsed >= TOWN_NAMES.length || openJob(next) === null) return;
   if (town.goneDay !== null && next.day < town.goneDay + TRAVELLER_RETURN_DAYS) return;
   next.town = { ...town, traveller: { name: TOWN_NAMES[town.namesUsed], arrivedDay: next.day, refusals: 0, askedDay: null }, namesUsed: town.namesUsed + 1 };
 }

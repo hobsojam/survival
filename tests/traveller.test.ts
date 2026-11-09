@@ -142,6 +142,16 @@ describe('asking for work', () => {
     expect(back.town.namesUsed).toBe(2);
   });
 
+  it('sends the next traveller even with the house made home again, since only the first needs the hall', () => {
+    let state = asking();
+    for (let no = 0; no < TRAVELLER_REFUSALS; no++) {
+      state = answer(state, false).state;
+      if (no < TRAVELLER_REFUSALS - 1) state = nextMorning(state);
+    }
+    const house = { ...state, day: DAY + 3 + TRAVELLER_RETURN_DAYS, castle: { ...state.castle, home: 'house' as const } };
+    expect(throughNightfall(house).town.traveller).toMatchObject({ name: 'Tomas' });
+  });
+
   it('refuses an answer with no one asking', () => {
     const quiet = hallHome();
     expect(answer(quiet, true)).toEqual({ state: quiet, message: '' });
@@ -218,6 +228,18 @@ describe('the visitor on the page', () => {
 });
 
 describe('the town in the year journal', () => {
+  it('writes a line for each neighbour who stays, even two in one season, and never one twice', () => {
+    const first = recordJournal(asking(), answer(asking(), true).state, { type: 'answerTraveller', yes: true }).state;
+    const tomas = { name: 'Tomas', job: 'honey' as const, house: null, arrivedDay: DAY + 2 };
+    const before = { ...first, day: DAY + 3 };
+    const after = { ...before, town: { ...before.town, people: [...before.town.people, tomas], namesUsed: 2 } };
+    const both = recordJournal(before, after, { type: 'answerTraveller', yes: true }).state;
+    expect(both.journal.filter(entry => entry.id.startsWith('neighbour')).map(entry => entry.name)).toEqual(['Ada', 'Tomas']);
+    const again = recordJournal(after, { ...after, town: { ...after.town, people: [...after.town.people] } }).state;
+    expect(again.journal.filter(entry => entry.id.startsWith('neighbour'))).toHaveLength(1);
+  });
+
+
   it('leaves its lines off the page as blanks until they are written', () => {
     const before = journalPageView(hallHome(), currentPage(DAY)).blanks;
     const stayed = recordJournal(asking(), answer(asking(), true).state, { type: 'answerTraveller', yes: true }).state;
