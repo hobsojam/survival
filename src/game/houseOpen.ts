@@ -1,0 +1,21 @@
+import { openJob } from './jobs';
+import type { GameState } from './state';
+import { HOUSE_NEEDS } from './town';
+
+// EASTER EGG: the town, see src/game/town.ts. Which house is open to build. This sits apart from town.ts because it
+// asks the jobs what is free, and the jobs need the game state, which needs the town.
+
+/** Whether a house is open to build. Houses go up one at a time, in plot order: the next one opens for someone already
+ * waiting in the hall, or, once every finished house is lived in, while there is a job free for a newcomer to take. */
+export const houseOpen = (state: GameState, plot: number): boolean => {
+  const { houses, people } = state.town;
+  const house = houses[plot];
+  if (house === undefined || house.doneDay !== null || houses.slice(0, plot).some(lower => lower.doneDay === null)) return false;
+  if (people.some(person => person.house === null)) return true;
+  const allLivedIn = houses.every((built, index) => built.doneDay === null || people.some(person => person.house === index));
+  return people.length > 0 && allLivedIn && openJob(state) !== null;
+};
+
+/** How many more beams or fittings the open houses still take. */
+export const townGoodNeed = (state: GameState, good: 'beams' | 'fittings'): number =>
+  state.town.houses.reduce((total, house, plot) => total + (houseOpen(state, plot) ? HOUSE_NEEDS[good] - house[good] : 0), 0);

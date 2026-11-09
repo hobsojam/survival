@@ -1,3 +1,4 @@
+import { street } from './townStreet';
 import { describe, expect, it } from 'vitest';
 import { townsfolkSprites } from '../src/art/townsfolkSprites';
 import { CAMP_EXIT } from '../src/game/areas';
@@ -63,7 +64,7 @@ describe('where the town\'s people are', () => {
     expect(gap(personSpot(town(end), 0)!, HALL_DOOR_SPOT)).toBeLessThan(0.2);
     const housed = town(end, state => {
       state.town.people = [{ ...ada, house: 0 }];
-      state.town.houses = [{ stone: 30, beams: 4, fittings: 1, doneDay: 64 }];
+      state.town.houses = street({ stone: 30, beams: 4, fittings: 1, doneDay: 64 });
     });
     expect(gap(personSpot(housed, 0)!, HOUSE_PLOTS[0])).toBeLessThan(0.2);
   });

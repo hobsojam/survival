@@ -1,13 +1,17 @@
 import { spendCastleStone } from './castleSites';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { BALANCE, type AreaId, type GameState } from './state';
-import { HOUSE_NEEDS, houseFinished, houseOpen, type HouseState } from './town';
+import { houseOpen } from './houseOpen';
+import { HOUSE_NEEDS, houseFinished, type HouseState } from './town';
 
 // EASTER EGG: the town, see src/game/town.ts. Houses on fixed plots on the hills outside the castle walls, built in
 // stages from stone, the workshop's beams and the forge's iron. The first is built for the first neighbour.
 
-/** Where the houses stand: on the open ground south-east of the castle, below the wall. */
-export const HOUSE_PLOTS: readonly { area: AreaId; x: number; y: number }[] = [{ area: 'hills', x: 31, y: 23 }];
+/** Where the houses stand, in the order they are built: a street of two rows on the open ground below the castle wall,
+ * with a lane between them, starting south-east of the castle and growing west. */
+export const HOUSE_PLOTS: readonly { area: AreaId; x: number; y: number }[] = (
+  [[31, 23], [26, 21], [22, 21], [27, 25], [18, 21], [23, 25], [14, 21], [19, 25]] as const
+).map(([x, y]) => ({ area: 'hills' as const, x, y }));
 
 /** How far a house has got: none, its footings at ten stone, its walls at thirty, its roof at four beams, its door and hearth at its fitting. */
 export function houseStage(house: HouseState): 0 | 1 | 2 | 3 | 4 {

@@ -31,10 +31,11 @@ export interface TownState {
 export const HOUSE_NEEDS = { stone: 30, beams: 4, fittings: 1 } as const;
 
 /** How many plots there are for houses. */
-export const HOUSE_COUNT = 1;
+export const HOUSE_COUNT = 8;
 
 /** The names people arrive with, in the order they come. People are people and already have names: these are never changed. */
-export const TOWN_NAMES: readonly string[] = ['Ada', 'Tomas', 'Elin', 'Bram', 'Maud', 'Osric', 'Hild', 'Piers', 'Agnes', 'Wat', 'Isolde', 'Hugh'];
+export const TOWN_NAMES: readonly string[] = ['Ada', 'Tomas', 'Elin', 'Bram', 'Maud', 'Osric', 'Hild', 'Piers', 'Agnes', 'Wat', 'Isolde', 'Hugh',
+  'Cuthbert', 'Edith', 'Godric', 'Joan', 'Lettice', 'Martin', 'Nell', 'Roger', 'Sybil', 'Walter', 'Alys', 'Ralf'];
 
 export const emptyHouse = (): HouseState => ({ stone: 0, beams: 0, fittings: 0, doneDay: null });
 
@@ -46,13 +47,3 @@ export const townStarted = (state: GameState): boolean => state.town.traveller !
 /** Whether every part of a house is laid. */
 export const houseFinished = (house: HouseState): boolean =>
   house.stone === HOUSE_NEEDS.stone && house.beams === HOUSE_NEEDS.beams && house.fittings === HOUSE_NEEDS.fittings;
-
-/** Whether a house is open to build: someone who has stayed is waiting for a house, and it isn't finished yet. */
-export const houseOpen = (state: GameState, plot: number): boolean => {
-  const house = state.town.houses[plot];
-  return house !== undefined && house.doneDay === null && state.town.people.some(person => person.house === null);
-};
-
-/** How many more beams or fittings the open houses still take. */
-export const townGoodNeed = (state: GameState, good: 'beams' | 'fittings'): number =>
-  state.town.houses.reduce((total, house, plot) => total + (houseOpen(state, plot) ? HOUSE_NEEDS[good] - house[good] : 0), 0);

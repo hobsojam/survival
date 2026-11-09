@@ -1,4 +1,6 @@
 import { emptyTown } from '../src/game/town';
+import { townSpots } from '../src/game/townSites';
+import { finishedCastleCamp } from './townStreet';
 import { describe, expect, it } from 'vitest';
 import { createGame, type GameState } from '../src/game/state';
 import { loadGame, saveGame, SAVE_KEY, SAVE_VERSION } from '../src/game/save';
@@ -333,5 +335,18 @@ describe('the version 39 upgrade: the castle', () => {
     if (loaded.kind !== 'loaded') return;
     expect(loaded.state.town).toEqual(emptyTown());
     expect(loaded.state.castle).toEqual(old.castle);
+  });
+
+  it('brings a version 40 town up to the street of eight plots, with the next plot open', () => {
+    const old = finishedCastleCamp();
+    old.town = { ...old.town, people: [{ name: 'Ada', job: 'hens', house: 0, arrivedDay: 20 }, { name: 'Tomas', job: 'honey', house: null, arrivedDay: 40 }], namesUsed: 2, houses: [{ stone: 30, beams: 4, fittings: 1, doneDay: 30 }] };
+    const storage = new MemoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 40, state: old }));
+    const loaded = loadGame(storage);
+    expect(loaded.kind).toBe('loaded');
+    if (loaded.kind !== 'loaded') return;
+    expect(loaded.state.town.houses).toHaveLength(8);
+    expect(loaded.state.town.houses[0]).toEqual({ stone: 30, beams: 4, fittings: 1, doneDay: 30 });
+    expect(townSpots(loaded.state).map(spot => spot.plot)).toEqual([1]);
   });
 });
