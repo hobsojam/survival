@@ -1,6 +1,6 @@
 import { spendCastleStone } from './castleSites';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
-import { PAVING_SECTION, SQUARE_NEEDS, STALL_IDS, STALL_SPOTS, STALL_WORDS, pieceDone, pieceOpen, type SquarePiece, type SquareState } from './square';
+import { PAVING_SECTION, SQUARE_NEEDS, STALL_IDS, STALL_SPOTS, STALL_WORDS, halfHangingLeft, pieceDone, pieceOpen, type SquarePiece, type SquareState } from './square';
 import { BALANCE, type AreaId, type GameState } from './state';
 
 // EASTER EGG: the town, see src/game/town.ts. Where the square's pieces stand on the hills, at the west end of the
@@ -36,7 +36,10 @@ function pieceNeed(square: SquareState, piece: SquarePiece): Need {
 }
 
 const cartStone = (state: GameState): number => (state.castle.cart.at === 'hills' ? state.castle.cart.stone : 0);
-const has = (state: GameState, need: Need): boolean => (need === 'stone' ? state.inventory.stone + cartStone(state) >= 1 : state.castle.goods[need] >= 1);
+const has = (state: GameState, need: Need): boolean => {
+  if (need === 'stone') return state.inventory.stone + cartStone(state) >= 1;
+  return (need === 'hangings' && halfHangingLeft(state.town.square)) || state.castle.goods[need] >= 1;
+};
 
 const SHORT: Record<Need, string> = {
   stone: 'Bring stone up from the quarry.', beams: 'Make beams at the workshop.', fittings: 'Make an iron fitting at the forge.', hangings: 'Weave a hanging at the loom.'
@@ -77,10 +80,12 @@ function laid(square: SquareState, piece: SquarePiece, need: Need): SquareState 
   return { ...square, stalls: { ...square.stalls, [piece]: { ...square.stalls[piece], [key]: square.stalls[piece][key] + 1 } } };
 }
 
-/** The state with one piece of the square laid: stone from the cart and the bag, a beam, fitting or hanging from the castle goods. */
+/** The state with one piece of the square laid: stone from the cart and the bag, a beam, fitting or hanging from the castle goods. A hanging makes two awnings. */
 export function doSquareWork(state: GameState, piece: SquarePiece): GameState {
   const need = pieceNeed(state.town.square, piece);
-  const paid = need === 'stone' ? spendCastleStone(state) : { ...state, castle: { ...state.castle, goods: { ...state.castle.goods, [need]: state.castle.goods[need] - 1 } } };
+  const halfLeft = need === 'hangings' && halfHangingLeft(state.town.square);
+  const paid = need === 'stone' ? spendCastleStone(state)
+    : halfLeft ? state : { ...state, castle: { ...state.castle, goods: { ...state.castle.goods, [need]: state.castle.goods[need] - 1 } } };
   if (!paid) return state;
   const square = laid(state.town.square, piece, need);
   const doneDays = pieceDone(square, piece) ? { ...square.doneDays, [piece]: state.day } : square.doneDays;
@@ -94,5 +99,6 @@ export function squareWorkLine(after: SquareState, piece: SquarePiece): string {
     return after.paving % PAVING_SECTION === 0 ? 'A quarter of the square is paved.' : 'You lay another paving stone.';
   }
   if (piece === 'well') return pieceDone(after, 'well') ? 'The well is finished. The bucket comes up full.' : 'You lay another stone on the well.';
-  return pieceDone(after, piece) ? `The ${STALL_WORDS[piece]} stall is up, with its awning.` : 'You raise a beam for the stall.';
+  if (!pieceDone(after, piece)) return 'You raise a beam for the stall.';
+  return `The ${STALL_WORDS[piece]} stall is up, with ${halfHangingLeft(after) ? 'half a hanging' : 'the other half'} for its awning.`;
 }

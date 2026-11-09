@@ -14,7 +14,7 @@ import { FEAST_ITEMS, HALL_DOOR_SPOT, NEEDS, TOWERS, castleFinished, everyOtherS
 import { CART_SPOTS, GOODS, castleSpots, goodRoom, type CastleGood } from '../../src/game/castleSites';
 import { travellerAsking } from '../../src/game/traveller';
 import { townSpots } from '../../src/game/townSites';
-import { STALL_IDS, SQUARE_NEEDS, pieceDone } from '../../src/game/square';
+import { STALL_IDS, SQUARE_NEEDS, halfHangingLeft, pieceDone } from '../../src/game/square';
 import { squareSpots } from '../../src/game/squareSites';
 import { HOUSE_NEEDS } from '../../src/game/town';
 import { KEEP_DOOR_AT, KEEP_DOOR_WOOD, KEEP_SITE, atHallDoor, keepFinished, keepOpen } from '../../src/game/keep';
@@ -461,15 +461,15 @@ export class Player {
       { id: 'town-answer', shown: travellerAsking, done: state => !travellerAsking(state), step: () => this.act({ type: 'answerTraveller', yes: true }) },
       ...(['beams', 'fittings'] as const).map(good => ({
         id: `town-${good}`,
-        shown: (state: GameState) => castleFinished(state) && townSpots(state).length + squareSpots(state).length > 0 && !allStalls(state),
+        shown: (state: GameState) => castleFinished(state) && (townSpots(state).length > 0 || (threeHouses(state) && squareSpots(state).length > 0)) && !allStalls(state),
         done: (state: GameState) => goodRoom(state, good) === 0 || allStalls(state) || houseHasGoods(state, good),
         step: () => this.payFor(good === 'beams' ? { wood: GOODS.beams.cost.wood, fiber: 0, stone: 0 } : { wood: GOODS.fittings.cost.wood, fiber: 0, stone: 0, ore: GOODS.fittings.cost.ore }, { type: 'makeCastleGood', good })
       })),
       { id: 'town-house', shown: state => townSpots(state).length > 0 && !allStalls(state), done: state => townSpots(state).length === 0 || allStalls(state), step: () => this.buildHouse() },
       // The stalls' awnings are woven at the loom, as the hall's hangings were.
-      { id: 'town-hangings', shown: state => castleFinished(state) && state.structures.loom && squareSpots(state).length > 0 && !allStalls(state), done: state => goodRoom(state, 'hangings') === 0 || allStalls(state), step: () => this.weaveHanging() },
-      // The square is worked only while no house plot is open, so the houses keep their pace.
-      { id: 'town-square', shown: state => squareSpots(state).length > 0 && townSpots(state).length === 0, done: allStalls, step: () => this.buildSquare() },
+      { id: 'town-hangings', shown: state => threeHouses(state) && castleFinished(state) && state.structures.loom && squareSpots(state).length > 0 && !allStalls(state), done: state => goodRoom(state, 'hangings') === 0 || allStalls(state), step: () => this.weaveHanging() },
+      // The square is started once the third house stands, and worked only while no house plot is open, so the houses keep their pace.
+      { id: 'town-square', shown: state => threeHouses(state) && squareSpots(state).length > 0 && townSpots(state).length === 0, done: allStalls, step: () => this.buildSquare() },
       { id: 'castle-moat-fills', shown: state => state.castle.moat.stretches >= NEEDS.moat, done: state => moatFill(state) === 1, step: () => false },
       { id: 'mine', shown: state => progress(state).pickaxeCrafted, done: state => progress(state).mineBuilt, step: () => this.buildMine() },
       ...(['basket', 'cairn'] as const).map(site => ({
@@ -589,7 +589,8 @@ export class Player {
       const action: GameAction = { type: 'squareWork', piece };
       if (piece === 'paving' || (piece === 'well' && square.well.stone < SQUARE_NEEDS.well.stone)) return this.stoneStep(spot, action);
       const good = piece === 'well' ? 'fittings' : square.stalls[piece].beams < SQUARE_NEEDS.stall.beams ? 'beams' : 'hangings';
-      if (this.state.castle.goods[good] > 0) return this.goTo(spot.area) && this.walkTo(spot) && this.act(action);
+      const halfLeft = good === 'hangings' && halfHangingLeft(square);
+      if (halfLeft || this.state.castle.goods[good] > 0) return this.goTo(spot.area) && this.walkTo(spot) && this.act(action);
     }
     return false;
   }
@@ -938,6 +939,8 @@ const isFeastItem = (item: FoodItem): item is FeastItem => (FEAST_ITEMS as reado
 /** A little longer once the castle is finished and home, so whatever else the game offers gets a chance to be taken up. */
 const DAYS_AFTER_THE_END = 40;
 /** The square's five stalls standing is where the scripted game's town stops: the game ends there. EASTER EGG: the town. */
+/** The scripted player starts the square once the third house stands. EASTER EGG: the town. */
+const threeHouses = (state: GameState): boolean => state.town.houses[2]?.doneDay != null;
 /** While a house plot is open, goods are made for the house alone, so the square's stalls don't hold it up. */
 const houseHasGoods = (state: GameState, good: 'beams' | 'fittings'): boolean => {
   const spot = townSpots(state)[0];

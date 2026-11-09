@@ -369,7 +369,7 @@ export const castleGoodsTitle = (state: GameState): string => (state.castle.fini
 /** What each good is for once the castle is finished and the town needs it instead. EASTER EGG: the town, see src/game/town.ts. */
 const TOWN_GOOD_COPY: Partial<Record<CastleGood, string>> = {
   beams: 'Four at a time, cut and dressed for the town\'s houses and stalls.',
-  hangings: 'One at a time, woven from wool for the stalls\' awnings.'
+  hangings: 'One at a time, woven from wool and cut in two for the stalls\' awnings.'
 };
 
 /** A good's line in the panel: for the castle while it stands unfinished, then for the town. */

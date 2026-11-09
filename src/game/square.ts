@@ -7,6 +7,11 @@ import type { GameState } from './state';
 
 /** The five stalls, one for each good the town will sell on market day. */
 export type StallId = 'bread' | 'honey' | 'wool' | 'apples' | 'eggs';
+/** How many stalls have their awning up. Each hanging is cut in two, so every other awning is the half left over. */
+export const awningsUp = (square: SquareState): number => STALL_IDS.filter(id => square.stalls[id].hangings > 0).length;
+/** Whether half a hanging is left over from the last awning, ready for the next. */
+export const halfHangingLeft = (square: SquareState): boolean => awningsUp(square) % 2 === 1;
+
 /** The stall jobs, one for each stall. */
 export const STALL_JOBS = { bread: 'breadStall', honey: 'honeyStall', wool: 'woolStall', apples: 'appleStall', eggs: 'eggStall' } as const satisfies Record<StallId, JobId>;
 

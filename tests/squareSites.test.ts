@@ -88,7 +88,24 @@ describe('building the square', () => {
     expect(promptFor(marked('bread', paved))).toContain('Raise a stall beam (0/2)');
     const frame = marked('apples', state => { paved(state); state.town.square.stalls.apples.beams = 2; });
     expect(promptFor(frame)).toContain('Hang the stall\'s awning');
-    expect(work(frame, 'apples').message).toBe('The apple stall is up, with its awning.');
+    expect(work(frame, 'apples').message).toBe('The apple stall is up, with half a hanging for its awning.');
+  });
+
+  it('cuts each hanging in two, so every other awning needs no new hanging', () => {
+    const halfUp = (state: GameState) => {
+      paved(state);
+      state.town.square.stalls.bread = { beams: 2, hangings: 1 };
+      state.town.square.doneDays.bread = 46;
+      state.town.square.stalls.apples.beams = 2;
+      state.castle.goods.hangings = 0;
+    };
+    const second = marked('apples', halfUp);
+    expect(promptFor(second)).toContain('Hang the stall\'s awning');
+    const done = work(second, 'apples');
+    expect(done.message).toBe('The apple stall is up, with the other half for its awning.');
+    expect(done.state.castle.goods.hangings).toBe(0);
+    const first = work(marked('apples', state => { paved(state); state.town.square.stalls.apples.beams = 2; }), 'apples');
+    expect(first.state.castle.goods.hangings).toBe(0);
   });
 
   it('asks for a hanging from the loom when there is none, and still lets the rest be built', () => {
@@ -119,9 +136,11 @@ describe('the goods the square needs', () => {
   it('asks the loom for hangings for the stalls once the paving is down, and fewer as awnings go up', () => {
     const none = (state: GameState) => { state.castle.goods = { beams: 0, fittings: 0, hangings: 0 }; };
     expect(goodRoom(marked('paving', none), 'hangings')).toBe(0);
-    expect(goodRoom(marked('well', state => { none(state); paved(state); }), 'hangings')).toBe(5);
+    expect(goodRoom(marked('well', state => { none(state); paved(state); }), 'hangings')).toBe(3);
     const hung = marked('bread', state => { none(state); paved(state); state.town.square.stalls.bread = { beams: 2, hangings: 1 }; state.town.square.doneDays.bread = 46; });
-    expect(goodRoom(hung, 'hangings')).toBe(4);
+    expect(goodRoom(hung, 'hangings')).toBe(2);
+    const two = marked('honey', state => { none(state); paved(state); for (const id of ['bread', 'honey'] as const) { state.town.square.stalls[id] = { beams: 2, hangings: 1 }; state.town.square.doneDays[id] = 46; } });
+    expect(goodRoom(two, 'hangings')).toBe(2);
     expect(townGoodNeed(marked('well', state => { none(state); paved(state); }), 'beams')).toBe(10 + townGoodNeed(marked('paving', none), 'beams'));
     expect(townGoodNeed(marked('well', state => { none(state); paved(state); }), 'fittings')).toBe(1 + townGoodNeed(marked('paving', none), 'fittings'));
   });
@@ -129,7 +148,7 @@ describe('the goods the square needs', () => {
   it('words the goods for the town once the castle is finished', () => {
     const town = marked('well', paved);
     expect(goodCopy(town, 'beams')).toBe('Four at a time, cut and dressed for the town\'s houses and stalls.');
-    expect(goodCopy(town, 'hangings')).toBe('One at a time, woven from wool for the stalls\' awnings.');
+    expect(goodCopy(town, 'hangings')).toBe('One at a time, woven from wool and cut in two for the stalls\' awnings.');
     expect(goodCopy(town, 'fittings')).toBe('One at a time, to fit the beams.');
     const castle = { ...town, castle: { ...town.castle, finishedDay: null } };
     expect(goodCopy(castle, 'beams')).toBe('Four at a time, cut and dressed for the towers and the hall.');
