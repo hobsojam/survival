@@ -25,6 +25,10 @@ import { sheepStage, type SheepStage } from '../game/sheep';
 import { APPLE_TREE, HOMESTEAD_SHED } from '../game/homestead';
 import type { StockLevel } from '../art/phase3Sprites';
 import { HOUSE_PLOTS, houseStage } from '../game/townSites';
+import { bridgeStage } from '../game/bridge';
+import { BRIDGE_SITE } from '../game/bridgeSites';
+import { milestoneDone } from '../game/meadow';
+import { MILESTONE_SITE, ROAD_ORDER, ROAD_SPOTS } from '../game/roadSites';
 import { townsfolkHere } from '../game/townsfolk';
 import { TOWN_NAMES } from '../game/town';
 import { TOWNSFOLK_DRESSES } from '../art/townsfolkSprites';
@@ -157,6 +161,27 @@ function addSquare(state: GameState, add: AddVisual): void {
   }
 }
 
+/** The bridge on the hills from its first stone: the piers, the arch on its centering, the deck, and the finished parapets. EASTER EGG: the town, see src/game/town.ts. */
+function addBridge(state: GameState, add: AddVisual): void {
+  const { bridge } = state.town;
+  if (state.area !== 'hills' || (bridge.stone === 0 && bridge.beams === 0)) return;
+  const stage = bridgeStage(bridge);
+  const frame = stage === null ? 'done' : stage === 'parapet' ? 'deck' : stage;
+  add('bridge', `townBridge:${frame}${isWinter(state.day) ? 's' : ''}`, BRIDGE_SITE.x, BRIDGE_SITE.y, GROUND_DECAL_DEPTH + 2);
+}
+
+/** The meadow's old road under bracken where it isn't cleared yet, thinner where it is being cleared, and its milestone. EASTER EGG: the town, see src/game/town.ts. */
+function addMeadow(state: GameState, add: AddVisual): void {
+  const snow = isWinter(state.day) ? 's' : '';
+  const { road } = state.town;
+  const clear = ROAD_ORDER.slice(0, road.cleared);
+  const working = road.work > 0 ? ROAD_ORDER[road.cleared] : null;
+  ROAD_SPOTS.forEach((spot, i) => {
+    if (!clear.includes(i)) add(`road-${i}`, `roadBrush:${i === working ? 'half' : 'wild'}${snow}`, spot.x, spot.y, GROUND_DECAL_DEPTH + 1);
+  });
+  if (road.milestone > 0) add('milestone', `milestone:${milestoneDone(road) ? 'done' : 'low'}${snow}`, MILESTONE_SITE.x, MILESTONE_SITE.y);
+}
+
 /** The town's people out in this area: at work, walking home, or the traveller waiting by the hall door. Each name keeps its own colours. */
 function addTownsfolk(state: GameState, timeMs: number, add: AddVisual): void {
   for (const each of townsfolkHere(state)) {
@@ -225,6 +250,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     addBuilding(state, add);
     addTown(state, add);
     addSquare(state, add);
+    addBridge(state, add);
     if (isRevealed(state)) add('castle-line', 'castleLine:still', WALLS.left, WALLS.top, GROUND_DECAL_DEPTH);
     HILL_TREES.forEach((tree, index) => treeUnderWall(state.castle, tree) || add(`hill-tree-${index}`, `${tree.sprite}:${frame}`, tree.x, tree.y));
     addPiles(state, visuals, add);
@@ -233,6 +259,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
   // EASTER EGG: the town, see src/game/town.ts. The meadow over the bridge, with its houses.
   if (state.area === 'meadow') {
     addTown(state, add);
+    addMeadow(state, add);
     addPiles(state, visuals, add);
     return visuals;
   }

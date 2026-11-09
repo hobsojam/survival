@@ -270,14 +270,14 @@ function meadowPlant(x: number, y: number, time: Season): string | undefined {
  * along its edges, and the lane down from the bridge to the old road. Nothing here is gathered. */
 function buildMeadowMap(time: Season): TerrainMap {
   const map = emptyMap();
-  const lane = MEADOW_PATHS.slice(0, 1);
   const clear = (x: number, y: number, by: number) => pathDistance(x + .5, y + .5, MEADOW_PATHS) >= by
     && HOUSE_PLOTS.every(plot => plot.area !== 'meadow' || Math.hypot(plot.x - x, plot.y - y) >= 2.5);
   for (let y = 0; y < BALANCE.mapHeight; y++) {
     const row: string[] = [];
     for (let x = 0; x < BALANCE.mapWidth; x++) {
       row.push(`grass${hash(x, y, 50) % 4}`);
-      const path = pathTile(x, y, lane);
+      // The old road's stones lie under the bracken the scene draws over each uncleared stretch.
+      const path = pathTile(x, y, MEADOW_PATHS);
       if (path) map.pathTiles.push({ x, y, sprite: path });
       if (edgeDistance(x, y) <= 1 && hash(x, y, 56) % 4 === 0) {
         if (clear(x, y, 2)) map.trees.push({ x, y, sprite: hash(x, y, 57) % 3 === 0 ? 'treeBroadleaf' : 'treeYoung' });
