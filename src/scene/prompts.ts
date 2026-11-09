@@ -8,6 +8,7 @@ import { NEEDS, isRevealed, lineDistance } from '../game/castle';
 import { GATE_SPOT, cartWithin, castleNeedsStone, castlePrompt, castleWorkBlocker, nearestCastleSpot } from '../game/castleSites';
 import { townPrompt, townSpots, townWorkBlocker } from '../game/townSites';
 import { squarePrompt, squareSpots, squareWorkBlocker } from '../game/squareSites';
+import { bridgePrompt, bridgeSpot, bridgeWorkBlocker } from '../game/bridgeSites';
 import { greetingHere } from '../game/townsfolk';
 import { KEEP_DOOR_WOOD, KEEP_SITE, KEEP_STONES, atHallDoor, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor } from '../game/keep';
 import { ponyNote, ponyOfferLabel } from '../game/pony';
@@ -31,7 +32,7 @@ export const KEY_ACTIONS: readonly [string, GameAction][] = [
 
 const ACTION_POSES: Partial<Record<GameAction['type'], SurvivorAction>> = {
   gather: 'gather', rest: 'rest', cook: 'cook', stargaze: 'stargaze',
-  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', takeCartStone: 'gather', digOre: 'gather', layStone: 'gather', castleWork: 'gather', townWork: 'gather', squareWork: 'gather', hangDoor: 'gather', offerPony: 'gather', fish: 'gather',
+  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', takeCartStone: 'gather', digOre: 'gather', layStone: 'gather', castleWork: 'gather', townWork: 'gather', squareWork: 'gather', bridgeWork: 'gather', hangDoor: 'gather', offerPony: 'gather', fish: 'gather',
   gatherApples: 'gather', plantPip: 'gather', pickOrchardApple: 'gather', searchShed: 'gather', takeEgg: 'gather'
 };
 
@@ -146,7 +147,7 @@ export function actionEffect(action: GameAction, after: GameState): { kind: 'dus
   if (action.type === 'digOre') return { kind: 'dust', ...OUTCROP_SITE };
   if (action.type === 'layStone' || action.type === 'hangDoor') return { kind: 'dust', ...KEEP_SITE };
   if (action.type === 'castleWork' && action.site === 'gatehouse' && after.castle.gatehouse === NEEDS.gatehouse) return { kind: 'portcullis', x: GATE_SPOT.x, y: GATE_SPOT.y };
-  if (action.type === 'castleWork' || action.type === 'townWork' || action.type === 'squareWork') return { kind: 'dust', x: after.player.x, y: after.player.y };
+  if (action.type === 'castleWork' || action.type === 'townWork' || action.type === 'squareWork' || action.type === 'bridgeWork') return { kind: 'dust', x: after.player.x, y: after.player.y };
   if (action.type === 'cook' || action.type === 'stargaze') return { kind: action.type, x: after.player.x, y: after.player.y };
   return undefined;
 }
@@ -300,6 +301,14 @@ function squareChoice(state: GameState): Choice | null {
   return squareWorkBlocker(state, spot.piece) === null ? { label, action: { type: 'squareWork', piece: spot.piece } } : { label };
 }
 
+/** EASTER EGG: the bridge, when the survivor is at it, see src/game/town.ts. */
+function bridgeChoice(state: GameState): Choice | null {
+  const spot = bridgeSpot(state);
+  if (!spot || state.area !== spot.area || !within(state, spot)) return null;
+  const label = bridgePrompt(state);
+  return bridgeWorkBlocker(state) === null ? { label, action: { type: 'bridgeWork' } } : { label };
+}
+
 /** EASTER EGG: the town's house plot the survivor is at, see src/game/town.ts. */
 function townChoice(state: GameState): Choice | null {
   const spot = townSpots(state).find(each => each.area === state.area && within(state, each));
@@ -341,6 +350,7 @@ function hillsChoices(state: GameState): Choice[] {
   const castle = castleChoice(state);
   const town = townChoice(state);
   const square = squareChoice(state);
+  const bridge = bridgeChoice(state);
   const cart = cartChoice(state);
   // EASTER EGG: the castle's line of old stones, named only once it has been seen.
   const stones = isRevealed(state) && state.castle.frames === 0 && !castle && lineDistance(state.player) <= BALANCE.interactionRadius;
@@ -354,6 +364,7 @@ function hillsChoices(state: GameState): Choice[] {
     ...(castle ? [castle] : []),
     ...(town ? [town] : []),
     ...(square ? [square] : []),
+    ...(bridge ? [bridge] : []),
     ...(cart ? [cart] : []),
     ...(stones ? [{ label: 'Old stones · a wall could run here' }] : []),
     ...(offer ? [{ label: offer, action: { type: 'offerPony' as const } }] : []),

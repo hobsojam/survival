@@ -10,6 +10,7 @@ import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, outcropLeft } from '../gam
 import { CART_SPOTS, castleSpots, type CastleSite } from '../game/castleSites';
 import { townSpots } from '../game/townSites';
 import { squareSpots } from '../game/squareSites';
+import { bridgeSpot } from '../game/bridgeSites';
 import type { SquarePiece } from '../game/square';
 import { KEEP_SITE, keepFinished, keepNeedsDoor } from '../game/keep';
 import { keepFrame } from './visuals';
@@ -34,6 +35,7 @@ export type TapTarget =
   | { kind: 'castleSite'; site: CastleSite; x: number; y: number }
   | { kind: 'townSite'; plot: number; x: number; y: number }
   | { kind: 'squareSite'; piece: SquarePiece; x: number; y: number }
+  | { kind: 'bridgeSite'; x: number; y: number }
   | { kind: 'stoneCart'; x: number; y: number }
   | { kind: 'chickens'; x: number; y: number; action: 'meetChickens' | 'leadChickens' }
   | { kind: 'appleTree' | 'shed' | 'coop'; x: number; y: number }
@@ -113,6 +115,12 @@ function squareTargets(state: GameState): { target: TapTarget }[] {
   return squareSpots(state).filter(spot => spot.area === state.area).map(({ piece, x, y }) => ({ target: { kind: 'squareSite' as const, piece, x, y } }));
 }
 
+/** The bridge while it can be built, from the hills. EASTER EGG: the town, see src/game/town.ts. */
+function bridgeTargets(state: GameState): { target: TapTarget }[] {
+  const spot = bridgeSpot(state);
+  return spot && spot.area === state.area ? [{ target: { kind: 'bridgeSite' as const, x: spot.x, y: spot.y } }] : [];
+}
+
 /** The town's open house plots in this area. EASTER EGG: the town, see src/game/town.ts. */
 function townTargets(state: GameState): { target: TapTarget }[] {
   return townSpots(state).filter(spot => spot.area === state.area).map(({ plot, x, y }) => ({ target: { kind: 'townSite' as const, plot, x, y } }));
@@ -146,6 +154,7 @@ export function pickTapTarget(state: GameState, x: number, y: number): TapTarget
       ...castleTargets(state),
       ...townTargets(state),
       ...squareTargets(state),
+      ...bridgeTargets(state),
       ...cartTargets(state),
       ...(wild ? [{ target: { kind: 'pony' as const, ...wild }, sprite: 'pony' }] : []),
       { target: { kind: 'crossing', ...HILLS_EXIT } }];
@@ -233,6 +242,7 @@ export function targetAction(target: TapTarget): GameAction | null {
     case 'castleSite': return { type: 'castleWork', site: target.site };
     case 'townSite': return { type: 'townWork', plot: target.plot };
     case 'squareSite': return { type: 'squareWork', piece: target.piece };
+    case 'bridgeSite': return { type: 'bridgeWork' };
     case 'stoneCart': return { type: 'takeCartStone' };
     case 'chickens': return { type: target.action };
     case 'appleTree': return { type: 'gatherApples' };
