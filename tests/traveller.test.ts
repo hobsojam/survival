@@ -7,7 +7,10 @@ import { newsBetween } from '../src/game/news';
 import { advanceTime, applyAction } from '../src/game/rules';
 import { loadGame, saveGame } from '../src/game/save';
 import { createGame, type GameState } from '../src/game/state';
-import { TRAVELLER_REFUSALS, TRAVELLER_RETURN_DAYS, travellerArrives, travellerAsking, townNews } from '../src/game/traveller';
+import { JOB_ORDER } from '../src/game/jobs';
+import { TRAVELLER_REFUSALS, TRAVELLER_RETURN_DAYS, WORD_DAYS, travellerArrives, travellerAsking, townNews } from '../src/game/traveller';
+import type { JobId } from '../src/game/town';
+import { street } from './townStreet';
 import { visitorView } from '../src/ui/panels';
 import { renderVisitorPanel, visitorAction } from '../src/ui/townPanel';
 import { currentPage, journalPageView } from '../src/ui/yearJournal';
@@ -65,7 +68,18 @@ const asking = (change?: (state: GameState) => void): GameState => {
   return nextMorning(arrived);
 };
 
-const answer = (state: GameState, yes: boolean) => applyAction(state, { type: 'answerTraveller', yes });
+const answer = (state: GameState, yes: boolean, job?: JobId) => applyAction(state, { type: 'answerTraveller', yes, ...(job ? { job } : {}) });
+
+const built = (doneDay: number) => ({ stone: 30, beams: 4, fittings: 1, doneDay });
+/** Ada keeps the hens from the first house, and the second was finished on DAY with no one in it yet. The bees and the beds want a worker unless `bare`. */
+const settled = (day: number, bare = false): GameState => hallHome(state => {
+  state.day = day;
+  state.town = { ...state.town, people: [{ name: 'Ada', job: 'hens', house: 0, arrivedDay: 20 }], namesUsed: 1, houses: street(built(30), built(DAY)) };
+  if (!bare) Object.assign(state.structures, { beehive: true, vegetableBeds: true });
+});
+/** Tomas came at nightfall on DAY + WORD_DAYS, and it is the next morning. */
+const tomasAsking = (): GameState => nextMorning(throughNightfall(settled(DAY + WORD_DAYS)));
+const jobsView = (shown: JobId[]) => JOB_ORDER.map(job => expect.objectContaining({ job, shown: shown.includes(job) }));
 
 describe('the traveller arrives', () => {
   it('comes to the hall door at the first nightfall with the hall as home, wherever the survivor is', () => {
@@ -175,6 +189,58 @@ describe('asking for work', () => {
   });
 });
 
+describe('word gets around', () => {
+  it('sends someone new a few days after each house is finished', () => {
+    expect(WORD_DAYS).toBe(5);
+    expect(throughNightfall(settled(DAY + WORD_DAYS - 1)).town.traveller).toBeNull();
+    const arrived = throughNightfall(settled(DAY + WORD_DAYS));
+    expect(arrived.town.traveller).toEqual({ name: 'Tomas', arrivedDay: DAY + WORD_DAYS, refusals: 0, askedDay: null });
+    expect(arrived.town.namesUsed).toBe(2);
+    const morning = advanceTime({ ...arrived, timeOfDay: 239.5 }, 1);
+    expect(townNews(arrived, morning)).toEqual(['Tomas heard there was work here, and came to the hall door at nightfall.']);
+  });
+
+  it('sends no one while the finished houses are all lived in', () => {
+    const full = settled(DAY + WORD_DAYS);
+    full.town.houses = street(built(30));
+    expect(throughNightfall(full).town.traveller).toBeNull();
+  });
+
+  it('gives the newcomer the job you choose and the empty house', () => {
+    const result = answer(tomasAsking(), true, 'beds');
+    expect(result.message).toBe('Tomas will stay.');
+    expect(result.state.town.people[1]).toEqual({ name: 'Tomas', job: 'beds', house: 1, arrivedDay: DAY + WORD_DAYS });
+    expect(answer(tomasAsking(), true).state.town.people[1]).toMatchObject({ job: 'honey', house: 1 });
+  });
+
+  it('refuses a job that is not free, and any answer with no one asking', () => {
+    const state = tomasAsking();
+    expect(answer(state, true, 'sheep')).toEqual({ state, message: '' });
+    expect(answer(state, true, 'hens')).toEqual({ state, message: '' });
+    const quiet = settled(DAY);
+    expect(answer(quiet, true, 'beds')).toEqual({ state: quiet, message: '' });
+  });
+
+  it('waits for a job to open, and sends someone the nightfall after the bakery is built', () => {
+    const idle = settled(DAY + WORD_DAYS, true);
+    expect(throughNightfall(idle).town.traveller).toBeNull();
+    idle.structures.bakery = true;
+    expect(throughNightfall(idle).town.traveller).toMatchObject({ name: 'Tomas' });
+  });
+
+  it('sends someone else no sooner than ten days after a newcomer is turned away', () => {
+    let state = tomasAsking();
+    for (let no = 0; no < TRAVELLER_REFUSALS; no++) {
+      state = answer(state, false).state;
+      if (no < TRAVELLER_REFUSALS - 1) state = nextMorning(state);
+    }
+    const gone = state.town.goneDay!;
+    expect(state.town.traveller).toBeNull();
+    expect(throughNightfall({ ...state, day: gone + TRAVELLER_RETURN_DAYS - 1 }).town.traveller).toBeNull();
+    expect(throughNightfall({ ...state, day: gone + TRAVELLER_RETURN_DAYS }).town.traveller).toMatchObject({ name: 'Elin' });
+  });
+});
+
 describe('the morning after', () => {
   it('names the traveller in the morning news', () => {
     const arrived = throughNightfall(hallHome());
@@ -196,15 +262,23 @@ describe('the morning after', () => {
 describe('the visitor on the page', () => {
   it('shows the ask with its two answers only while someone is asking', () => {
     expect(visitorView(hallHome()).shown).toBe(false);
-    expect(visitorView(asking())).toEqual({ shown: true, copy: 'Ada asks if there is any work. Ada could look after the hens.', yes: 'Offer work', no: 'Not today' });
+    expect(visitorView(asking())).toEqual({ shown: true, copy: 'Ada asks if there is any work. Ada could look after the hens.', jobs: jobsView(['hens']), no: 'Not today' });
+    expect(visitorView(asking()).jobs[0].label).toBe('Look after the hens');
+  });
+
+  it('asks which job to give when more than one is free', () => {
+    const view = visitorView(tomasAsking());
+    expect(view.copy).toBe('Tomas asks if there is any work. Which job will you give Tomas?');
+    expect(view.jobs).toEqual(jobsView(['honey', 'beds']));
+    expect(view.jobs.filter(job => job.shown).map(job => job.label)).toEqual(['Keep the bees', 'Tend the vegetable beds']);
   });
 
   const page = () => {
     const elements = {
       '.visitor-panel': { hidden: true, textContent: null, dataset: {} },
       '#visitor-copy': { hidden: false, textContent: null, dataset: {} },
-      '#visitor-yes': { hidden: false, textContent: null, dataset: { answer: 'yes' } },
-      '#visitor-no': { hidden: false, textContent: null, dataset: { answer: 'no' } }
+      '#visitor-no': { hidden: false, textContent: null, dataset: { answer: 'no' } },
+      ...Object.fromEntries(JOB_ORDER.map(job => [`#visitor-job-${job}`, { hidden: true, textContent: null, dataset: { job } }]))
     } as Record<string, { hidden: boolean; textContent: string | null; dataset: DOMStringMap }>;
     return { elements, root: { querySelector: (selector: string) => elements[selector] ?? null } };
   };
@@ -214,10 +288,14 @@ describe('the visitor on the page', () => {
     renderVisitorPanel(root, visitorView(asking()));
     expect(elements['.visitor-panel'].hidden).toBe(false);
     expect(elements['#visitor-copy'].textContent).toBe('Ada asks if there is any work. Ada could look after the hens.');
-    expect(elements['#visitor-yes'].textContent).toBe('Offer work');
+    expect(elements['#visitor-job-hens']).toMatchObject({ hidden: false, textContent: 'Look after the hens', dataset: { job: 'hens' } });
+    expect(elements['#visitor-job-honey'].hidden).toBe(true);
     expect(elements['#visitor-no'].textContent).toBe('Not today');
-    expect(visitorAction(elements['#visitor-yes'].dataset)).toEqual({ type: 'answerTraveller', yes: true });
+    expect(visitorAction(elements['#visitor-job-hens'].dataset)).toEqual({ type: 'answerTraveller', yes: true, job: 'hens' });
     expect(visitorAction(elements['#visitor-no'].dataset)).toEqual({ type: 'answerTraveller', yes: false });
+    expect(visitorAction({ job: 'pigs' })).toEqual({ type: 'answerTraveller', yes: false });
+    renderVisitorPanel(root, visitorView(tomasAsking()));
+    expect(JOB_ORDER.filter(job => !elements[`#visitor-job-${job}`].hidden)).toEqual(['honey', 'beds']);
     renderVisitorPanel(root, visitorView(hallHome()));
     expect(elements['.visitor-panel'].hidden).toBe(true);
   });

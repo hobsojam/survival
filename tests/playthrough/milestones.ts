@@ -65,5 +65,7 @@ export const MILESTONES: readonly Milestone[] = [
   // EASTER EGG: the town, see src/game/town.ts.
   { id: 'town-traveller', label: 'A traveller came to the hall door', reached: state => state.town.namesUsed > 0 },
   { id: 'town-neighbour', label: 'Took on the first neighbour', reached: state => state.town.people.length > 0 },
-  { id: 'town-house', label: 'Built the first house', reached: state => state.town.houses[0]?.doneDay !== null }
+  { id: 'town-house', label: 'Built the first house', reached: state => state.town.houses[0]?.doneDay !== null },
+  { id: 'town-house-2', label: 'Built the second house', reached: state => state.town.houses[1]?.doneDay !== null },
+  { id: 'town-house-3', label: 'Three houses, three neighbours', reached: state => state.town.houses[2]?.doneDay !== null && state.town.people.some(person => person.house === 2) }
 ];

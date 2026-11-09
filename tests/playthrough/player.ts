@@ -451,15 +451,16 @@ export class Player {
       { id: 'castle-feast', shown: everyOtherSectionDone, done: castleFinished, step: () => this.layFeast() },
       // Once the castle is finished, the first time through the hall's door offers it as home, and the player takes it.
       { id: 'castle-home', shown: castleFinished, done: state => state.castle.home === 'hall', step: () => this.moveIn() },
-      // EASTER EGG: the town. The traveller at the hall door is offered work on their first ask, then the first house is built for them.
+      // EASTER EGG: the town. Each traveller at the hall door is offered the first free job on their first ask, and the houses
+      // are built one after another as they open, up to the third, where the game ends.
       { id: 'town-answer', shown: travellerAsking, done: state => !travellerAsking(state), step: () => this.act({ type: 'answerTraveller', yes: true }) },
       ...(['beams', 'fittings'] as const).map(good => ({
         id: `town-${good}`,
-        shown: (state: GameState) => castleFinished(state) && townSpots(state).length > 0,
-        done: (state: GameState) => goodRoom(state, good) === 0,
+        shown: (state: GameState) => castleFinished(state) && townSpots(state).length > 0 && !threeHouses(state),
+        done: (state: GameState) => goodRoom(state, good) === 0 || threeHouses(state),
         step: () => this.payFor(good === 'beams' ? { wood: GOODS.beams.cost.wood, fiber: 0, stone: 0 } : { wood: GOODS.fittings.cost.wood, fiber: 0, stone: 0, ore: GOODS.fittings.cost.ore }, { type: 'makeCastleGood', good })
       })),
-      { id: 'town-house', shown: state => townSpots(state).length > 0, done: state => townSpots(state).length === 0, step: () => this.buildHouse() },
+      { id: 'town-house', shown: state => townSpots(state).length > 0 && !threeHouses(state), done: state => townSpots(state).length === 0 || threeHouses(state), step: () => this.buildHouse() },
       { id: 'castle-moat-fills', shown: state => state.castle.moat.stretches >= NEEDS.moat, done: state => moatFill(state) === 1, step: () => false },
       { id: 'mine', shown: state => progress(state).pickaxeCrafted, done: state => progress(state).mineBuilt, step: () => this.buildMine() },
       ...(['basket', 'cairn'] as const).map(site => ({
@@ -557,7 +558,7 @@ export class Player {
     return usable() > 0 && this.goTo(spot.area) && this.walkTo(spot) && this.act(action);
   }
 
-  /** The first house: its stone as the castle's, then the beams and the fitting made at camp. EASTER EGG: the town. */
+  /** The next open house: its stone as the castle's, then the beams and the fitting made at camp. EASTER EGG: the town. */
   private buildHouse(): boolean {
     const spot = townSpots(this.state)[0];
     if (!spot) return false;
@@ -911,4 +912,6 @@ const isFeastItem = (item: FoodItem): item is FeastItem => (FEAST_ITEMS as reado
 
 /** A little longer once the castle is finished and home, so whatever else the game offers gets a chance to be taken up. */
 const DAYS_AFTER_THE_END = 40;
-const MILESTONES_THAT_END = ['keep-finished', 'keep-night', 'keep-climbed', 'castle-finished', 'castle-home', 'town-traveller', 'town-neighbour', 'town-house'];
+/** The third house is where the scripted game's town stops: the game ends there. EASTER EGG: the town. */
+const threeHouses = (state: GameState): boolean => state.town.houses[2]?.doneDay != null;
+const MILESTONES_THAT_END = ['keep-finished', 'keep-night', 'keep-climbed', 'castle-finished', 'castle-home', 'town-traveller', 'town-neighbour', 'town-house', 'town-house-2', 'town-house-3'];
