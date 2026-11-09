@@ -99,7 +99,7 @@ export function startlePony(next: GameState): void {
 
 /** Whether the shod pony is with the survivor now: it stays out of the snow on the hills, and goes home at nightfall unless it stayed by the finished keep tonight. */
 export function ponyWith(state: GameState): boolean {
-  if (state.pony.shod === null) return false;
+  if (state.pony.shod === null || state.area === 'meadow') return false;
   if (state.area === 'hills' && isWinter(state.day)) return false;
   return !isNight(state) || state.area === 'camp' || (state.area === 'hills' && state.keep.ponyNight === state.day);
 }

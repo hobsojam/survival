@@ -1,3 +1,5 @@
+import { emptyHouse } from '../src/game/town';
+import { ROAD_WORK } from '../src/game/meadow';
 import { finishedCastleCamp, street } from './townStreet';
 import { describe, expect, it } from 'vitest';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
@@ -775,6 +777,10 @@ describe('the town in the save', () => {
   const accepts = (change?: (state: GameState) => void) => saveGame(new MemoryStorage(), finished(change)).ok;
   const ada = { name: 'Ada', job: 'hens' as const, house: null, arrivedDay: 20 };
   const built = { stone: 30, beams: 4, fittings: 1, doneDay: 30 };
+  /** Eight houses finished, so the bridge can be built. */
+  const eight = (state: GameState) => { state.town.houses = street(...Array.from({ length: 8 }, () => built)); };
+  /** Eight houses and the bridge finished. */
+  const meadowOpen = (state: GameState) => { eight(state); state.town.bridge = { stone: 50, beams: 4, fittings: 2, doneDays: { piers: 40, arch: 45, parapet: 50 } }; };
 
   it('accepts no town, a traveller, a person in the hall, and a person in a finished house', () => {
     expect(accepts()).toBe(true);
@@ -823,9 +829,30 @@ describe('the town in the save', () => {
     ['a finished piece with no finished day', (state: GameState) => { state.town.houses = street(built, built); state.town.square.paving = 40; }],
     ['a finished day on an unfinished piece', (state: GameState) => { state.town.houses = street(built, built); Object.assign(state.town.square, { paving: 39, doneDays: { paving: 40 } }); }],
     ['the second house finished before the first', (state: GameState) => { state.town.houses = street({ stone: 0, beams: 0, fittings: 0, doneDay: null }, built); }],
-    ['a town with more houses than plots', (state: GameState) => { state.town.houses = [...state.town.houses, { stone: 0, beams: 0, fittings: 0, doneDay: null }]; }]
+    ['a town with more houses than plots', (state: GameState) => { state.town.houses = [...state.town.houses, { stone: 0, beams: 0, fittings: 0, doneDay: null }]; }],
+    ['the meadow before the bridge is done', (state: GameState) => { eight(state); state.area = 'meadow'; }],
+    ['bridge work with seven houses finished', (state: GameState) => { state.town.houses = street(...Array.from({ length: 7 }, () => built)); state.town.bridge.stone = 3; }],
+    ['arch beams before the piers', (state: GameState) => { eight(state); Object.assign(state.town.bridge, { stone: 23, beams: 1 }); }],
+    ['arch stone before its beams', (state: GameState) => { eight(state); Object.assign(state.town.bridge, { stone: 25, beams: 3, doneDays: { piers: 40 } }); }],
+    ['parapet cramps before its stone', (state: GameState) => { eight(state); Object.assign(state.town.bridge, { stone: 49, beams: 4, fittings: 1, doneDays: { piers: 40, arch: 45 } }); }],
+    ['road work before the bridge is done', (state: GameState) => { eight(state); state.town.road.work = 1; }],
+    ['milestone stone before the road is cleared', (state: GameState) => { meadowOpen(state); Object.assign(state.town.road, { cleared: 5, milestone: 1 }); }],
+    ['work on a road section past what it takes', (state: GameState) => { meadowOpen(state); state.town.road.work = ROAD_WORK; }],
+    ['a meadow house worked before the bridge is done', (state: GameState) => { eight(state); state.town.houses = [...street(...Array.from({ length: 12 }, () => built)).slice(0, 12), { stone: 3, beams: 0, fittings: 0, doneDay: null }, emptyHouse(), emptyHouse()]; }],
+    ['the meadow found before the bridge is done', (state: GameState) => { eight(state); state.progress.meadowFound = true; }],
+    ['a finished bridge stage with no day', (state: GameState) => { eight(state); Object.assign(state.town.bridge, { stone: 24, doneDays: {} }); }],
+    ['a day on an unfinished bridge stage', (state: GameState) => { eight(state); Object.assign(state.town.bridge, { stone: 20, doneDays: { piers: 40 } }); }],
+    ['a cleared road with no day', (state: GameState) => { meadowOpen(state); state.town.road.cleared = 6; }]
   ])('rejects %s', (_, change) => {
     expect(accepts(change)).toBe(false);
+  });
+
+  it('accepts the bridge under way, the meadow once it is done, the road cleared and a house in the meadow', () => {
+    expect(accepts(state => { eight(state); Object.assign(state.town.bridge, { stone: 24, doneDays: { piers: 40 } }); })).toBe(true);
+    expect(accepts(state => { meadowOpen(state); state.area = 'meadow'; state.progress.meadowFound = true; })).toBe(true);
+    expect(accepts(state => { meadowOpen(state); Object.assign(state.town.road, { cleared: 1, work: 2 }); })).toBe(true);
+    expect(accepts(state => { meadowOpen(state); Object.assign(state.town.road, { cleared: 6, milestone: 6, doneDays: { road: 52, milestone: 55 } }); })).toBe(true);
+    expect(accepts(state => { meadowOpen(state); state.town.houses = [...street(...Array.from({ length: 12 }, () => built)).slice(0, 12), built, emptyHouse(), emptyHouse()]; })).toBe(true);
   });
 });
 

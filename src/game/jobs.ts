@@ -5,6 +5,9 @@ import { COOP_SITE } from './chickens';
 import { cutField, sownField, stripStage, threshGrain, threshedField } from './field';
 import { addFood, foodCount, storeTotal, takeFrom, type FoodItem } from './food';
 import { hasWoodStore, woodStoreCapacity } from './home';
+import { bridgeDone } from './bridge';
+import { CART_SPOTS, NEEDS } from './castle';
+import { GOODS, goodBatch } from './castleSites';
 import { treeRipe } from './orchard';
 import { fedSheep, shornSheep } from './sheep';
 import { STALL_IDS, STALL_JOBS, STALL_RESERVE, STALL_SPOTS, STALL_STOCK, STALL_WORDS, WOOL_RESERVE, pieceDone, type StallId } from './square';
@@ -113,8 +116,10 @@ function stallDawn(next: GameState, id: StallId): void {
   next.town.square = { ...next.town.square, stock: { ...next.town.square.stock, [id]: next.town.square.stock[id] + 1 } };
 }
 
+/** The work the bridge opens, offered after the stalls. */
+type MeadowJobId = 'carter' | 'joiner';
 /** The camp's own jobs, held before anyone is given a stall. */
-type CampJobId = Exclude<JobId, (typeof STALL_JOBS)[StallId]>;
+type CampJobId = Exclude<JobId, (typeof STALL_JOBS)[StallId] | MeadowJobId>;
 
 const campJobs: Record<CampJobId, Job> = {
   hens: {
@@ -190,9 +195,42 @@ const stallJob = (id: StallId): Job => ({
   dawn: next => stallDawn(next, id)
 });
 
+/** How much stone the carter brings to the cart each dawn. */
+export const CARTER_STONE = 4;
+/** How much wood the joiner leaves in the store, so the survivor's own needs aren't left short. */
+export const JOINER_WOOD_RESERVE = 10;
+
+/** A load of stone into the cart, wherever it stands, never past what it holds. */
+function carterDawn(next: GameState): void {
+  const { cart } = next.castle;
+  next.castle = { ...next.castle, cart: { ...cart, stone: Math.min(NEEDS.cartStone, cart.stone + CARTER_STONE) } };
+}
+
+/** A batch of beams from the wood store while the town still wants them, keeping the reserve back. */
+function joinerDawn(next: GameState): void {
+  const cost = GOODS.beams.cost.wood;
+  const made = goodBatch(next, 'beams');
+  if (made <= 0 || next.storedWood < cost + JOINER_WOOD_RESERVE) return;
+  next.storedWood -= cost;
+  next.castle = { ...next.castle, goods: { ...next.castle.goods, beams: next.castle.goods.beams + made } };
+}
+
+/** The bridge's work: offered once it is finished and every camp job that is open is taken; once held, it goes on whatever opens later. */
+const meadowJob = (offer: string, needs: (state: GameState) => boolean, spot: Job['spot'], dawn: Job['dawn']): Job => ({
+  offer, spot, dawn,
+  open: state => bridgeDone(state.town.bridge) && needs(state) && !campJobOpen(state),
+  works: needs
+});
+
+const meadowJobs: Record<MeadowJobId, Job> = {
+  carter: meadowJob('drive the stone cart', state => state.progress.workshop.stoneCart, { area: 'quarry', x: CART_SPOTS.quarry.x, y: CART_SPOTS.quarry.y + 1 }, carterDawn),
+  joiner: meadowJob('make beams at the workshop', state => state.structures.workshop && hasWoodStore(state), campSpot(9.5, 0), joinerDawn)
+};
+
 export const JOBS: Record<JobId, Job> = {
   ...campJobs,
-  ...Object.fromEntries(STALL_IDS.map(id => [STALL_JOBS[id], stallJob(id)])) as Record<(typeof STALL_JOBS)[StallId], Job>
+  ...Object.fromEntries(STALL_IDS.map(id => [STALL_JOBS[id], stallJob(id)])) as Record<(typeof STALL_JOBS)[StallId], Job>,
+  ...meadowJobs
 };
 
 /** The order jobs are offered in. */

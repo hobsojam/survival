@@ -31,7 +31,7 @@ const dawn = (state: GameState): GameState => { const next = structuredClone(sta
 
 describe('the stallholders', () => {
   it('names each stall job after its good, and stands in front of the stall', () => {
-    expect(JOB_IDS.slice(8)).toEqual(['breadStall', 'honeyStall', 'woolStall', 'appleStall', 'eggStall']);
+    expect(JOB_IDS.slice(8, 13)).toEqual(['breadStall', 'honeyStall', 'woolStall', 'appleStall', 'eggStall']);
     expect(STALL_JOBS).toEqual({ bread: 'breadStall', honey: 'honeyStall', wool: 'woolStall', apples: 'appleStall', eggs: 'eggStall' });
     expect(JOBS.breadStall.offer).toBe('keep the bread stall');
     expect(JOBS.appleStall.offer).toBe('keep the apple stall');

@@ -147,7 +147,7 @@ describe('the goods the square needs', () => {
 
   it('words the goods for the town once the castle is finished', () => {
     const town = marked('well', paved);
-    expect(goodCopy(town, 'beams')).toBe('Four at a time, cut and dressed for the town\'s houses and stalls.');
+    expect(goodCopy(town, 'beams')).toBe('Four at a time, cut and dressed for the town\'s houses, stalls and bridge.');
     expect(goodCopy(town, 'hangings')).toBe('One at a time, woven from wool and cut in two for the stalls\' awnings.');
     expect(goodCopy(town, 'fittings')).toBe('One at a time, to fit the beams.');
     const castle = { ...town, castle: { ...town.castle, finishedDay: null } };

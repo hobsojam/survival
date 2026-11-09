@@ -4,12 +4,15 @@ import { isAtCamp, type GameAction } from '../game/rules';
 import { choppableTrees } from '../game/clearing';
 import { nodeShown } from '../game/forage';
 import { sprites } from '../art/sprites';
-import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, hillsPathOpen, pathOpen } from '../game/areas';
+import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HILLS_BRIDGE_EXIT, HOMESTEAD_EXIT, MEADOW_ENTRY, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, hillsPathOpen, pathOpen } from '../game/areas';
+import { bridgeDone } from '../game/bridge';
 import { wildPonyAt } from '../game/pony';
 import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, outcropLeft } from '../game/hills';
 import { CART_SPOTS, castleSpots, type CastleSite } from '../game/castleSites';
 import { townSpots } from '../game/townSites';
 import { squareSpots } from '../game/squareSites';
+import { bridgeSpot } from '../game/bridgeSites';
+import { roadSpot } from '../game/roadSites';
 import type { SquarePiece } from '../game/square';
 import { KEEP_SITE, keepFinished, keepNeedsDoor } from '../game/keep';
 import { keepFrame } from './visuals';
@@ -34,6 +37,8 @@ export type TapTarget =
   | { kind: 'castleSite'; site: CastleSite; x: number; y: number }
   | { kind: 'townSite'; plot: number; x: number; y: number }
   | { kind: 'squareSite'; piece: SquarePiece; x: number; y: number }
+  | { kind: 'bridgeSite'; x: number; y: number }
+  | { kind: 'roadSite'; x: number; y: number }
   | { kind: 'stoneCart'; x: number; y: number }
   | { kind: 'chickens'; x: number; y: number; action: 'meetChickens' | 'leadChickens' }
   | { kind: 'appleTree' | 'shed' | 'coop'; x: number; y: number }
@@ -113,6 +118,12 @@ function squareTargets(state: GameState): { target: TapTarget }[] {
   return squareSpots(state).filter(spot => spot.area === state.area).map(({ piece, x, y }) => ({ target: { kind: 'squareSite' as const, piece, x, y } }));
 }
 
+/** The bridge while it can be built, from the hills. EASTER EGG: the town, see src/game/town.ts. */
+function bridgeTargets(state: GameState): { target: TapTarget }[] {
+  const spot = bridgeSpot(state);
+  return spot && spot.area === state.area ? [{ target: { kind: 'bridgeSite' as const, x: spot.x, y: spot.y } }] : [];
+}
+
 /** The town's open house plots in this area. EASTER EGG: the town, see src/game/town.ts. */
 function townTargets(state: GameState): { target: TapTarget }[] {
   return townSpots(state).filter(spot => spot.area === state.area).map(({ plot, x, y }) => ({ target: { kind: 'townSite' as const, plot, x, y } }));
@@ -146,9 +157,15 @@ export function pickTapTarget(state: GameState, x: number, y: number): TapTarget
       ...castleTargets(state),
       ...townTargets(state),
       ...squareTargets(state),
+      ...bridgeTargets(state),
       ...cartTargets(state),
       ...(wild ? [{ target: { kind: 'pony' as const, ...wild }, sprite: 'pony' }] : []),
-      { target: { kind: 'crossing', ...HILLS_EXIT } }];
+      { target: { kind: 'crossing', ...HILLS_EXIT } },
+      ...(bridgeDone(state.town.bridge) ? [{ target: { kind: 'crossing' as const, ...HILLS_BRIDGE_EXIT } }] : [])];
+  } else if (state.area === 'meadow') {
+    const road = roadSpot(state);
+    candidates = [...piles, ...townTargets(state), ...(road ? [{ target: { kind: 'roadSite' as const, x: road.x, y: road.y } }] : []),
+      { target: { kind: 'crossing', ...MEADOW_ENTRY } }];
   } else if (state.area === 'homestead') {
     candidates = [...piles,
       { target: { kind: 'shed', ...HOMESTEAD_SHED } },
@@ -233,6 +250,8 @@ export function targetAction(target: TapTarget): GameAction | null {
     case 'castleSite': return { type: 'castleWork', site: target.site };
     case 'townSite': return { type: 'townWork', plot: target.plot };
     case 'squareSite': return { type: 'squareWork', piece: target.piece };
+    case 'bridgeSite': return { type: 'bridgeWork' };
+    case 'roadSite': return { type: 'roadWork' };
     case 'stoneCart': return { type: 'takeCartStone' };
     case 'chickens': return { type: target.action };
     case 'appleTree': return { type: 'gatherApples' };

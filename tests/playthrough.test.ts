@@ -10,14 +10,19 @@ import { reportTables } from './playthrough/report';
 vi.setConfig({ testTimeout: 120000 });
 
 const GAMES: ReadonlyArray<readonly [number, Style]> = [[1, 'orderly'], [2, 'wandering'], [3, 'wandering'], [4, 'unhurried'], [7, 'unhurried']];
-/** Over twelve years: well past any of these games to the castle made home, so this only trips on a real stall. */
-const MOST_DAYS = 500;
+/** Well past any of these games to the first house in the meadow, so this only trips on a real stall. The unhurried games build their first house
+ * around day 340 and their thirteenth, over the bridge, between days 550 and 615, depending on the Node version. */
+const MOST_DAYS = 750;
 /** The animal houses wait on a wild animal choosing to stay, which is chance, so a game may end without them. */
 const UP_TO_CHANCE = new Set(['build:birdhouse', 'build:wolfHouse', 'build:foxDen']);
 const ENDS_THE_GAME = ['keep-finished', 'keep-night', 'keep-climbed', 'castle-finished', 'castle-home', 'town-traveller', 'town-neighbour', 'town-house', 'town-house-2', 'town-house-3',
-  'square-marked', 'square-paved', 'square-well', 'square-stalls'];
+  'square-marked', 'square-paved', 'square-well', 'square-stalls', 'bridge-piers', 'bridge', 'meadow', 'meadow-road', 'milestone', 'meadow-house'];
 /** The square's days, from marking it out to its fifth stall standing: no more than four seasons of steady play between the houses. EASTER EGG: the town. */
 const SQUARE_DAYS = 120;
+/** The meadow's days, from the bridge's piers to the first house over it: about four seasons of steady play. EASTER EGG: the town. */
+const MEADOW_DAYS = 120;
+/** The longest wait between the meadow's finishes: the bridge's stages, the crossing, the road, the milestone and the houses going up meanwhile. EASTER EGG: the town. */
+const LONGEST_MEADOW_WAIT = 45;
 /** The castle's days, from the keep's last stone to the feast's last dish: about 200 of steady play. The orderly game is quickest at about 130. */
 const CASTLE_DAYS = [110, 280] as const;
 /** The longest wait between one of the castle's finishes and the next: the cart, each section, the moat filling, the first dish and the last. The wall's first side and the hall's wool are the long ones, at about 30 to 40. */
@@ -64,6 +69,17 @@ describe.each(GAMES)('a whole game, seed %i, played in a %s way', (seed, style) 
     const run = game(seed, style);
     const day = (id: string) => run.hits.find(hit => hit.id === id)?.day;
     expect(day('square-stalls')! - day('square-marked')!).toBeLessThanOrEqual(SQUARE_DAYS);
+  });
+
+  it('builds the bridge, the meadow road and the first house over it within the days it was meant to take, with a finish never far off', () => {
+    const run = game(seed, style);
+    const day = (id: string) => run.hits.find(hit => hit.id === id)!.day;
+    const [piers, house] = [day('bridge-piers'), day('meadow-house')];
+    expect(house - piers).toBeLessThanOrEqual(MEADOW_DAYS);
+    const finishes = [...['bridge-piers', 'bridge', 'meadow', 'meadow-road', 'milestone', 'meadow-house'].map(day), ...run.houseDoneDays.filter((each): each is number => each !== null && each >= piers && each <= house)]
+      .sort((a, b) => a - b);
+    const waits = finishes.slice(1).map((each, i) => each - finishes[i]);
+    expect(Math.max(...waits), `finishes ${finishes.join(', ')}`).toBeLessThanOrEqual(LONGEST_MEADOW_WAIT);
   });
 
   it('raises the castle in about the days it was meant to take, with a finish never far off', () => {

@@ -3,6 +3,8 @@ import { emptyOrchard } from './orchard';
 import { emptyPony } from './pony';
 import { emptyKeep } from './keep';
 import { emptyCastle } from './castle';
+import { emptyBridge } from './bridge';
+import { emptyRoad } from './meadow';
 import { emptySquare } from './square';
 import { HOUSE_COUNT, emptyHouse, emptyTown } from './town';
 
@@ -12,7 +14,7 @@ import { HOUSE_COUNT, emptyHouse, emptyTown } from './town';
 // anything the player had. Loading runs every step a save needs, in order, then validates the result as usual.
 
 /** The saved shape's version. Bump it by one with every change to the shape, and add its upgrade step below. */
-export const SAVE_VERSION = 42;
+export const SAVE_VERSION = 43;
 
 /** The oldest save that can still be brought up to date: earlier formats were never upgraded and don't load. */
 export const OLDEST_UPGRADABLE_VERSION = 23;
@@ -175,7 +177,14 @@ export const SAVE_UPGRADES: Readonly<Record<number, SaveUpgrade>> = {
   41: old => {
     const state = old as Upgradable & { town: Upgradable & { houses: unknown[] } };
     const houses = Array.isArray(state.town?.houses) ? state.town.houses : [];
-    return { ...state, town: { ...state.town, houses: [...houses, ...Array.from({ length: Math.max(0, HOUSE_COUNT - houses.length) }, emptyHouse)], square: emptySquare() } };
+    return { ...state, town: { ...state.town, houses: [...houses, ...Array.from({ length: Math.max(0, 12 - houses.length) }, emptyHouse)], square: emptySquare() } };
+  },
+  // Version 43: the bridge to the meadow, its road and three more plots. A version 42 town has none of them.
+  42: old => {
+    const state = old as Upgradable & { town: Upgradable & { houses: unknown[] }; progress: Upgradable };
+    const houses = Array.isArray(state.town?.houses) ? state.town.houses : [];
+    return { ...state, progress: { ...state.progress, meadowFound: false },
+      town: { ...state.town, houses: [...houses, ...Array.from({ length: Math.max(0, HOUSE_COUNT - houses.length) }, emptyHouse)], bridge: emptyBridge(), road: emptyRoad() } };
   }
 };
 

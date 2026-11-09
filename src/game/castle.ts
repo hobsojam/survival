@@ -2,6 +2,9 @@ import { YEAR_LENGTH } from './calendar';
 import { rainWindow } from './rain';
 import type { GameState } from './state';
 
+/** Where the cart stands in each area, clear of the quarry face and rubble, the road and the paths on one side, and of the keep, the outcrop and the road on the other. */
+export const CART_SPOTS = { quarry: { x: 24, y: 8 }, hills: { x: 30, y: 7 } } as const;
+
 // EASTER EGG: the castle after the keep is deliberately left out of the README and hidden on screen until the survivor
 // has climbed the keep on a second day and seen the line of stones. Nothing here shows before that reveal.
 // It is built a stone at a time from the quarry: a road, a cart, timber frames, a curtain wall, four towers, a gatehouse,

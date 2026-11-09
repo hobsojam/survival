@@ -1,3 +1,5 @@
+import { emptyBridge, type BridgeState } from './bridge';
+import { emptyRoad, type RoadState } from './meadow';
 import { emptySquare, type SquareState } from './square';
 import type { GameState } from './state';
 
@@ -8,10 +10,10 @@ import type { GameState } from './state';
 
 /** A job a worker can take over from the survivor. */
 export type JobId = 'hens' | 'honey' | 'loaves' | 'wood' | 'beds' | 'field' | 'sheep' | 'orchard'
-  | 'breadStall' | 'honeyStall' | 'woolStall' | 'appleStall' | 'eggStall';
-/** The camp's jobs, then the square's stalls. */
+  | 'breadStall' | 'honeyStall' | 'woolStall' | 'appleStall' | 'eggStall' | 'carter' | 'joiner';
+/** The camp's jobs, then the square's stalls, then the work the bridge opens: the carter's and the joiner's. */
 export const JOB_IDS: readonly JobId[] = ['hens', 'honey', 'loaves', 'wood', 'beds', 'field', 'sheep', 'orchard',
-  'breadStall', 'honeyStall', 'woolStall', 'appleStall', 'eggStall'];
+  'breadStall', 'honeyStall', 'woolStall', 'appleStall', 'eggStall', 'carter', 'joiner'];
 
 /** Someone at the hall door who hasn't stayed yet. `askedDay` is the last day they were told no. */
 export interface Traveller { name: string; arrivedDay: number; refusals: number; askedDay: number | null }
@@ -30,13 +32,17 @@ export interface TownState {
   /** One for each plot. */
   houses: HouseState[];
   square: SquareState;
+  /** The bridge over the stream to the meadow. */
+  bridge: BridgeState;
+  /** The old road through the meadow and its milestone. */
+  road: RoadState;
 }
 
 /** What a house takes: stone for its footings and walls, beams for its roof, and an iron fitting for its door. */
 export const HOUSE_NEEDS = { stone: 30, beams: 4, fittings: 1 } as const;
 
-/** How many plots there are for houses. */
-export const HOUSE_COUNT = 12;
+/** How many plots there are for houses: twelve on the hills and three in the meadow. */
+export const HOUSE_COUNT = 15;
 
 /** The names people arrive with, in the order they come. People are people and already have names: these are never changed. */
 export const TOWN_NAMES: readonly string[] = ['Ada', 'Tomas', 'Elin', 'Bram', 'Maud', 'Osric', 'Hild', 'Piers', 'Agnes', 'Wat', 'Isolde', 'Hugh',
@@ -44,7 +50,8 @@ export const TOWN_NAMES: readonly string[] = ['Ada', 'Tomas', 'Elin', 'Bram', 'M
 
 export const emptyHouse = (): HouseState => ({ stone: 0, beams: 0, fittings: 0, doneDay: null });
 
-export const emptyTown = (): TownState => ({ traveller: null, goneDay: null, namesUsed: 0, people: [], houses: Array.from({ length: HOUSE_COUNT }, emptyHouse), square: emptySquare() });
+export const emptyTown = (): TownState => ({ traveller: null, goneDay: null, namesUsed: 0, people: [], houses: Array.from({ length: HOUSE_COUNT }, emptyHouse), square: emptySquare(),
+  bridge: emptyBridge(), road: emptyRoad() });
 
 /** Whether anyone has come yet. */
 export const townStarted = (state: GameState): boolean => state.town.traveller !== null || state.town.people.length > 0;

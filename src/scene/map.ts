@@ -3,8 +3,10 @@ import { season, type Season } from '../game/calendar';
 import { QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, hillsPathOpen, homesteadPathOpen, pathOpen } from '../game/areas';
 import { clearingTile, hillGroundTile, pathTile, quarryGroundTile, terrainSprites } from '../art/terrain';
 import { hillRockAt, moatAt } from './hillsGeometry';
+import { bridgeDone, bridgeOpen } from '../game/bridge';
+import { HOUSE_PLOTS } from '../game/townSites';
 import { CLEARING_STEPS, STEP_IDS, clearingKey, clearingReach, inClearedPatch, type ClearingState, type StepId } from '../game/clearing';
-import { CAMP_BOTH_OPEN_PATHS, CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_HOMESTEAD_PATHS, CAMP_OPEN_PATHS, CAMP_PATHS, CAMP_SIGN, HOMESTEAD_PATHS, HOMESTEAD_SIGN, QUARRY_PATHS, QUARRY_HILLS_PATHS, HILLS_PATHS, HILLS_SIGN, QUARRY_SIGN, mixHash, pathDistance, type PathRoute } from './mapGeometry';
+import { CAMP_BOTH_OPEN_PATHS, CAMP_CENTER_X, CAMP_CENTER_Y, CAMP_HOMESTEAD_PATHS, CAMP_OPEN_PATHS, CAMP_PATHS, CAMP_SIGN, HOMESTEAD_PATHS, HOMESTEAD_SIGN, QUARRY_PATHS, QUARRY_HILLS_PATHS, HILLS_PATHS, HILLS_BRIDGE_PATHS, HILLS_SIGN, MEADOW_PATHS, QUARRY_SIGN, mixHash, pathDistance, type PathRoute } from './mapGeometry';
 import { FACE_HEIGHT, QUARRY_MEADOWS, faceBottom, floorDepth } from './quarryGeometry';
 
 export interface MapItem { x: number; y: number; sprite: string }
@@ -12,12 +14,14 @@ export interface TerrainMap { ground: string[][]; pathTiles: MapItem[]; campEdge
   /** Signposts, drawn standing like the trees. */
   signs: MapItem[] }
 
-export type TerrainKey = 'camp' | 'camp-open' | 'camp-homestead-open' | 'camp-both-open' | 'quarry' | 'quarry-hills-open' | 'homestead' | 'hills';
+export type TerrainKey = 'camp' | 'camp-open' | 'camp-homestead-open' | 'camp-both-open' | 'quarry' | 'quarry-hills-open' | 'homestead' | 'hills' | 'hills-bridge' | 'meadow';
 
 /** Which area's terrain and which camp paths the scene should show. */
 export function terrainKey(state: GameState): TerrainKey {
   if (state.area === 'quarry') return hillsPathOpen(state) ? 'quarry-hills-open' : 'quarry';
-  if (state.area === 'hills') return 'hills';
+  // EASTER EGG: the town. A lane runs down to the bridge once it can be begun.
+  if (state.area === 'hills') return bridgeOpen(state) || bridgeDone(state.town.bridge) ? 'hills-bridge' : 'hills';
+  if (state.area === 'meadow') return 'meadow';
   if (state.area === 'homestead') return 'homestead';
   const quarryOpen = pathOpen(state), homesteadOpen = homesteadPathOpen(state);
   if (quarryOpen && homesteadOpen) return 'camp-both-open';
@@ -31,7 +35,7 @@ export function shownTerrainKey(state: GameState): string {
   return `${terrainKey(state)}-${clearingKey(state.clearing.cleared)}-${state.clearing.marked ?? 'unmarked'}-${season(state.day)}`;
 }
 
-const ROUTES: Record<Exclude<TerrainKey, 'quarry' | 'quarry-hills-open' | 'homestead' | 'hills'>, readonly PathRoute[]> = {
+const ROUTES: Record<Exclude<TerrainKey, 'quarry' | 'quarry-hills-open' | 'homestead' | 'hills' | 'hills-bridge' | 'meadow'>, readonly PathRoute[]> = {
   camp: CAMP_PATHS, 'camp-open': CAMP_OPEN_PATHS, 'camp-homestead-open': CAMP_HOMESTEAD_PATHS,
   'camp-both-open': CAMP_BOTH_OPEN_PATHS
 };
@@ -232,21 +236,58 @@ function hillPlant(x: number, y: number, time: Season): string | undefined {
 }
 
 /** The hills: open rolling grass, rock showing near the top, and plants that change with the season. Nothing here is gathered. */
-function buildHillsMap(time: Season): TerrainMap {
+function buildHillsMap(time: Season, paths: readonly PathRoute[] = HILLS_PATHS): TerrainMap {
   const map = emptyMap();
+  const streamRow = BALANCE.mapHeight - 1;
   for (let y = 0; y < BALANCE.mapHeight; y++) {
     const row: string[] = [];
     for (let x = 0; x < BALANCE.mapWidth; x++) {
-      row.push(hillGroundTile(x, y));
-      const path = pathTile(x, y, HILLS_PATHS);
+      // EASTER EGG: the town. The stream runs along the hills' foot, under where the bridge goes.
+      row.push(y === streamRow ? `${time === 'winter' ? 'streamIce' : 'stream'}${hash(x, y, 48) % 2}` : hillGroundTile(x, y));
+      const path = y === streamRow ? null : pathTile(x, y, paths);
       if (path) map.pathTiles.push({ x, y, sprite: path });
-      const sprite = hillRockAt(x, y) || moatAt(x, y) || pathDistance(x + .5, y + .5, HILLS_PATHS) < 1.7 || nearSign(x, y, HILLS_SIGN) ? undefined : hillPlant(x, y, time);
+      const sprite = y >= streamRow - 1 || hillRockAt(x, y) || moatAt(x, y) || pathDistance(x + .5, y + .5, paths) < 1.7 || nearSign(x, y, HILLS_SIGN) ? undefined : hillPlant(x, y, time);
       // A little off the tile's middle, so the plants don't stand in rows.
       if (sprite) map.decorations.push({ x: x + (hash(x, y, 46) % 5 - 2) / 5, y: y + (hash(x, y, 47) % 5 - 2) / 5, sprite });
     }
     map.ground.push(row);
   }
   map.signs = [{ ...HILLS_SIGN, sprite: 'signpostCamp' }];
+  return map;
+}
+
+/** What grows on an open meadow tile: wildflowers and long grass, more flowers in spring, fallen leaves in autumn, and the flowers gone under the snow in winter. */
+function meadowPlant(x: number, y: number, time: Season): string | undefined {
+  const pick = hash(x, y, 51) % 12;
+  if (pick < 3 && time !== 'winter') return hash(x, y, 52) % 2 ? `flowerClump${hash(x, y, 53) % 2}` : `flower${hash(x, y, 53) % 3}`;
+  if (pick < 4 && time === 'spring') return `flower${hash(x, y, 54) % 3}`;
+  if (pick < 6) return time === 'winter' ? `tuft${hash(x, y, 55) % 2}` : `longGrass${hash(x, y, 55) % 2}`;
+  if (pick === 6 && time === 'autumn') return 'fallenLeaf';
+  return undefined;
+}
+
+/** EASTER EGG: the town, see src/game/town.ts. The meadow over the bridge: soft grass and wildflowers, a few young trees
+ * along its edges, and the lane down from the bridge to the old road. Nothing here is gathered. */
+function buildMeadowMap(time: Season): TerrainMap {
+  const map = emptyMap();
+  const clear = (x: number, y: number, by: number) => pathDistance(x + .5, y + .5, MEADOW_PATHS) >= by
+    && HOUSE_PLOTS.every(plot => plot.area !== 'meadow' || Math.hypot(plot.x - x, plot.y - y) >= 2.5);
+  for (let y = 0; y < BALANCE.mapHeight; y++) {
+    const row: string[] = [];
+    for (let x = 0; x < BALANCE.mapWidth; x++) {
+      row.push(`grass${hash(x, y, 50) % 4}`);
+      // The old road's stones lie under the bracken the scene draws over each uncleared stretch.
+      const path = pathTile(x, y, MEADOW_PATHS);
+      if (path) map.pathTiles.push({ x, y, sprite: path });
+      if (edgeDistance(x, y) <= 1 && hash(x, y, 56) % 4 === 0) {
+        if (clear(x, y, 2)) map.trees.push({ x, y, sprite: hash(x, y, 57) % 3 === 0 ? 'treeBroadleaf' : 'treeYoung' });
+        continue;
+      }
+      const sprite = clear(x, y, 1.7) ? meadowPlant(x, y, time) : undefined;
+      if (sprite) map.decorations.push({ x, y, sprite });
+    }
+    map.ground.push(row);
+  }
   return map;
 }
 
@@ -259,6 +300,8 @@ export function buildMap(nodes: ResourceNode[], key: TerrainKey, time: Season = 
   if (key === 'quarry') return buildQuarryMap(time);
   if (key === 'quarry-hills-open') return buildQuarryMap(time, QUARRY_HILLS_PATHS);
   if (key === 'hills') return buildHillsMap(time);
+  if (key === 'hills-bridge') return buildHillsMap(time, HILLS_BRIDGE_PATHS);
+  if (key === 'meadow') return buildMeadowMap(time);
   if (key === 'homestead') return buildHomesteadMap(time);
   const standing = STEP_IDS.filter(id => !clearing.cleared.includes(id));
   const site: CampSite = { nodes, routes: ROUTES[key], cleared: clearing.cleared, reserved: standing.flatMap(id => CLEARING_STEPS[id].trees) };

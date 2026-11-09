@@ -1,4 +1,4 @@
-import { CAMP_EXIT, HOMESTEAD_EXIT } from './areas';
+import { CAMP_EXIT, HILLS_BRIDGE_EXIT, HOMESTEAD_EXIT, MEADOW_ENTRY } from './areas';
 import { afternoonStart, duskLength, nightStart, season, type Season } from './calendar';
 import { HALL_DOOR_SPOT } from './castle';
 import { HILLS_EXIT } from './hills';
@@ -14,7 +14,7 @@ import { HOUSE_PLOTS } from './townSites';
 export interface PersonSpot { area: AreaId; x: number; y: number; walking: boolean }
 
 /** The way out of each area toward the hills. */
-const EXITS: Partial<Record<AreaId, { x: number; y: number }>> = { camp: CAMP_EXIT, homestead: HOMESTEAD_EXIT, quarry: { x: 0, y: 15 } };
+const EXITS: Partial<Record<AreaId, { x: number; y: number }>> = { camp: CAMP_EXIT, homestead: HOMESTEAD_EXIT, quarry: { x: 0, y: 15 }, meadow: { x: MEADOW_ENTRY.x, y: 0 } };
 
 const between = (from: { x: number; y: number }, to: { x: number; y: number }, f: number) => ({ x: from.x + (to.x - from.x) * f, y: from.y + (to.y - from.y) * f });
 
@@ -31,10 +31,32 @@ export function personSpot(state: GameState, index: number): PersonSpot | null {
   const work = JOBS[person.job].spot;
   const walk = walkHome(state);
   if (walk === null) return { ...work, walking: false };
-  const home = person.house === null ? HALL_DOOR_SPOT : HOUSE_PLOTS[person.house];
-  if (work.area === 'hills') return { area: 'hills', ...between(work, home, walk), walking: true };
-  if (walk < 0.5) return { area: work.area, ...between(work, EXITS[work.area] ?? work, walk * 2), walking: true };
-  return { area: 'hills', ...between(HILLS_EXIT, home, (walk - 0.5) * 2), walking: true };
+  const home = person.house === null ? { area: 'hills' as const, ...HALL_DOOR_SPOT } : HOUSE_PLOTS[person.house];
+  return { ...onTheWay(walkLegs(work, home), walk), walking: true };
+}
+
+type Leg = { area: AreaId; from: { x: number; y: number }; to: { x: number; y: number } };
+
+/** The stretches of the walk home: out of the work's area to the hills, across them, and over the bridge to a meadow home. */
+function walkLegs(work: { area: AreaId; x: number; y: number }, home: { area: AreaId; x: number; y: number }): Leg[] {
+  const legs: Leg[] = [];
+  let at = { x: work.x, y: work.y };
+  if (work.area !== 'hills') {
+    legs.push({ area: work.area, from: at, to: EXITS[work.area] ?? at });
+    at = HILLS_EXIT;
+  }
+  if (home.area === 'meadow') {
+    legs.push({ area: 'hills', from: at, to: HILLS_BRIDGE_EXIT });
+    legs.push({ area: 'meadow', from: MEADOW_ENTRY, to: home });
+  } else legs.push({ area: 'hills', from: at, to: home });
+  return legs;
+}
+
+/** Where along the legs the walk has come, each leg an even share of it. */
+function onTheWay(legs: Leg[], walk: number): { area: AreaId; x: number; y: number } {
+  const index = Math.min(legs.length - 1, Math.floor(walk * legs.length));
+  const leg = legs[index];
+  return { area: leg.area, ...between(leg.from, leg.to, walk * legs.length - index) };
 }
 
 /** Where the traveller waits by the hall door, by day once they have slept a night by the fire. */

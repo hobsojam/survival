@@ -1,4 +1,6 @@
 import { TOWN_NAMES, emptyHouse, emptyTown } from '../src/game/town';
+import { emptyBridge } from '../src/game/bridge';
+import { emptyRoad } from '../src/game/meadow';
 import { emptySquare } from '../src/game/square';
 import { townSpots } from '../src/game/townSites';
 import { finishedCastleCamp } from './townStreet';
@@ -346,7 +348,7 @@ describe('the version 39 upgrade: the castle', () => {
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind !== 'loaded') return;
-    expect(loaded.state.town.houses).toHaveLength(12);
+    expect(loaded.state.town.houses).toHaveLength(15);
     expect(loaded.state.town.houses[0]).toEqual({ stone: 30, beams: 4, fittings: 1, doneDay: 30 });
     expect(townSpots(loaded.state).map(spot => spot.plot)).toEqual([1]);
   });
@@ -362,9 +364,27 @@ describe('the version 39 upgrade: the castle', () => {
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind !== 'loaded') return;
-    expect(loaded.state.town.houses).toHaveLength(12);
-    expect(loaded.state.town.houses.slice(8)).toEqual(Array.from({ length: 4 }, emptyHouse));
+    expect(loaded.state.town.houses).toHaveLength(15);
+    expect(loaded.state.town.houses.slice(8)).toEqual(Array.from({ length: 7 }, emptyHouse));
     expect(loaded.state.town.square).toEqual(emptySquare());
     expect(townSpots(loaded.state)).toEqual([]);
+  });
+
+  it('brings a version 42 town up with the bridge and the road untouched and three more plots, the meadow unfound', () => {
+    const old = finishedCastleCamp() as unknown as { town: Record<string, unknown>; progress: Record<string, unknown> };
+    const houses = Array.from({ length: 12 }, (_, i) => (i < 9 ? { stone: 30, beams: 4, fittings: 1, doneDay: 20 + i } : emptyHouse()));
+    old.town = { ...old.town, houses };
+    delete old.town.bridge;
+    delete old.town.road;
+    delete old.progress.meadowFound;
+    const storage = new MemoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 42, state: old }));
+    const loaded = loadGame(storage);
+    expect(loaded.kind).toBe('loaded');
+    if (loaded.kind !== 'loaded') return;
+    expect(loaded.state.town.houses).toEqual([...houses, emptyHouse(), emptyHouse(), emptyHouse()]);
+    expect(loaded.state.town.bridge).toEqual(emptyBridge());
+    expect(loaded.state.town.road).toEqual(emptyRoad());
+    expect(loaded.state.progress.meadowFound).toBe(false);
   });
 });

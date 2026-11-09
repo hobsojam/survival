@@ -9,9 +9,12 @@ import { HOUSE_NEEDS, houseFinished, type HouseState } from './town';
 
 /** Where the houses stand, in the order they are built: a street of two rows on the open ground below the castle wall,
  * with a lane between them, starting south-east of the castle and growing west to the square, then four around the square. */
-export const HOUSE_PLOTS: readonly { area: AreaId; x: number; y: number }[] = (
-  [[31, 23], [26, 21], [22, 21], [27, 25], [18, 21], [23, 25], [14, 21], [19, 25], [15, 25], [3, 21], [3, 26], [13, 28]] as const
-).map(([x, y]) => ({ area: 'hills' as const, x, y }));
+export const HOUSE_PLOTS: readonly { area: AreaId; x: number; y: number }[] = [
+  ...([[31, 23], [26, 21], [22, 21], [27, 25], [18, 21], [23, 25], [14, 21], [19, 25], [15, 25], [3, 21], [3, 26], [13, 28]] as const)
+    .map(([x, y]) => ({ area: 'hills' as const, x, y })),
+  // Over the bridge, in the meadow, either side of the lane down to the old road.
+  ...([[20, 7], [28, 7], [20, 12]] as const).map(([x, y]) => ({ area: 'meadow' as const, x, y }))
+];
 
 /** How far a house has got: none, its footings at ten stone, its walls at thirty, its roof at four beams, its door and hearth at its fitting. */
 export function houseStage(house: HouseState): 0 | 1 | 2 | 3 | 4 {
@@ -33,7 +36,7 @@ const houseNeed = (house: HouseState): 'stone' | 'beams' | 'fittings' => {
   return house.beams < HOUSE_NEEDS.beams ? 'beams' : 'fittings';
 };
 
-const cartStone = (state: GameState): number => (state.castle.cart.at === 'hills' ? state.castle.cart.stone : 0);
+const cartStone = (state: GameState): number => (state.castle.cart.at === 'hills' && state.area === 'hills' ? state.castle.cart.stone : 0);
 const SHORT = { stone: 'Bring stone up from the quarry.', beams: 'Make beams at the workshop.', fittings: 'Make an iron fitting at the forge.' } as const;
 const LABELS = { stone: 'Lay a house stone', beams: 'Set a house beam', fittings: 'Hang the house door' } as const;
 const ASKS = { stone: 'House · bring stone up from the quarry', beams: 'House · make beams at the workshop', fittings: 'House · make an iron fitting at the forge' } as const;

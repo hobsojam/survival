@@ -21,6 +21,9 @@ import { CASTLE_SECTIONS, FEAST_ITEMS, NEEDS, allSectionsBuilt, SIDES, TOWERS, h
 import { SAVE_VERSION, upgradeSave } from './saveUpgrades';
 import { HOUSE_COUNT, HOUSE_NEEDS, JOB_IDS, TOWN_NAMES, houseFinished, type HouseState } from './town';
 import { SQUARE_HOUSES, SQUARE_NEEDS, SQUARE_PIECES, STALL_IDS, STALL_JOBS, STALL_STOCK, pieceDone, type SquareState } from './square';
+import { BRIDGE_HOUSES, BRIDGE_NEEDS, BRIDGE_STAGES, BRIDGE_STONE, PIERS_STONE, bridgeDone, stageDone, type BridgeState } from './bridge';
+import { MILESTONE_STONE, ROAD_SECTIONS, ROAD_WORK } from './meadow';
+import { HOUSE_PLOTS } from './townSites';
 
 export { SAVE_VERSION };
 export const SAVE_KEY = 'hearthwild.save';
@@ -59,7 +62,7 @@ function validFood(store: unknown, day: unknown): boolean {
 function validSurvivor({ player, inventory, area, day, cakeBonus }: SaveShape): boolean {
   return bool(cakeBonus) && onMap(player.x, player.y) && meter(player.energy) && meter(player.hunger) && meter(player.warmth)
     && (['wood', 'fiber', 'stone', 'ore'] as const).every(key => count(inventory[key])) && validFood(inventory.food, day)
-    && (area === 'camp' || area === 'quarry' || area === 'homestead' || area === 'hills');
+    && (area === 'camp' || area === 'quarry' || area === 'homestead' || area === 'hills' || area === 'meadow');
 }
 
 function validStructureDependencies(structures: ObjectValue): boolean {
@@ -251,7 +254,7 @@ function validWorld({ nodes, trees, stonePiles, day, clearing }: SaveShape): boo
       && readyBy(tree.readyDay, today + BALANCE.treeRegrowDays);
   });
   const pilesValid = stonePiles.every(pile => object(pile) && typeof pile.id === 'string' && onMap(pile.x, pile.y)
-    && whole(pile.count) && pile.count >= 1 && (pile.area === 'camp' || pile.area === 'quarry' || pile.area === 'homestead' || pile.area === 'hills')
+    && whole(pile.count) && pile.count >= 1 && (pile.area === 'camp' || pile.area === 'quarry' || pile.area === 'homestead' || pile.area === 'hills' || pile.area === 'meadow')
     && (pile.item === 'stone' || pile.item === 'ore'));
   return nodesMatch && treesMatch && pilesValid;
 }
@@ -512,6 +515,34 @@ function validSquare(square: unknown, houses: HouseState[], day: number, jobs: u
   });
 }
 
+/** The bridge is laid in order, piers then the arch's beams then its stone then the parapet's cramps, only once
+ * enough houses are finished. Each finished stage has its day. EASTER EGG: the town, see src/game/town.ts. */
+function validBridge(bridge: unknown, houses: HouseState[], day: number): bridge is BridgeState {
+  if (!object(bridge) || !object(bridge.doneDays)) return false;
+  const { stone, beams, fittings, doneDays } = bridge;
+  if (!upTo(stone, BRIDGE_STONE) || !upTo(beams, BRIDGE_NEEDS.arch.beams) || !upTo(fittings, BRIDGE_NEEDS.parapet.fittings)) return false;
+  if ((beams > 0 && stone < PIERS_STONE) || (stone > PIERS_STONE && beams < BRIDGE_NEEDS.arch.beams) || (fittings > 0 && stone < BRIDGE_STONE)) return false;
+  if ((stone > 0 || beams > 0) && houses.filter(house => house.doneDay !== null).length < BRIDGE_HOUSES) return false;
+  if (!Object.keys(doneDays).every(key => BRIDGE_STAGES.includes(key as never))) return false;
+  const typed = bridge as unknown as BridgeState;
+  return BRIDGE_STAGES.every(stage => {
+    const done = doneDays[stage];
+    return stageDone(typed, stage) ? whole(done) && done >= 1 && done <= day : done === undefined;
+  });
+}
+
+/** The road is cleared a section at a time once the bridge is done, and its milestone set only once it is all clear. */
+function validRoad(road: unknown, bridgeFinished: boolean, day: number): boolean {
+  if (!object(road) || !object(road.doneDays)) return false;
+  const { cleared, work, milestone, doneDays } = road;
+  if (!upTo(cleared, ROAD_SECTIONS) || !count(work) || work >= ROAD_WORK || !upTo(milestone, MILESTONE_STONE)) return false;
+  if ((cleared > 0 || work > 0) && !bridgeFinished) return false;
+  if ((work > 0 && cleared >= ROAD_SECTIONS) || (milestone > 0 && cleared < ROAD_SECTIONS)) return false;
+  if (!Object.keys(doneDays).every(key => key === 'road' || key === 'milestone')) return false;
+  const dayOk = (finished: boolean, done: unknown) => finished ? whole(done) && done >= 1 && done <= day : done === undefined;
+  return dayOk(cleared >= ROAD_SECTIONS, doneDays.road) && dayOk(milestone >= MILESTONE_STONE, doneDays.milestone);
+}
+
 /** The town starts only after the castle is finished. Everyone has one of the names given out so far, no two share a name, a job or a house, and anyone with a house has a finished one. */
 function validTown(shape: SaveShape): boolean {
   if (!object(shape.town) || !object(shape.castle)) return false;
@@ -534,6 +565,13 @@ function validTown(shape: SaveShape): boolean {
   const jobs = people.map(person => (person as ObjectValue).job);
   const homes = people.map(person => (person as ObjectValue).house).filter(house => house !== null);
   if (!validSquare(shape.town.square, houses as HouseState[], day, jobs)) return false;
+  const bridge = shape.town.bridge;
+  if (!validBridge(bridge, houses as HouseState[], day) || !validRoad(shape.town.road, bridgeDone(bridge), day)) return false;
+  // Over the bridge: the meadow, and its plots, only once the bridge is done.
+  const meadowWorked = houses.some((house, plot) => HOUSE_PLOTS[plot].area === 'meadow' && (house as HouseState).stone > 0);
+  if (!bridgeDone(bridge) && (meadowWorked || shape.area === 'meadow' || shape.progress.meadowFound === true)) return false;
+  if (!bool(shape.progress.meadowFound) || (shape.area === 'meadow' && !shape.progress.meadowFound)) return false;
+  if (!bridgeDone(bridge) && (jobs.includes('carter') || jobs.includes('joiner'))) return false;
   if (traveller !== null) {
     if (!object(traveller) || !dayOk(traveller.arrivedDay) || !upTo(traveller.refusals, 2)) return false;
     if (traveller.askedDay !== null && !dayOk(traveller.askedDay)) return false;
