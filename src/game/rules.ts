@@ -18,6 +18,8 @@ import { beehiveDawn, takeHoneyBlocker, takenHoney } from './beehive';
 import { jobsDawn } from './jobs';
 import { answeredTraveller, travellerArrives } from './traveller';
 import { doTownWork, townWorkBlocker, townWorkLine } from './townSites';
+import { doSquareWork, squareWorkBlocker, squareWorkLine } from './squareSites';
+import type { SquarePiece } from './square';
 import { cutField, cutStripBlocker, grindGrainBlocker, seededField, sowStripBlocker, sownField, threshStripBlocker, threshedField, wildGrainBlocker } from './field';
 import { BED_CROPS, bedsDawn, drawWaterBlocker, emptyBed, harvestBedBlocker, needsWater, sowBedBlocker } from './beds';
 import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
@@ -63,6 +65,7 @@ export type GameAction =
   | { type: 'chooseHome'; home: 'house' | 'hall' }
   | { type: 'answerTraveller'; yes: boolean; job?: JobId }
   | { type: 'townWork'; plot: number }
+  | { type: 'squareWork'; piece: SquarePiece }
   | { type: 'makeCastleGood'; good: CastleGood }
   | { type: 'takeHoney' }
   | { type: 'drawWater' }
@@ -1489,10 +1492,23 @@ const townWork: ActionHandler<'townWork'> = (state, action) => {
   };
 };
 
+/** EASTER EGG: the town. One piece of the square laid, with the same effort as a house's. */
+const squareWork: ActionHandler<'squareWork'> = (state, action) => {
+  const blocker = squareWorkBlocker(state, action.piece);
+  if (blocker) return refuse(state, blocker);
+  const worked = doSquareWork(state, action.piece);
+  const effort = 0.5;
+  return {
+    state: advanceTime({ ...worked, player: tire(state, BALANCE.digEnergyCost * effort) }, workSeconds(state, BALANCE.digSeconds * effort), 'working'),
+    message: squareWorkLine(worked.town.square, action.piece)
+  };
+};
+
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   chooseHome,
   answerTraveller,
   townWork,
+  squareWork,
   feedSheep,
   nameAnimal,
   shearFlock,

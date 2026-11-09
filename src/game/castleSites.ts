@@ -563,10 +563,10 @@ const goodTotals = (castle: CastleState, good: CastleGood): { needed: number; bu
   return { needed: perTower * TOWERS.length + hall, built: TOWERS.reduce((sum, id) => sum + castle.towers[id][key], castle.hall[key]) };
 };
 
-/** How many of a good are still worth making: what the castle and the town's open houses need, less what is made and what is already built in. Hangings are the hall's alone. */
+/** How many of a good are still worth making: what the castle and the town's open houses and square need, less what is made and what is already built in. */
 export const goodRoom = (state: GameState, good: CastleGood): number => {
   const { needed, built } = goodTotals(state.castle, good);
-  const town = good === 'hangings' ? 0 : townGoodNeed(state, good);
+  const town = townGoodNeed(state, good);
   return Math.max(0, needed - built + town - state.castle.goods[good]);
 };
 
@@ -577,7 +577,7 @@ export const goodBatch = (state: GameState, good: CastleGood): number => Math.mi
 function hangingBlocker(state: GameState): string | null {
   if (!state.structures.loom) return 'Build the loom first.';
   if (state.castle.frames === 0) return 'Begin the timber frames first.';
-  if (goodRoom(state, 'hangings') === 0) return 'The castle has enough hangings now.';
+  if (goodRoom(state, 'hangings') === 0) return state.castle.finishedDay === null ? 'The castle has enough hangings now.' : 'There are enough hangings for now.';
   if (!isInClearing(state)) return 'Return to camp to use the loom.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   return state.sheep.wool < GOODS.hangings.wool ? `You need ${GOODS.hangings.wool} wool for the hanging.` : null;

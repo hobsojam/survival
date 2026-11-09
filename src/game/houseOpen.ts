@@ -1,5 +1,6 @@
 import { openJobs } from './jobs';
 import type { GameState } from './state';
+import { SQUARE_NEEDS, STALL_IDS, pieceOpen } from './square';
 import { HOUSE_NEEDS } from './town';
 
 // EASTER EGG: the town, see src/game/town.ts. Which house is open to build. This sits apart from town.ts because it
@@ -21,6 +22,14 @@ export const houseOpen = (state: GameState, plot: number): boolean => {
   return people.length > 0 && allLivedIn && openJobs(state).length > 0;
 };
 
-/** How many more beams or fittings the open houses still take. */
-export const townGoodNeed = (state: GameState, good: 'beams' | 'fittings'): number =>
-  state.town.houses.reduce((total, house, plot) => total + (houseOpen(state, plot) ? HOUSE_NEEDS[good] - house[good] : 0), 0);
+/** How many more beams, fittings or hangings the open square pieces still take: the well's winch, and each stall's beams and awning. */
+function squareGoodNeed(state: GameState, good: 'beams' | 'fittings' | 'hangings'): number {
+  const { square } = state.town;
+  if (good === 'fittings') return pieceOpen(state, 'well') ? SQUARE_NEEDS.well.fittings - square.well.fittings : 0;
+  return STALL_IDS.reduce((total, id) => total + (pieceOpen(state, id) ? SQUARE_NEEDS.stall[good] - square.stalls[id][good] : 0), 0);
+}
+
+/** How many more beams, fittings or hangings the open houses and the open pieces of the square still take. Houses take no hangings. */
+export const townGoodNeed = (state: GameState, good: 'beams' | 'fittings' | 'hangings'): number =>
+  squareGoodNeed(state, good) + (good === 'hangings' ? 0
+    : state.town.houses.reduce((total, house, plot) => total + (houseOpen(state, plot) ? HOUSE_NEEDS[good] - house[good] : 0), 0));
