@@ -24,6 +24,7 @@ import { showBuildList, showCampStores } from './showPanels';
 import type { WovenId } from '../game/sheep';
 import { NameDialog, wireNameDialog } from './nameDialog';
 import { homeChoiceView, visitorView, cookBerryView, supplyCount, axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, decorationMarkup, decorationButtonView, DECORATION_CHOICES, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, chickenCoopPanelView, friendRosterView, sheepPanelView, loomPanelView, pipsLine, loomItemMarkup, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, castleGoodsView, castleGoodsTitle, type ActionPanelView } from './panels';
+import { welcomeBack } from './welcomeBack';
 import type { UpgradeId } from '../game/workshop';
 import type { CastleGood } from '../game/castleSites';
 import { Soundscape } from '../game/soundscape';
@@ -353,12 +354,7 @@ export class App {
   private continueGame(): void {
     if (this.previousSave.kind !== 'loaded') return;
     this.startGame(this.previousSave.state);
-    const area = this.previousSave.state.area;
-    let welcome = 'Welcome back to your camp.';
-    if (area === 'quarry') welcome = 'Welcome back. You are out by the old quarry.';
-    if (area === 'homestead') welcome = 'Welcome back. You are at the old homestead.';
-    if (area === 'hills') welcome = 'Welcome back. You are up on the hills.';
-    this.setMessage(welcome);
+    this.setMessage(welcomeBack(this.previousSave.state.area));
     this.setText('save-status', 'Loaded locally');
   }
 
