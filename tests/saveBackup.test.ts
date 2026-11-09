@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SAVE_VERSION, readSaveText, saveText } from '../src/game/save';
 import { createGame, type GameState } from '../src/game/state';
+import { HOUSE_COUNT } from '../src/game/town';
 import { SaveLoader, campToReplace, clearSaveNote, copySave, loadConfirmCopy, saveFileName, wireSaveBackup } from '../src/ui/saveBackup';
 import { finishedCastleCamp } from './townStreet';
 
@@ -20,11 +21,15 @@ describe('a save as text', () => {
 
   it('brings an older save up to date', () => {
     const old = JSON.parse(saveText(finishedCastleCamp()));
-    old.version = SAVE_VERSION - 1;
+    // A version 41 save: before the square, the bridge, the meadow road and the last plots.
+    old.version = 41;
     delete old.state.town.square;
+    delete old.state.town.bridge;
+    delete old.state.town.road;
+    delete old.state.progress.meadowFound;
     old.state.town.houses = old.state.town.houses.slice(0, 8);
     const read = readSaveText(JSON.stringify(old));
-    expect(read.ok && read.state.town.houses.length).toBe(12);
+    expect(read.ok && read.state.town.houses.length).toBe(HOUSE_COUNT);
   });
 
   it.each([
