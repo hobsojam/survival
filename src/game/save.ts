@@ -492,6 +492,8 @@ function validTown(shape: SaveShape): boolean {
   const dayOk = (value: unknown): boolean => whole(value) && value >= 1 && value <= day;
   if (!Array.isArray(people) || !Array.isArray(houses) || houses.length !== HOUSE_COUNT || !upTo(namesUsed, TOWN_NAMES.length)) return false;
   if (!houses.every(house => validHouse(house, day))) return false;
+  // Houses are built in plot order, so none is finished above one that isn't.
+  if (houses.some((house, plot) => plot > 0 && (house as HouseState).doneDay !== null && (houses[plot - 1] as HouseState).doneDay === null)) return false;
   if (goneDay !== null && !dayOk(goneDay)) return false;
   const given = TOWN_NAMES.slice(0, namesUsed);
   const names: unknown[] = [];

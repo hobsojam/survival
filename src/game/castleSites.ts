@@ -8,7 +8,7 @@ import { KEEP_SITE } from './keep';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { ponyWith } from './pony';
 import { BALANCE, type AreaId, type GameState } from './state';
-import { townGoodNeed } from './town';
+import { townGoodNeed } from './houseOpen';
 
 // EASTER EGG: the castle, see src/game/castle.ts. The sections of it that can be worked on, kept apart from the saved
 // state in castle.ts because the places they stand are drawn from areas.ts, which needs the state module to load first.

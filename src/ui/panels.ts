@@ -1,3 +1,5 @@
+import { JOBS, JOB_ORDER } from '../game/jobs';
+import type { JobId } from '../game/town';
 import { NEEDS, isRevealed, wallFinished } from '../game/castle';
 import { cutStripBlocker, grindGrainBlocker, sowStripBlocker, stripStage, threshStripBlocker, type StripStage } from '../game/field';
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isWinter, nightStart, season } from '../game/calendar';
@@ -168,13 +170,19 @@ export function homeChoiceView(state: GameState): HomeChoiceView {
   return { shown: offeredHome, home, choose: 'hall', button: 'Make the hall your home', copy: 'You could make the hall your home. The camp will carry on below, and the house stays yours.' };
 }
 
-export interface VisitorView { shown: boolean; copy: string; yes: string; no: string }
+export interface VisitorView { shown: boolean; copy: string; jobs: { job: JobId; label: string; shown: boolean }[]; no: string }
 
 /** The traveller at the hall door asking for work, while they are asking. EASTER EGG: the town, see src/game/town.ts. */
 export function visitorView(state: GameState): VisitorView {
   const asking = travellerOffer(state);
-  const copy = asking ? `${asking.name} asks if there is any work. ${asking.name} could ${asking.offer}.` : '';
-  return { shown: asking !== null, copy, yes: 'Offer work', no: 'Not today' };
+  const free = asking?.jobs ?? [];
+  let copy = '';
+  if (asking) {
+    const ask = free.length === 1 ? `${asking.name} could ${JOBS[free[0]].offer}.` : `Which job will you give ${asking.name}?`;
+    copy = `${asking.name} asks if there is any work. ${ask}`;
+  }
+  const label = (job: JobId) => JOBS[job].offer.charAt(0).toUpperCase() + JOBS[job].offer.slice(1);
+  return { shown: asking !== null, copy, jobs: JOB_ORDER.map(job => ({ job, label: label(job), shown: free.includes(job) })), no: 'Not today' };
 }
 
 /** The Windmill panel, once built: the flour in its bin against its room, and whether milling can go ahead. */

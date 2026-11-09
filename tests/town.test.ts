@@ -6,7 +6,7 @@ import { createGame } from '../src/game/state';
 
 describe('the town before anyone comes', () => {
   it('starts empty, with one unbuilt house', () => {
-    expect(emptyTown()).toEqual({ traveller: null, goneDay: null, namesUsed: 0, people: [], houses: [{ stone: 0, beams: 0, fittings: 0, doneDay: null }] });
+    expect(emptyTown()).toEqual({ traveller: null, goneDay: null, namesUsed: 0, people: [], houses: Array.from({ length: 8 }, () => ({ stone: 0, beams: 0, fittings: 0, doneDay: null })) });
     expect(createGame().town).toEqual(emptyTown());
   });
 
