@@ -1,3 +1,4 @@
+import { STALL_IDS, pieceDone, squareMarked } from '../../src/game/square';
 import { NEEDS, TOWERS, castleFinished, hallFinished, isRevealed, moatFill, towerFinished, wallFinished } from '../../src/game/castle';
 import { KEEP_DOOR_AT, keepFinished } from '../../src/game/keep';
 import type { GameState, StructureId } from '../../src/game/state';
@@ -67,5 +68,9 @@ export const MILESTONES: readonly Milestone[] = [
   { id: 'town-neighbour', label: 'Took on the first neighbour', reached: state => state.town.people.length > 0 },
   { id: 'town-house', label: 'Built the first house', reached: state => state.town.houses[0]?.doneDay !== null },
   { id: 'town-house-2', label: 'Built the second house', reached: state => state.town.houses[1]?.doneDay !== null },
-  { id: 'town-house-3', label: 'Three houses, three neighbours', reached: state => state.town.houses[2]?.doneDay !== null && state.town.people.some(person => person.house === 2) }
+  { id: 'town-house-3', label: 'Three houses, three neighbours', reached: state => state.town.houses[2]?.doneDay !== null && state.town.people.some(person => person.house === 2) },
+  { id: 'square-marked', label: 'Marked out the square', reached: squareMarked },
+  { id: 'square-paved', label: 'Paved the square', reached: state => pieceDone(state.town.square, 'paving') },
+  { id: 'square-well', label: 'Finished the well', reached: state => pieceDone(state.town.square, 'well') },
+  { id: 'square-stalls', label: 'Raised all five stalls', reached: state => STALL_IDS.every(id => pieceDone(state.town.square, id)) }
 ];

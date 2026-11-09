@@ -14,6 +14,8 @@ import { FEAST_ITEMS, HALL_DOOR_SPOT, NEEDS, TOWERS, castleFinished, everyOtherS
 import { CART_SPOTS, GOODS, castleSpots, goodRoom, type CastleGood } from '../../src/game/castleSites';
 import { travellerAsking } from '../../src/game/traveller';
 import { townSpots } from '../../src/game/townSites';
+import { STALL_IDS, SQUARE_NEEDS, pieceDone } from '../../src/game/square';
+import { squareSpots } from '../../src/game/squareSites';
 import { HOUSE_NEEDS } from '../../src/game/town';
 import { KEEP_DOOR_AT, KEEP_DOOR_WOOD, KEEP_SITE, atHallDoor, keepFinished, keepOpen } from '../../src/game/keep';
 import { ORCHARD_SPOTS, spotAction } from '../../src/game/orchard';
@@ -454,15 +456,20 @@ export class Player {
       // Once the castle is finished, the first time through the hall's door offers it as home, and the player takes it.
       { id: 'castle-home', shown: castleFinished, done: state => state.castle.home === 'hall', step: () => this.moveIn() },
       // EASTER EGG: the town. Each traveller at the hall door is offered the first free job on their first ask, and the houses
-      // are built one after another as they open, up to the third, where the game ends.
+      // are built one after another as they open. Once two are up the square is built between houses, piece by piece, and
+      // the game ends when its five stalls stand.
       { id: 'town-answer', shown: travellerAsking, done: state => !travellerAsking(state), step: () => this.act({ type: 'answerTraveller', yes: true }) },
       ...(['beams', 'fittings'] as const).map(good => ({
         id: `town-${good}`,
-        shown: (state: GameState) => castleFinished(state) && townSpots(state).length > 0 && !threeHouses(state),
-        done: (state: GameState) => goodRoom(state, good) === 0 || threeHouses(state),
+        shown: (state: GameState) => castleFinished(state) && townSpots(state).length + squareSpots(state).length > 0 && !allStalls(state),
+        done: (state: GameState) => goodRoom(state, good) === 0 || allStalls(state) || houseHasGoods(state, good),
         step: () => this.payFor(good === 'beams' ? { wood: GOODS.beams.cost.wood, fiber: 0, stone: 0 } : { wood: GOODS.fittings.cost.wood, fiber: 0, stone: 0, ore: GOODS.fittings.cost.ore }, { type: 'makeCastleGood', good })
       })),
-      { id: 'town-house', shown: state => townSpots(state).length > 0 && !threeHouses(state), done: state => townSpots(state).length === 0 || threeHouses(state), step: () => this.buildHouse() },
+      { id: 'town-house', shown: state => townSpots(state).length > 0 && !allStalls(state), done: state => townSpots(state).length === 0 || allStalls(state), step: () => this.buildHouse() },
+      // The stalls' awnings are woven at the loom, as the hall's hangings were.
+      { id: 'town-hangings', shown: state => castleFinished(state) && state.structures.loom && squareSpots(state).length > 0 && !allStalls(state), done: state => goodRoom(state, 'hangings') === 0 || allStalls(state), step: () => this.weaveHanging() },
+      // The square is worked only while no house plot is open, so the houses keep their pace.
+      { id: 'town-square', shown: state => squareSpots(state).length > 0 && townSpots(state).length === 0, done: allStalls, step: () => this.buildSquare() },
       { id: 'castle-moat-fills', shown: state => state.castle.moat.stretches >= NEEDS.moat, done: state => moatFill(state) === 1, step: () => false },
       { id: 'mine', shown: state => progress(state).pickaxeCrafted, done: state => progress(state).mineBuilt, step: () => this.buildMine() },
       ...(['basket', 'cairn'] as const).map(site => ({
@@ -570,6 +577,21 @@ export class Player {
     const good = house.beams < HOUSE_NEEDS.beams ? 'beams' : 'fittings';
     if (this.state.castle.goods[good] === 0) return false;
     return this.goTo(spot.area) && this.walkTo(spot) && this.act(action);
+  }
+
+  /** The next piece of the square that can be worked: stone for the paving and the well, then the goods made at camp. EASTER EGG: the town. */
+  private buildSquare(): boolean {
+    // A house plot opening takes the work back, even partway through a piece.
+    if (townSpots(this.state).length > 0) return false;
+    for (const spot of squareSpots(this.state)) {
+      const { square } = this.state.town;
+      const { piece } = spot;
+      const action: GameAction = { type: 'squareWork', piece };
+      if (piece === 'paving' || (piece === 'well' && square.well.stone < SQUARE_NEEDS.well.stone)) return this.stoneStep(spot, action);
+      const good = piece === 'well' ? 'fittings' : square.stalls[piece].beams < SQUARE_NEEDS.stall.beams ? 'beams' : 'hangings';
+      if (this.state.castle.goods[good] > 0) return this.goTo(spot.area) && this.walkTo(spot) && this.act(action);
+    }
+    return false;
   }
 
   /** One stretch of the moat, on a day the ground isn't frozen and none has been dug yet. */
@@ -915,6 +937,11 @@ const isFeastItem = (item: FoodItem): item is FeastItem => (FEAST_ITEMS as reado
 
 /** A little longer once the castle is finished and home, so whatever else the game offers gets a chance to be taken up. */
 const DAYS_AFTER_THE_END = 40;
-/** The third house is where the scripted game's town stops: the game ends there. EASTER EGG: the town. */
-const threeHouses = (state: GameState): boolean => state.town.houses[2]?.doneDay != null;
-const MILESTONES_THAT_END = ['keep-finished', 'keep-night', 'keep-climbed', 'castle-finished', 'castle-home', 'town-traveller', 'town-neighbour', 'town-house', 'town-house-2', 'town-house-3'];
+/** The square's five stalls standing is where the scripted game's town stops: the game ends there. EASTER EGG: the town. */
+/** While a house plot is open, goods are made for the house alone, so the square's stalls don't hold it up. */
+const houseHasGoods = (state: GameState, good: 'beams' | 'fittings'): boolean => {
+  const spot = townSpots(state)[0];
+  return spot !== undefined && state.castle.goods[good] >= HOUSE_NEEDS[good] - state.town.houses[spot.plot][good];
+};
+const allStalls = (state: GameState): boolean => STALL_IDS.every(id => pieceDone(state.town.square, id));
+const MILESTONES_THAT_END = ['keep-finished', 'keep-night', 'keep-climbed', 'castle-finished', 'castle-home', 'town-traveller', 'town-neighbour', 'town-house', 'town-house-2', 'town-house-3', 'square-marked', 'square-paved', 'square-well', 'square-stalls'];
