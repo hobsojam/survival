@@ -17,14 +17,14 @@ export const TRAVELLER_REFUSALS = 3;
 export const WORD_DAYS = 5;
 
 /** The lowest finished house no one lives in yet, or null. */
-const emptyHouse = (state: GameState): number | null => {
+const vacantHouse = (state: GameState): number | null => {
   const index = state.town.houses.findIndex((house, plot) => house.doneDay !== null && !state.town.people.some(person => person.house === plot));
   return index < 0 ? null : index;
 };
 
 /** Whether word of a finished house has had time to get around: one stands empty, finished WORD_DAYS or more ago. */
 const wordGotAround = (state: GameState): boolean => {
-  const plot = emptyHouse(state);
+  const plot = vacantHouse(state);
   return plot !== null && state.town.houses[plot].doneDay! + WORD_DAYS <= state.day;
 };
 
@@ -63,7 +63,7 @@ export function answeredTraveller(state: GameState, yes: boolean, given?: JobId)
   if (!travellerAsking(state) || traveller === null || jobs.length === 0 || (yes && !jobs.includes(job))) return { state, message: '' };
   const { name } = traveller;
   if (yes) {
-    const town = { ...state.town, traveller: null, people: [...state.town.people, { name, job, house: emptyHouse(state), arrivedDay: traveller.arrivedDay }] };
+    const town = { ...state.town, traveller: null, people: [...state.town.people, { name, job, house: vacantHouse(state), arrivedDay: traveller.arrivedDay }] };
     return { state: { ...state, town }, message: `${name} will stay.` };
   }
   const refusals = traveller.refusals + 1;

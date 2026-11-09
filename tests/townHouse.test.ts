@@ -13,6 +13,7 @@ import { applyAction } from '../src/game/rules';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
 import { HOUSE_COUNT } from '../src/game/town';
 import { HOUSE_PLOTS, houseStage, townSpots, townWorkBlocker } from '../src/game/townSites';
+import { PLOT_DAYS } from '../src/game/houseOpen';
 import { townNews } from '../src/game/traveller';
 import { castleGoodsTitle, castleGoodsView } from '../src/ui/panels';
 import { HILLS_PATHS, pathDistance } from '../src/scene/mapGeometry';
@@ -109,7 +110,7 @@ describe('when the plot opens', () => {
     const plots = (state: GameState) => townSpots(state).map(spot => spot.plot);
     expect(plots(waiting())).toEqual([0]);
     const housed = (change: (state: GameState) => void = () => {}) => waiting(state => {
-      state.town.houses = street({ stone: 30, beams: 4, fittings: 1, doneDay: 64 });
+      state.town.houses = street({ stone: 30, beams: 4, fittings: 1, doneDay: DAY - PLOT_DAYS });
       state.town.people = [{ ...ada, house: 0 }];
       state.structures.beehive = true;
       change(state);
@@ -119,9 +120,20 @@ describe('when the plot opens', () => {
     expect(plots(housed(state => { state.structures.beehive = false; }))).toEqual([]);
   });
 
+  it('opens the next plot a few days after the last house is finished, not at once', () => {
+    expect(PLOT_DAYS).toBe(5);
+    const lived = (doneDay: number) => waiting(state => {
+      state.town.houses = street({ stone: 30, beams: 4, fittings: 1, doneDay });
+      state.town.people = [{ ...ada, house: 0 }];
+      state.structures.beehive = true;
+    });
+    expect(townSpots(lived(DAY - PLOT_DAYS + 1))).toEqual([]);
+    expect(townSpots(lived(DAY - PLOT_DAYS)).map(spot => spot.plot)).toEqual([1]);
+  });
+
   it('shuts once the house is finished', () => {
     expect(townSpots(waiting(state => {
-      state.town.houses = street({ stone: 30, beams: 4, fittings: 1, doneDay: 64 });
+      state.town.houses = street({ stone: 30, beams: 4, fittings: 1, doneDay: DAY - PLOT_DAYS });
       state.town.people = [{ ...ada, house: 0 }];
     }))).toEqual([]);
   });
