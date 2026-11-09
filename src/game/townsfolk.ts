@@ -1,9 +1,11 @@
 import { CAMP_EXIT, HOMESTEAD_EXIT } from './areas';
-import { afternoonStart, duskLength, isWinter, nightStart } from './calendar';
+import { afternoonStart, duskLength, nightStart, season, type Season } from './calendar';
 import { HALL_DOOR_SPOT } from './castle';
 import { HILLS_EXIT } from './hills';
 import { JOBS } from './jobs';
+import { isRaining } from './rain';
 import type { AreaId, GameState } from './state';
+import { TOWN_NAMES } from './town';
 import { HOUSE_PLOTS } from './townSites';
 
 // EASTER EGG: the town, see src/game/town.ts. Where the town's people are through the day: at their work by day,
@@ -42,11 +44,26 @@ export function travellerSpot(state: GameState): { area: AreaId; x: number; y: n
   return { area: 'hills', x: HALL_DOOR_SPOT.x + 1.5, y: HALL_DOOR_SPOT.y + 1 };
 }
 
+/** What people say of the season, outside winter. */
+const SEASON_LINES: Record<Exclude<Season, 'winter'>, string> = {
+  spring: 'The grass is coming on.',
+  summer: 'Warm one today.',
+  autumn: 'The leaves are turning.'
+};
+
+function greetingLine(state: GameState, name: string): string {
+  if (walkHome(state) !== null) return 'Good evening.';
+  if (isRaining(state)) return 'Wet one today.';
+  const now = season(state.day);
+  if (now === 'winter') return 'Cold one today.';
+  // Every other day each person remarks on the season instead, and not all on the same days.
+  if ((TOWN_NAMES.indexOf(name) + state.day) % 2 !== 0) return SEASON_LINES[now];
+  return state.timeOfDay < afternoonStart(state.day) ? 'Good morning.' : 'Good afternoon.';
+}
+
 /** What someone says as the survivor passes. */
 export function greeting(state: GameState, name: string): string {
-  if (walkHome(state) !== null) return `${name} · Good evening.`;
-  if (isWinter(state.day)) return `${name} · Cold one today.`;
-  return state.timeOfDay < afternoonStart(state.day) ? `${name} · Good morning.` : `${name} · Good afternoon.`;
+  return `${name} · ${greetingLine(state, name)}`;
 }
 
 /** Everyone out in the survivor's area now, with their names and where they are. */
