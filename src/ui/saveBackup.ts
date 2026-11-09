@@ -1,8 +1,14 @@
-import { readSaveText, saveText } from '../game/save';
+import { readSaveText, saveText, type LoadResult } from '../game/save';
 import type { GameState } from '../game/state';
 
 // Backing a game up and bringing one back: a save file to download, the same save as a code to copy, and a box that
 // loads either. The save is checked exactly as the browser's own is, and nothing is replaced without asking.
+
+/** The camp a load would replace: the one in play, else the one the browser has saved, else none. */
+export function campToReplace(playing: GameState | null, saved: LoadResult): GameState | null {
+  if (playing) return playing;
+  return saved.kind === 'loaded' ? saved.state : null;
+}
 
 /** The download's name: the camp's day, so two backups tell themselves apart. */
 export const saveFileName = (state: GameState): string => `hearthwild-day-${state.day}.json`;
@@ -38,8 +44,10 @@ interface SaveLoaderParts {
 interface SaveLoaderDeps {
   /** The camp a load would replace, or null when there is none. */
   current(): GameState | null;
-  /** Stops or restarts the scene. */
-  holdGame(hold: boolean): void;
+  /** Stops the scene while the box is open. */
+  holdGame(): void;
+  /** Restarts it once the box closes. */
+  releaseGame(): void;
   /** Tells the scene to stop or start listening to the keyboard. */
   setTyping(typing: boolean): void;
   load(state: GameState): void;
@@ -63,7 +71,7 @@ export class SaveLoader {
     this.parts.code.value = '';
     this.choosing();
     this.parts.overlay.hidden = false;
-    this.deps.holdGame(true);
+    this.deps.holdGame();
     this.deps.setTyping(true);
   }
 
@@ -72,7 +80,7 @@ export class SaveLoader {
     this.opened = false;
     this.pending = null;
     this.parts.overlay.hidden = true;
-    this.deps.holdGame(false);
+    this.deps.releaseGame();
     this.deps.setTyping(false);
   }
 

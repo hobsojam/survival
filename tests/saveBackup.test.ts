@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SAVE_VERSION, readSaveText, saveText } from '../src/game/save';
 import { createGame, type GameState } from '../src/game/state';
-import { SaveLoader, clearSaveNote, copySave, loadConfirmCopy, saveFileName, wireSaveBackup } from '../src/ui/saveBackup';
+import { SaveLoader, campToReplace, clearSaveNote, copySave, loadConfirmCopy, saveFileName, wireSaveBackup } from '../src/ui/saveBackup';
 import { finishedCastleCamp } from './townStreet';
 
 const NOT_A_SAVE = 'This isn\'t a Hearthwild save.';
@@ -73,7 +73,7 @@ describe('the load box', () => {
       askCopy: { textContent: '' as string | null },
       choose: { hidden: false }
     };
-    const box = new SaveLoader(parts, { current: () => current, holdGame: hold => held.push(hold), setTyping: on => typing.push(on), load: state => loaded.push(state) });
+    const box = new SaveLoader(parts, { current: () => current, holdGame: () => held.push(true), releaseGame: () => held.push(false), setTyping: on => typing.push(on), load: state => loaded.push(state) });
     return { box, parts, held, typing, loaded };
   };
   /** A camp on day 60 with the castle finished. */
@@ -173,7 +173,7 @@ describe('the save panel on the page', () => {
     const loaded: GameState[] = [];
     const downloads: [string, string][] = [];
     const parts = { overlay: { hidden: true }, code: page.code, error: { textContent: '' as string | null }, ask: { hidden: true }, askCopy: { textContent: '' as string | null }, choose: { hidden: false } };
-    const loader = new SaveLoader(parts, { current: () => null, holdGame: () => {}, setTyping: () => {}, load: each => loaded.push(each) });
+    const loader = new SaveLoader(parts, { current: () => null, holdGame: () => {}, releaseGame: () => {}, setTyping: () => {}, load: each => loaded.push(each) });
     wireSaveBackup(page, doc, loader, { state: () => state, download: (text, name) => downloads.push([text, name]), clipboard });
     return { page, doc, loader, loaded, downloads, state, parts };
   };
@@ -238,5 +238,16 @@ describe('the save panel on the page', () => {
     clearSaveNote(page);
     expect(page.note.textContent).toBe('');
     expect(page.codeOut.hidden).toBe(true);
+  });
+});
+
+describe('the camp a load would replace', () => {
+  it('is the camp in play, else the browser\'s save, else none', () => {
+    const playing = finishedCastleCamp();
+    const saved = createGame();
+    expect(campToReplace(playing, { kind: 'loaded', state: saved })).toBe(playing);
+    expect(campToReplace(null, { kind: 'loaded', state: saved })).toBe(saved);
+    expect(campToReplace(null, { kind: 'empty' })).toBeNull();
+    expect(campToReplace(null, { kind: 'invalid', reason: 'bad' })).toBeNull();
   });
 });

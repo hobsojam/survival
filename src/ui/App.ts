@@ -23,7 +23,7 @@ import { browserDownloadDoc, downloadText } from './download';
 import { showBuildList, showCampStores } from './showPanels';
 import type { WovenId } from '../game/sheep';
 import { NameDialog, wireNameDialog } from './nameDialog';
-import { SaveLoader, clearSaveNote, wireSaveBackup, type SaveBackupPage } from './saveBackup';
+import { SaveLoader, campToReplace, clearSaveNote, wireSaveBackup, type SaveBackupPage } from './saveBackup';
 import { homeChoiceView, visitorView, cookBerryView, supplyCount, axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, decorationMarkup, decorationButtonView, DECORATION_CHOICES, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, chickenCoopPanelView, friendRosterView, sheepPanelView, loomPanelView, pipsLine, loomItemMarkup, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, castleGoodsView, castleGoodsTitle, type ActionPanelView } from './panels';
 import type { UpgradeId } from '../game/workshop';
 import type { CastleGood } from '../game/castleSites';
@@ -379,20 +379,15 @@ export class App {
     this.saveLoader = new SaveLoader({
       overlay: find('#load-overlay'), code, error: find('#load-error'), ask: find('#load-ask'), askCopy: find('#load-ask-copy'), choose: find('#load-choose')
     }, {
-      current: () => (this.scene ? this.scene.getState() : this.previousSave.kind === 'loaded' ? this.previousSave.state : null),
-      holdGame: hold => { if (hold) this.game?.scene.pause('GameScene'); else this.game?.scene.resume('GameScene'); },
+      current: () => campToReplace(this.scene?.getState() ?? null, this.previousSave),
+      holdGame: () => this.game?.scene.pause('GameScene'),
+      releaseGame: () => this.game?.scene.resume('GameScene'),
       setTyping: typing => this.scene?.setTyping(typing),
       load: state => this.loadBackup(state)
     });
     wireSaveBackup(this.savePage, document, this.saveLoader, {
       state: () => this.scene?.getState() ?? this.state,
-      download: (text, name) => {
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-        link.download = name;
-        link.click();
-        window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-      },
+      download: (text, name) => downloadText(browserDownloadDoc(document), name, text),
       clipboard: navigator.clipboard
     });
   }
