@@ -7,6 +7,7 @@ import { HILLS_EXIT, OUTCROP_SITE, QUARRY_HILLS_EXIT, outcropNote } from '../gam
 import { NEEDS, isRevealed, lineDistance } from '../game/castle';
 import { GATE_SPOT, cartWithin, castleNeedsStone, castlePrompt, castleWorkBlocker, nearestCastleSpot } from '../game/castleSites';
 import { townPrompt, townSpots, townWorkBlocker } from '../game/townSites';
+import { squarePrompt, squareSpots, squareWorkBlocker } from '../game/squareSites';
 import { greetingHere } from '../game/townsfolk';
 import { KEEP_DOOR_WOOD, KEEP_SITE, KEEP_STONES, atHallDoor, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor } from '../game/keep';
 import { ponyNote, ponyOfferLabel } from '../game/pony';
@@ -30,7 +31,7 @@ export const KEY_ACTIONS: readonly [string, GameAction][] = [
 
 const ACTION_POSES: Partial<Record<GameAction['type'], SurvivorAction>> = {
   gather: 'gather', rest: 'rest', cook: 'cook', stargaze: 'stargaze',
-  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', takeCartStone: 'gather', digOre: 'gather', layStone: 'gather', castleWork: 'gather', townWork: 'gather', hangDoor: 'gather', offerPony: 'gather', fish: 'gather',
+  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', takeCartStone: 'gather', digOre: 'gather', layStone: 'gather', castleWork: 'gather', townWork: 'gather', squareWork: 'gather', hangDoor: 'gather', offerPony: 'gather', fish: 'gather',
   gatherApples: 'gather', plantPip: 'gather', pickOrchardApple: 'gather', searchShed: 'gather', takeEgg: 'gather'
 };
 
@@ -145,7 +146,7 @@ export function actionEffect(action: GameAction, after: GameState): { kind: 'dus
   if (action.type === 'digOre') return { kind: 'dust', ...OUTCROP_SITE };
   if (action.type === 'layStone' || action.type === 'hangDoor') return { kind: 'dust', ...KEEP_SITE };
   if (action.type === 'castleWork' && action.site === 'gatehouse' && after.castle.gatehouse === NEEDS.gatehouse) return { kind: 'portcullis', x: GATE_SPOT.x, y: GATE_SPOT.y };
-  if (action.type === 'castleWork' || action.type === 'townWork') return { kind: 'dust', x: after.player.x, y: after.player.y };
+  if (action.type === 'castleWork' || action.type === 'townWork' || action.type === 'squareWork') return { kind: 'dust', x: after.player.x, y: after.player.y };
   if (action.type === 'cook' || action.type === 'stargaze') return { kind: action.type, x: after.player.x, y: after.player.y };
   return undefined;
 }
@@ -290,6 +291,15 @@ function castleChoice(state: GameState): Choice | null {
   return castleWorkBlocker(state, spot.site) === null ? { label, action: { type: 'castleWork', site: spot.site } } : { label };
 }
 
+/** EASTER EGG: the square's piece the survivor is at, nearest first, see src/game/town.ts. */
+function squareChoice(state: GameState): Choice | null {
+  const spot = squareSpots(state).filter(each => each.area === state.area && within(state, each))
+    .sort((a, b) => Math.hypot(a.x - state.player.x, a.y - state.player.y) - Math.hypot(b.x - state.player.x, b.y - state.player.y))[0];
+  if (!spot) return null;
+  const label = squarePrompt(state, spot.piece);
+  return squareWorkBlocker(state, spot.piece) === null ? { label, action: { type: 'squareWork', piece: spot.piece } } : { label };
+}
+
 /** EASTER EGG: the town's house plot the survivor is at, see src/game/town.ts. */
 function townChoice(state: GameState): Choice | null {
   const spot = townSpots(state).find(each => each.area === state.area && within(state, each));
@@ -330,6 +340,7 @@ function hillsChoices(state: GameState): Choice[] {
   const keep = keepChoice(state) ?? (atHallDoor(state) ? doorChoice(state, 'hall') : null);
   const castle = castleChoice(state);
   const town = townChoice(state);
+  const square = squareChoice(state);
   const cart = cartChoice(state);
   // EASTER EGG: the castle's line of old stones, named only once it has been seen.
   const stones = isRevealed(state) && state.castle.frames === 0 && !castle && lineDistance(state.player) <= BALANCE.interactionRadius;
@@ -342,6 +353,7 @@ function hillsChoices(state: GameState): Choice[] {
     ...(keep ? [keep] : []),
     ...(castle ? [castle] : []),
     ...(town ? [town] : []),
+    ...(square ? [square] : []),
     ...(cart ? [cart] : []),
     ...(stones ? [{ label: 'Old stones · a wall could run here' }] : []),
     ...(offer ? [{ label: offer, action: { type: 'offerPony' as const } }] : []),

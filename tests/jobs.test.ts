@@ -9,6 +9,8 @@ import { ORCHARD_SPOTS } from '../src/game/orchard';
 import { CAMP_STRUCTURES } from '../src/scene/visuals';
 import type { JobId, Person } from '../src/game/town';
 
+/** The camp's own jobs; the stalls on the square come after them, in tests/stalls.test.ts. */
+const CAMP_JOBS = JOB_ORDER.slice(0, 8);
 const worker = (job: JobId, name = 'Ada'): Person => ({ name, job, house: null, arrivedDay: 1 });
 
 /** A camp with the hens home in their coop, the bees in their hive and a larder, at the very end of day 20. */
@@ -103,7 +105,7 @@ describe('the honey job', () => {
 
 describe('which job is open', () => {
   it('offers the hens first, then the bees, then nothing', () => {
-    expect(JOB_ORDER).toEqual(['hens', 'honey', 'loaves', 'wood', 'beds', 'field', 'sheep', 'orchard']);
+    expect(JOB_ORDER).toEqual(['hens', 'honey', 'loaves', 'wood', 'beds', 'field', 'sheep', 'orchard', 'breadStall', 'honeyStall', 'woolStall', 'appleStall', 'eggStall']);
     expect(openJob(camp())).toBe('hens');
     expect(openJob(camp([worker('hens')]))).toBe('honey');
     expect(openJob(camp([worker('hens'), worker('honey', 'Tomas')]))).toBeNull();
@@ -301,7 +303,7 @@ describe('the orchard job', () => {
 
 describe('the open jobs', () => {
   it('lists every job free, in order, skipping the held ones and the ones without their buildings', () => {
-    expect(openJobs(fullCamp([], SPRING_DAY))).toEqual(JOB_ORDER);
+    expect(openJobs(fullCamp([], SPRING_DAY))).toEqual(CAMP_JOBS);
     expect(openJobs(fullCamp([worker('hens'), worker('wood', 'Tomas')], SPRING_DAY))).toEqual(['honey', 'loaves', 'beds', 'field', 'sheep', 'orchard']);
     const bare = fullCamp([], SPRING_DAY);
     Object.assign(bare.structures, { bakery: false, woodpile: false, vegetableBeds: false, granary: false, orchard: false });
@@ -325,7 +327,7 @@ describe('the open jobs', () => {
 
   it('puts each worker beside their work, and no two on the same spot', () => {
     const building: Record<string, string> = { hens: 'chickenCoop', honey: 'beehive', loaves: 'bakery', wood: 'woodpile', beds: 'vegetableBeds', field: 'field', sheep: 'sheepPen' };
-    for (const job of JOB_ORDER) {
+    for (const job of CAMP_JOBS) {
       const spot = JOBS[job].spot;
       expect(spot.area).toBe('camp');
       if (job === 'orchard') {
@@ -337,7 +339,7 @@ describe('the open jobs', () => {
         expect(Math.hypot(spot.x - (BALANCE.campX + dx), spot.y - (BALANCE.campY + dy)), job).toBeLessThanOrEqual(3);
       }
     }
-    for (const a of JOB_ORDER) for (const b of JOB_ORDER) {
+    for (const a of CAMP_JOBS) for (const b of CAMP_JOBS) {
       if (a < b) expect(Math.hypot(JOBS[a].spot.x - JOBS[b].spot.x, JOBS[a].spot.y - JOBS[b].spot.y), `${a} ${b}`).toBeGreaterThan(1);
     }
   });

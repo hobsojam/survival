@@ -366,9 +366,20 @@ const GOOD_COPY: Record<CastleGood, { title: string; copy: string; cost: string 
 /** The heading over the goods rows: the castle's, and once it is finished, the town's. */
 export const castleGoodsTitle = (state: GameState): string => (state.castle.finishedDay === null ? 'FOR THE CASTLE' : 'FOR THE TOWN');
 
+/** What each good is for once the castle is finished and the town needs it instead. EASTER EGG: the town, see src/game/town.ts. */
+const TOWN_GOOD_COPY: Partial<Record<CastleGood, string>> = {
+  beams: 'Four at a time, cut and dressed for the town\'s houses and stalls.',
+  hangings: 'One at a time, woven from wool and cut in two for the stalls\' awnings.'
+};
+
+/** A good's line in the panel: for the castle while it stands unfinished, then for the town. */
+export const goodCopy = (state: GameState, good: CastleGood): string =>
+  (state.castle.finishedDay !== null ? TOWN_GOOD_COPY[good] : undefined) ?? GOOD_COPY[good].copy;
+
 export function castleGoodsView(state: GameState): CastleGoodRow[] {
   return (['beams', 'fittings', 'hangings'] as const).map(good => {
-    const { title, copy, cost } = GOOD_COPY[good];
+    const { title, cost } = GOOD_COPY[good];
+    const copy = goodCopy(state, good);
     const blocker = goodBlocker(state, good);
     const shown = isRevealed(state) && state.castle.frames > 0 && goodRoom(state, good) > 0;
     return { good, shown, title, copy: blocker ?? copy, cost, have: state.castle.goods[good], disabled: Boolean(blocker) };

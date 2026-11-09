@@ -1,3 +1,5 @@
+import { PAVING_SECTION, SQUARE_NEEDS, STALL_IDS, pieceDone, squareMarked } from '../game/square';
+import { PAVING_SPOTS, SQUARE_CENTRE, STALL_SPOTS, WELL_SPOT } from '../game/squareSites';
 import { feathersFound } from '../game/companion';
 import { stripStage } from '../game/field';
 import { isWinter, nightStart, season } from '../game/calendar';
@@ -133,6 +135,28 @@ function addTown(state: GameState, add: AddVisual): void {
   });
 }
 
+/** The square on the hills once it is marked out: the ground, the paving a quarter at a time, the well and the stalls with their stock. EASTER EGG: the town, see src/game/town.ts. */
+function addSquare(state: GameState, add: AddVisual): void {
+  if (state.area !== 'hills' || !squareMarked(state)) return;
+  const snow = isWinter(state.day) ? 's' : '';
+  const { square } = state.town;
+  add('square-ground', `squareGround:marked${snow}`, SQUARE_CENTRE.x, SQUARE_CENTRE.y, GROUND_DECAL_DEPTH);
+  PAVING_SPOTS.forEach((spot, quarter) => {
+    const laid = Math.min(PAVING_SECTION, Math.max(0, square.paving - quarter * PAVING_SECTION));
+    if (laid > 0) add(`square-paving-${quarter}`, `squarePaving:${laid === PAVING_SECTION ? 'done' : 'half'}${snow}`, spot.x, spot.y, GROUND_DECAL_DEPTH + 1);
+  });
+  if (square.well.stone > 0) {
+    const stage = square.well.fittings > 0 ? 'done' : square.well.stone === SQUARE_NEEDS.well.stone ? 'walls' : 'low';
+    add('square-well', `townWell:${stage}${snow}`, WELL_SPOT.x, WELL_SPOT.y);
+  }
+  for (const id of STALL_IDS) {
+    if (square.stalls[id].beams === 0) continue;
+    const stock = square.stock[id];
+    const stage = !pieceDone(square, id) ? 'frame' : stock === 0 ? id : `${id}-${stock <= 6 ? 'some' : 'full'}`;
+    add(`square-stall-${id}`, `townStall:${stage}${snow}`, STALL_SPOTS[id].x, STALL_SPOTS[id].y);
+  }
+}
+
 /** The town's people out in this area: at work, walking home, or the traveller waiting by the hall door. Each name keeps its own colours. */
 function addTownsfolk(state: GameState, timeMs: number, add: AddVisual): void {
   for (const each of townsfolkHere(state)) {
@@ -200,6 +224,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     addMoat(state, add);
     addBuilding(state, add);
     addTown(state, add);
+    addSquare(state, add);
     if (isRevealed(state)) add('castle-line', 'castleLine:still', WALLS.left, WALLS.top, GROUND_DECAL_DEPTH);
     HILL_TREES.forEach((tree, index) => treeUnderWall(state.castle, tree) || add(`hill-tree-${index}`, `${tree.sprite}:${frame}`, tree.x, tree.y));
     addPiles(state, visuals, add);

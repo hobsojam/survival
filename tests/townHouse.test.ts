@@ -67,8 +67,8 @@ describe('where the house stands', () => {
   };
   const overlap = (a: ReturnType<typeof px>, b: ReturnType<typeof px>) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 
-  it('lays out eight plots on the hills below the castle, outside its walls', () => {
-    expect(HOUSE_PLOTS).toEqual([[31, 23], [26, 21], [22, 21], [27, 25], [18, 21], [23, 25], [14, 21], [19, 25]].map(([x, y]) => ({ area: 'hills', x, y })));
+  it('lays out twelve plots on the hills below the castle, outside its walls: the street, then four around the square', () => {
+    expect(HOUSE_PLOTS).toEqual([[31, 23], [26, 21], [22, 21], [27, 25], [18, 21], [23, 25], [14, 21], [19, 25], [15, 25], [3, 21], [3, 26], [13, 28]].map(([x, y]) => ({ area: 'hills', x, y })));
     expect(HOUSE_COUNT).toBe(HOUSE_PLOTS.length);
     for (const plot of HOUSE_PLOTS) expect(plot.y).toBeGreaterThan(WALLS.bottom);
   });
@@ -96,6 +96,9 @@ describe('where the house stands', () => {
     HOUSE_PLOTS.forEach((other, otherIndex) => {
       if (otherIndex !== index) expect(overlap(box, px(other, townSprites.townHouse)), `plot ${otherIndex}`).toBe(false);
     });
+    // Clear of the square's ground, and inside the 40 by 30 hills.
+    expect(overlap(box, { left: 5.5 * 16, top: 20.5 * 16, right: 11.5 * 16, bottom: 25.5 * 16 })).toBe(false);
+    expect(box.left >= 0 && box.top >= 0 && box.right <= 40 * 16 && box.bottom <= 30 * 16, `${JSON.stringify(box)}`).toBe(true);
   });
 });
 

@@ -20,6 +20,7 @@ import { KEEP_DOOR_AT, KEEP_STONES } from './keep';
 import { CASTLE_SECTIONS, FEAST_ITEMS, NEEDS, allSectionsBuilt, SIDES, TOWERS, hallFinished, towerFinished, wallFinished, type CastleState } from './castle';
 import { SAVE_VERSION, upgradeSave } from './saveUpgrades';
 import { HOUSE_COUNT, HOUSE_NEEDS, JOB_IDS, TOWN_NAMES, houseFinished, type HouseState } from './town';
+import { SQUARE_HOUSES, SQUARE_NEEDS, SQUARE_PIECES, STALL_IDS, STALL_JOBS, STALL_STOCK, pieceDone, type SquareState } from './square';
 
 export { SAVE_VERSION };
 export const SAVE_KEY = 'hearthwild.save';
@@ -484,6 +485,33 @@ function validHouse(house: unknown, day: number): house is HouseState {
   return (doneDay !== null) === houseFinished(house as unknown as HouseState);
 }
 
+/** The square's counts are whole and within what each piece takes, laid in order: nothing before two houses are
+ * finished, no well or stall before the paving, the well's winch after its stone, a stall's awning after its beams.
+ * Each finished piece has its day, and only a finished stall with a keeper holds stock. EASTER EGG: the town, see src/game/town.ts. */
+function validSquare(square: unknown, houses: HouseState[], day: number, jobs: unknown[]): boolean {
+  if (!object(square) || !object(square.well) || !object(square.stalls) || !object(square.stock) || !object(square.doneDays)) return false;
+  const { paving, well, stalls, stock, doneDays } = square;
+  if (!upTo(paving, SQUARE_NEEDS.paving) || !upTo(well.stone, SQUARE_NEEDS.well.stone) || !upTo(well.fittings, SQUARE_NEEDS.well.fittings)) return false;
+  if (well.fittings > 0 && well.stone < SQUARE_NEEDS.well.stone) return false;
+  for (const id of STALL_IDS) {
+    const stall = stalls[id];
+    if (!object(stall) || !upTo(stall.beams, SQUARE_NEEDS.stall.beams) || !upTo(stall.hangings, SQUARE_NEEDS.stall.hangings)) return false;
+    if (stall.hangings > 0 && stall.beams < SQUARE_NEEDS.stall.beams) return false;
+    if (!upTo(stock[id], STALL_STOCK)) return false;
+    if (stock[id] > 0 && (stall.hangings < SQUARE_NEEDS.stall.hangings || !jobs.includes(STALL_JOBS[id]))) return false;
+  }
+  if (Object.keys(stalls).length !== STALL_IDS.length || Object.keys(stock).length !== STALL_IDS.length) return false;
+  const typed = square as unknown as SquareState;
+  const beyondPaving = typed.well.stone > 0 || STALL_IDS.some(id => typed.stalls[id].beams > 0);
+  if ((typed.paving > 0 || beyondPaving) && houses.filter(house => house.doneDay !== null).length < SQUARE_HOUSES) return false;
+  if (beyondPaving && typed.paving < SQUARE_NEEDS.paving) return false;
+  if (!Object.keys(doneDays).every(key => SQUARE_PIECES.includes(key as never))) return false;
+  return SQUARE_PIECES.every(piece => {
+    const done = doneDays[piece];
+    return pieceDone(typed, piece) ? whole(done) && done >= 1 && done <= day : done === undefined;
+  });
+}
+
 /** The town starts only after the castle is finished. Everyone has one of the names given out so far, no two share a name, a job or a house, and anyone with a house has a finished one. */
 function validTown(shape: SaveShape): boolean {
   if (!object(shape.town) || !object(shape.castle)) return false;
@@ -505,6 +533,7 @@ function validTown(shape: SaveShape): boolean {
   }
   const jobs = people.map(person => (person as ObjectValue).job);
   const homes = people.map(person => (person as ObjectValue).house).filter(house => house !== null);
+  if (!validSquare(shape.town.square, houses as HouseState[], day, jobs)) return false;
   if (traveller !== null) {
     if (!object(traveller) || !dayOk(traveller.arrivedDay) || !upTo(traveller.refusals, 2)) return false;
     if (traveller.askedDay !== null && !dayOk(traveller.askedDay)) return false;
