@@ -1,4 +1,4 @@
-import { openJob } from './jobs';
+import { openJobs } from './jobs';
 import type { GameState } from './state';
 import { HOUSE_NEEDS } from './town';
 
@@ -13,7 +13,7 @@ export const houseOpen = (state: GameState, plot: number): boolean => {
   if (house === undefined || house.doneDay !== null || houses.slice(0, plot).some(lower => lower.doneDay === null)) return false;
   if (people.some(person => person.house === null)) return true;
   const allLivedIn = houses.every((built, index) => built.doneDay === null || people.some(person => person.house === index));
-  return people.length > 0 && allLivedIn && openJob(state) !== null;
+  return people.length > 0 && allLivedIn && openJobs(state).length > 0;
 };
 
 /** How many more beams or fittings the open houses still take. */
