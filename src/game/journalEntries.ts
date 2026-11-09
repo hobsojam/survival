@@ -55,7 +55,7 @@ const TOWN_LINES: Record<TownMoment, string> = {
   traveller: 'A lost traveller came to the hall door. The first face I have seen in years.',
   neighbour: '{name} is staying on.'
 };
-const townPage = (word: SeasonWord): PageEntry[] => TOWN_MOMENTS.map(moment => ({ id: `${moment}${word}` as TownJournalId, lines: [TOWN_LINES[moment]] }));
+const townPage = (word: SeasonWord): PageEntry[] => TOWN_MOMENTS.map(moment => ({ id: `${moment}${word}` as TownJournalId, lines: [TOWN_LINES[moment]], ...(moment === 'neighbour' ? { perName: true } : {}) }));
 
 /** `name` is the animal's name when the line was written, so naming one later never changes old lines. */
 export interface JournalEntry { year: number; id: JournalId; day: number; variant: number; name?: string }
@@ -65,6 +65,8 @@ interface PageEntry {
   lines: readonly string[];
   /** Announced already by its own message, so writing it adds no second line. */
   silent?: boolean;
+  /** Written once for each name, so two neighbours in one season each get their line. */
+  perName?: boolean;
 }
 
 export const JOURNAL_PAGES: Record<Season, readonly PageEntry[]> = {
@@ -330,7 +332,7 @@ export function recordJournal(before: GameState, after: GameState, action?: Game
       const noticed = RULES[entry.id](moment);
       if (!noticed || season(noticed.day) !== s) continue;
       const year = yearOf(noticed.day);
-      if (after.journal.some(item => item.year === year && item.id === entry.id)) continue;
+      if (after.journal.some(item => item.year === year && item.id === entry.id && (!entry.perName || item.name === noticed.name))) continue;
       const variant = noticed.variant ?? 0;
       written.push({ year, id: entry.id, day: noticed.day, variant, ...(noticed.name === undefined ? {} : { name: noticed.name }) });
       if (!entry.silent && !noticed.silent) messages.push(`Written in your journal: ${lineWithName(entry.lines[variant], noticed.name)}`);

@@ -19,7 +19,7 @@ import { ORCHARD_SPOTS } from './orchard';
 import { KEEP_DOOR_AT, KEEP_STONES } from './keep';
 import { CASTLE_SECTIONS, FEAST_ITEMS, NEEDS, allSectionsBuilt, SIDES, TOWERS, hallFinished, towerFinished, wallFinished, type CastleState } from './castle';
 import { SAVE_VERSION, upgradeSave } from './saveUpgrades';
-import { HOUSE_NEEDS, JOB_IDS, TOWN_NAMES, houseFinished, type HouseState } from './town';
+import { HOUSE_COUNT, HOUSE_NEEDS, JOB_IDS, TOWN_NAMES, houseFinished, type HouseState } from './town';
 
 export { SAVE_VERSION };
 export const SAVE_KEY = 'hearthwild.save';
@@ -490,7 +490,7 @@ function validTown(shape: SaveShape): boolean {
   const { traveller, goneDay, namesUsed, people, houses } = shape.town;
   const day = shape.day as number;
   const dayOk = (value: unknown): boolean => whole(value) && value >= 1 && value <= day;
-  if (!Array.isArray(people) || !Array.isArray(houses) || !upTo(namesUsed, TOWN_NAMES.length)) return false;
+  if (!Array.isArray(people) || !Array.isArray(houses) || houses.length !== HOUSE_COUNT || !upTo(namesUsed, TOWN_NAMES.length)) return false;
   if (!houses.every(house => validHouse(house, day))) return false;
   if (goneDay !== null && !dayOk(goneDay)) return false;
   const given = TOWN_NAMES.slice(0, namesUsed);

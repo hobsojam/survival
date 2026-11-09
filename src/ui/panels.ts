@@ -355,6 +355,9 @@ const GOOD_COPY: Record<CastleGood, { title: string; copy: string; cost: string 
 };
 
 /** The castle's goods, made at camp: a row shows once the frames are begun and the castle still wants more of it. Hangings are woven at the loom from wool. */
+/** The heading over the goods rows: the castle's, and once it is finished, the town's. */
+export const castleGoodsTitle = (state: GameState): string => (state.castle.finishedDay === null ? 'FOR THE CASTLE' : 'FOR THE TOWN');
+
 export function castleGoodsView(state: GameState): CastleGoodRow[] {
   return (['beams', 'fittings', 'hangings'] as const).map(good => {
     const { title, copy, cost } = GOOD_COPY[good];

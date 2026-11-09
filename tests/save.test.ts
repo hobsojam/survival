@@ -813,7 +813,9 @@ describe('the town in the save', () => {
     ['a finished day on an unfinished house', (state: GameState) => { state.town.houses = [{ stone: 30, beams: 4, fittings: 0, doneDay: 30 }]; }],
     ['a finished house with no day', (state: GameState) => { state.town.houses = [{ ...built, doneDay: null }]; }],
     ['fewer names used than people', (state: GameState) => { state.town.people = [ada]; state.town.namesUsed = 0; }],
-    ['a town that is not an object', (state: GameState) => { (state as unknown as Record<string, unknown>).town = null; }]
+    ['a town that is not an object', (state: GameState) => { (state as unknown as Record<string, unknown>).town = null; }],
+    ['a town with no house plots', (state: GameState) => { state.town.houses = []; }],
+    ['a town with more houses than plots', (state: GameState) => { state.town.houses = [...state.town.houses, { stone: 0, beams: 0, fittings: 0, doneDay: null }]; }]
   ])('rejects %s', (_, change) => {
     expect(accepts(change)).toBe(false);
   });
