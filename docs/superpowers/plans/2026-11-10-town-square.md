@@ -86,7 +86,7 @@
     - `pieceDone(square, piece): boolean`.
     - `pieceOpen(state, piece): boolean` is true when the square is marked, the piece isn't done, and the piece is the paving or the paving is done.
 - **Town state.** `TownState` gains `square: SquareState`, and `emptyTown()` includes `emptySquare()`.
-- **Plots.** `HOUSE_COUNT = 12`. `HOUSE_PLOTS` gains four plots around the square, in this building order: `(15,25)`, `(3.5,21)`, `(3.5,26)`, `(13,28)`.
+- **Plots.** `HOUSE_COUNT = 12`. `HOUSE_PLOTS` gains four plots around the square, in this building order: `(15,25)`, `(3,21)`, `(3,26)`, `(13,28)`.
   - If a placement test shows one of these overlapping, move it by the smallest step that clears it, and ledger a ruling.
 - **The upgrade.** `SAVE_VERSION = 42`. `SAVE_UPGRADES[41]` pads `town.houses` to 12 and adds `town.square = emptySquare()`. Its comment reads: "Version 42: the town's square and its four plots. A version 41 town has neither."
 - **Validation.** `validTown` also checks:

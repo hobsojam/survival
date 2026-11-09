@@ -1,3 +1,4 @@
+import { emptySquare, type SquareState } from './square';
 import type { GameState } from './state';
 
 // EASTER EGG: the town after the castle is deliberately left out of the README and hidden on screen until a lost
@@ -25,13 +26,14 @@ export interface TownState {
   people: Person[];
   /** One for each plot. */
   houses: HouseState[];
+  square: SquareState;
 }
 
 /** What a house takes: stone for its footings and walls, beams for its roof, and an iron fitting for its door. */
 export const HOUSE_NEEDS = { stone: 30, beams: 4, fittings: 1 } as const;
 
 /** How many plots there are for houses. */
-export const HOUSE_COUNT = 8;
+export const HOUSE_COUNT = 12;
 
 /** The names people arrive with, in the order they come. People are people and already have names: these are never changed. */
 export const TOWN_NAMES: readonly string[] = ['Ada', 'Tomas', 'Elin', 'Bram', 'Maud', 'Osric', 'Hild', 'Piers', 'Agnes', 'Wat', 'Isolde', 'Hugh',
@@ -39,7 +41,7 @@ export const TOWN_NAMES: readonly string[] = ['Ada', 'Tomas', 'Elin', 'Bram', 'M
 
 export const emptyHouse = (): HouseState => ({ stone: 0, beams: 0, fittings: 0, doneDay: null });
 
-export const emptyTown = (): TownState => ({ traveller: null, goneDay: null, namesUsed: 0, people: [], houses: Array.from({ length: HOUSE_COUNT }, emptyHouse) });
+export const emptyTown = (): TownState => ({ traveller: null, goneDay: null, namesUsed: 0, people: [], houses: Array.from({ length: HOUSE_COUNT }, emptyHouse), square: emptySquare() });
 
 /** Whether anyone has come yet. */
 export const townStarted = (state: GameState): boolean => state.town.traveller !== null || state.town.people.length > 0;

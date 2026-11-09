@@ -3,6 +3,7 @@ import { emptyOrchard } from './orchard';
 import { emptyPony } from './pony';
 import { emptyKeep } from './keep';
 import { emptyCastle } from './castle';
+import { emptySquare } from './square';
 import { HOUSE_COUNT, emptyHouse, emptyTown } from './town';
 
 // Bringing an older save up to date as it loads. Every change to the saved shape bumps SAVE_VERSION by one and adds
@@ -11,7 +12,7 @@ import { HOUSE_COUNT, emptyHouse, emptyTown } from './town';
 // anything the player had. Loading runs every step a save needs, in order, then validates the result as usual.
 
 /** The saved shape's version. Bump it by one with every change to the shape, and add its upgrade step below. */
-export const SAVE_VERSION = 41;
+export const SAVE_VERSION = 42;
 
 /** The oldest save that can still be brought up to date: earlier formats were never upgraded and don't load. */
 export const OLDEST_UPGRADABLE_VERSION = 23;
@@ -168,7 +169,13 @@ export const SAVE_UPGRADES: Readonly<Record<number, SaveUpgrade>> = {
   40: old => {
     const state = old as Upgradable & { town: Upgradable & { houses: unknown[] } };
     const houses = Array.isArray(state.town?.houses) ? state.town.houses : [];
-    return { ...state, town: { ...state.town, houses: [...houses, ...Array.from({ length: Math.max(0, HOUSE_COUNT - houses.length) }, emptyHouse)] } };
+    return { ...state, town: { ...state.town, houses: [...houses, ...Array.from({ length: Math.max(0, 8 - houses.length) }, emptyHouse)] } };
+  },
+  // Version 42: the town's square and its four plots. A version 41 town has neither.
+  41: old => {
+    const state = old as Upgradable & { town: Upgradable & { houses: unknown[] } };
+    const houses = Array.isArray(state.town?.houses) ? state.town.houses : [];
+    return { ...state, town: { ...state.town, houses: [...houses, ...Array.from({ length: Math.max(0, HOUSE_COUNT - houses.length) }, emptyHouse)], square: emptySquare() } };
   }
 };
 

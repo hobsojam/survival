@@ -784,6 +784,9 @@ describe('the town in the save', () => {
     expect(accepts(state => { state.town.people = [ada]; state.town.houses = street({ stone: 30, beams: 2, fittings: 0, doneDay: null }); state.town.namesUsed = 1; })).toBe(true);
     expect(accepts(state => { state.town.goneDay = 30; state.town.namesUsed = 1; })).toBe(true);
     expect(accepts(state => { state.town.people = [{ ...ada, house: 0 }, { name: 'Tomas', job: 'honey', house: 1, arrivedDay: 31 }]; state.town.houses = street(built, built); state.town.namesUsed = 2; })).toBe(true);
+    const twoHouses = (state: GameState) => { state.town.people = [{ ...ada, house: 0 }, { name: 'Tomas', job: 'honey', house: 1, arrivedDay: 31 }]; state.town.houses = street(built, built); state.town.namesUsed = 2; };
+    expect(accepts(state => { twoHouses(state); Object.assign(state.town.square, { paving: 40, doneDays: { paving: 40 } }); state.town.square.stalls.bread = { beams: 2, hangings: 0 }; })).toBe(true);
+    expect(accepts(state => { twoHouses(state); Object.assign(state.town.square, { paving: 40, well: { stone: 12, fittings: 1 }, doneDays: { paving: 40, well: 41 } }); })).toBe(true);
   });
 
   it.each([
@@ -803,7 +806,14 @@ describe('the town in the save', () => {
     ['fewer names used than people', (state: GameState) => { state.town.people = [ada]; state.town.namesUsed = 0; }],
     ['a town that is not an object', (state: GameState) => { (state as unknown as Record<string, unknown>).town = null; }],
     ['a town with no house plots', (state: GameState) => { state.town.houses = []; }],
-    ['a town with seven houses', (state: GameState) => { state.town.houses = state.town.houses.slice(0, 7); }],
+    ['a town with eleven houses', (state: GameState) => { state.town.houses = state.town.houses.slice(0, 11); }],
+    ['square work with only one house finished', (state: GameState) => { state.town.houses = street(built); state.town.square.paving = 3; }],
+    ['a stall beam before the paving is done', (state: GameState) => { state.town.houses = street(built, built); state.town.square.paving = 39; state.town.square.stalls.bread.beams = 1; }],
+    ['a well fitting before its stone', (state: GameState) => { state.town.houses = street(built, built); Object.assign(state.town.square, { paving: 40, doneDays: { paving: 40 }, well: { stone: 11, fittings: 1 } }); }],
+    ['paving past what the square takes', (state: GameState) => { state.town.houses = street(built, built); state.town.square.paving = 41; }],
+    ['stall stock with no one keeping it', (state: GameState) => { state.town.houses = street(built, built); Object.assign(state.town.square, { paving: 40, doneDays: { paving: 40, bread: 41 } }); state.town.square.stalls.bread = { beams: 2, hangings: 1 }; state.town.square.stock.bread = 3; }],
+    ['a finished piece with no finished day', (state: GameState) => { state.town.houses = street(built, built); state.town.square.paving = 40; }],
+    ['a finished day on an unfinished piece', (state: GameState) => { state.town.houses = street(built, built); Object.assign(state.town.square, { paving: 39, doneDays: { paving: 40 } }); }],
     ['the second house finished before the first', (state: GameState) => { state.town.houses = street({ stone: 0, beams: 0, fittings: 0, doneDay: null }, built); }],
     ['a town with more houses than plots', (state: GameState) => { state.town.houses = [...state.town.houses, { stone: 0, beams: 0, fittings: 0, doneDay: null }]; }]
   ])('rejects %s', (_, change) => {

@@ -1,3 +1,4 @@
+import { emptySquare } from '../src/game/square';
 import { describe, expect, it } from 'vitest';
 import { HOUSE_NEEDS, TOWN_NAMES, emptyTown, townStarted } from '../src/game/town';
 import { createGame } from '../src/game/state';
@@ -5,8 +6,8 @@ import { createGame } from '../src/game/state';
 // EASTER EGG: the town, see src/game/town.ts.
 
 describe('the town before anyone comes', () => {
-  it('starts empty, with one unbuilt house', () => {
-    expect(emptyTown()).toEqual({ traveller: null, goneDay: null, namesUsed: 0, people: [], houses: Array.from({ length: 8 }, () => ({ stone: 0, beams: 0, fittings: 0, doneDay: null })) });
+  it('starts empty, with every house unbuilt and no square', () => {
+    expect(emptyTown()).toEqual({ traveller: null, goneDay: null, namesUsed: 0, people: [], houses: Array.from({ length: 12 }, () => ({ stone: 0, beams: 0, fittings: 0, doneDay: null })), square: emptySquare() });
     expect(createGame().town).toEqual(emptyTown());
   });
 

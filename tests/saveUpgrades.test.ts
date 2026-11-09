@@ -1,4 +1,5 @@
-import { emptyTown } from '../src/game/town';
+import { TOWN_NAMES, emptyHouse, emptyTown } from '../src/game/town';
+import { emptySquare } from '../src/game/square';
 import { townSpots } from '../src/game/townSites';
 import { finishedCastleCamp } from './townStreet';
 import { describe, expect, it } from 'vitest';
@@ -345,8 +346,25 @@ describe('the version 39 upgrade: the castle', () => {
     const loaded = loadGame(storage);
     expect(loaded.kind).toBe('loaded');
     if (loaded.kind !== 'loaded') return;
-    expect(loaded.state.town.houses).toHaveLength(8);
+    expect(loaded.state.town.houses).toHaveLength(12);
     expect(loaded.state.town.houses[0]).toEqual({ stone: 30, beams: 4, fittings: 1, doneDay: 30 });
     expect(townSpots(loaded.state).map(spot => spot.plot)).toEqual([1]);
+  });
+
+  it('brings a version 41 town up with its square unbuilt and four more plots, none open while every camp job is held', () => {
+    const jobs = ['hens', 'honey', 'loaves', 'wood', 'beds', 'field', 'sheep', 'orchard'] as const;
+    const old = finishedCastleCamp() as unknown as { town: Record<string, unknown> };
+    old.town = { traveller: null, goneDay: null, namesUsed: 8,
+      people: jobs.map((job, i) => ({ name: TOWN_NAMES[i], job, house: i, arrivedDay: 20 + i })),
+      houses: jobs.map((_, i) => ({ stone: 30, beams: 4, fittings: 1, doneDay: 20 + i })) };
+    const storage = new MemoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({ version: 41, state: old }));
+    const loaded = loadGame(storage);
+    expect(loaded.kind).toBe('loaded');
+    if (loaded.kind !== 'loaded') return;
+    expect(loaded.state.town.houses).toHaveLength(12);
+    expect(loaded.state.town.houses.slice(8)).toEqual(Array.from({ length: 4 }, emptyHouse));
+    expect(loaded.state.town.square).toEqual(emptySquare());
+    expect(townSpots(loaded.state)).toEqual([]);
   });
 });
