@@ -38,6 +38,14 @@ button:focus-visible { outline: 3px solid #d69c5d; outline-offset: 3px; }
 .name-overlay[hidden] { display: none; }
 .name-overlay input { display: block; width: 100%; box-sizing: border-box; margin: 12px 0 4px; padding: 10px 12px; border: 1px solid #b9c9b4; border-radius: 10px; font: inherit; font-size: 16px; }
 .name-overlay small { display: block; min-height: 1.3em; color: #a0472f; }
+.load-overlay { z-index: 32; }
+.load-card { width: 100%; max-width: 360px; }
+.load-card textarea, .save-code { display: block; width: 100%; box-sizing: border-box; margin: 12px 0 4px; padding: 10px 12px; border: 1px solid #b9c9b4; border-radius: 10px; font: inherit; font-size: 14px; resize: vertical; }
+.load-card .load-error { display: block; min-height: 1.3em; margin-top: 8px; color: #a0472f; }
+.save-actions { display: grid; gap: 8px; margin-top: 10px; }
+.save-actions .secondary-button { width: 100%; border-radius: 9px; padding: 10px; border: 1px solid #9bb398; font-weight: 700; }
+.save-note { display: block; min-height: 1.3em; margin-top: 8px; color: #426447; }
+#phone-new-game { display: none; }
 .name-actions { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
 .pause-card { max-width: 320px; padding: 22px 24px; border-radius: 16px; background: #fffdf7; text-align: center; box-shadow: 0 12px 32px #17302466; }
 .pause-card h2 { margin: 4px 0 8px; }
@@ -358,6 +366,7 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
   .survivor-panel h2, .survivor-panel .meter, .survivor-panel .quick-actions button:not(#eat-ration-button) { display: none; }
   .survivor-panel .quick-actions { grid-template-columns: 1fr; margin-top: 0; }
   .sidebar button { min-height: 44px; touch-action: manipulation; }
+  #phone-new-game { display: block; }
   .phone-only button { width: 100%; border-radius: 9px; padding: 12px; border: 1px solid #9bb398; font-weight: 700; }
 }
 /* Narrow phones: the day pill needs the room more than the title does. */
