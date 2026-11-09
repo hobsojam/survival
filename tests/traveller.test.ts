@@ -213,6 +213,15 @@ describe('word gets around', () => {
     expect(answer(tomasAsking(), true).state.town.people[1]).toMatchObject({ job: 'honey', house: 1 });
   });
 
+  it('gives a newcomer a stall to keep once the square has one standing, and the empty house', () => {
+    const idle = settled(DAY + WORD_DAYS, true);
+    Object.assign(idle.town.square, { paving: 40, doneDays: { paving: DAY, honey: DAY } });
+    idle.town.square.stalls.honey = { beams: 2, hangings: 1 };
+    const result = answer(nextMorning(throughNightfall(idle)), true, 'honeyStall');
+    expect(result.message).toBe('Tomas will stay.');
+    expect(result.state.town.people[1]).toEqual({ name: 'Tomas', job: 'honeyStall', house: 1, arrivedDay: DAY + WORD_DAYS });
+  });
+
   it('refuses a job that is not free, and any answer with no one asking', () => {
     const state = tomasAsking();
     expect(answer(state, true, 'sheep')).toEqual({ state, message: '' });

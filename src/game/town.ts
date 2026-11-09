@@ -7,8 +7,11 @@ import type { GameState } from './state';
 // docs/superpowers/specs/2026-11-08-town-design.md.
 
 /** A job a worker can take over from the survivor. */
-export type JobId = 'hens' | 'honey' | 'loaves' | 'wood' | 'beds' | 'field' | 'sheep' | 'orchard';
-export const JOB_IDS: readonly JobId[] = ['hens', 'honey', 'loaves', 'wood', 'beds', 'field', 'sheep', 'orchard'];
+export type JobId = 'hens' | 'honey' | 'loaves' | 'wood' | 'beds' | 'field' | 'sheep' | 'orchard'
+  | 'breadStall' | 'honeyStall' | 'woolStall' | 'appleStall' | 'eggStall';
+/** The camp's jobs, then the square's stalls. */
+export const JOB_IDS: readonly JobId[] = ['hens', 'honey', 'loaves', 'wood', 'beds', 'field', 'sheep', 'orchard',
+  'breadStall', 'honeyStall', 'woolStall', 'appleStall', 'eggStall'];
 
 /** Someone at the hall door who hasn't stayed yet. `askedDay` is the last day they were told no. */
 export interface Traveller { name: string; arrivedDay: number; refusals: number; askedDay: number | null }

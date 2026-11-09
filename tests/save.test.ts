@@ -787,6 +787,10 @@ describe('the town in the save', () => {
     const twoHouses = (state: GameState) => { state.town.people = [{ ...ada, house: 0 }, { name: 'Tomas', job: 'honey', house: 1, arrivedDay: 31 }]; state.town.houses = street(built, built); state.town.namesUsed = 2; };
     expect(accepts(state => { twoHouses(state); Object.assign(state.town.square, { paving: 40, doneDays: { paving: 40 } }); state.town.square.stalls.bread = { beams: 2, hangings: 0 }; })).toBe(true);
     expect(accepts(state => { twoHouses(state); Object.assign(state.town.square, { paving: 40, well: { stone: 12, fittings: 1 }, doneDays: { paving: 40, well: 41 } }); })).toBe(true);
+    expect(accepts(state => {
+      twoHouses(state); state.town.people.push({ name: 'Elin', job: 'breadStall', house: null, arrivedDay: 42 }); state.town.namesUsed = 3;
+      Object.assign(state.town.square, { paving: 40, doneDays: { paving: 40, bread: 41 } }); state.town.square.stalls.bread = { beams: 2, hangings: 1 }; state.town.square.stock.bread = 3;
+    })).toBe(true);
   });
 
   it.each([

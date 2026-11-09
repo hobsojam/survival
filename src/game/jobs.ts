@@ -3,12 +3,15 @@ import { emptyBed, needsWater } from './beds';
 import { isSpring, isWinter, yearOf } from './calendar';
 import { COOP_SITE } from './chickens';
 import { cutField, sownField, stripStage, threshGrain, threshedField } from './field';
-import { addFood, storeTotal } from './food';
+import { addFood, foodCount, storeTotal, takeFrom, type FoodItem } from './food';
 import { hasWoodStore, woodStoreCapacity } from './home';
 import { treeRipe } from './orchard';
 import { fedSheep, shornSheep } from './sheep';
+import { STALL_IDS, STALL_JOBS, STALL_RESERVE, STALL_SPOTS, STALL_STOCK, STALL_WORDS, WOOL_RESERVE, pieceDone, type StallId } from './square';
 import { BALANCE, foodStoreCapacity, type AreaId, type GameState } from './state';
 import { JOB_IDS, type JobId } from './town';
+
+export { STALL_JOBS } from './square';
 
 // EASTER EGG: the town, see src/game/town.ts. A worker takes over one of the survivor's regular jobs and does it every
 // dawn without fail. What won't fit is left where it is for another day, so nothing is wasted.
@@ -22,8 +25,11 @@ export interface Job {
   spot: { area: AreaId; x: number; y: number };
   /** The job's work on the day just begun. */
   dawn: (next: GameState) => void;
+  /** Whether a worker already on the job can do it, when that differs from whether it can be offered. */
+  works?: (state: GameState) => boolean;
 }
 
+const held = (state: GameState, job: JobId): boolean => state.town.people.some(person => person.job === job);
 const larderRoom = (state: GameState): number => Math.max(0, foodStoreCapacity(state) - storeTotal(state.larder));
 const campSpot = (dx: number, dy: number) => ({ area: 'camp' as const, x: BALANCE.campX + dx, y: BALANCE.campY + dy });
 
@@ -89,7 +95,28 @@ function orchardDawn(next: GameState): void {
   }) };
 }
 
-export const JOBS: Record<JobId, Job> = {
+/** Where each stall's good comes from: the larder's food, or the wool basket. */
+const STALL_FOOD: Record<Exclude<StallId, 'wool'>, FoodItem> = { bread: 'bread', honey: 'honey', apples: 'apple', eggs: 'egg' };
+
+/** One of the stall's good onto its counter, if there's room on it and the camp has more than it keeps back. */
+function stallDawn(next: GameState, id: StallId): void {
+  if (next.town.square.stock[id] >= STALL_STOCK) return;
+  if (id === 'wool') {
+    if (next.sheep.wool <= WOOL_RESERVE) return;
+    next.sheep = { ...next.sheep, wool: next.sheep.wool - 1 };
+  } else {
+    const item = STALL_FOOD[id];
+    const larder = foodCount(next.larder, item) > STALL_RESERVE ? takeFrom(next.larder, item, 1) : null;
+    if (!larder) return;
+    next.larder = larder;
+  }
+  next.town.square = { ...next.town.square, stock: { ...next.town.square.stock, [id]: next.town.square.stock[id] + 1 } };
+}
+
+/** The camp's own jobs, held before anyone is given a stall. */
+type CampJobId = Exclude<JobId, (typeof STALL_JOBS)[StallId]>;
+
+const campJobs: Record<CampJobId, Job> = {
   hens: {
     offer: 'look after the hens',
     open: state => state.chickens.rescued && state.structures.chickenCoop && state.structures.larder,
@@ -151,10 +178,25 @@ export const JOBS: Record<JobId, Job> = {
   }
 };
 
+const campJobOpen = (state: GameState): boolean =>
+  (Object.keys(campJobs) as CampJobId[]).some(job => !held(state, job) && campJobs[job].open(state));
+
+/** A stall is offered once it stands and every camp job that is open is taken; its keeper stocks it from then on. */
+const stallJob = (id: StallId): Job => ({
+  offer: `keep the ${STALL_WORDS[id]} stall`,
+  open: state => pieceDone(state.town.square, id) && !campJobOpen(state),
+  works: state => pieceDone(state.town.square, id),
+  spot: { area: 'hills', x: STALL_SPOTS[id].x, y: STALL_SPOTS[id].y + 1 },
+  dawn: next => stallDawn(next, id)
+});
+
+export const JOBS: Record<JobId, Job> = {
+  ...campJobs,
+  ...Object.fromEntries(STALL_IDS.map(id => [STALL_JOBS[id], stallJob(id)])) as Record<(typeof STALL_JOBS)[StallId], Job>
+};
+
 /** The order jobs are offered in. */
 export const JOB_ORDER: readonly JobId[] = JOB_IDS;
-
-const held = (state: GameState, job: JobId): boolean => state.town.people.some(person => person.job === job);
 
 /** The jobs the camp has ready that no one holds yet, in the order they are offered. */
 export function openJobs(state: GameState): JobId[] {
@@ -166,7 +208,7 @@ export function openJob(state: GameState): JobId | null {
   return openJobs(state)[0] ?? null;
 }
 
-/** Each worker does their job at dawn. */
+/** Each worker does their job at dawn, the camp's first, so a stall can take what came in that morning. */
 export function jobsDawn(next: GameState): void {
-  for (const job of JOB_ORDER) if (held(next, job) && JOBS[job].open(next)) JOBS[job].dawn(next);
+  for (const job of JOB_ORDER) if (held(next, job) && (JOBS[job].works ?? JOBS[job].open)(next)) JOBS[job].dawn(next);
 }

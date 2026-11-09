@@ -43,7 +43,7 @@ export function addFood(store: FoodStore, item: FoodItem, n: number, day: number
 }
 
 /** Takes n of an item from one store, the oldest fresh pieces first. Null if there isn't enough. */
-function takeFrom(store: FoodStore, item: FoodItem, n: number): FoodStore | null {
+export function takeFrom(store: FoodStore, item: FoodItem, n: number): FoodStore | null {
   if (foodCount(store, item) < n) return null;
   if (isFresh(item)) return { ...store, [item]: [...store[item]].sort((a, b) => a - b).slice(n) };
   return { ...store, [item]: store[item] - n };

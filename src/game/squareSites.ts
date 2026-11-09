@@ -1,6 +1,6 @@
 import { spendCastleStone } from './castleSites';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
-import { PAVING_SECTION, SQUARE_NEEDS, STALL_IDS, pieceDone, pieceOpen, type SquarePiece, type SquareState, type StallId } from './square';
+import { PAVING_SECTION, SQUARE_NEEDS, STALL_IDS, STALL_SPOTS, STALL_WORDS, pieceDone, pieceOpen, type SquarePiece, type SquareState } from './square';
 import { BALANCE, type AreaId, type GameState } from './state';
 
 // EASTER EGG: the town, see src/game/town.ts. Where the square's pieces stand on the hills, at the west end of the
@@ -12,12 +12,7 @@ export const SQUARE_CENTRE = { x: 8.5, y: 23 } as const;
 export const PAVING_SPOTS: readonly { x: number; y: number }[] = [{ x: 7, y: 22 }, { x: 10, y: 22 }, { x: 7, y: 24.5 }, { x: 10, y: 24.5 }];
 /** The well stands in the middle. */
 export const WELL_SPOT = SQUARE_CENTRE;
-/** The stalls around the square's edges: two along the top, three along the bottom. */
-export const STALL_SPOTS: Record<StallId, { x: number; y: number }> = {
-  bread: { x: 6.5, y: 21 }, honey: { x: 10.5, y: 21 }, apples: { x: 6, y: 25.5 }, wool: { x: 8.5, y: 25.5 }, eggs: { x: 11, y: 25.5 }
-};
-/** Each stall's good as one word: "the apple stall". */
-export const STALL_WORDS: Record<StallId, string> = { bread: 'bread', honey: 'honey', wool: 'wool', apples: 'apple', eggs: 'egg' };
+export { STALL_SPOTS, STALL_WORDS } from './square';
 
 export interface SquareSpot { piece: SquarePiece; area: AreaId; x: number; y: number }
 

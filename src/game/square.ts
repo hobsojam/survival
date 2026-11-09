@@ -1,3 +1,4 @@
+import type { JobId } from './town';
 import type { GameState } from './state';
 
 // EASTER EGG: the town, see src/game/town.ts. The market square at the west end of the street, marked out once two
@@ -6,11 +7,21 @@ import type { GameState } from './state';
 
 /** The five stalls, one for each good the town will sell on market day. */
 export type StallId = 'bread' | 'honey' | 'wool' | 'apples' | 'eggs';
+/** The stall jobs, one for each stall. */
+export const STALL_JOBS = { bread: 'breadStall', honey: 'honeyStall', wool: 'woolStall', apples: 'appleStall', eggs: 'eggStall' } as const satisfies Record<StallId, JobId>;
+
 export const STALL_IDS: readonly StallId[] = ['bread', 'honey', 'wool', 'apples', 'eggs'];
 
 /** A piece of the square that is built on its own. */
 export type SquarePiece = 'paving' | 'well' | StallId;
 export const SQUARE_PIECES: readonly SquarePiece[] = ['paving', 'well', ...STALL_IDS];
+
+/** The stalls around the square's edges: two along the top, three along the bottom. */
+export const STALL_SPOTS: Record<StallId, { x: number; y: number }> = {
+  bread: { x: 6.5, y: 21 }, honey: { x: 10.5, y: 21 }, apples: { x: 6, y: 25.5 }, wool: { x: 8.5, y: 25.5 }, eggs: { x: 11, y: 25.5 }
+};
+/** Each stall's good as one word: "the apple stall". */
+export const STALL_WORDS: Record<StallId, string> = { bread: 'bread', honey: 'honey', wool: 'wool', apples: 'apple', eggs: 'egg' };
 
 /** What each piece takes: paving stones, the well's stone and its iron winch, and each stall's beams and wool awning. */
 export const SQUARE_NEEDS = { paving: 40, well: { stone: 12, fittings: 1 }, stall: { beams: 2, hangings: 1 } } as const;
