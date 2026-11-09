@@ -1,3 +1,4 @@
+import { street } from './townStreet';
 import { describe, expect, it } from 'vitest';
 import { townsfolkSprites } from '../src/art/townsfolkSprites';
 import { CAMP_EXIT } from '../src/game/areas';
@@ -12,6 +13,7 @@ import { HOUSE_PLOTS } from '../src/game/townSites';
 import { greeting, personSpot, travellerSpot } from '../src/game/townsfolk';
 import { promptFor, useKeyAction } from '../src/scene/prompts';
 import { pickTapTarget } from '../src/scene/tapTarget';
+import { rainWindow } from '../src/game/rain';
 import { sceneVisuals } from '../src/scene/visuals';
 
 // EASTER EGG: the town, see src/game/town.ts. The town's people at their work and on their way home.
@@ -63,7 +65,7 @@ describe('where the town\'s people are', () => {
     expect(gap(personSpot(town(end), 0)!, HALL_DOOR_SPOT)).toBeLessThan(0.2);
     const housed = town(end, state => {
       state.town.people = [{ ...ada, house: 0 }];
-      state.town.houses = [{ stone: 30, beams: 4, fittings: 1, doneDay: 64 }];
+      state.town.houses = street({ stone: 30, beams: 4, fittings: 1, doneDay: 64 });
     });
     expect(gap(personSpot(housed, 0)!, HOUSE_PLOTS[0])).toBeLessThan(0.2);
   });
@@ -81,17 +83,47 @@ describe('where the town\'s people are', () => {
 });
 
 describe('saying hello', () => {
-  it('greets by the time of day, and in winter by the cold', () => {
-    expect(greeting(town(10), 'Ada')).toBe('Ada · Good morning.');
-    expect(greeting(town(afternoonStart(SPRING) + 1), 'Ada')).toBe('Ada · Good afternoon.');
+  /** A spring day with no rain, odd or even. Ada's name is the first, so on an odd day she remarks on the season. */
+  const dryDay = (odd: boolean, from = 61) => Array.from({ length: 10 }, (_, i) => from + i).find(day => rainWindow(day) === null && day % 2 === (odd ? 1 : 0))!;
+  const on = (day: number, time = 10) => town(time, state => { state.day = day; });
+
+  it('greets by the time of day on some days', () => {
+    const even = dryDay(false);
+    expect(greeting(on(even), 'Ada')).toBe('Ada · Good morning.');
+    expect(greeting(on(even, afternoonStart(even) + 1), 'Ada')).toBe('Ada · Good afternoon.');
+  });
+
+  it('remarks on the season on the others', () => {
+    expect(greeting(on(dryDay(true)), 'Ada')).toBe('Ada · The grass is coming on.');
+    expect(greeting(on(71), 'Ada')).toBe('Ada · Warm one today.');
+    expect(greeting(on(81), 'Ada')).toBe('Ada · The leaves are turning.');
+    expect(greeting(on(72), 'Ada')).toBe('Ada · Good morning.');
+  });
+
+  it('says good evening through the dusk, whatever the day', () => {
     expect(greeting(town(duskStart + 1), 'Ada')).toBe('Ada · Good evening.');
-    expect(greeting(town(10, state => { state.day = WINTER; }), 'Ada')).toBe('Ada · Cold one today.');
+    expect(greeting(on(WINTER, nightStart(WINTER) - duskLength(WINTER) + 1), 'Ada')).toBe('Ada · Good evening.');
+  });
+
+  it('talks of the rain while it rains, and of the cold in winter', () => {
+    const wet = Array.from({ length: 10 }, (_, i) => 61 + i).find(day => rainWindow(day) !== null)!;
+    const window = rainWindow(wet)!;
+    expect(greeting(on(wet, window.start + 1), 'Ada')).toBe('Ada · Wet one today.');
+    expect(greeting(on(wet, window.end + 1), 'Ada')).not.toBe('Ada · Wet one today.');
+    expect(greeting(on(WINTER), 'Ada')).toBe('Ada · Cold one today.');
+    expect(greeting(on(WINTER + 1), 'Ada')).toBe('Ada · Cold one today.');
+  });
+
+  it('has two people say different things on the same day', () => {
+    const day = on(dryDay(true));
+    expect(greeting(day, 'Ada')).toBe('Ada · The grass is coming on.');
+    expect(greeting(day, 'Tomas')).toBe('Tomas · Good morning.');
   });
 
   it('adds the greeting to the prompt when the survivor passes, and leaves E and taps alone', () => {
     const near = town(60, state => { state.player = { ...state.player, x: JOBS.hens.spot.x + 1, y: JOBS.hens.spot.y }; });
     const alone = { ...near, town: { ...near.town, people: [] } };
-    expect(promptFor(near)).toContain('Ada · Good morning.');
+    expect(promptFor(near)).toContain(greeting(near, 'Ada'));
     expect(promptFor(near)).toContain(promptFor(alone));
     expect(useKeyAction(near)).toEqual(useKeyAction(alone));
     expect(pickTapTarget(near, JOBS.hens.spot.x, JOBS.hens.spot.y)).toEqual(pickTapTarget(alone, JOBS.hens.spot.x, JOBS.hens.spot.y));
@@ -105,7 +137,8 @@ describe('saying hello', () => {
       state.town = { ...state.town, people: [], traveller: { name: 'Tomas', arrivedDay: 64, refusals: 0, askedDay: null }, namesUsed: 2 };
       state.player = { ...state.player, x: HALL_DOOR_SPOT.x + 2, y: HALL_DOOR_SPOT.y + 1 };
     });
-    expect(promptFor(hills)).toContain('Tomas · Good morning.');
+    expect(promptFor(hills)).toContain(greeting(hills, 'Tomas'));
+    expect(greeting(hills, 'Tomas')).toMatch(/^Tomas · /);
   });
 });
 

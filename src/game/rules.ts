@@ -1,3 +1,4 @@
+import type { JobId } from './town';
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isSummer, isWinter, nightStart, yearOf } from './calendar';
 import { CAMP_EXIT, CAMP_HOMESTEAD_EXIT, HOMESTEAD_EXIT, QUARRY_EXIT, QUARRY_SITE, RUBBLE_SITE, crossing, hillsPathOpen, pathOpen } from './areas';
 import { offerToPony, ponyArrives, ponyOfferBlocker, startlePony, ponyStaysAtKeep } from './pony';
@@ -60,7 +61,7 @@ export type GameAction =
   | { type: 'takeLoaf' }
   | { type: 'castleWork'; site: CastleSite }
   | { type: 'chooseHome'; home: 'house' | 'hall' }
-  | { type: 'answerTraveller'; yes: boolean }
+  | { type: 'answerTraveller'; yes: boolean; job?: JobId }
   | { type: 'townWork'; plot: number }
   | { type: 'makeCastleGood'; good: CastleGood }
   | { type: 'takeHoney' }
@@ -1474,7 +1475,7 @@ const chooseHome = (state: GameState, action: ActionOf<'chooseHome'>): ActionRes
 };
 
 /** Answering the traveller at the hall door. EASTER EGG: the town, see src/game/town.ts. */
-const answerTraveller = (state: GameState, action: ActionOf<'answerTraveller'>): ActionResult => answeredTraveller(state, action.yes);
+const answerTraveller = (state: GameState, action: ActionOf<'answerTraveller'>): ActionResult => answeredTraveller(state, action.yes, action.job);
 
 /** A piece of a house laid, at the castle's pace. EASTER EGG: the town, see src/game/town.ts. */
 const townWork: ActionHandler<'townWork'> = (state, action) => {

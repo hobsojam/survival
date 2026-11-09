@@ -3,7 +3,7 @@ import { emptyOrchard } from './orchard';
 import { emptyPony } from './pony';
 import { emptyKeep } from './keep';
 import { emptyCastle } from './castle';
-import { emptyTown } from './town';
+import { HOUSE_COUNT, emptyHouse, emptyTown } from './town';
 
 // Bringing an older save up to date as it loads. Every change to the saved shape bumps SAVE_VERSION by one and adds
 // the step that upgrades a save from the version before: SAVE_UPGRADES[23] turns a version 23 save into version 24.
@@ -11,7 +11,7 @@ import { emptyTown } from './town';
 // anything the player had. Loading runs every step a save needs, in order, then validates the result as usual.
 
 /** The saved shape's version. Bump it by one with every change to the shape, and add its upgrade step below. */
-export const SAVE_VERSION = 40;
+export const SAVE_VERSION = 41;
 
 /** The oldest save that can still be brought up to date: earlier formats were never upgraded and don't load. */
 export const OLDEST_UPGRADABLE_VERSION = 23;
@@ -163,7 +163,13 @@ export const SAVE_UPGRADES: Readonly<Record<number, SaveUpgrade>> = {
     return { ...state, castle: emptyCastle(), progress: { ...state.progress, workshop: { ...state.progress.workshop, stoneCart: false, portcullis: false } } };
   },
   // Version 40: the town after the castle. An older camp has no traveller, people or houses.
-  39: old => ({ ...(old as Upgradable), town: emptyTown() })
+  39: old => ({ ...(old as Upgradable), town: emptyTown() }),
+  // Version 41: the town's street of eight plots. A version 40 town has one.
+  40: old => {
+    const state = old as Upgradable & { town: Upgradable & { houses: unknown[] } };
+    const houses = Array.isArray(state.town?.houses) ? state.town.houses : [];
+    return { ...state, town: { ...state.town, houses: [...houses, ...Array.from({ length: Math.max(0, HOUSE_COUNT - houses.length) }, emptyHouse)] } };
+  }
 };
 
 export type UpgradeResult = { ok: true; state: unknown } | { ok: false; reason: string };

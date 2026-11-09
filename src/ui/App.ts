@@ -30,6 +30,7 @@ import { Soundscape } from '../game/soundscape';
 import { isAtHome } from '../game/home';
 import { homeChoiceAction, renderHomePanel } from './homePanel';
 import { renderVisitorPanel, visitorAction } from './townPanel';
+import { JOB_ORDER } from '../game/jobs';
 
 const buildOptions = Object.keys(BUILDINGS) as StructureId[];
 
@@ -103,7 +104,7 @@ export class App {
                   <p id="journal-milestones-head" class="journal-subhead">Camp milestones</p><ul id="journal-milestones" class="journal-list"></ul>
                 </details></section>
               <section class="panel home-panel" data-tab="camp" hidden><p class="eyebrow">THE GREAT HALL</p><h2>Home</h2><p class="garden-hint" id="home-copy"></p><div class="tool-row"><button type="button" id="home-button" data-home-choice="hall"></button></div></section>
-              <section class="panel visitor-panel" data-tab="camp" hidden><p class="eyebrow">THE HALL DOOR</p><h2>A visitor</h2><p class="garden-hint" id="visitor-copy"></p><div class="tool-row"><button type="button" id="visitor-yes" class="ready" data-answer="yes"></button><button type="button" id="visitor-no" data-answer="no"></button></div></section>
+              <section class="panel visitor-panel" data-tab="camp" hidden><p class="eyebrow">THE HALL DOOR</p><h2>A visitor</h2><p class="garden-hint" id="visitor-copy"></p><div class="tool-row visitor-answers">${JOB_ORDER.map(job => `<button type="button" id="visitor-job-${job}" data-job="${job}" class="ready" hidden></button>`).join('')}<button type="button" id="visitor-no" data-answer="no"></button></div></section>
               <section class="panel year-journal-panel" data-tab="camp"><p class="eyebrow">THE YEAR SO FAR</p><div class="year-wheel"><span class="year-dial" aria-hidden="true"><span id="year-hand" class="year-hand"></span></span><p id="year-label" class="year-label"></p><ul class="visually-hidden" aria-label="Seasons"><li id="year-season-0">Autumn</li><li id="year-season-1">Winter</li><li id="year-season-2">Spring</li><li id="year-season-3">Summer</li></ul></div><div class="year-journal-page"><div class="year-journal-head"><button type="button" id="year-journal-previous" class="year-journal-turn" aria-label="Earlier page">‹</button><div><h2 id="year-journal-title"></h2><p id="year-journal-days" class="year-journal-days"></p></div><button type="button" id="year-journal-next" class="year-journal-turn" aria-label="Later page">›</button></div><ul id="year-journal-entries" class="year-journal-entries"></ul></div></section>
               <section class="panel bag-panel" data-tab="bag"><p class="eyebrow">IN YOUR BAG</p><div class="supplies">
                 <div><span class="supply-icon wood">▰</span><strong id="wood-count">0</strong><small>Wood</small><small id="wood-stored" class="supply-note"></small><button type="button" class="supply-action" data-action="stokeFire" data-supply="wood" aria-label="Burn one wood">Burn</button></div>
@@ -155,7 +156,7 @@ export class App {
       });
     });
     this.root.querySelector<HTMLButtonElement>('#home-button')?.addEventListener('click', event => this.scene?.perform(homeChoiceAction((event.currentTarget as HTMLButtonElement).dataset)));
-    for (const id of ['#visitor-yes', '#visitor-no']) this.root.querySelector<HTMLButtonElement>(id)?.addEventListener('click', event => this.scene?.perform(visitorAction((event.currentTarget as HTMLButtonElement).dataset)));
+    for (const id of [...JOB_ORDER.map(job => `#visitor-job-${job}`), '#visitor-no']) this.root.querySelector<HTMLButtonElement>(id)?.addEventListener('click', event => this.scene?.perform(visitorAction((event.currentTarget as HTMLButtonElement).dataset)));
     this.root.addEventListener('click', event => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-action="plantGarden"], [data-action="harvestGarden"]');
       if (!button) return;

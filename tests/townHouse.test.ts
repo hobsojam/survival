@@ -1,3 +1,4 @@
+import { street } from './townStreet';
 import { describe, expect, it } from 'vitest';
 import { castleSprites } from '../src/art/castleSprites';
 import { keepSprites } from '../src/art/keepSprites';
@@ -55,7 +56,7 @@ const waiting = (change: (state: GameState) => void = () => {}): GameState => {
 };
 
 const work = (state: GameState) => applyAction(state, { type: 'townWork', plot: 0 });
-const withHouse = (house: Partial<GameState['town']['houses'][number]>) => waiting(state => { state.town.houses = [{ ...state.town.houses[0], ...house }]; });
+const withHouse = (house: Partial<GameState['town']['houses'][number]>) => waiting(state => { state.town.houses = street({ ...state.town.houses[0], ...house }); });
 
 describe('where the house stands', () => {
   const px = (spot: { x: number; y: number }, def: { anchor: number[]; size: number[] }) => {
@@ -65,29 +66,35 @@ describe('where the house stands', () => {
   };
   const overlap = (a: ReturnType<typeof px>, b: ReturnType<typeof px>) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 
-  it('is on the hills below the castle, outside its walls', () => {
-    expect(HOUSE_PLOTS).toEqual([{ area: 'hills', x: 31, y: 23 }]);
+  it('lays out eight plots on the hills below the castle, outside its walls', () => {
+    expect(HOUSE_PLOTS).toEqual([[31, 23], [26, 21], [22, 21], [27, 25], [18, 21], [23, 25], [14, 21], [19, 25]].map(([x, y]) => ({ area: 'hills', x, y })));
     expect(HOUSE_COUNT).toBe(HOUSE_PLOTS.length);
-    expect(PLOT.y).toBeGreaterThan(WALLS.bottom);
+    for (const plot of HOUSE_PLOTS) expect(plot.y).toBeGreaterThan(WALLS.bottom);
   });
 
-  it('is clear of the moat, the trees, the paths, the cart, the gate and the outcrop', () => {
-    for (const tile of MOAT_TILES) expect(Math.hypot(tile.x - PLOT.x, tile.y - PLOT.y)).toBeGreaterThan(3);
-    for (const tree of HILL_TREES) expect(Math.hypot(tree.x - PLOT.x, tree.y - PLOT.y), `${tree.x},${tree.y}`).toBeGreaterThanOrEqual(2.5);
-    expect(pathDistance(PLOT.x, PLOT.y, HILLS_PATHS)).toBeGreaterThan(2);
-    for (const spot of [CART_SPOTS.hills, GATE_SPOT, OUTCROP_SITE]) expect(Math.hypot(spot.x - PLOT.x, spot.y - PLOT.y)).toBeGreaterThan(3);
+  it.each(HOUSE_PLOTS.map((plot, index) => [index, plot] as const))('keeps plot %i clear of the moat, the trees, the paths, the cart, the gate and the outcrop', (_index, plot) => {
+    for (const tile of MOAT_TILES) expect(Math.hypot(tile.x - plot.x, tile.y - plot.y)).toBeGreaterThan(3);
+    for (const tree of HILL_TREES) expect(Math.hypot(tree.x - plot.x, tree.y - plot.y), `${tree.x},${tree.y}`).toBeGreaterThanOrEqual(2.5);
+    expect(pathDistance(plot.x, plot.y, HILLS_PATHS)).toBeGreaterThan(2);
+    for (const spot of [CART_SPOTS.hills, GATE_SPOT, OUTCROP_SITE]) expect(Math.hypot(spot.x - plot.x, spot.y - plot.y)).toBeGreaterThan(3);
   });
 
-  it('keeps its picture off the castle, the keep and the outcrop', () => {
-    const box = px(PLOT, townSprites.townHouse);
+  it.each(HOUSE_PLOTS.map((plot, index) => [index, plot] as const))('keeps plot %i\'s picture off the castle, the keep, the outcrop and the other houses', (index, plot) => {
+    const box = px(plot, townSprites.townHouse);
     expect(overlap(box, px(KEEP_SITE, keepSprites.keep))).toBe(false);
     expect(overlap(box, px(HALL_SPOT, castleSprites.castleHall))).toBe(false);
     expect(overlap(box, px(FRAMES_SPOT, castleSprites.castleFrames))).toBe(false);
     expect(overlap(box, px(GATE_SPOT, castleSprites.castleGatehouse))).toBe(false);
     expect(overlap(box, px(OUTCROP_SITE, { anchor: [8, 15], size: [16, 16] }))).toBe(false);
     for (let x = WALLS.left; x <= WALLS.right; x++) expect(overlap(box, px({ x, y: WALLS.bottom }, castleSprites.castleWall))).toBe(false);
-    for (let y = WALLS.top; y <= WALLS.bottom; y++) expect(overlap(box, px({ x: WALLS.right, y }, castleSprites.castleWall))).toBe(false);
+    for (let y = WALLS.top; y <= WALLS.bottom; y++) {
+      expect(overlap(box, px({ x: WALLS.right, y }, castleSprites.castleWall))).toBe(false);
+      expect(overlap(box, px({ x: WALLS.left, y }, castleSprites.castleWall))).toBe(false);
+    }
     for (const [x, y] of [[WALLS.right, WALLS.bottom], [WALLS.left, WALLS.bottom]]) expect(overlap(box, px({ x, y }, castleSprites.castleTower))).toBe(false);
+    HOUSE_PLOTS.forEach((other, otherIndex) => {
+      if (otherIndex !== index) expect(overlap(box, px(other, townSprites.townHouse)), `plot ${otherIndex}`).toBe(false);
+    });
   });
 });
 
@@ -98,9 +105,23 @@ describe('when the plot opens', () => {
     expect(townSpots(waiting())).toEqual([{ plot: 0, area: 'hills', x: PLOT.x, y: PLOT.y }]);
   });
 
+  it('opens one plot at a time, in order, while there is work for a newcomer', () => {
+    const plots = (state: GameState) => townSpots(state).map(spot => spot.plot);
+    expect(plots(waiting())).toEqual([0]);
+    const housed = (change: (state: GameState) => void = () => {}) => waiting(state => {
+      state.town.houses = street({ stone: 30, beams: 4, fittings: 1, doneDay: 64 });
+      state.town.people = [{ ...ada, house: 0 }];
+      state.structures.beehive = true;
+      change(state);
+    });
+    expect(plots(housed())).toEqual([1]);
+    expect(plots(housed(state => { state.town.houses = street({ stone: 30, beams: 4, fittings: 1, doneDay: 64 }, { stone: 30, beams: 4, fittings: 1, doneDay: 64 }); }))).toEqual([]);
+    expect(plots(housed(state => { state.structures.beehive = false; }))).toEqual([]);
+  });
+
   it('shuts once the house is finished', () => {
     expect(townSpots(waiting(state => {
-      state.town.houses = [{ stone: 30, beams: 4, fittings: 1, doneDay: 64 }];
+      state.town.houses = street({ stone: 30, beams: 4, fittings: 1, doneDay: 64 });
       state.town.people = [{ ...ada, house: 0 }];
     }))).toEqual([]);
   });
@@ -119,8 +140,8 @@ describe('working at the plot', () => {
     expect(work(noStone).message).toBe('Bring stone up from the quarry.');
     expect(promptFor(noStone)).toContain('House · bring stone up from the quarry');
     expect(useKeyAction(noStone)).toBeUndefined();
-    expect(work(waiting(state => { state.town.houses = [{ stone: 30, beams: 0, fittings: 0, doneDay: null }]; state.castle.goods.beams = 0; })).message).toBe('Make beams at the workshop.');
-    expect(work(waiting(state => { state.town.houses = [{ stone: 30, beams: 4, fittings: 0, doneDay: null }]; state.castle.goods.fittings = 0; })).message).toBe('Make an iron fitting at the forge.');
+    expect(work(waiting(state => { state.town.houses = street({ stone: 30, beams: 0, fittings: 0, doneDay: null }); state.castle.goods.beams = 0; })).message).toBe('Make beams at the workshop.');
+    expect(work(waiting(state => { state.town.houses = street({ stone: 30, beams: 4, fittings: 0, doneDay: null }); state.castle.goods.fittings = 0; })).message).toBe('Make an iron fitting at the forge.');
     expect(work(waiting(state => { state.player.x = PLOT.x + 4; })).message).toBe('Move closer to the house.');
     expect(work(waiting(state => { state.player.energy = 0; })).message).toBe(TOO_TIRED_MESSAGE);
     expect(townWorkBlocker(waiting(state => { state.town.people = []; state.town.namesUsed = 0; }), 0)).not.toBeNull();
@@ -205,7 +226,7 @@ describe('the castle goods for the house', () => {
     expect(goodRoom(atCamp(), 'fittings')).toBe(1);
     expect(goodRoom(atCamp(), 'hangings')).toBe(0);
     expect(goodBatch(atCamp(), 'beams')).toBe(4);
-    expect(goodRoom(atCamp(state => { state.town.houses = [{ stone: 30, beams: 3, fittings: 0, doneDay: null }]; }), 'beams')).toBe(1);
+    expect(goodRoom(atCamp(state => { state.town.houses = street({ stone: 30, beams: 3, fittings: 0, doneDay: null }); }), 'beams')).toBe(1);
     expect(goodRoom(atCamp(state => { state.castle.goods.beams = 4; }), 'beams')).toBe(0);
   });
 
