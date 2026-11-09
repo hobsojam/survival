@@ -22,6 +22,7 @@ import { answeredTraveller, travellerArrives } from './traveller';
 import { doTownWork, townWorkBlocker, townWorkLine } from './townSites';
 import { doSquareWork, squareWorkBlocker, squareWorkLine } from './squareSites';
 import { bridgeWorkBlocker, bridgeWorkLine, doBridgeWork } from './bridgeSites';
+import { doRoadWork, roadWorkBlocker, roadWorkLine } from './roadSites';
 import type { SquarePiece } from './square';
 import { cutField, cutStripBlocker, grindGrainBlocker, seededField, sowStripBlocker, sownField, threshStripBlocker, threshedField, wildGrainBlocker } from './field';
 import { BED_CROPS, bedsDawn, drawWaterBlocker, emptyBed, harvestBedBlocker, needsWater, sowBedBlocker } from './beds';
@@ -70,6 +71,7 @@ export type GameAction =
   | { type: 'townWork'; plot: number }
   | { type: 'squareWork'; piece: SquarePiece }
   | { type: 'bridgeWork' }
+  | { type: 'roadWork' }
   | { type: 'makeCastleGood'; good: CastleGood }
   | { type: 'takeHoney' }
   | { type: 'drawWater' }
@@ -1535,12 +1537,25 @@ const bridgeWork: ActionHandler<'bridgeWork'> = state => {
   };
 };
 
+/** EASTER EGG: the town. One go at the old road through the meadow, or a stone for its milestone, with the same effort as a house's. */
+const roadWork: ActionHandler<'roadWork'> = state => {
+  const blocker = roadWorkBlocker(state);
+  if (blocker) return refuse(state, blocker);
+  const worked = doRoadWork(state);
+  const effort = 0.5;
+  return {
+    state: advanceTime({ ...worked, player: tire(state, BALANCE.digEnergyCost * effort) }, workSeconds(state, BALANCE.digSeconds * effort), 'working'),
+    message: roadWorkLine(worked.town.road)
+  };
+};
+
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   chooseHome,
   answerTraveller,
   townWork,
   squareWork,
   bridgeWork,
+  roadWork,
   feedSheep,
   nameAnimal,
   shearFlock,

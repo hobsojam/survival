@@ -10,6 +10,7 @@ import { GATE_SPOT, cartWithin, castleNeedsStone, castlePrompt, castleWorkBlocke
 import { townPrompt, townSpots, townWorkBlocker } from '../game/townSites';
 import { squarePrompt, squareSpots, squareWorkBlocker } from '../game/squareSites';
 import { bridgePrompt, bridgeSpot, bridgeWorkBlocker } from '../game/bridgeSites';
+import { roadPrompt, roadSpot, roadWorkBlocker } from '../game/roadSites';
 import { greetingHere } from '../game/townsfolk';
 import { KEEP_DOOR_WOOD, KEEP_SITE, KEEP_STONES, atHallDoor, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor } from '../game/keep';
 import { ponyNote, ponyOfferLabel } from '../game/pony';
@@ -33,7 +34,7 @@ export const KEY_ACTIONS: readonly [string, GameAction][] = [
 
 const ACTION_POSES: Partial<Record<GameAction['type'], SurvivorAction>> = {
   gather: 'gather', rest: 'rest', cook: 'cook', stargaze: 'stargaze',
-  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', takeCartStone: 'gather', digOre: 'gather', layStone: 'gather', castleWork: 'gather', townWork: 'gather', squareWork: 'gather', bridgeWork: 'gather', hangDoor: 'gather', offerPony: 'gather', fish: 'gather',
+  chopTree: 'gather', pickUpStone: 'gather', gatherRubble: 'gather', digQuarry: 'gather', takeCartStone: 'gather', digOre: 'gather', layStone: 'gather', castleWork: 'gather', townWork: 'gather', squareWork: 'gather', bridgeWork: 'gather', roadWork: 'gather', hangDoor: 'gather', offerPony: 'gather', fish: 'gather',
   gatherApples: 'gather', plantPip: 'gather', pickOrchardApple: 'gather', searchShed: 'gather', takeEgg: 'gather'
 };
 
@@ -149,7 +150,7 @@ export function actionEffect(action: GameAction, after: GameState): { kind: 'dus
   if (action.type === 'digOre') return { kind: 'dust', ...OUTCROP_SITE };
   if (action.type === 'layStone' || action.type === 'hangDoor') return { kind: 'dust', ...KEEP_SITE };
   if (action.type === 'castleWork' && action.site === 'gatehouse' && after.castle.gatehouse === NEEDS.gatehouse) return { kind: 'portcullis', x: GATE_SPOT.x, y: GATE_SPOT.y };
-  if (action.type === 'castleWork' || action.type === 'townWork' || action.type === 'squareWork' || action.type === 'bridgeWork') return { kind: 'dust', x: after.player.x, y: after.player.y };
+  if (action.type === 'castleWork' || action.type === 'townWork' || action.type === 'squareWork' || action.type === 'bridgeWork' || action.type === 'roadWork') return { kind: 'dust', x: after.player.x, y: after.player.y };
   if (action.type === 'cook' || action.type === 'stargaze') return { kind: action.type, x: after.player.x, y: after.player.y };
   return undefined;
 }
@@ -386,7 +387,16 @@ function hillsPrompt(state: GameState): string {
 /** EASTER EGG: everything in reach in the meadow over the bridge, see src/game/town.ts. */
 function meadowChoices(state: GameState): Choice[] {
   const town = townChoice(state);
-  return town ? [town] : [];
+  const road = roadChoice(state);
+  return [...(road ? [road] : []), ...(town ? [town] : [])];
+}
+
+/** The old road's next section or its milestone, when the survivor is at it. */
+function roadChoice(state: GameState): Choice | null {
+  const spot = roadSpot(state);
+  if (!spot || state.area !== spot.area || !within(state, spot)) return null;
+  const label = roadPrompt(state);
+  return roadWorkBlocker(state) === null ? { label, action: { type: 'roadWork' } } : { label };
 }
 
 function meadowPrompt(state: GameState): string {

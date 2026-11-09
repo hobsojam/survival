@@ -12,6 +12,7 @@ import { CART_SPOTS, castleSpots, type CastleSite } from '../game/castleSites';
 import { townSpots } from '../game/townSites';
 import { squareSpots } from '../game/squareSites';
 import { bridgeSpot } from '../game/bridgeSites';
+import { roadSpot } from '../game/roadSites';
 import type { SquarePiece } from '../game/square';
 import { KEEP_SITE, keepFinished, keepNeedsDoor } from '../game/keep';
 import { keepFrame } from './visuals';
@@ -37,6 +38,7 @@ export type TapTarget =
   | { kind: 'townSite'; plot: number; x: number; y: number }
   | { kind: 'squareSite'; piece: SquarePiece; x: number; y: number }
   | { kind: 'bridgeSite'; x: number; y: number }
+  | { kind: 'roadSite'; x: number; y: number }
   | { kind: 'stoneCart'; x: number; y: number }
   | { kind: 'chickens'; x: number; y: number; action: 'meetChickens' | 'leadChickens' }
   | { kind: 'appleTree' | 'shed' | 'coop'; x: number; y: number }
@@ -161,7 +163,9 @@ export function pickTapTarget(state: GameState, x: number, y: number): TapTarget
       { target: { kind: 'crossing', ...HILLS_EXIT } },
       ...(bridgeDone(state.town.bridge) ? [{ target: { kind: 'crossing' as const, ...HILLS_BRIDGE_EXIT } }] : [])];
   } else if (state.area === 'meadow') {
-    candidates = [...piles, ...townTargets(state), { target: { kind: 'crossing', ...MEADOW_ENTRY } }];
+    const road = roadSpot(state);
+    candidates = [...piles, ...townTargets(state), ...(road ? [{ target: { kind: 'roadSite' as const, x: road.x, y: road.y } }] : []),
+      { target: { kind: 'crossing', ...MEADOW_ENTRY } }];
   } else if (state.area === 'homestead') {
     candidates = [...piles,
       { target: { kind: 'shed', ...HOMESTEAD_SHED } },
@@ -247,6 +251,7 @@ export function targetAction(target: TapTarget): GameAction | null {
     case 'townSite': return { type: 'townWork', plot: target.plot };
     case 'squareSite': return { type: 'squareWork', piece: target.piece };
     case 'bridgeSite': return { type: 'bridgeWork' };
+    case 'roadSite': return { type: 'roadWork' };
     case 'stoneCart': return { type: 'takeCartStone' };
     case 'chickens': return { type: target.action };
     case 'appleTree': return { type: 'gatherApples' };
