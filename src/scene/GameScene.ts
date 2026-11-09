@@ -21,6 +21,7 @@ import { ENDING_FADE_MS } from '../ui/ending';
 import { SceneEffects } from './SceneEffects';
 import { SceneLighting } from './SceneLighting';
 import { NightWatch } from './sleepReplay';
+import { MessageLine } from './messageLine';
 import { DoorFade, comesDownKey, doorFadeFor, type KeyPress } from './doorFade';
 import { KeepViewLayer } from './KeepViewLayer';
 import { newlyStayed, newlyWon, type NameTarget } from '../game/names';
@@ -66,12 +67,14 @@ export class GameScene extends Phaser.Scene {
   private keepView!: KeepViewLayer;
   /** What's waiting to be said until the player has come down: only the season's line sits on the view. */
   private heldNotices: string[] = [];
+  private readonly messageLine = new MessageLine();
 
   constructor(state: GameState, onStateChange: (state: GameState, cause: 'action' | 'tick') => void, onFeedback: (message: string) => void, onSound: (cue: SoundCue) => void = () => undefined) {
     super({ key: 'GameScene' });
     this.state = state;
     this.onStateChange = onStateChange;
-    this.onFeedback = onFeedback;
+    // Messages said close together share the line, so the next tick's journal line can't wipe out the morning's notes.
+    this.onFeedback = message => onFeedback(this.messageLine.say(message, this.time.now));
     this.onSound = onSound;
   }
 
