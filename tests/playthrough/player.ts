@@ -11,7 +11,10 @@ import { HILLS_EXIT, OUTCROP_SITE, availableOre, outcropLeft } from '../../src/g
 import { HOUSE_SPOT, fuelLeft, hasWoodStore, livesInHouse, woodStoreCapacity } from '../../src/game/home';
 import { recordJournal } from '../../src/game/journalEntries';
 import { FEAST_ITEMS, HALL_DOOR_SPOT, NEEDS, TOWERS, castleFinished, everyOtherSectionDone, feastWants, hallFinished, isRevealed, moatFill, towerFinished, wallFinished } from '../../src/game/castle';
-import { CART_SPOTS, GOODS, castleSpots, type CastleGood } from '../../src/game/castleSites';
+import { CART_SPOTS, GOODS, castleSpots, goodRoom, type CastleGood } from '../../src/game/castleSites';
+import { travellerAsking } from '../../src/game/traveller';
+import { townSpots } from '../../src/game/townSites';
+import { HOUSE_NEEDS } from '../../src/game/town';
 import { KEEP_DOOR_AT, KEEP_DOOR_WOOD, KEEP_SITE, atHallDoor, keepFinished, keepOpen } from '../../src/game/keep';
 import { ORCHARD_SPOTS, spotAction } from '../../src/game/orchard';
 import { PONY_SPOTS, ponyOfferBlocker, ponyWith, wildPonyAt } from '../../src/game/pony';
@@ -448,6 +451,15 @@ export class Player {
       { id: 'castle-feast', shown: everyOtherSectionDone, done: castleFinished, step: () => this.layFeast() },
       // Once the castle is finished, the first time through the hall's door offers it as home, and the player takes it.
       { id: 'castle-home', shown: castleFinished, done: state => state.castle.home === 'hall', step: () => this.moveIn() },
+      // EASTER EGG: the town. The traveller at the hall door is offered work on their first ask, then the first house is built for them.
+      { id: 'town-answer', shown: travellerAsking, done: state => !travellerAsking(state), step: () => this.act({ type: 'answerTraveller', yes: true }) },
+      ...(['beams', 'fittings'] as const).map(good => ({
+        id: `town-${good}`,
+        shown: (state: GameState) => castleFinished(state) && townSpots(state).length > 0,
+        done: (state: GameState) => goodRoom(state, good) === 0,
+        step: () => this.payFor(good === 'beams' ? { wood: GOODS.beams.cost.wood, fiber: 0, stone: 0 } : { wood: GOODS.fittings.cost.wood, fiber: 0, stone: 0, ore: GOODS.fittings.cost.ore }, { type: 'makeCastleGood', good })
+      })),
+      { id: 'town-house', shown: state => townSpots(state).length > 0, done: state => townSpots(state).length === 0, step: () => this.buildHouse() },
       { id: 'castle-moat-fills', shown: state => state.castle.moat.stretches >= NEEDS.moat, done: state => moatFill(state) === 1, step: () => false },
       { id: 'mine', shown: state => progress(state).pickaxeCrafted, done: state => progress(state).mineBuilt, step: () => this.buildMine() },
       ...(['basket', 'cairn'] as const).map(site => ({
@@ -533,12 +545,28 @@ export class Player {
   /** Stone for a wall side or a tower: dug into the cart or the bag, hauled up with the pony, and laid, nearest site first. */
   private layCastleStone(prefix: string): boolean {
     const spot = castleSpots(this.state).filter(each => each.site.startsWith(prefix))[0];
-    if (!spot) return false;
+    return spot ? this.stoneStep(spot, { type: 'castleWork', site: spot.site }) : false;
+  }
+
+  /** Stone for any building on the hills: dug, hauled up with the cart, and laid by the given action. */
+  private stoneStep(spot: { area: AreaId; x: number; y: number }, action: GameAction): boolean {
     const usable = (): number => this.state.inventory.stone + (this.state.castle.cart.at === 'hills' ? this.state.castle.cart.stone : 0);
     if (usable() === 0 && this.state.castle.cart.stone === 0 && !this.makeRoom(BALANCE.stoneSpaces, 'stone')) return false;
     if (this.quarryGives() && (this.free() >= BALANCE.stoneSpaces || this.state.castle.cart.at === 'quarry') && this.quarryStone()) return true;
     if (usable() === 0 && this.state.castle.cart.at === 'quarry' && this.state.castle.cart.stone > 0) return this.haulFromCart();
-    return usable() > 0 && this.goTo(spot.area) && this.walkTo(spot) && this.act({ type: 'castleWork', site: spot.site });
+    return usable() > 0 && this.goTo(spot.area) && this.walkTo(spot) && this.act(action);
+  }
+
+  /** The first house: its stone as the castle's, then the beams and the fitting made at camp. EASTER EGG: the town. */
+  private buildHouse(): boolean {
+    const spot = townSpots(this.state)[0];
+    if (!spot) return false;
+    const house = this.state.town.houses[spot.plot];
+    const action: GameAction = { type: 'townWork', plot: spot.plot };
+    if (house.stone < HOUSE_NEEDS.stone) return this.stoneStep(spot, action);
+    const good = house.beams < HOUSE_NEEDS.beams ? 'beams' : 'fittings';
+    if (this.state.castle.goods[good] === 0) return false;
+    return this.goTo(spot.area) && this.walkTo(spot) && this.act(action);
   }
 
   /** One stretch of the moat, on a day the ground isn't frozen and none has been dug yet. */
@@ -883,4 +911,4 @@ const isFeastItem = (item: FoodItem): item is FeastItem => (FEAST_ITEMS as reado
 
 /** A little longer once the castle is finished and home, so whatever else the game offers gets a chance to be taken up. */
 const DAYS_AFTER_THE_END = 40;
-const MILESTONES_THAT_END = ['keep-finished', 'keep-night', 'keep-climbed', 'castle-finished', 'castle-home'];
+const MILESTONES_THAT_END = ['keep-finished', 'keep-night', 'keep-climbed', 'castle-finished', 'castle-home', 'town-traveller', 'town-neighbour', 'town-house'];

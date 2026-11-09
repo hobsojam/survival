@@ -1,4 +1,4 @@
-import type { CastleJournalId, JournalId } from '../game/journalEntries';
+import type { CastleJournalId, JournalId, TownJournalId } from '../game/journalEntries';
 import { palette, type PaletteKey } from './palette';
 
 // The year journal's little pictures, drawn in the game's own palette so they look the same on every machine.
@@ -66,8 +66,22 @@ const castleMomentIcons: Record<CastleJournalId, JournalIcon> = Object.fromEntri
   (Object.keys(CASTLE_SEASONS) as (keyof typeof CASTLE_SEASONS)[]).flatMap(season => (Object.keys(CASTLE_SCENES) as (keyof typeof CASTLE_SCENES)[]).map(moment => [`${moment}${season}`, castleMomentIcon(moment, season)]))
 ) as Record<CastleJournalId, JournalIcon>;
 
+/** The town's moments: a figure at the hall's lit door, and two figures by it for a neighbour who stays. EASTER EGG: the town, see src/game/town.ts. */
+const TOWN_SCENES = {
+  traveller: ['..........', '.bbbbbbb..', '.bbyyybb..', '.bbyyybb..', '.bbyyyb.h.', '.bbyyyb.cc', '.bbyyyb.cc', '.bbyyyb.k.', '..........'],
+  neighbour: ['..........', '.bbbbbbb..', '.bbyyybb..', '.bbyyybb..', '.bhyyyb.h.', '.ccyyyb.cc', '.ccyyyb.cc', '.kbyyyb.k.', '..........']
+} as const;
+const townIcon = (moment: keyof typeof TOWN_SCENES, season: keyof typeof CASTLE_SEASONS): JournalIcon => ({
+  legend: { x: CASTLE_SEASONS[season][0], b: 'stone2', y: 'scarf3', h: 'fox1', c: 'wood2', k: 'wood1' },
+  rows: [CASTLE_SEASONS[season][1], ...TOWN_SCENES[moment]]
+});
+const townIcons = Object.fromEntries(
+  (Object.keys(CASTLE_SEASONS) as (keyof typeof CASTLE_SEASONS)[]).flatMap(season => (Object.keys(TOWN_SCENES) as (keyof typeof TOWN_SCENES)[]).map(moment => [`${moment}${season}`, townIcon(moment, season)]))
+) as Record<TownJournalId, JournalIcon>;
+
 export const JOURNAL_ICONS: Record<JournalId, JournalIcon> = {
   ...castleMomentIcons,
+  ...townIcons,
   keepViewAutumn: keepViewIcon('fox1', 'fox3', '.......t..'),
   keepViewWinter: keepViewIcon('frost', 'paper', '.t.....t..'),
   keepViewSpring: keepViewIcon('leaf2', 'flower1', '.t........'),
