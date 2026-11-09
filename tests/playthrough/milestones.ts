@@ -1,4 +1,6 @@
 import { STALL_IDS, pieceDone, squareMarked } from '../../src/game/square';
+import { bridgeDone } from '../../src/game/bridge';
+import { milestoneDone, roadDone } from '../../src/game/meadow';
 import { NEEDS, TOWERS, castleFinished, hallFinished, isRevealed, moatFill, towerFinished, wallFinished } from '../../src/game/castle';
 import { KEEP_DOOR_AT, keepFinished } from '../../src/game/keep';
 import type { GameState, StructureId } from '../../src/game/state';
@@ -72,5 +74,11 @@ export const MILESTONES: readonly Milestone[] = [
   { id: 'square-marked', label: 'Marked out the square', reached: squareMarked },
   { id: 'square-paved', label: 'Paved the square', reached: state => pieceDone(state.town.square, 'paving') },
   { id: 'square-well', label: 'Finished the well', reached: state => pieceDone(state.town.square, 'well') },
-  { id: 'square-stalls', label: 'Raised all five stalls', reached: state => STALL_IDS.every(id => pieceDone(state.town.square, id)) }
+  { id: 'square-stalls', label: 'Raised all five stalls', reached: state => STALL_IDS.every(id => pieceDone(state.town.square, id)) },
+  { id: 'bridge-piers', label: 'Raised the bridge\'s piers', reached: state => state.town.bridge.doneDays.piers !== undefined },
+  { id: 'bridge', label: 'Finished the bridge', reached: state => bridgeDone(state.town.bridge) },
+  { id: 'meadow', label: 'Crossed to the meadow', reached: state => state.progress.meadowFound },
+  { id: 'meadow-road', label: 'Cleared the old road', reached: state => roadDone(state.town.road) },
+  { id: 'milestone', label: 'Set the milestone', reached: state => milestoneDone(state.town.road) },
+  { id: 'meadow-house', label: 'Built the first house in the meadow', reached: state => state.town.houses[12]?.doneDay != null }
 ];

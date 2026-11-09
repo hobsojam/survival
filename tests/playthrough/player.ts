@@ -1,4 +1,8 @@
-import { CAMP_EXIT, QUARRY_SITE, RUBBLE_SITE } from '../../src/game/areas';
+import { CAMP_EXIT, HILLS_BRIDGE_EXIT, MEADOW_ENTRY, QUARRY_SITE, RUBBLE_SITE } from '../../src/game/areas';
+import { BRIDGE_NEEDS, BRIDGE_STONE, bridgeDone, bridgeOpen, bridgeStage } from '../../src/game/bridge';
+import { bridgeSpot } from '../../src/game/bridgeSites';
+import { milestoneDone, roadDone } from '../../src/game/meadow';
+import { roadSpot } from '../../src/game/roadSites';
 import { daysLeftInSeason, isWinter, nightStart, season } from '../../src/game/calendar';
 import { CHICKEN_SITE, COOP_SITE } from '../../src/game/chickens';
 import { CLEARING_STEPS, STEP_IDS, nextStep, type Side, type StepId, choppableTrees, isClearingStump } from '../../src/game/clearing';
@@ -243,14 +247,26 @@ export class Player {
     this.tick(STEP_SECONDS);
   }
 
+  /** Walks over the bridge, down from the hills into the meadow or back up. EASTER EGG: the town. */
+  private crossBridge(): void {
+    const down = this.state.area === 'hills';
+    this.walkTo(down ? { x: HILLS_BRIDGE_EXIT.x, y: HILLS_BRIDGE_EXIT.y - 0.1 } : { x: MEADOW_ENTRY.x, y: 0.2 }, 0.2);
+    this.act({ type: 'move', dx: 0, dy: down ? 2 : -2 });
+    this.tick(STEP_SECONDS);
+  }
+
   /** Walks to an area, by the only ways the paths go. */
   private goTo(area: AreaId): boolean {
-    let guard = 6;
+    let guard = 8;
     while (this.state.area !== area && guard-- > 0) {
       const here = this.state.area;
       if (here === 'homestead') this.cross(-1);
-      else if (here === 'hills') this.cross(1);
-      else if (here === 'quarry') this.cross(area === 'hills' ? -1 : 1);
+      else if (here === 'meadow') this.crossBridge();
+      else if (here === 'hills' && area === 'meadow') {
+        if (!bridgeDone(this.state.town.bridge)) return false;
+        this.crossBridge();
+      } else if (here === 'hills') this.cross(1);
+      else if (here === 'quarry') this.cross(area === 'hills' || area === 'meadow' ? -1 : 1);
       else if (!this.state.structures.shelter) return false;
       else this.cross(area === 'homestead' ? 1 : -1);
     }
@@ -461,15 +477,19 @@ export class Player {
       { id: 'town-answer', shown: travellerAsking, done: state => !travellerAsking(state), step: () => this.act({ type: 'answerTraveller', yes: true }) },
       ...(['beams', 'fittings'] as const).map(good => ({
         id: `town-${good}`,
-        shown: (state: GameState) => castleFinished(state) && (townSpots(state).length > 0 || (threeHouses(state) && squareSpots(state).length > 0)) && !allStalls(state),
-        done: (state: GameState) => goodRoom(state, good) === 0 || allStalls(state) || houseHasGoods(state, good),
+        shown: (state: GameState) => castleFinished(state) && (townSpots(state).length > 0 || (threeHouses(state) && squareSpots(state).length > 0) || bridgeOpen(state)) && !townDone(state),
+        done: (state: GameState) => goodRoom(state, good) === 0 || townDone(state) || houseHasGoods(state, good),
         step: () => this.payFor(good === 'beams' ? { wood: GOODS.beams.cost.wood, fiber: 0, stone: 0 } : { wood: GOODS.fittings.cost.wood, fiber: 0, stone: 0, ore: GOODS.fittings.cost.ore }, { type: 'makeCastleGood', good })
       })),
-      { id: 'town-house', shown: state => townSpots(state).length > 0 && !allStalls(state), done: state => townSpots(state).length === 0 || allStalls(state), step: () => this.buildHouse() },
+      { id: 'town-house', shown: state => townSpots(state).length > 0 && !townDone(state), done: state => townSpots(state).length === 0 || townDone(state), step: () => this.buildHouse() },
       // The stalls' awnings are woven at the loom, as the hall's hangings were.
       { id: 'town-hangings', shown: state => threeHouses(state) && castleFinished(state) && state.structures.loom && squareSpots(state).length > 0 && !allStalls(state), done: state => goodRoom(state, 'hangings') === 0 || allStalls(state), step: () => this.weaveHanging() },
       // The square is started once the third house stands, and worked only while no house plot is open, so the houses keep their pace.
       { id: 'town-square', shown: state => threeHouses(state) && squareSpots(state).length > 0 && townSpots(state).length === 0, done: allStalls, step: () => this.buildSquare() },
+      // Once the eighth house stands the bridge is built as the square was, only while no house plot is open. Over it, the
+      // old road is cleared and its milestone set whenever nothing else is open, and the first meadow house ends the game.
+      { id: 'town-bridge', shown: state => bridgeOpen(state) && townSpots(state).length === 0, done: state => bridgeDone(state.town.bridge), step: () => this.buildBridge() },
+      { id: 'meadow-road', shown: state => roadSpot(state) !== null && townSpots(state).length === 0, done: state => milestoneDone(state.town.road), step: () => this.workRoad() },
       { id: 'castle-moat-fills', shown: state => state.castle.moat.stretches >= NEEDS.moat, done: state => moatFill(state) === 1, step: () => false },
       { id: 'mine', shown: state => progress(state).pickaxeCrafted, done: state => progress(state).mineBuilt, step: () => this.buildMine() },
       ...(['basket', 'cairn'] as const).map(site => ({
@@ -558,8 +578,9 @@ export class Player {
     return spot ? this.stoneStep(spot, { type: 'castleWork', site: spot.site }) : false;
   }
 
-  /** Stone for any building on the hills: dug, hauled up with the cart, and laid by the given action. */
+  /** Stone for any building on the hills: dug, hauled up with the cart, and laid by the given action. Over the bridge the cart can't follow, so it is carried in the bag. */
   private stoneStep(spot: { area: AreaId; x: number; y: number }, action: GameAction): boolean {
+    if (spot.area === 'meadow') return this.bagStoneStep(spot, action);
     const usable = (): number => this.state.inventory.stone + (this.state.castle.cart.at === 'hills' ? this.state.castle.cart.stone : 0);
     if (usable() === 0 && this.state.castle.cart.stone === 0 && !this.makeRoom(BALANCE.stoneSpaces, 'stone')) return false;
     if (this.quarryGives() && (this.free() >= BALANCE.stoneSpaces || this.state.castle.cart.at === 'quarry') && this.quarryStone()) return true;
@@ -577,6 +598,34 @@ export class Player {
     const good = house.beams < HOUSE_NEEDS.beams ? 'beams' : 'fittings';
     if (this.state.castle.goods[good] === 0) return false;
     return this.goTo(spot.area) && this.walkTo(spot) && this.act(action);
+  }
+
+  /** Stone carried in the bag to the meadow: taken from the cart wherever it stands, or dug, then laid by the given action. EASTER EGG: the town. */
+  private bagStoneStep(spot: { area: AreaId; x: number; y: number }, action: GameAction): boolean {
+    if (this.state.inventory.stone > 0) return this.goTo(spot.area) && this.walkTo(spot) && this.act(action);
+    const { cart } = this.state.castle;
+    if (cart.stone > 0 && this.makeRoom(BALANCE.stoneSpaces, 'stone')) return this.goTo(cart.at) && this.walkTo(CART_SPOTS[cart.at]) && this.act({ type: 'takeCartStone' });
+    return this.fetchStone();
+  }
+
+  /** The bridge: its stone as the castle's, then the arch's beams and the parapet's cramps made at camp. EASTER EGG: the town. */
+  private buildBridge(): boolean {
+    const spot = bridgeSpot(this.state);
+    if (!spot || townSpots(this.state).length > 0) return false;
+    const { bridge } = this.state.town;
+    const stage = bridgeStage(bridge);
+    const action: GameAction = { type: 'bridgeWork' };
+    const good = stage === 'arch' && bridge.beams < BRIDGE_NEEDS.arch.beams ? 'beams' : stage === 'parapet' && bridge.stone >= BRIDGE_STONE ? 'fittings' : null;
+    if (good === null) return this.stoneStep(spot, action);
+    return this.state.castle.goods[good] > 0 && this.goTo(spot.area) && this.walkTo(spot) && this.act(action);
+  }
+
+  /** The old road a go at a time, then the milestone's stone carried over in the bag. EASTER EGG: the town. */
+  private workRoad(): boolean {
+    const spot = roadSpot(this.state);
+    if (!spot || townSpots(this.state).length > 0) return false;
+    if (roadDone(this.state.town.road)) return this.bagStoneStep(spot, { type: 'roadWork' });
+    return this.goTo(spot.area) && this.walkTo(spot) && this.act({ type: 'roadWork' });
   }
 
   /** The next piece of the square that can be worked: stone for the paving and the well, then the goods made at camp. EASTER EGG: the town. */
@@ -947,4 +996,7 @@ const houseHasGoods = (state: GameState, good: 'beams' | 'fittings'): boolean =>
   return spot !== undefined && state.castle.goods[good] >= HOUSE_NEEDS[good] - state.town.houses[spot.plot][good];
 };
 const allStalls = (state: GameState): boolean => STALL_IDS.every(id => pieceDone(state.town.square, id));
-const MILESTONES_THAT_END = ['keep-finished', 'keep-night', 'keep-climbed', 'castle-finished', 'castle-home', 'town-traveller', 'town-neighbour', 'town-house', 'town-house-2', 'town-house-3', 'square-marked', 'square-paved', 'square-well', 'square-stalls'];
+const MILESTONES_THAT_END = ['keep-finished', 'keep-night', 'keep-climbed', 'castle-finished', 'castle-home', 'town-traveller', 'town-neighbour', 'town-house', 'town-house-2', 'town-house-3', 'square-marked', 'square-paved', 'square-well', 'square-stalls',
+  'bridge-piers', 'bridge', 'meadow', 'meadow-road', 'milestone', 'meadow-house'];
+/** The first meadow house and the milestone are where the scripted game's town stops now. EASTER EGG: the town. */
+const townDone = (state: GameState): boolean => state.town.houses[12]?.doneDay != null && milestoneDone(state.town.road);
