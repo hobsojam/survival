@@ -43,6 +43,7 @@ button:focus-visible { outline: 3px solid #d69c5d; outline-offset: 3px; }
 .pause-card h2 { margin: 4px 0 8px; }
 .pause-card p:not(.eyebrow) { margin: 0 0 16px; color: #536d55; font-size: 13px; line-height: 1.45; }
 .pause-card .primary-button { width: 100%; }
+.name-actions :is(.primary-button, .secondary-button) { flex: 1; width: auto; }
 .pause-key { display: block; margin-top: 8px; color: #77897b; font-size: 11px; }
 .save-status { color: #5f6e63; font-size: 11px; white-space: nowrap; }
 .restart-button { border: 0; background: transparent; color: #58715c; font-size: 11px; font-weight: 700; text-decoration: underline; }
@@ -379,10 +380,10 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
 .garden-plot button:disabled { opacity: .55; cursor: default; }
 /* The full-width action buttons of the camp's building panels and the workshop. */
 .beds-panel .tool-row { margin-top: 12px; }
-:is(.beds-panel, .workshop-panel, .granary-panel, .windmill-panel, .sheep-panel, .loom-panel, .bakery-panel, .beehive-panel, .home-panel, .visitor-panel, #mine-panel) .tool-row button { width: 100%; border: 1px solid #bbd0b6; border-bottom-width: 2px; border-radius: 9px; background: #e7f0e2; color: #426447; padding: 10px; font-size: 12px; font-weight: 700; }
-:is(.beds-panel, .workshop-panel, .granary-panel, .windmill-panel, .sheep-panel, .loom-panel, .bakery-panel, .beehive-panel, .home-panel, .visitor-panel, #mine-panel) .tool-row button.ready { background: #517d5b; border-color: #42724d; color: #fffdf7; }
-:is(.beds-panel, .workshop-panel, .granary-panel, .windmill-panel, .sheep-panel, .loom-panel, .bakery-panel, .beehive-panel, .home-panel, .visitor-panel, #mine-panel) .tool-row button:disabled { opacity: .55; cursor: default; }
-:is(.beds-panel, .workshop-panel, .granary-panel, .windmill-panel, .sheep-panel, .loom-panel, .bakery-panel, .beehive-panel, .home-panel, .visitor-panel, #mine-panel) .tool-row small { display: block; margin-top: 7px; color: #4f6655; text-align: center; font-size: 11px; }
+:is(.beds-panel, .workshop-panel, .granary-panel, .windmill-panel, .sheep-panel, .loom-panel, .bakery-panel, .beehive-panel, .chicken-coop-panel, .home-panel, .visitor-panel, #mine-panel) .tool-row button { width: 100%; border: 1px solid #bbd0b6; border-bottom-width: 2px; border-radius: 9px; background: #e7f0e2; color: #426447; padding: 10px; font-size: 12px; font-weight: 700; }
+:is(.beds-panel, .workshop-panel, .granary-panel, .windmill-panel, .sheep-panel, .loom-panel, .bakery-panel, .beehive-panel, .chicken-coop-panel, .home-panel, .visitor-panel, #mine-panel) .tool-row button.ready { background: #517d5b; border-color: #42724d; color: #fffdf7; }
+:is(.beds-panel, .workshop-panel, .granary-panel, .windmill-panel, .sheep-panel, .loom-panel, .bakery-panel, .beehive-panel, .chicken-coop-panel, .home-panel, .visitor-panel, #mine-panel) .tool-row button:disabled { opacity: .55; cursor: default; }
+:is(.beds-panel, .workshop-panel, .granary-panel, .windmill-panel, .sheep-panel, .loom-panel, .bakery-panel, .beehive-panel, .chicken-coop-panel, .home-panel, .visitor-panel, #mine-panel) .tool-row small { display: block; margin-top: 7px; color: #4f6655; text-align: center; font-size: 11px; }
 .visitor-panel .visitor-answers { display: flex; flex-direction: column; gap: 6px; }
 .visitor-panel .visitor-answers button[hidden] { display: none; }
 
