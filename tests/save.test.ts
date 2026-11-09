@@ -816,6 +816,10 @@ describe('the town in the save', () => {
     ['a well fitting before its stone', (state: GameState) => { state.town.houses = street(built, built); Object.assign(state.town.square, { paving: 40, doneDays: { paving: 40 }, well: { stone: 11, fittings: 1 } }); }],
     ['paving past what the square takes', (state: GameState) => { state.town.houses = street(built, built); state.town.square.paving = 41; }],
     ['stall stock with no one keeping it', (state: GameState) => { state.town.houses = street(built, built); Object.assign(state.town.square, { paving: 40, doneDays: { paving: 40, bread: 41 } }); state.town.square.stalls.bread = { beams: 2, hangings: 1 }; state.town.square.stock.bread = 3; }],
+    ['stall stock on a stall still without its awning', (state: GameState) => {
+      state.town.houses = street(built, built); state.town.people = [{ ...ada, job: 'breadStall' }]; state.town.namesUsed = 1;
+      Object.assign(state.town.square, { paving: 40, doneDays: { paving: 40 } }); state.town.square.stalls.bread = { beams: 2, hangings: 0 }; state.town.square.stock.bread = 3;
+    }],
     ['a finished piece with no finished day', (state: GameState) => { state.town.houses = street(built, built); state.town.square.paving = 40; }],
     ['a finished day on an unfinished piece', (state: GameState) => { state.town.houses = street(built, built); Object.assign(state.town.square, { paving: 39, doneDays: { paving: 40 } }); }],
     ['the second house finished before the first', (state: GameState) => { state.town.houses = street({ stone: 0, beams: 0, fittings: 0, doneDay: null }, built); }],
