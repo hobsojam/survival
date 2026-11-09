@@ -67,20 +67,30 @@ describe('where the house stands', () => {
   };
   const overlap = (a: ReturnType<typeof px>, b: ReturnType<typeof px>) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 
+  const HILLS_PLOTS = HOUSE_PLOTS.filter(plot => plot.area === 'hills');
+
   it('lays out twelve plots on the hills below the castle, outside its walls: the street, then four around the square', () => {
-    expect(HOUSE_PLOTS).toEqual([[31, 23], [26, 21], [22, 21], [27, 25], [18, 21], [23, 25], [14, 21], [19, 25], [15, 25], [3, 21], [3, 26], [13, 28]].map(([x, y]) => ({ area: 'hills', x, y })));
-    expect(HOUSE_COUNT).toBe(HOUSE_PLOTS.length);
-    for (const plot of HOUSE_PLOTS) expect(plot.y).toBeGreaterThan(WALLS.bottom);
+    expect(HILLS_PLOTS).toEqual([[31, 23], [26, 21], [22, 21], [27, 25], [18, 21], [23, 25], [14, 21], [19, 25], [15, 25], [3, 21], [3, 26], [13, 28]].map(([x, y]) => ({ area: 'hills', x, y })));
+    expect(HOUSE_PLOTS.slice(0, 12)).toEqual(HILLS_PLOTS);
+    for (const plot of HILLS_PLOTS) expect(plot.y).toBeGreaterThan(WALLS.bottom);
   });
 
-  it.each(HOUSE_PLOTS.map((plot, index) => [index, plot] as const))('keeps plot %i clear of the moat, the trees, the paths, the cart, the gate and the outcrop', (_index, plot) => {
+  it('lays out three more plots over the bridge, in the meadow, after the hills', () => {
+    expect(HOUSE_PLOTS.slice(12)).toEqual([[20, 7], [28, 7], [20, 12]].map(([x, y]) => ({ area: 'meadow', x, y })));
+    expect(HOUSE_COUNT).toBe(HOUSE_PLOTS.length);
+    HOUSE_PLOTS.slice(12).forEach((plot, index) => HOUSE_PLOTS.slice(12).forEach((other, otherIndex) => {
+      if (index !== otherIndex) expect(overlap(px(plot, townSprites.townHouse), px(other, townSprites.townHouse))).toBe(false);
+    }));
+  });
+
+  it.each(HILLS_PLOTS.map((plot, index) => [index, plot] as const))('keeps plot %i clear of the moat, the trees, the paths, the cart, the gate and the outcrop', (_index, plot) => {
     for (const tile of MOAT_TILES) expect(Math.hypot(tile.x - plot.x, tile.y - plot.y)).toBeGreaterThan(3);
     for (const tree of HILL_TREES) expect(Math.hypot(tree.x - plot.x, tree.y - plot.y), `${tree.x},${tree.y}`).toBeGreaterThanOrEqual(2.5);
     expect(pathDistance(plot.x, plot.y, HILLS_PATHS)).toBeGreaterThan(2);
     for (const spot of [CART_SPOTS.hills, GATE_SPOT, OUTCROP_SITE]) expect(Math.hypot(spot.x - plot.x, spot.y - plot.y)).toBeGreaterThan(3);
   });
 
-  it.each(HOUSE_PLOTS.map((plot, index) => [index, plot] as const))('keeps plot %i\'s picture off the castle, the keep, the outcrop and the other houses', (index, plot) => {
+  it.each(HILLS_PLOTS.map((plot, index) => [index, plot] as const))('keeps plot %i\'s picture off the castle, the keep, the outcrop and the other houses', (index, plot) => {
     const box = px(plot, townSprites.townHouse);
     expect(overlap(box, px(KEEP_SITE, keepSprites.keep))).toBe(false);
     expect(overlap(box, px(HALL_SPOT, castleSprites.castleHall))).toBe(false);
@@ -93,7 +103,7 @@ describe('where the house stands', () => {
       expect(overlap(box, px({ x: WALLS.left, y }, castleSprites.castleWall))).toBe(false);
     }
     for (const [x, y] of [[WALLS.right, WALLS.bottom], [WALLS.left, WALLS.bottom]]) expect(overlap(box, px({ x, y }, castleSprites.castleTower))).toBe(false);
-    HOUSE_PLOTS.forEach((other, otherIndex) => {
+    HILLS_PLOTS.forEach((other, otherIndex) => {
       if (otherIndex !== index) expect(overlap(box, px(other, townSprites.townHouse)), `plot ${otherIndex}`).toBe(false);
     });
     // Clear of the square's ground, and inside the 40 by 30 hills.

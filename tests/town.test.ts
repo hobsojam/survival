@@ -1,3 +1,5 @@
+import { emptyBridge } from '../src/game/bridge';
+import { emptyRoad } from '../src/game/meadow';
 import { emptySquare } from '../src/game/square';
 import { describe, expect, it } from 'vitest';
 import { HOUSE_NEEDS, TOWN_NAMES, emptyTown, townStarted } from '../src/game/town';
@@ -7,7 +9,7 @@ import { createGame } from '../src/game/state';
 
 describe('the town before anyone comes', () => {
   it('starts empty, with every house unbuilt and no square', () => {
-    expect(emptyTown()).toEqual({ traveller: null, goneDay: null, namesUsed: 0, people: [], houses: Array.from({ length: 12 }, () => ({ stone: 0, beams: 0, fittings: 0, doneDay: null })), square: emptySquare() });
+    expect(emptyTown()).toEqual({ traveller: null, goneDay: null, namesUsed: 0, people: [], houses: Array.from({ length: 15 }, () => ({ stone: 0, beams: 0, fittings: 0, doneDay: null })), square: emptySquare(), bridge: emptyBridge(), road: emptyRoad() });
     expect(createGame().town).toEqual(emptyTown());
   });
 

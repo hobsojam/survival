@@ -102,7 +102,7 @@ export interface StonePile {
   item: 'stone' | 'ore';
 }
 
-export type AreaId = 'camp' | 'quarry' | 'homestead' | 'hills';
+export type AreaId = 'camp' | 'quarry' | 'homestead' | 'hills' | 'meadow';
 
 export type HousePaint = 'natural' | 'berry' | 'leaf';
 export interface HomesteadDecorations { paint: HousePaint; flowerBoxes: boolean; fence: number }
@@ -154,7 +154,7 @@ export interface GameState {
   structures: Record<StructureId, boolean>;
   decorations: HomesteadDecorations;
   progress: { nextStormDay: number | null; hearthUnlocked: boolean; lookoutRepaired: boolean; axeCrafted: boolean;
-    quarryFound: boolean; homesteadFound: boolean; hillsFound: boolean; oreFoundDay: number | null; pickaxeCrafted: boolean; mineBuilt: boolean; potCrafted: boolean; packWoven: boolean;
+    quarryFound: boolean; homesteadFound: boolean; hillsFound: boolean; meadowFound: boolean; oreFoundDay: number | null; pickaxeCrafted: boolean; mineBuilt: boolean; potCrafted: boolean; packWoven: boolean;
     /** A fishing line, for the frozen spring in winter. */
     fishingLine: boolean;
     /** The workshop's upgrades, each made once. */
@@ -479,7 +479,7 @@ export function createGame(): GameState {
     decorations: emptyDecorations(),
     structures: { orchard: false, shelter: false, shelterThatched: false, shelterStonework: false, shelterPorch: false, shelterFinished: false, bed: false, hearth: false, dryingRack: false, garden: false, windbreak: false, stonePile: false, toolshed: false, larder: false, storehouse: false, woodpile: false, timberYard: false, fibreStack: false, vegetableBeds: false, well: false, house: false, workshop: false, field: false, granary: false, windmill: false, bakery: false, beehive: false, sheepPen: false, loom: false, chickenCoop: false, birdhouse: false, wolfHouse: false, foxDen: false },
     progress: { nextStormDay: BALANCE.coldNightStartDay, hearthUnlocked: false, lookoutRepaired: false, axeCrafted: false,
-      quarryFound: false, homesteadFound: false, hillsFound: false, oreFoundDay: null, pickaxeCrafted: false, mineBuilt: false, potCrafted: false, packWoven: false, fishingLine: false,
+      quarryFound: false, homesteadFound: false, hillsFound: false, meadowFound: false, oreFoundDay: null, pickaxeCrafted: false, mineBuilt: false, potCrafted: false, packWoven: false, fishingLine: false,
       workshop: { saw: false, handcart: false, bedTools: false, harvestTools: false, quern: false, shears: false, forge: false, horseshoes: false, ironPickaxe: false, hinges: false, stoneCart: false, portcullis: false },
       discoveries: { basket: false, spring: false, cairn: false } },
     nodes,
