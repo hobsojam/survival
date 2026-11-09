@@ -63,6 +63,8 @@ export interface RunResult {
   unbuiltWhenNoneLeft: string[];
   /** The day each of the castle's sections was finished, as the game ended. */
   castleDoneDays: GameState['castle']['doneDays'];
+  /** The day each house was finished, by plot, as the game ended. EASTER EGG: the town. */
+  houseDoneDays: (number | null)[];
 }
 
 type Material = 'wood' | 'fiber' | 'stone';
@@ -903,7 +905,8 @@ export class Player {
       journalHints: this.journalHints,
       noneLeftDays: this.noneLeftDays,
       unbuiltWhenNoneLeft: [...this.unbuiltWhenNoneLeft],
-      castleDoneDays: this.state.castle.doneDays
+      castleDoneDays: this.state.castle.doneDays,
+      houseDoneDays: this.state.town.houses.map(house => house.doneDay)
     };
   }
 }
