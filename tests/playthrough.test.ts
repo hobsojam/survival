@@ -14,7 +14,7 @@ const GAMES: ReadonlyArray<readonly [number, Style]> = [[1, 'orderly'], [2, 'wan
 const MOST_DAYS = 500;
 /** The animal houses wait on a wild animal choosing to stay, which is chance, so a game may end without them. */
 const UP_TO_CHANCE = new Set(['build:birdhouse', 'build:wolfHouse', 'build:foxDen']);
-const ENDS_THE_GAME = ['keep-finished', 'keep-night', 'keep-climbed', 'castle-finished', 'castle-home'];
+const ENDS_THE_GAME = ['keep-finished', 'keep-night', 'keep-climbed', 'castle-finished', 'castle-home', 'town-traveller', 'town-neighbour', 'town-house'];
 /** The castle's days, from the keep's last stone to the feast's last dish: about 200 of steady play. The orderly game is quickest at about 130. */
 const CASTLE_DAYS = [110, 280] as const;
 /** The longest wait between one of the castle's finishes and the next: the cart, each section, the moat filling, the first dish and the last. The wall's first side and the hall's wool are the long ones, at about 30 to 40. */

@@ -61,5 +61,9 @@ export const MILESTONES: readonly Milestone[] = [
   { id: 'hall', label: 'Built, roofed and hung the great hall', reached: state => hallFinished(state.castle.hall) },
   { id: 'feast', label: 'Set the first dish on the hall\'s table', reached: state => Object.values(state.castle.feast).some(count => count > 0) },
   { id: 'castle-finished', label: 'Finished the castle with the feast', reached: castleFinished },
-  { id: 'castle-home', label: 'Made the great hall home', reached: state => state.castle.home === 'hall' }
+  { id: 'castle-home', label: 'Made the great hall home', reached: state => state.castle.home === 'hall' },
+  // EASTER EGG: the town, see src/game/town.ts.
+  { id: 'town-traveller', label: 'A traveller came to the hall door', reached: state => state.town.namesUsed > 0 },
+  { id: 'town-neighbour', label: 'Took on the first neighbour', reached: state => state.town.people.length > 0 },
+  { id: 'town-house', label: 'Built the first house', reached: state => state.town.houses[0]?.doneDay !== null }
 ];

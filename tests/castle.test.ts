@@ -1002,14 +1002,14 @@ describe('the towers', () => {
 
   it('leaves the cap on beams and fittings unchanged when goods move into a tower', () => {
     const state = standAt(wallsUp({ goods: { beams: 5, fittings: 3, hangings: 0 }, towers: { ...emptyCastle().towers, ne: { stones: 20, beams: 1, fittings: 0 } } }), 'tower-ne');
-    const roomBefore = [goodRoom(state.castle, 'beams'), goodRoom(state.castle, 'fittings')];
+    const roomBefore = [goodRoom(state, 'beams'), goodRoom(state, 'fittings')];
     const beamed = doWork(state, 'tower-ne').state;
-    expect([goodRoom(beamed.castle, 'beams'), goodRoom(beamed.castle, 'fittings')]).toEqual(roomBefore);
+    expect([goodRoom(beamed, 'beams'), goodRoom(beamed, 'fittings')]).toEqual(roomBefore);
     const done = { ...state, castle: { ...state.castle, towers: { ...state.castle.towers, ne: { stones: 20, beams: 4, fittings: 0 } } } };
     const fitted = doWork(done, 'tower-ne').state;
     expect(fitted.castle.towers.ne.fittings).toBe(1);
     expect(fitted.castle.goods.fittings).toBe(2);
-    expect([goodRoom(fitted.castle, 'beams'), goodRoom(fitted.castle, 'fittings')]).toEqual([goodRoom(done.castle, 'beams'), goodRoom(done.castle, 'fittings')]);
+    expect([goodRoom(fitted, 'beams'), goodRoom(fitted, 'fittings')]).toEqual([goodRoom(done, 'beams'), goodRoom(done, 'fittings')]);
     expect(goodBlocker({ ...state, storedWood: 20, area: 'camp', player: { ...state.player, x: BALANCE.campX, y: BALANCE.campY }, structures: { ...state.structures, workshop: true }, progress: { ...state.progress, workshop: { ...state.progress.workshop, forge: true } } }, 'beams')).toBeNull();
   });
 
@@ -2253,8 +2253,8 @@ describe('hangings: made at the loom from wool', () => {
   });
 
   it('stops at two in all, counting what is already hung in the hall', () => {
-    expect(goodRoom(atLoom(8).castle, 'hangings')).toBe(2);
-    expect(goodBatch(atLoom(8).castle, 'hangings')).toBe(1);
+    expect(goodRoom(atLoom(8), 'hangings')).toBe(2);
+    expect(goodBatch(atLoom(8), 'hangings')).toBe(1);
     expect(goodBlocker(atLoom(8, { goods: { beams: 0, fittings: 0, hangings: 2 } }), 'hangings')).toBe('The castle has enough hangings now.');
     expect(goodBlocker(atLoom(8, { goods: { beams: 0, fittings: 0, hangings: 1 }, hall: { ...emptyCastle().hall, hangings: 1 } }), 'hangings')).toBe('The castle has enough hangings now.');
     expect(goodBlocker(atLoom(8, { goods: { beams: 0, fittings: 0, hangings: 1 } }), 'hangings')).toBeNull();
@@ -2265,15 +2265,15 @@ describe('hangings: made at the loom from wool', () => {
   it('leaves the cap unchanged when a hanging moves from the goods into the hall', () => {
     const state = standAt(hallOpen({ stones: 40, beams: 12, fittings: 6 }, { goods: { beams: 0, fittings: 0, hangings: 2 } }), 'hall');
     const hung = doWork(state, 'hall').state;
-    expect(goodRoom(hung.castle, 'hangings')).toBe(goodRoom(state.castle, 'hangings'));
-    expect(goodRoom(hung.castle, 'beams')).toBe(goodRoom(state.castle, 'beams'));
+    expect(goodRoom(hung, 'hangings')).toBe(goodRoom(state, 'hangings'));
+    expect(goodRoom(hung, 'beams')).toBe(goodRoom(state, 'beams'));
   });
 
   it('counts the hall\'s beams and fittings in the cap too', () => {
     // 4 per tower and 12 for the hall is 28 beams, and 14 fittings: a hall that has them all has room for none.
     const full = atLoom(8, { hall: { ...emptyCastle().hall, beams: 12, fittings: 6 }, goods: { beams: 16, fittings: 8, hangings: 0 } });
-    expect(goodRoom(full.castle, 'beams')).toBe(0);
-    expect(goodRoom(full.castle, 'fittings')).toBe(0);
+    expect(goodRoom(full, 'beams')).toBe(0);
+    expect(goodRoom(full, 'fittings')).toBe(0);
   });
 });
 

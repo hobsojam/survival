@@ -14,6 +14,9 @@ import { FORAGE, isForage, nodeShown } from './forage';
 import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
 import { bakeryDawn, millGrainBlocker, milledState, takeLoafBlocker, takenLoaf } from './bakehouse';
 import { beehiveDawn, takeHoneyBlocker, takenHoney } from './beehive';
+import { jobsDawn } from './jobs';
+import { answeredTraveller, travellerArrives } from './traveller';
+import { doTownWork, townWorkBlocker, townWorkLine } from './townSites';
 import { cutField, cutStripBlocker, grindGrainBlocker, seededField, sowStripBlocker, sownField, threshStripBlocker, threshedField, wildGrainBlocker } from './field';
 import { BED_CROPS, bedsDawn, drawWaterBlocker, emptyBed, harvestBedBlocker, needsWater, sowBedBlocker } from './beds';
 import { fuelLeft, isAtHome, livesInHouse, tendFireplace } from './home';
@@ -57,6 +60,8 @@ export type GameAction =
   | { type: 'takeLoaf' }
   | { type: 'castleWork'; site: CastleSite }
   | { type: 'chooseHome'; home: 'house' | 'hall' }
+  | { type: 'answerTraveller'; yes: boolean }
+  | { type: 'townWork'; plot: number }
   | { type: 'makeCastleGood'; good: CastleGood }
   | { type: 'takeHoney' }
   | { type: 'drawWater' }
@@ -252,7 +257,10 @@ export function advanceTime(state: GameState, seconds: number, activity: Activit
     const dusk = next.timeOfDay < nightStart(next.day);
     next.timeOfDay += step;
     remaining -= step;
-    if (dusk && next.timeOfDay >= nightStart(next.day)) ponyStaysAtKeep(next);
+    if (dusk && next.timeOfDay >= nightStart(next.day)) {
+      ponyStaysAtKeep(next);
+      travellerArrives(next);
+    }
     wolfVisit(next);
     startleFox(next);
     startlePony(next);
@@ -340,6 +348,7 @@ function dawn(next: GameState, home: boolean): void {
   next.larder = larder.store;
   const shelf = bakeryDawn(next);
   beehiveDawn(next);
+  jobsDawn(next);
   const lost = { berry: bag.lost.berry + larder.lost.berry, greens: bag.lost.greens + larder.lost.greens, bread: bag.lost.bread + larder.lost.bread + shelf.lost,
     apple: bag.lost.apple + larder.lost.apple, egg: bag.lost.egg + larder.lost.egg };
   if (lost.berry + lost.greens + lost.bread + lost.apple + lost.egg > 0) next.lastSpoiled = { day: next.day, ...lost };
@@ -1393,7 +1402,7 @@ const makeCastleGood: ActionHandler<'makeCastleGood'> = (state, action) => {
   const blocker = goodBlocker(state, action.good);
   if (blocker) return refuse(state, blocker);
   const { good } = action;
-  const made = goodBatch(state.castle, good);
+  const made = goodBatch(state, good);
   if (good === 'hangings') {
     const woven = { ...state, sheep: { ...state.sheep, wool: state.sheep.wool - GOODS.hangings.wool }, castle: { ...state.castle, goods: { ...state.castle.goods, hangings: state.castle.goods.hangings + made } } };
     return { state: advanceTime({ ...woven, player: tire(state, BALANCE.buildEnergyCost) }, workSeconds(state, BALANCE.buildSeconds), 'working'), message: 'You wove a hanging for the hall.' };
@@ -1464,8 +1473,25 @@ const chooseHome = (state: GameState, action: ActionOf<'chooseHome'>): ActionRes
   return { state: { ...state, castle: { ...state.castle, home: action.home } }, message: HOME_LINES[action.home] };
 };
 
+/** Answering the traveller at the hall door. EASTER EGG: the town, see src/game/town.ts. */
+const answerTraveller = (state: GameState, action: ActionOf<'answerTraveller'>): ActionResult => answeredTraveller(state, action.yes);
+
+/** A piece of a house laid, at the castle's pace. EASTER EGG: the town, see src/game/town.ts. */
+const townWork: ActionHandler<'townWork'> = (state, action) => {
+  const blocker = townWorkBlocker(state, action.plot);
+  if (blocker) return refuse(state, blocker);
+  const worked = doTownWork(state, action.plot);
+  const effort = 0.5;
+  return {
+    state: advanceTime({ ...worked, player: tire(state, BALANCE.digEnergyCost * effort) }, workSeconds(state, BALANCE.digSeconds * effort), 'working'),
+    message: townWorkLine(worked.town.houses[action.plot])
+  };
+};
+
 const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   chooseHome,
+  answerTraveller,
+  townWork,
   feedSheep,
   nameAnimal,
   shearFlock,

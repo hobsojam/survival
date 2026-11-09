@@ -7,6 +7,7 @@ import { emptyField, type FieldState } from './field';
 import { emptyOrchard, type OrchardState } from './orchard';
 import { emptyKeep, type KeepState } from './keep';
 import { emptyCastle, type CastleState } from './castle';
+import { emptyTown, type TownState } from './town';
 import { emptyPony, type PonyState } from './pony';
 export type ResourceKind = 'branch' | 'berry' | 'fiber' | 'stone' | 'hazel' | 'pine' | 'greens' | 'honey' | 'wildGrain';
 
@@ -184,6 +185,8 @@ export interface GameState {
   keep: KeepState;
   /** The castle after the keep: a secret until the survivor finds the line of stones. */
   castle: CastleState;
+  /** The town after the castle: a secret until a traveller comes to the hall door. */
+  town: TownState;
   /** Wood split and stacked on the woodpile, outside the bag: it counts for building and the fire, from anywhere. */
   storedWood: number;
   /** Felled wood waiting in the handcart: it counts as stored wood, for building and the fires, from anywhere. */
@@ -494,6 +497,7 @@ export function createGame(): GameState {
     pony: emptyPony(),
     keep: emptyKeep(),
     castle: emptyCastle(),
+    town: emptyTown(),
     storedWood: 0, cartWood: 0,
     storedFiber: 0,
     larder: emptyFood(),

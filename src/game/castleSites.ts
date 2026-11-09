@@ -8,6 +8,7 @@ import { KEEP_SITE } from './keep';
 import { TOO_TIRED_MESSAGE, isExhausted } from './needs';
 import { ponyWith } from './pony';
 import { BALANCE, type AreaId, type GameState } from './state';
+import { townGoodNeed } from './town';
 
 // EASTER EGG: the castle, see src/game/castle.ts. The sections of it that can be worked on, kept apart from the saved
 // state in castle.ts because the places they stand are drawn from areas.ts, which needs the state module to load first.
@@ -562,20 +563,21 @@ const goodTotals = (castle: CastleState, good: CastleGood): { needed: number; bu
   return { needed: perTower * TOWERS.length + hall, built: TOWERS.reduce((sum, id) => sum + castle.towers[id][key], castle.hall[key]) };
 };
 
-/** How many of a good are still worth making: what the castle needs, less what is made and what is already built in. */
-export const goodRoom = (castle: CastleState, good: CastleGood): number => {
-  const { needed, built } = goodTotals(castle, good);
-  return Math.max(0, needed - built - castle.goods[good]);
+/** How many of a good are still worth making: what the castle and the town's open houses need, less what is made and what is already built in. Hangings are the hall's alone. */
+export const goodRoom = (state: GameState, good: CastleGood): number => {
+  const { needed, built } = goodTotals(state.castle, good);
+  const town = good === 'hangings' ? 0 : townGoodNeed(state, good);
+  return Math.max(0, needed - built + town - state.castle.goods[good]);
 };
 
 /** How many of a good one making gives: a full batch, or what is left if less. */
-export const goodBatch = (castle: CastleState, good: CastleGood): number => Math.min(GOODS[good].batch, goodRoom(castle, good));
+export const goodBatch = (state: GameState, good: CastleGood): number => Math.min(GOODS[good].batch, goodRoom(state, good));
 
 /** Why a hanging can't be woven right now, or null if it can. Hangings need the loom and its wool, not the workshop, and are made anywhere in the clearing. */
 function hangingBlocker(state: GameState): string | null {
   if (!state.structures.loom) return 'Build the loom first.';
   if (state.castle.frames === 0) return 'Begin the timber frames first.';
-  if (goodRoom(state.castle, 'hangings') === 0) return 'The castle has enough hangings now.';
+  if (goodRoom(state, 'hangings') === 0) return 'The castle has enough hangings now.';
   if (!isInClearing(state)) return 'Return to camp to use the loom.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   return state.sheep.wool < GOODS.hangings.wool ? `You need ${GOODS.hangings.wool} wool for the hanging.` : null;
@@ -588,7 +590,7 @@ export function goodBlocker(state: GameState, good: CastleGood): string | null {
   if (!state.structures.workshop) return 'Build a workshop first.';
   if (good === 'fittings' && !state.progress.workshop.forge) return 'Add a forge to the workshop first.';
   if (state.castle.frames === 0) return 'Begin the timber frames first.';
-  if (goodRoom(state.castle, good) === 0) return `The castle has enough ${good} now.`;
+  if (goodRoom(state, good) === 0) return `There is enough ${good} for now.`;
   if (!isInClearing(state)) return 'Return to camp to work at the workshop.';
   if (isExhausted(state)) return TOO_TIRED_MESSAGE;
   const { cost } = GOODS[good];

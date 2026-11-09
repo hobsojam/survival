@@ -26,6 +26,7 @@ import { KEEPSAKES_NEEDED, cloakBlocker, keepsakeStock, pillowBlocker } from '..
 import { DISHES, DISH_ORDER, cookBlocker, dishBlocker, foodWord, ingredientList, potBlocker, type DishId } from '../game/cooking';
 import { fishingLineBlocker } from '../game/fishing';
 import { DECORATION_COSTS, decorationBlocker, type DecorationChoice } from '../game/rules';
+import { travellerOffer } from '../game/traveller';
 
 export interface GardenPlotPanelView {
   label: string;
@@ -165,6 +166,15 @@ export function homeChoiceView(state: GameState): HomeChoiceView {
     return { shown: offeredHome, home, choose: 'house', button: 'Make the house your home again', copy: 'The hall is your home. The camp carries on below, and the house is still yours.' };
   }
   return { shown: offeredHome, home, choose: 'hall', button: 'Make the hall your home', copy: 'You could make the hall your home. The camp will carry on below, and the house stays yours.' };
+}
+
+export interface VisitorView { shown: boolean; copy: string; yes: string; no: string }
+
+/** The traveller at the hall door asking for work, while they are asking. EASTER EGG: the town, see src/game/town.ts. */
+export function visitorView(state: GameState): VisitorView {
+  const asking = travellerOffer(state);
+  const copy = asking ? `${asking.name} asks if there is any work. ${asking.name} could ${asking.offer}.` : '';
+  return { shown: asking !== null, copy, yes: 'Offer work', no: 'Not today' };
 }
 
 /** The Windmill panel, once built: the flour in its bin against its room, and whether milling can go ahead. */
@@ -349,7 +359,7 @@ export function castleGoodsView(state: GameState): CastleGoodRow[] {
   return (['beams', 'fittings', 'hangings'] as const).map(good => {
     const { title, copy, cost } = GOOD_COPY[good];
     const blocker = goodBlocker(state, good);
-    const shown = isRevealed(state) && state.castle.frames > 0 && goodRoom(state.castle, good) > 0;
+    const shown = isRevealed(state) && state.castle.frames > 0 && goodRoom(state, good) > 0;
     return { good, shown, title, copy: blocker ?? copy, cost, have: state.castle.goods[good], disabled: Boolean(blocker) };
   });
 }
