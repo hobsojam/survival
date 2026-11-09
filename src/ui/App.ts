@@ -23,6 +23,7 @@ import { browserDownloadDoc, downloadText } from './download';
 import { showBuildList, showCampStores } from './showPanels';
 import type { WovenId } from '../game/sheep';
 import { NameDialog, wireNameDialog } from './nameDialog';
+import { SaveLoader, clearSaveNote, wireSaveBackup, type SaveBackupPage } from './saveBackup';
 import { homeChoiceView, visitorView, cookBerryView, supplyCount, axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, decorationMarkup, decorationButtonView, DECORATION_CHOICES, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, chickenCoopPanelView, friendRosterView, sheepPanelView, loomPanelView, pipsLine, loomItemMarkup, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, castleGoodsView, castleGoodsTitle, type ActionPanelView } from './panels';
 import type { UpgradeId } from '../game/workshop';
 import type { CastleGood } from '../game/castleSites';
@@ -53,6 +54,8 @@ export class App {
   private journalPage: number | null = null;
   private readonly pause: PauseControl;
   private nameDialog: NameDialog | null = null;
+  private saveLoader: SaveLoader | null = null;
+  private savePage: SaveBackupPage | null = null;
   private toastTimer?: number;
 
   constructor(root: HTMLElement) {
@@ -65,7 +68,7 @@ export class App {
       this.previousSave = { kind: 'invalid', reason: `Browser storage is unavailable: ${String(error)}` };
     }
     this.soundscape = new Soundscape(this.storage);
-    this.pause = createPause(this.root, { scenes: () => this.game?.scene, sound: this.soundscape, save: () => { if (this.storage) this.saveCurrent(); }, started: () => Boolean(this.scene), asking: () => this.nameDialog?.open ?? false });
+    this.pause = createPause(this.root, { scenes: () => this.game?.scene, sound: this.soundscape, save: () => { if (this.storage) this.saveCurrent(); }, started: () => Boolean(this.scene), asking: () => (this.nameDialog?.open ?? false) || (this.saveLoader?.isOpen ?? false) });
     const clearingMarkup = (['north', 'east', 'south', 'west'] as const).map(side => `<button type="button" class="build-item" data-clear-side="${side}"><span class="build-copy"><strong></strong><small></small></span></button>`).join('');
     this.root.innerHTML = `
       <div class="shell">
@@ -128,7 +131,7 @@ export class App {
               <section class="panel chicken-coop-panel" data-tab="camp" hidden><p class="eyebrow">AT CAMP</p><h2>Chicken coop</h2><p class="garden-hint" id="chicken-coop-status"></p><p class="garden-hint" id="coop-names" hidden></p><p class="garden-hint" id="chicken-coop-eggs"></p><div class="tool-row"><button type="button" id="take-egg-button" data-action="takeEgg">Take an egg</button><small id="take-egg-hint"></small></div></section>
               <section class="panel night-panel" data-tab="camp"><p class="eyebrow">CAMP MOMENTS</p><h2>Cook or unwind</h2><p class="night-hint" id="night-hint">Cook by the fire any time. Stargazing waits for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" data-dish="berries" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button>${nightDishMarkup()}</div></section>
               <section class="panel build-panel" data-tab="build"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand anywhere in the clearing to build.</p><div id="build-list">${buildListMarkup()}</div><div id="decoration-group" hidden><h3 class="build-group-heading">Make it yours</h3><div id="decoration-list">${decorationMarkup()}</div></div><div id="clearing-group" hidden><h3 class="build-group-heading">Clear the land</h3><p id="clearing-progress" class="build-hint" hidden></p><div id="clearing-sides">${clearingMarkup}</div><div class="tool-row" id="clear-row"><h3 id="clear-title">Clear the ground</h3><p id="clear-copy" class="lookout-copy"></p><button type="button" id="clear-button" data-action="clearGround">Clear the ground</button><small id="clear-cost"></small></div></div></section>
-              <section class="panel phone-only" data-tab="camp"><p class="eyebrow">THIS CAMP</p><button type="button" id="phone-new-game" class="secondary-button">Start a new game</button></section>
+              <section class="panel camp-save-panel" data-tab="camp"><p class="eyebrow">THIS CAMP</p><h2>Your save</h2><p class="garden-hint">Take this camp to another device, or bring one here.</p><div class="save-actions"><button type="button" id="save-file" class="secondary-button">Save to a file</button><button type="button" id="copy-save" class="secondary-button">Copy save code</button><button type="button" id="load-save" class="secondary-button">Load a save…</button><button type="button" id="phone-new-game" class="secondary-button">Start a new game</button></div><small id="save-note" class="save-note" aria-live="polite"></small><textarea id="save-code-out" class="save-code" readonly hidden aria-label="Your save code"></textarea></section>
             </div>
           </aside>
         </div>
@@ -136,8 +139,9 @@ export class App {
           <div class="dock-actions"><button type="button" data-action="eat">Eat</button><button type="button" data-action="rest">Rest</button><button type="button" data-action="stokeFire">Fire</button><button type="button" data-action="sleep" id="dock-sleep">Sleep</button><button type="button" data-action="cook" id="dock-cook" hidden>Cook</button><button type="button" data-action="stargaze" id="dock-stargaze" hidden>Stars</button><button type="button" data-action="befriend" id="dock-offer" hidden>Offer</button></div>
           <div class="dock-tabs"><button type="button" data-tab-button="bag">🎒 Bag</button><button type="button" data-tab-button="build">🔨 Build</button><button type="button" data-tab-button="camp">🌙 Camp</button></div>
         </nav>
-        <div id="start-screen" class="start-screen"><div class="start-card"><div class="start-mark">✦</div><p class="eyebrow">A SMALL SURVIVAL STORY</p><h1>Make a little place<br>feel like home.</h1><p class="start-copy">Gather what you need, keep a fire glowing, and build a refuge one day at a time.</p><p id="start-note" class="start-note"></p><div class="start-buttons"><button id="continue-game" class="primary-button" hidden>Continue your camp</button><button id="new-game" class="secondary-button">Start a new game</button></div><small>Single player · Saves in this browser</small></div></div>
+        <div id="start-screen" class="start-screen"><div class="start-card"><div class="start-mark">✦</div><p class="eyebrow">A SMALL SURVIVAL STORY</p><h1>Make a little place<br>feel like home.</h1><p class="start-copy">Gather what you need, keep a fire glowing, and build a refuge one day at a time.</p><p id="start-note" class="start-note"></p><div class="start-buttons"><button id="continue-game" class="primary-button" hidden>Continue your camp</button><button id="new-game" class="secondary-button">Start a new game</button><button type="button" id="start-load-save" class="secondary-button">Load a save…</button></div><small>Single player · Saves in this browser</small></div></div>
         <div id="lookout-ending" class="lookout-ending hidden" role="dialog" aria-modal="true" aria-labelledby="ending-title"><div class="start-card"><div class="start-mark">✦</div><p class="eyebrow">A VIEW FROM ABOVE</p><h1 id="ending-title">A place to call home.</h1><p class="start-copy">The lookout stands again. Beyond your camp, the old quarry lies to the west with stone among its rubble. Your field journal now shows the areas you can explore.</p><div class="start-buttons"><button id="continue-exploring" class="primary-button">Keep exploring</button></div></div></div>${endingMarkup()}
+        <div id="load-overlay" class="name-overlay load-overlay" hidden><div class="pause-card load-card" role="dialog" aria-modal="true" aria-labelledby="load-title"><p class="eyebrow">YOUR SAVE</p><h2 id="load-title">Load a save</h2><div id="load-choose"><div class="name-actions"><button type="button" id="load-file" class="primary-button">Choose a file…</button></div><input id="load-file-input" type="file" accept=".json,application/json,text/plain" hidden><textarea id="load-code" rows="4" placeholder="…or paste a save code here" aria-label="Save code"></textarea><div class="name-actions"><button type="button" id="load-code-button" class="secondary-button">Load this code</button><button type="button" id="load-cancel" class="secondary-button">Not now</button></div></div><div id="load-ask" hidden><p id="load-ask-copy"></p><div class="name-actions"><button type="button" id="load-yes" class="primary-button">Load it</button><button type="button" id="load-keep" class="secondary-button">Keep my camp</button></div></div><small id="load-error" class="load-error" aria-live="polite"></small></div></div>
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
@@ -194,6 +198,7 @@ export class App {
       perform: action => this.scene?.perform(action)
     });
     wireNameDialog({ overlay: nameOverlay, form: nameForm, cancel: this.root.querySelector<HTMLButtonElement>('#name-cancel')! }, document, this.nameDialog);
+    this.wireSaveBackup();
     this.root.querySelectorAll<HTMLButtonElement>('[data-castle-good]').forEach(button => {
       button.addEventListener('click', () => this.scene?.perform({ type: 'makeCastleGood', good: button.dataset.castleGood as CastleGood }));
     });
@@ -360,6 +365,44 @@ export class App {
     if (area === 'hills') welcome = 'Welcome back. You are up on the hills.';
     this.setMessage(welcome);
     this.setText('save-status', 'Loaded locally');
+  }
+
+  /** The save panel's buttons and the load box: a file to download, a code to copy, and a file or code to load. */
+  private wireSaveBackup(): void {
+    const find = <T extends HTMLElement>(selector: string): T => this.root.querySelector<T>(selector)!;
+    const code = find<HTMLTextAreaElement>('#load-code');
+    this.savePage = {
+      saveFile: find('#save-file'), copy: find('#copy-save'), open: [find('#load-save'), find('#start-load-save')], chooseFile: find('#load-file'),
+      fileInput: find<HTMLInputElement>('#load-file-input'), loadCode: find('#load-code-button'), cancel: find('#load-cancel'), yes: find('#load-yes'),
+      keep: find('#load-keep'), note: find('#save-note'), codeOut: find<HTMLTextAreaElement>('#save-code-out'), code
+    };
+    this.saveLoader = new SaveLoader({
+      overlay: find('#load-overlay'), code, error: find('#load-error'), ask: find('#load-ask'), askCopy: find('#load-ask-copy'), choose: find('#load-choose')
+    }, {
+      current: () => (this.scene ? this.scene.getState() : this.previousSave.kind === 'loaded' ? this.previousSave.state : null),
+      holdGame: hold => { if (hold) this.game?.scene.pause('GameScene'); else this.game?.scene.resume('GameScene'); },
+      setTyping: typing => this.scene?.setTyping(typing),
+      load: state => this.loadBackup(state)
+    });
+    wireSaveBackup(this.savePage, document, this.saveLoader, {
+      state: () => this.scene?.getState() ?? this.state,
+      download: (text, name) => {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+        link.download = name;
+        link.click();
+        window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+      },
+      clipboard: navigator.clipboard
+    });
+  }
+
+  /** A save brought in from a file or a code replaces the camp, and is kept as the browser's save at once. */
+  private loadBackup(state: GameState): void {
+    this.startGame(state);
+    if (this.savePage) clearSaveNote(this.savePage);
+    this.setMessage(`Your camp from day ${state.day} is loaded.`);
+    this.saveCurrent();
   }
 
   private saveCurrent(): void {

@@ -652,7 +652,7 @@ export function saveGame(storage: Storage, state: GameState): SaveResult {
   if (state.ending) return forgetSave(storage, state);
   if (!validState(state)) return { ok: false, error: 'The game state is invalid and was not saved.' };
   try {
-    storage.setItem(SAVE_KEY, JSON.stringify({ version: SAVE_VERSION, state }));
+    storage.setItem(SAVE_KEY, saveText(state));
     return { ok: true };
   } catch (error) {
     return { ok: false, error: errorText(error) };
@@ -676,6 +676,27 @@ function movedBranches(state: unknown): void {
   }
 }
 
+/** Why a save's text can't be loaded, for the reader to word: not JSON, JSON that isn't a save, a version it can't bring up to date, or bad game data. */
+type Opened = { kind: 'loaded'; state: GameState } | { kind: 'ended' } | { kind: 'notJson' } | { kind: 'notSave' } | { kind: 'version'; reason: string } | { kind: 'damaged' };
+
+/** A save's text read, brought up to date and checked exactly as a current one is. */
+function openSave(raw: string): Opened {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { kind: 'notJson' };
+  }
+  if (!object(parsed) || !('version' in parsed) || !('state' in parsed)) return { kind: 'notSave' };
+  // An older save is brought up to date first, then checked exactly as a current one is.
+  const upgraded = upgradeSave(parsed.version, parsed.state);
+  if (!upgraded.ok) return { kind: 'version', reason: upgraded.reason };
+  movedBranches(upgraded.state);
+  if (!validState(upgraded.state)) return { kind: 'damaged' };
+  // A story that has ended is over: its save holds no camp to continue.
+  return upgraded.state.ending ? { kind: 'ended' } : { kind: 'loaded', state: upgraded.state };
+}
+
 export function loadGame(storage: Storage): LoadResult {
   let raw: string | null;
   try {
@@ -684,19 +705,26 @@ export function loadGame(storage: Storage): LoadResult {
     return { kind: 'invalid', reason: `Could not read local save: ${errorText(error)}` };
   }
   if (raw === null) return { kind: 'empty' };
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return { kind: 'invalid', reason: 'The local save is not valid JSON.' };
-  }
-  if (!object(parsed)) return { kind: 'invalid', reason: 'This save uses an unsupported version.' };
-  // An older save is brought up to date first, then checked exactly as a current one is.
-  const upgraded = upgradeSave(parsed.version, parsed.state);
-  if (!upgraded.ok) return { kind: 'invalid', reason: upgraded.reason };
-  movedBranches(upgraded.state);
-  if (!validState(upgraded.state)) return { kind: 'invalid', reason: 'The local save contains invalid game data.' };
-  // A story that has ended is over: its save holds no camp to continue.
-  if (upgraded.state.ending) return { kind: 'empty' };
-  return { kind: 'loaded', state: upgraded.state };
+  const opened = openSave(raw);
+  if (opened.kind === 'loaded') return opened;
+  if (opened.kind === 'ended') return { kind: 'empty' };
+  if (opened.kind === 'version') return { kind: 'invalid', reason: opened.reason };
+  if (opened.kind === 'damaged') return { kind: 'invalid', reason: 'The local save contains invalid game data.' };
+  return { kind: 'invalid', reason: opened.kind === 'notJson' ? 'The local save is not valid JSON.' : 'This save uses an unsupported version.' };
+}
+
+/** The game as a save's text: the same as the browser keeps, so a save file and a save code are one thing. */
+export function saveText(state: GameState): string {
+  return JSON.stringify({ version: SAVE_VERSION, state });
+}
+
+/** A save brought in from a file or a pasted code, or the reason it can't be loaded, worded for the player. */
+export function readSaveText(text: string): { ok: true; state: GameState } | { ok: false; reason: string } {
+  const opened = openSave(text.trim());
+  if (opened.kind === 'loaded') return { ok: true, state: opened.state };
+  if (opened.kind === 'ended') return { ok: false, reason: 'This save\'s story has ended, so there is no camp in it to load.' };
+  if (opened.kind === 'damaged') return { ok: false, reason: 'This save is damaged, so it can\'t be loaded.' };
+  // A save too old or too new to bring up to date says which; a version that was never the game's is no save of it.
+  if (opened.kind === 'version' && /newer|older/.test(opened.reason)) return { ok: false, reason: opened.reason };
+  return { ok: false, reason: 'This isn\'t a Hearthwild save.' };
 }
