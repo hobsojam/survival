@@ -80,5 +80,16 @@ export function townNews(before: GameState, after: GameState): string[] {
   const line = after.town.people.length === 0
     ? `${traveller?.name}, a lost traveller, came to the hall door at nightfall and slept by the fire.`
     : `${traveller?.name} heard there was work here, and came to the hall door at nightfall.`;
-  return [...(arrived ? [line] : []), ...houseNews(before, after)];
+  return [...(arrived ? [line] : []), ...houseNews(before, after), ...meadowNews(before, after)];
+}
+
+/** The mornings after the bridge is finished, the meadow road cleared, and its milestone set. */
+function meadowNews(before: GameState, after: GameState): string[] {
+  if (after.day <= before.day) return [];
+  const { bridge, road } = after.town;
+  return [
+    ...(bridge.doneDays.parapet === before.day ? ['The bridge over the stream is finished.'] : []),
+    ...(road.doneDays.road === before.day ? ['The old road through the meadow is clear.'] : []),
+    ...(road.doneDays.milestone === before.day ? ['The milestone stands by the meadow road.'] : [])
+  ];
 }

@@ -66,13 +66,16 @@ const castleMomentIcons: Record<CastleJournalId, JournalIcon> = Object.fromEntri
   (Object.keys(CASTLE_SEASONS) as (keyof typeof CASTLE_SEASONS)[]).flatMap(season => (Object.keys(CASTLE_SCENES) as (keyof typeof CASTLE_SCENES)[]).map(moment => [`${moment}${season}`, castleMomentIcon(moment, season)]))
 ) as Record<CastleJournalId, JournalIcon>;
 
-/** The town's moments: a figure at the hall's lit door, and two figures by it for a neighbour who stays. EASTER EGG: the town, see src/game/town.ts. */
+/** The town's moments: a figure at the hall's lit door, two figures by it for a neighbour who stays, the bridge, and the meadow road's milestone. EASTER EGG: the town, see src/game/town.ts. */
 const TOWN_SCENES = {
   traveller: ['..........', '.bbbbbbb..', '.bbyyybb..', '.bbyyybb..', '.bbyyyb.h.', '.bbyyyb.cc', '.bbyyyb.cc', '.bbyyyb.k.', '..........'],
-  neighbour: ['..........', '.bbbbbbb..', '.bbyyybb..', '.bbyyybb..', '.bhyyyb.h.', '.ccyyyb.cc', '.ccyyyb.cc', '.kbyyyb.k.', '..........']
+  neighbour: ['..........', '.bbbbbbb..', '.bbyyybb..', '.bbyyybb..', '.bhyyyb.h.', '.ccyyyb.cc', '.ccyyyb.cc', '.kbyyyb.k.', '..........'],
+  // The bridge's arch over the stream, and the milestone beside the cleared road.
+  meadowFound: ['..........', 'bbbbbbbbbb', 'bbbbbbbbbb', 'bbbddddbbb', 'bbd....dbb', 'bb......bb', 'bbwwwwwwbb', 'wwwwwwwwww', '..........'],
+  meadowRoad: ['.......bb.', '.......bd.', '.......bb.', '.......bd.', '.......bb.', '......kbbk', 'eeeeeeeeee', 'edeedeedee', '..........']
 } as const;
 const townIcon = (moment: keyof typeof TOWN_SCENES, season: keyof typeof CASTLE_SEASONS): JournalIcon => ({
-  legend: { x: CASTLE_SEASONS[season][0], b: 'stone2', y: 'scarf3', h: 'fox1', c: 'wood2', k: 'wood1' },
+  legend: { x: CASTLE_SEASONS[season][0], b: 'stone2', d: 'stone0', y: 'scarf3', h: 'fox1', c: 'wood2', k: 'wood1', w: 'storm', e: 'earth2' },
   rows: [CASTLE_SEASONS[season][1], ...TOWN_SCENES[moment]]
 });
 const townIcons = Object.fromEntries(
