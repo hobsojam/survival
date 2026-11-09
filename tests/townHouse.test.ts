@@ -10,9 +10,10 @@ import { KEEP_SITE } from '../src/game/keep';
 import { TOO_TIRED_MESSAGE } from '../src/game/needs';
 import { applyAction } from '../src/game/rules';
 import { BALANCE, createGame, type GameState } from '../src/game/state';
+import { HOUSE_COUNT } from '../src/game/town';
 import { HOUSE_PLOTS, houseStage, townSpots, townWorkBlocker } from '../src/game/townSites';
 import { townNews } from '../src/game/traveller';
-import { castleGoodsView } from '../src/ui/panels';
+import { castleGoodsTitle, castleGoodsView } from '../src/ui/panels';
 import { HILLS_PATHS, pathDistance } from '../src/scene/mapGeometry';
 import { promptFor, useKeyAction } from '../src/scene/prompts';
 import { pickTapTarget, targetAction } from '../src/scene/tapTarget';
@@ -66,6 +67,7 @@ describe('where the house stands', () => {
 
   it('is on the hills below the castle, outside its walls', () => {
     expect(HOUSE_PLOTS).toEqual([{ area: 'hills', x: 31, y: 23 }]);
+    expect(HOUSE_COUNT).toBe(HOUSE_PLOTS.length);
     expect(PLOT.y).toBeGreaterThan(WALLS.bottom);
   });
 
@@ -217,6 +219,11 @@ describe('the castle goods for the house', () => {
     const rows = castleGoodsView(atCamp());
     expect(rows.filter(row => row.shown).map(row => row.good)).toEqual(['beams', 'fittings']);
     expect(goodBlocker(atCamp(state => { state.castle.goods.beams = 4; }), 'beams')).toBe('There is enough beams for now.');
+  });
+
+  it('heads the rows for the town once the castle is finished, and for the castle before', () => {
+    expect(castleGoodsTitle(atCamp())).toBe('FOR THE TOWN');
+    expect(castleGoodsTitle(atCamp(state => { state.castle.finishedDay = null; }))).toBe('FOR THE CASTLE');
   });
 
   it('makes beams for the house at the workshop', () => {
