@@ -571,6 +571,7 @@ function validTown(shape: SaveShape): boolean {
   const meadowWorked = houses.some((house, plot) => HOUSE_PLOTS[plot].area === 'meadow' && (house as HouseState).stone > 0);
   if (!bridgeDone(bridge) && (meadowWorked || shape.area === 'meadow' || shape.progress.meadowFound === true)) return false;
   if (!bool(shape.progress.meadowFound) || (shape.area === 'meadow' && !shape.progress.meadowFound)) return false;
+  if (!bridgeDone(bridge) && (jobs.includes('carter') || jobs.includes('joiner'))) return false;
   if (traveller !== null) {
     if (!object(traveller) || !dayOk(traveller.arrivedDay) || !upTo(traveller.refusals, 2)) return false;
     if (traveller.askedDay !== null && !dayOk(traveller.askedDay)) return false;

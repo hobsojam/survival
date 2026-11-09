@@ -575,7 +575,7 @@ describe('the stone cart: following the pony', () => {
 
 describe('the stone cart: spending it', () => {
   it('spends from a cart on the hills first, then the bag', () => {
-    const state = cartAt(withCart(2, { inventory: { ...game.inventory, stone: 3 } }), 'hills');
+    const state: GameState = { ...cartAt(withCart(2, { inventory: { ...game.inventory, stone: 3 } }), 'hills'), area: 'hills' };
     const one = spendCastleStone(state);
     expect(one?.castle.cart.stone).toBe(1);
     expect(one?.inventory.stone).toBe(3);

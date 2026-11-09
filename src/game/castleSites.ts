@@ -1,5 +1,5 @@
 import { QUARRY_SITE } from './areas';
-import { CASTLE_SECTIONS, FEAST_ITEMS, HALL_DOOR_SPOT, NEEDS, SIDES, TOWERS, WALLS, everyOtherSectionDone, feastWants, hallFinished, isRevealed, moatStretchSpot, towerFinished, wallFinished, type CastleSection, type CastleState, type FeastItem, type TowerId, type WallSide } from './castle';
+import { CART_SPOTS, CASTLE_SECTIONS, FEAST_ITEMS, HALL_DOOR_SPOT, NEEDS, SIDES, TOWERS, WALLS, everyOtherSectionDone, feastWants, hallFinished, isRevealed, moatStretchSpot, towerFinished, wallFinished, type CastleSection, type CastleState, type FeastItem, type TowerId, type WallSide } from './castle';
 import { HILLS_EXIT, QUARRY_HILLS_EXIT, availableOre } from './hills';
 import { availableWood, freeSpaces, isInClearing, spaceFor, spendWood } from './camp';
 import { isWinter } from './calendar';
@@ -406,14 +406,13 @@ export const siteNeed = (state: GameState, site: CastleSite): SiteNeed | null =>
 
 const NOTHING_HERE = 'There is nothing to build here yet.';
 
-/** Where the cart stands in each area, clear of the quarry face and rubble, the road and the paths on one side, and of the keep, the outcrop and the road on the other. */
-export const CART_SPOTS = { quarry: { x: 24, y: 8 }, hills: { x: 30, y: 7 } } as const;
+export { CART_SPOTS };
 
 /** How much more the cart can take, or none before it is made. */
 export const cartRoom = (state: GameState): number => (state.progress.workshop.stoneCart ? NEEDS.cartStone - state.castle.cart.stone : 0);
 
-/** The cart's stone that building can use: only while it stands on the hills, where the building is. */
-const cartLoad = (state: GameState): number => (state.castle.cart.at === 'hills' ? state.castle.cart.stone : 0);
+/** The cart's stone to hand: only on the hills, and only while the survivor is there with it. */
+const cartLoad = (state: GameState): number => (state.castle.cart.at === 'hills' && state.area === 'hills' ? state.castle.cart.stone : 0);
 
 /** Where a dig's stones go: into the cart while it stands at the quarry, then into the bag, never more than there is room for. */
 export const stoneIntake = (state: GameState, stones: number): { toCart: number; toBag: number } => {

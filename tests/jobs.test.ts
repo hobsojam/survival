@@ -105,7 +105,7 @@ describe('the honey job', () => {
 
 describe('which job is open', () => {
   it('offers the hens first, then the bees, then nothing', () => {
-    expect(JOB_ORDER).toEqual(['hens', 'honey', 'loaves', 'wood', 'beds', 'field', 'sheep', 'orchard', 'breadStall', 'honeyStall', 'woolStall', 'appleStall', 'eggStall']);
+    expect(JOB_ORDER).toEqual(['hens', 'honey', 'loaves', 'wood', 'beds', 'field', 'sheep', 'orchard', 'breadStall', 'honeyStall', 'woolStall', 'appleStall', 'eggStall', 'carter', 'joiner']);
     expect(openJob(camp())).toBe('hens');
     expect(openJob(camp([worker('hens')]))).toBe('honey');
     expect(openJob(camp([worker('hens'), worker('honey', 'Tomas')]))).toBeNull();

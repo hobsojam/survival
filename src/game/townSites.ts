@@ -36,7 +36,7 @@ const houseNeed = (house: HouseState): 'stone' | 'beams' | 'fittings' => {
   return house.beams < HOUSE_NEEDS.beams ? 'beams' : 'fittings';
 };
 
-const cartStone = (state: GameState): number => (state.castle.cart.at === 'hills' ? state.castle.cart.stone : 0);
+const cartStone = (state: GameState): number => (state.castle.cart.at === 'hills' && state.area === 'hills' ? state.castle.cart.stone : 0);
 const SHORT = { stone: 'Bring stone up from the quarry.', beams: 'Make beams at the workshop.', fittings: 'Make an iron fitting at the forge.' } as const;
 const LABELS = { stone: 'Lay a house stone', beams: 'Set a house beam', fittings: 'Hang the house door' } as const;
 const ASKS = { stone: 'House · bring stone up from the quarry', beams: 'House · make beams at the workshop', fittings: 'House · make an iron fitting at the forge' } as const;

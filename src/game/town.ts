@@ -10,10 +10,10 @@ import type { GameState } from './state';
 
 /** A job a worker can take over from the survivor. */
 export type JobId = 'hens' | 'honey' | 'loaves' | 'wood' | 'beds' | 'field' | 'sheep' | 'orchard'
-  | 'breadStall' | 'honeyStall' | 'woolStall' | 'appleStall' | 'eggStall';
-/** The camp's jobs, then the square's stalls. */
+  | 'breadStall' | 'honeyStall' | 'woolStall' | 'appleStall' | 'eggStall' | 'carter' | 'joiner';
+/** The camp's jobs, then the square's stalls, then the work the bridge opens: the carter's and the joiner's. */
 export const JOB_IDS: readonly JobId[] = ['hens', 'honey', 'loaves', 'wood', 'beds', 'field', 'sheep', 'orchard',
-  'breadStall', 'honeyStall', 'woolStall', 'appleStall', 'eggStall'];
+  'breadStall', 'honeyStall', 'woolStall', 'appleStall', 'eggStall', 'carter', 'joiner'];
 
 /** Someone at the hall door who hasn't stayed yet. `askedDay` is the last day they were told no. */
 export interface Traveller { name: string; arrivedDay: number; refusals: number; askedDay: number | null }

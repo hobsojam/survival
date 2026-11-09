@@ -2,7 +2,8 @@ import { openJobs } from './jobs';
 import type { GameState } from './state';
 import { SQUARE_NEEDS, STALL_IDS, halfHangingLeft, pieceOpen } from './square';
 import { HOUSE_NEEDS } from './town';
-import { BRIDGE_NEEDS, bridgeOpen } from './bridge';
+import { BRIDGE_NEEDS, bridgeDone, bridgeOpen } from './bridge';
+import { HOUSE_PLOTS } from './townSites';
 
 // EASTER EGG: the town, see src/game/town.ts. Which house is open to build. This sits apart from town.ts because it
 // asks the jobs what is free, and the jobs need the game state, which needs the town.
@@ -17,6 +18,8 @@ export const houseOpen = (state: GameState, plot: number): boolean => {
   const { houses, people } = state.town;
   const house = houses[plot];
   if (house === undefined || house.doneDay !== null || houses.slice(0, plot).some(lower => lower.doneDay === null)) return false;
+  // The meadow's plots are over the bridge, so they wait for it.
+  if (HOUSE_PLOTS[plot].area === 'meadow' && !bridgeDone(state.town.bridge)) return false;
   if (plot > 0 && houses[plot - 1].doneDay! + PLOT_DAYS > state.day) return false;
   if (people.some(person => person.house === null)) return true;
   const allLivedIn = houses.every((built, index) => built.doneDay === null || people.some(person => person.house === index));
