@@ -19,7 +19,8 @@ const ENDS_THE_GAME = ['keep-finished', 'keep-night', 'keep-climbed', 'castle-fi
 const CASTLE_DAYS = [110, 280] as const;
 /** The longest wait between one of the castle's finishes and the next: the cart, each section, the moat filling, the first dish and the last. The wall's first side and the hall's wool are the long ones, at about 30 to 40. */
 const LONGEST_WAIT = 45;
-/** The longest wait from one house finished to the next: the spec asks for a finish every 10 to 20 days, and this leaves room for winter. EASTER EGG: the town. */
+/** The shortest and longest wait from one house finished to the next: the spec asks for a finish every 10 to 20 days, and the longest leaves room for winter. EASTER EGG: the town. */
+const SHORTEST_HOUSE_WAIT = 10;
 const LONGEST_HOUSE_WAIT = 30;
 
 const played = new Map<string, RunResult>();
@@ -49,10 +50,11 @@ describe.each(GAMES)('a whole game, seed %i, played in a %s way', (seed, style) 
     expect(game(seed, style).neverDone.filter(id => !UP_TO_CHANCE.has(id))).toEqual([]);
   });
 
-  it('finishes a house of the town never more than a month after the last', () => {
+  it('finishes a house of the town every ten days to a month', () => {
     const [first, second, third] = game(seed, style).houseDoneDays;
     expect(first).not.toBeNull();
-    expect([second! - first!, third! - second!].every(gap => gap <= LONGEST_HOUSE_WAIT), `gaps ${second! - first!}, ${third! - second!}`).toBe(true);
+    const gaps = [second! - first!, third! - second!];
+    expect(gaps.every(gap => gap >= SHORTEST_HOUSE_WAIT && gap <= LONGEST_HOUSE_WAIT), `gaps ${gaps.join(', ')}`).toBe(true);
   });
 
   it('raises the castle in about the days it was meant to take, with a finish never far off', () => {

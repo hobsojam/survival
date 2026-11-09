@@ -26,6 +26,12 @@ describe('panel buttons', () => {
     }
   });
 
+  it('lays the visitor\'s job buttons two to a row, so seven fit on a phone, with "Not today" across the row', () => {
+    expect(rulesFor('.visitor-panel .visitor-answers')).toMatch(/flex-wrap:\s*wrap/);
+    expect(rulesFor('.visitor-panel .visitor-answers button')).toMatch(/flex:\s*1 1 calc\(50% - 3px\)/);
+    expect(rulesFor('.visitor-panel .visitor-answers #visitor-no')).toMatch(/flex-basis:\s*100%/);
+  });
+
   it('styles the buttons on each garden plot, bed and field strip', () => {
     const rules = rulesFor('.garden-plot button');
     expect(rules).toContain('border-radius');
