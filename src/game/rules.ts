@@ -18,6 +18,8 @@ import { GARDEN_PLOT_COUNT, gardenDawn } from './garden';
 import { bakeryDawn, millGrainBlocker, milledState, takeLoafBlocker, takenLoaf } from './bakehouse';
 import { beehiveDawn, takeHoneyBlocker, takenHoney } from './beehive';
 import { jobsDawn } from './jobs';
+import { marketDawn } from './market';
+import { lensHandover } from './lens';
 import { answeredTraveller, travellerArrives } from './traveller';
 import { doTownWork, townWorkBlocker, townWorkLine } from './townSites';
 import { doSquareWork, squareWorkBlocker, squareWorkLine } from './squareSites';
@@ -359,6 +361,8 @@ function dawn(next: GameState, home: boolean): void {
   next.larder = larder.store;
   const shelf = bakeryDawn(next);
   beehiveDawn(next);
+  // EASTER EGG: the town. The traders took what was left at yesterday's market, before the keepers stock again.
+  marketDawn(next);
   jobsDawn(next);
   const lost = { berry: bag.lost.berry + larder.lost.berry, greens: bag.lost.greens + larder.lost.greens, bread: bag.lost.bread + larder.lost.bread + shelf.lost,
     apple: bag.lost.apple + larder.lost.apple, egg: bag.lost.egg + larder.lost.egg };
@@ -435,13 +439,18 @@ const move: ActionHandler<'move'> = (state, action) => {
   const rawX = state.player.x + action.dx * factor;
   const rawY = state.player.y + action.dy * factor;
   const crossed = crossing(state, rawX, rawY);
+  // Someone already lower than the bank allows, from an older save, stays where they are rather than being lifted up it.
+  const lowest = Math.max(lowestY(state, rawX), state.player.y);
   const player = crossed
     ? { ...state.player, x: crossed.x, y: crossed.y }
-    : { ...state.player, x: Math.max(0, Math.min(BALANCE.mapWidth - 1, rawX)), y: Math.max(0, Math.min(lowestY(state, rawX), rawY)) };
+    : { ...state.player, x: Math.max(0, Math.min(BALANCE.mapWidth - 1, rawX)), y: Math.max(0, Math.min(lowest, rawY)) };
   const moved = settleChickens(pickUpKeepsake({ ...state, ...(crossed ? { area: crossed.area } : {}), player }));
   const startled = { ...moved };
   startlePony(startled);
-  return withPonyArrival(state, walkedArrival(startled));
+  const arrived = withPonyArrival(state, walkedArrival(startled));
+  // EASTER EGG: the town. Coming near whoever has the glass lens for the survivor.
+  const lens = lensHandover(arrived.state);
+  return { state: lens.state, message: [arrived.message, lens.message].filter(Boolean).join(' ') };
 };
 
 const crossOver: ActionHandler<'cross'> = state => {

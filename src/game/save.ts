@@ -22,7 +22,7 @@ import { SAVE_VERSION, upgradeSave } from './saveUpgrades';
 import { HOUSE_COUNT, HOUSE_NEEDS, JOB_IDS, TOWN_NAMES, houseFinished, type HouseState } from './town';
 import { SQUARE_HOUSES, SQUARE_NEEDS, SQUARE_PIECES, STALL_IDS, STALL_JOBS, STALL_STOCK, pieceDone, type SquareState } from './square';
 import { BRIDGE_HOUSES, BRIDGE_NEEDS, BRIDGE_STAGES, BRIDGE_STONE, PIERS_STONE, bridgeDone, stageDone, type BridgeState } from './bridge';
-import { MILESTONE_STONE, ROAD_SECTIONS, ROAD_WORK } from './meadow';
+import { MILESTONE_STONE, ROAD_SECTIONS, ROAD_WORK, type RoadState } from './meadow';
 import { HOUSE_PLOTS } from './townSites';
 
 export { SAVE_VERSION };
@@ -543,6 +543,19 @@ function validRoad(road: unknown, bridgeFinished: boolean, day: number): boolean
   return dayOk(cleared >= ROAD_SECTIONS, doneDays.road) && dayOk(milestone >= MILESTONE_STONE, doneDays.milestone);
 }
 
+/** The square opens only once the castle is finished, every stall is kept and the milestone set, and the lens comes
+ * no sooner than the first market. EASTER EGG: the town, see src/game/town.ts. */
+function validMarket(market: unknown, castleFinished: boolean, jobs: unknown[], milestoneDay: unknown, day: number): boolean {
+  if (!object(market)) return false;
+  const { openDay, lensDay } = market;
+  const dayOk = (value: unknown): value is number => whole(value) && value >= 1 && value <= day;
+  if ((openDay !== null && !dayOk(openDay)) || (lensDay !== null && !dayOk(lensDay))) return false;
+  if (openDay === null) return lensDay === null;
+  if (!castleFinished || !STALL_IDS.every(id => jobs.includes(STALL_JOBS[id]))) return false;
+  if (!whole(milestoneDay) || milestoneDay > openDay) return false;
+  return lensDay === null || lensDay >= openDay + 2;
+}
+
 /** The town starts only after the castle is finished. Everyone has one of the names given out so far, no two share a name, a job or a house, and anyone with a house has a finished one. */
 function validTown(shape: SaveShape): boolean {
   if (!object(shape.town) || !object(shape.castle)) return false;
@@ -572,6 +585,8 @@ function validTown(shape: SaveShape): boolean {
   if (!bridgeDone(bridge) && (meadowWorked || shape.area === 'meadow' || shape.progress.meadowFound === true)) return false;
   if (!bool(shape.progress.meadowFound) || (shape.area === 'meadow' && !shape.progress.meadowFound)) return false;
   if (!bridgeDone(bridge) && (jobs.includes('carter') || jobs.includes('joiner'))) return false;
+  const road = shape.town.road as RoadState;
+  if (!validMarket(shape.town.market, shape.castle.finishedDay !== null, jobs, road.milestone >= MILESTONE_STONE ? road.doneDays.milestone : null, day)) return false;
   if (traveller !== null) {
     if (!object(traveller) || !dayOk(traveller.arrivedDay) || !upTo(traveller.refusals, 2)) return false;
     if (traveller.askedDay !== null && !dayOk(traveller.askedDay)) return false;

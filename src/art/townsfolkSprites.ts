@@ -16,7 +16,7 @@ const DRESS: readonly Record<'a' | 'f' | 'g' | 'h' | 'k', PaletteKey>[] = [
 ];
 
 /** A person facing the viewer: `stride` moves the feet apart, `arm` lifts one arm at work. */
-function person(g: Grid, stride: number, arm: number): void {
+export function person(g: Grid, stride: number, arm: number): void {
   box(g, 5, 21, 7, 1, 's'); box(g, 3, 22, 11, 1, 's');
   box(g, 5 + stride, 19, 3, 3, 'q'); box(g, 9 - stride, 19, 3, 3, 'q');
   dot(g, 5 + stride, 19, 'r'); dot(g, 9 - stride, 19, 'r');

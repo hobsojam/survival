@@ -7,7 +7,9 @@ import { PLOT_DAYS, houseOpen } from '../src/game/houseOpen';
 import { CARTER_STONE, JOBS, JOB_ORDER, JOINER_WOOD_RESERVE, jobsDawn, openJobs } from '../src/game/jobs';
 import { applyAction } from '../src/game/rules';
 import { saveGame } from '../src/game/save';
-import type { GameState } from '../src/game/state';
+import { BALANCE, type GameState } from '../src/game/state';
+import { CAMP_BOTH_OPEN_PATHS, pathDistance } from '../src/scene/mapGeometry';
+import { CAMP_STRUCTURES } from '../src/scene/visuals';
 import { TOWN_NAMES, type JobId, type Person } from '../src/game/town';
 import { HOUSE_PLOTS } from '../src/game/townSites';
 import { personSpot } from '../src/game/townsfolk';
@@ -81,6 +83,18 @@ describe('the carter and the joiner', () => {
     expect(JOBS.joiner.offer).toBe('make beams at the workshop');
     expect(JOBS.carter.spot).toEqual({ area: 'quarry', x: CART_SPOTS.quarry.x, y: CART_SPOTS.quarry.y + 1 });
     expect(JOBS.joiner.spot.area).toBe('camp');
+  });
+
+  it('puts the joiner by the workshop, clear of the camp\'s buildings, its paths and the other workers', () => {
+    const spot = JOBS.joiner.spot;
+    const camp = { x: BALANCE.campX, y: BALANCE.campY };
+    const workshop = CAMP_STRUCTURES.find(([id]) => id === 'workshop')!;
+    expect(Math.hypot(spot.x - (camp.x + workshop[1]), spot.y - (camp.y + workshop[2]))).toBeLessThanOrEqual(2.5);
+    for (const [id, dx, dy] of CAMP_STRUCTURES) expect(Math.hypot(spot.x - (camp.x + dx), spot.y - (camp.y + dy)), id).toBeGreaterThanOrEqual(1.5);
+    for (const [route, routes] of [['camp', CAMP_BOTH_OPEN_PATHS]] as const) expect(pathDistance(spot.x + 0.5, spot.y + 0.5, routes), route).toBeGreaterThanOrEqual(1);
+    for (const job of JOB_ORDER.filter(each => each !== 'joiner' && JOBS[each].spot.area === 'camp')) {
+      expect(Math.hypot(spot.x - JOBS[job].spot.x, spot.y - JOBS[job].spot.y), job).toBeGreaterThanOrEqual(1.5);
+    }
   });
 
   it('wait while a camp job is free', () => {

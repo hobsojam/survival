@@ -18,7 +18,7 @@ export const BRIDGE_SPAN = { x: 25, halfWidth: 1 };
 export const HILLS_BRIDGE_EXIT = { x: 25, y: BALANCE.mapHeight - 1 };
 export const MEADOW_ENTRY = { x: 25, y: 0.5 };
 /** How far down the hills the survivor can walk off the bridge, so they don't wade in the stream. */
-export const STREAM_BANK_Y = BALANCE.mapHeight - 1.6;
+export const STREAM_BANK_Y = BALANCE.mapHeight - 2;
 
 const onSpan = (x: number): boolean => Math.abs(x - BRIDGE_SPAN.x) <= BRIDGE_SPAN.halfWidth;
 

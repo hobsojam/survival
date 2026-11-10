@@ -12,6 +12,7 @@ import { squarePrompt, squareSpots, squareWorkBlocker } from '../game/squareSite
 import { bridgePrompt, bridgeSpot, bridgeWorkBlocker } from '../game/bridgeSites';
 import { roadPrompt, roadSpot, roadWorkBlocker } from '../game/roadSites';
 import { greetingHere } from '../game/townsfolk';
+import { SIGN_SPOT, signFace } from '../game/market';
 import { KEEP_DOOR_WOOD, KEEP_SITE, KEEP_STONES, atHallDoor, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor } from '../game/keep';
 import { ponyNote, ponyOfferLabel } from '../game/pony';
 import { availableWood } from '../game/wood';
@@ -266,9 +267,10 @@ function housePrompt(state: GameState): string {
   return night ? 'At the campfire · Watch the stars · Feed the fire' : 'At the campfire · Feed the fire · Click an upgrade to build';
 }
 
-/** A pressed action says its line. A step says nothing, unless it crossed into another area: that's a line the player has to hear. */
+/** A pressed action says its line. A step says nothing, unless it crossed into another area or was handed the glass
+ * lens: those are lines the player has to hear. */
 export function lineToSay(before: GameState, after: GameState, message: string, announce: boolean): string {
-  return announce || before.area !== after.area ? message : '';
+  return announce || before.area !== after.area || before.town.market.lensDay !== after.town.market.lensDay ? message : '';
 }
 
 /** Going in at the finished keep's door, or the finished hall's: to bed at night, otherwise up to the top. */
@@ -356,6 +358,8 @@ function hillsChoices(state: GameState): Choice[] {
   const square = squareChoice(state);
   const bridge = bridgeChoice(state);
   const cart = cartChoice(state);
+  // EASTER EGG: the town's market sign by the well, there to read the day before a market and on the day.
+  const face = within(state, SIGN_SPOT) ? signFace(state) : null;
   // EASTER EGG: the castle's line of old stones, named only once it has been seen.
   const stones = isRevealed(state) && state.castle.frames === 0 && !castle && lineDistance(state.player) <= BALANCE.interactionRadius;
   const offer = ponyOfferLabel(state);
@@ -370,6 +374,7 @@ function hillsChoices(state: GameState): Choice[] {
     ...(square ? [square] : []),
     ...(bridge ? [bridge] : []),
     ...(cart ? [cart] : []),
+    ...(face ? [{ label: `Market sign · market ${face === 'eve' ? 'tomorrow' : 'today'}` }] : []),
     ...(stones ? [{ label: 'Old stones · a wall could run here' }] : []),
     ...(offer ? [{ label: offer, action: { type: 'offerPony' as const } }] : []),
     ...(note ? [{ label: note }] : [])

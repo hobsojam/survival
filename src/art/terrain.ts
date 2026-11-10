@@ -305,14 +305,18 @@ export function hillGroundTile(x: number, y: number): string {
 }
 for (let y = 0; y < BALANCE.mapHeight; y++) for (let x = 0; x < BALANCE.mapWidth; x++) hillGroundTile(x, y);
 
-// EASTER EGG: the town, see src/game/town.ts. The stream along the hills' foot: a grassy bank, a lip of earth, then
-// water running on off the map, with ripples, or ice and snow in winter.
+// EASTER EGG: the town, see src/game/town.ts. The stream along the hills' foot, a tile and a half wide: the bank row, grass
+// and a lip of earth over the water's near half, then open water running on off the map, with ripples, or ice and snow in winter.
 const streamLegend: Record<string, PaletteKey> = { b: 'grass2', c: 'grass1', e: 'earth1', g: 'earth0', s: 'storm', l: 'flower4', i: 'frost', n: 'paper' };
 for (const winter of [false, true]) for (let variant = 0; variant < 2; variant++) {
-  const g = blank(16, 16, winter ? 'i' : 's');
-  rect(g, 0, 0, 16, 3, winter ? 'n' : 'b'); rect(g, 0, 3, 16, 1, winter ? 'i' : 'c'); rect(g, 0, 4, 16, 2, 'e'); rect(g, 0, 6, 16, 1, 'g');
-  for (let x = 1 + variant * 3; x < 16; x += 7) rect(g, x, 9 + (x % 3) * 2, 3, 1, winter ? 'n' : 'l');
-  terrainSprites[`${winter ? 'streamIce' : 'stream'}${variant}`] = sprite(g, streamLegend);
+  const ripple = winter ? 'n' : 'l';
+  const bank = blank(16, 16, winter ? 'i' : 's');
+  rect(bank, 0, 0, 16, 4, winter ? 'n' : 'b'); rect(bank, 0, 4, 16, 1, winter ? 'i' : 'c'); rect(bank, 0, 5, 16, 2, 'e'); rect(bank, 0, 7, 16, 1, 'g');
+  for (let x = 2 + variant * 4; x < 16; x += 8) rect(bank, x, 11 + (x % 2) * 2, 3, 1, ripple);
+  terrainSprites[`${winter ? 'streamIceBank' : 'streamBank'}${variant}`] = sprite(bank, streamLegend);
+  const open = blank(16, 16, winter ? 'i' : 's');
+  for (let x = 1 + variant * 3; x < 16; x += 7) rect(open, x, 3 + (x % 3) * 4, 3, 1, ripple);
+  terrainSprites[`${winter ? 'streamIce' : 'stream'}${variant}`] = sprite(open, streamLegend);
 }
 
 const decalLegend = { a: 'grass1', b: 'grass3', c: 'grass4', d: 'flower0', e: 'flower1', f: 'flower2', g: 'flower3', h: 'flower4', i: 'stone1', j: 'stone2', k: 'stone3', l: 'stone4', m: 'wood0', n: 'wood2', o: 'wood3', p: 'earth1', q: 'earth3', r: 'leaf2', s: 'leaf4', t: 'shadow', u: 'stone0' } as const;

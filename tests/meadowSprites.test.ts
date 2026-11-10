@@ -5,7 +5,7 @@ import { townSprites } from '../src/art/townSprites';
 import { BRIDGE_SITE } from '../src/game/bridgeSites';
 import { emptyRoad, type RoadState } from '../src/game/meadow';
 import { MILESTONE_SITE, ROAD_SPOTS } from '../src/game/roadSites';
-import type { GameState } from '../src/game/state';
+import { BALANCE, type GameState } from '../src/game/state';
 import { HOUSE_PLOTS } from '../src/game/townSites';
 import { MEADOW_PATHS, pathDistance } from '../src/scene/mapGeometry';
 import { sceneVisuals } from '../src/scene/visuals';
@@ -74,7 +74,7 @@ describe('drawing the meadow', () => {
 
 describe('the meadow\'s pictures', () => {
   it('has every frame it draws, at its size, and registered with the rest', () => {
-    expect(meadowSprites.townBridge.size).toEqual([56, 40]);
+    expect(meadowSprites.townBridge.size).toEqual([56, 44]);
     expect(meadowSprites.townBridge.anchor).toEqual([28, 30]);
     expect(meadowSprites.roadBrush.size).toEqual([104, 24]);
     expect(meadowSprites.milestone.size).toEqual([12, 20]);
@@ -100,13 +100,33 @@ describe('the meadow\'s pictures', () => {
     expect(pathDistance(MILESTONE_SITE.x + 0.5, MILESTONE_SITE.y + 0.5, MEADOW_PATHS)).toBeGreaterThanOrEqual(1);
   });
 
+  it('grows the wild bracken over the road taller than a survivor\'s knees, and thins it to clumps with the old stones showing once half cleared', () => {
+    const tall = (rows: string[]) => rows.filter(row => /[^.]/.test(row)).length;
+    const covered = (rows: string[]) => rows.join('').replace(/\./g, '').length;
+    const { wild, half } = meadowSprites.roadBrush.frames;
+    expect(tall(wild)).toBeGreaterThanOrEqual(18);
+    expect(covered(half)).toBeLessThan(covered(wild) * 0.75);
+    expect(half.join('')).toContain('a');
+  });
+
+  it('runs the finished bridge out over the stream, its water meeting the stream\'s on the bank row', () => {
+    const top = Math.round((BRIDGE_SITE.y + 0.5) * 16) - meadowSprites.townBridge.anchor[1];
+    expect(top + meadowSprites.townBridge.size[1], 'runs on off the map\'s edge').toBe(BALANCE.mapHeight * 16);
+    for (const frame of ['done', 'dones']) {
+      const rows = meadowSprites.townBridge.frames[frame];
+      const water = frame === 'done' ? 's' : 'I';
+      expect(top + rows.findIndex(row => row[1] === water), frame).toBe((BALANCE.mapHeight - 2) * 16 + 8);
+      expect(rows.at(-1)![28], frame).toBe('R');
+    }
+  });
+
   it('keeps the bridge inside the hills and off their houses', () => {
     const left = Math.round((BRIDGE_SITE.x + 0.5) * 16) - 28;
     const top = Math.round((BRIDGE_SITE.y + 0.5) * 16) - 30;
-    expect(left >= 0 && top + 40 <= 30 * 16).toBe(true);
+    expect(left >= 0 && top + meadowSprites.townBridge.size[1] <= 30 * 16).toBe(true);
     for (const plot of HOUSE_PLOTS.filter(each => each.area === 'hills')) {
       const house = { left: Math.round((plot.x + 0.5) * 16) - townSprites.townHouse.anchor[0], top: Math.round((plot.y + 0.5) * 16) - townSprites.townHouse.anchor[1] };
-      const apart = house.left + 36 <= left || left + 56 <= house.left || house.top + 38 <= top || top + 40 <= house.top;
+      const apart = house.left + 36 <= left || left + 56 <= house.left || house.top + 38 <= top || top + meadowSprites.townBridge.size[1] <= house.top;
       expect(apart, `${plot.x},${plot.y}`).toBe(true);
     }
   });

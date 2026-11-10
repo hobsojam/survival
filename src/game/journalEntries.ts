@@ -1,5 +1,6 @@
 import { inKeep } from './keep';
 import { NEEDS, TOWERS, moatFill, towerFinished, wallFinished } from './castle';
+import { firstMarketDay } from './market';
 import { duskLength, nightStart, season, seasonMessage, yearOf, type Season } from './calendar';
 import { defaultDish, type DishId } from './cooking';
 import { keepsakeStock } from './companion';
@@ -48,14 +49,17 @@ const CASTLE_LINES: Record<CastleMoment, string> = {
 const castlePage = (word: SeasonWord): PageEntry[] => CASTLE_MOMENTS.map(moment => ({ id: `${moment}${word}` as CastleJournalId, lines: [CASTLE_LINES[moment]] }));
 
 /** What the town leaves in the journal: the first traveller at the door, and each neighbour who stays, by name. EASTER EGG: the town, see src/game/town.ts. */
-type TownMoment = 'traveller' | 'neighbour' | 'meadowFound' | 'meadowRoad';
+type TownMoment = 'traveller' | 'neighbour' | 'meadowFound' | 'meadowRoad' | 'squareOpen' | 'firstMarket' | 'lens';
 export type TownJournalId = `${TownMoment}${SeasonWord}`;
-const TOWN_MOMENTS: readonly TownMoment[] = ['traveller', 'neighbour', 'meadowFound', 'meadowRoad'];
+const TOWN_MOMENTS: readonly TownMoment[] = ['traveller', 'neighbour', 'meadowFound', 'meadowRoad', 'squareOpen', 'firstMarket', 'lens'];
 const TOWN_LINES: Record<TownMoment, string> = {
   traveller: 'A lost traveller came to the hall door. The first face I have seen in years.',
   neighbour: '{name} is staying on.',
   meadowFound: 'Built a bridge over the stream, and found the meadow beyond.',
-  meadowRoad: 'Cleared the old road and set a milestone by it.'
+  meadowRoad: 'Cleared the old road and set a milestone by it.',
+  squareOpen: 'Every house is full. The square is ready for market day.',
+  firstMarket: 'The first market day. Traders came over the bridge.',
+  lens: 'Kept a glass lens a trader gave me.'
 };
 const townPage = (word: SeasonWord): PageEntry[] => TOWN_MOMENTS.map(moment => ({ id: `${moment}${word}` as TownJournalId, lines: [TOWN_LINES[moment]], ...(moment === 'neighbour' ? { perName: true } : {}) }));
 
@@ -240,7 +244,14 @@ const TOWN_RULES: Record<TownMoment, (m: Moment) => Noticed | null> = {
   neighbour: newcomer,
   // The first crossing to the meadow, over the finished bridge.
   meadowFound: m => onAfter(m, !m.before.progress.meadowFound && m.after.progress.meadowFound),
-  meadowRoad: m => onBefore(m, m.before.town.road.doneDays.milestone === undefined && m.after.town.road.doneDays.milestone !== undefined)
+  meadowRoad: m => onBefore(m, m.before.town.road.doneDays.milestone === undefined && m.after.town.road.doneDays.milestone !== undefined),
+  // Market day: the dawn the square opens, the first market's dawn, and the day the lens was given.
+  squareOpen: m => onAfter(m, m.before.town.market.openDay === null && m.after.town.market.openDay !== null),
+  firstMarket: m => {
+    const first = firstMarketDay(m.after);
+    return onAfter(m, first !== null && m.before.day < first && m.after.day >= first);
+  },
+  lens: m => (m.before.town.market.lensDay === null && m.after.town.market.lensDay !== null ? { day: m.after.town.market.lensDay } : null)
 };
 const townRules = Object.fromEntries(SEASON_WORDS.flatMap(word => TOWN_MOMENTS.map(moment => [`${moment}${word}`, TOWN_RULES[moment]]))) as Record<TownJournalId, (m: Moment) => Noticed | null>;
 const castleRules = Object.fromEntries(SEASON_WORDS.flatMap(word => CASTLE_MOMENTS.map(moment => [`${moment}${word}`, CASTLE_RULES[moment]]))) as Record<CastleJournalId, (m: Moment) => Noticed | null>;

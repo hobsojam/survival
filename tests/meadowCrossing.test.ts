@@ -72,10 +72,19 @@ describe('crossing the bridge', () => {
     expect(crossing(meadow, -1, 15)).toBeNull();
   });
 
-  it('keeps the survivor out of the stream off the bridge', () => {
-    const after = applyAction(onHills(30, 28.4), south).state;
+  it('keeps the survivor out of the stream off the bridge, with their feet on the bank', () => {
+    const after = applyAction(onHills(30, 27.6), south).state;
     expect(after.area).toBe('hills');
-    expect(after.player.y).toBeLessThan(29 - 0.5);
+    // Feet stand half a tile below the middle; the water starts halfway down row 28.
+    expect(after.player.y + 0.5).toBeLessThanOrEqual(28.5);
+  });
+
+  it('never jerks a survivor already standing lower, from an older save, up the bank', () => {
+    const low = onHills(30, 29);
+    const east = applyAction(low, { type: 'move', dx: 0.5, dy: 0 }).state;
+    expect(east.player.y).toBe(29);
+    expect(applyAction(low, south).state.player.y).toBe(29);
+    expect(applyAction(low, north).state.player.y).toBeLessThan(29);
   });
 
   it('crosses with the cross key at the bridge\'s end, both ways', () => {
@@ -148,8 +157,9 @@ describe('the meadow\'s ground', () => {
   it('runs the stream along the hills\' last row, with a lane down to the bridge once it is begun', () => {
     for (const time of ['summer', 'winter'] as const) {
       const map = buildMap([], 'hills', time);
-      expect(map.ground[29].every(tile => tile.startsWith('stream'))).toBe(true);
-      expect(map.decorations.some(item => Math.round(item.y) >= 29)).toBe(false);
+      expect(map.ground[28].every(tile => tile.startsWith(time === 'winter' ? 'streamIceBank' : 'streamBank'))).toBe(true);
+      expect(map.ground[29].every(tile => /^stream(Ice)?\d$/.test(tile))).toBe(true);
+      expect(map.decorations.some(item => item.y + 0.5 > 28)).toBe(false);
     }
     expect(terrainKey(onHills(25, 20, false))).toBe('hills-bridge');
     expect(HILLS_BRIDGE_PATHS.at(-1)).toEqual([25, 23, 25, 29]);

@@ -42,21 +42,21 @@ describe('the stallholders', () => {
     const after = dawn(square(['bread', 'honey', 'apples', 'eggs', 'wool'], undefined, state => {
       state.larder = addFood(addFood(addFood(addFood(state.larder, 'bread', 3, 50), 'honey', 3, 50), 'apple', 3, 50), 'egg', 2, 40);
       state.larder = addFood(state.larder, 'egg', 1, 58);
-      state.sheep = { ...state.sheep, wool: 4 };
+      state.sheep = { ...state.sheep, wool: 5 };
     }));
     expect(after.town.square.stock).toEqual({ bread: 1, honey: 1, wool: 1, apples: 1, eggs: 1 });
     expect(foodCount(after.larder, 'bread')).toBe(2);
     expect(foodCount(after.larder, 'honey')).toBe(2);
     expect(foodCount(after.larder, 'apple')).toBe(2);
     expect(after.larder.egg).toEqual([40, 58]);
-    expect(after.sheep.wool).toBe(3);
+    expect(after.sheep.wool).toBe(4);
   });
 
-  it('leaves the reserve alone: two of a food, three of wool', () => {
-    const after = dawn(square(['eggs', 'wool'], undefined, state => { state.larder = addFood(state.larder, 'egg', 2, 50); state.sheep = { ...state.sheep, wool: 3 }; }));
+  it('leaves the reserve alone: two of a food, four of wool, enough for a jumper', () => {
+    const after = dawn(square(['eggs', 'wool'], undefined, state => { state.larder = addFood(state.larder, 'egg', 2, 50); state.sheep = { ...state.sheep, wool: 4 }; }));
     expect(after.town.square.stock).toMatchObject({ eggs: 0, wool: 0 });
     expect(foodCount(after.larder, 'egg')).toBe(2);
-    expect(after.sheep.wool).toBe(3);
+    expect(after.sheep.wool).toBe(4);
   });
 
   it('takes nothing for a full stall or a stall with no keeper', () => {

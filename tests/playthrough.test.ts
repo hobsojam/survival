@@ -82,6 +82,16 @@ describe.each(GAMES)('a whole game, seed %i, played in a %s way', (seed, style) 
     expect(Math.max(...waits), `finishes ${finishes.join(', ')}`).toBeLessThanOrEqual(LONGEST_MEADOW_WAIT);
   });
 
+  it('opens the square once the town is full, and is given the lens at the first market', () => {
+    const run = game(seed, style);
+    const day = (id: string) => run.hits.find(hit => hit.id === id)?.day;
+    const [open, lens] = [day('square-open'), day('lens')];
+    expect(open, 'square-open').toBeDefined();
+    expect(lens! - open!).toBeLessThanOrEqual(2);
+    const lastHouse = Math.max(...run.houseDoneDays.filter((each): each is number => each !== null));
+    expect(lens! - lastHouse, `last house ${lastHouse}, lens ${lens}`).toBeLessThanOrEqual(LONGEST_MEADOW_WAIT);
+  });
+
   it('raises the castle in about the days it was meant to take, with a finish never far off', () => {
     const run = game(seed, style);
     const day = (id: string) => run.hits.find(hit => hit.id === id)?.day;

@@ -44,9 +44,9 @@ const CASTLE_LINE_MOMENTS: ReadonlySet<JournalId> = new Set<JournalId>(['castleL
 const CASTLE_PROGRESS_MOMENTS: ReadonlySet<JournalId> = new Set(JOURNAL_PAGES.autumn.concat(JOURNAL_PAGES.winter, JOURNAL_PAGES.spring, JOURNAL_PAGES.summer)
   .map(entry => entry.id).filter(id => /^castle(Road|Wall|Towers|Gatehouse|MoatFull|Feast|Finished)/.test(id)));
 
-/** The town's moments: the first traveller, each neighbour who stays, the bridge and the meadow road happen when they happen, so they are never a blank. EASTER EGG: the town, see src/game/town.ts. */
+/** The town's moments: the first traveller, each neighbour who stays, the bridge, the meadow road, the square opening, the first market and the lens happen when they happen, so they are never a blank. EASTER EGG: the town, see src/game/town.ts. */
 const TOWN_MOMENTS: ReadonlySet<JournalId> = new Set(JOURNAL_PAGES.autumn.concat(JOURNAL_PAGES.winter, JOURNAL_PAGES.spring, JOURNAL_PAGES.summer)
-  .map(entry => entry.id).filter(id => /^(traveller|neighbour|meadowFound|meadowRoad)/.test(id)));
+  .map(entry => entry.id).filter(id => /^(traveller|neighbour|meadowFound|meadowRoad|squareOpen|firstMarket|lens)/.test(id)));
 
 const KEEPSAKE_MOMENTS: ReadonlySet<JournalId> = new Set<JournalId>(['autumnKeepsake', 'winterKeepsake', 'springKeepsake', 'summerKeepsake']);
 
