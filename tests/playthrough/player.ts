@@ -2,6 +2,7 @@ import { CAMP_EXIT, HILLS_BRIDGE_EXIT, MEADOW_ENTRY, QUARRY_SITE, RUBBLE_SITE } 
 import { BRIDGE_NEEDS, BRIDGE_STONE, bridgeDone, bridgeOpen, bridgeStage } from '../../src/game/bridge';
 import { bridgeSpot } from '../../src/game/bridgeSites';
 import { milestoneDone, roadDone } from '../../src/game/meadow';
+import { TRADER_CART_SPOTS, firstMarketDay, traderSpot } from '../../src/game/market';
 import { roadSpot } from '../../src/game/roadSites';
 import { daysLeftInSeason, isWinter, nightStart, season } from '../../src/game/calendar';
 import { CHICKEN_SITE, COOP_SITE } from '../../src/game/chickens';
@@ -19,7 +20,7 @@ import { CART_SPOTS, GOODS, castleSpots, goodRoom, type CastleGood } from '../..
 import { travellerAsking } from '../../src/game/traveller';
 import { townSpots } from '../../src/game/townSites';
 import { STALL_IDS, SQUARE_NEEDS, halfHangingLeft, pieceDone } from '../../src/game/square';
-import { squareSpots } from '../../src/game/squareSites';
+import { STALL_SPOTS, squareSpots } from '../../src/game/squareSites';
 import { HOUSE_NEEDS } from '../../src/game/town';
 import { KEEP_DOOR_AT, KEEP_DOOR_WOOD, KEEP_SITE, atHallDoor, keepFinished, keepOpen } from '../../src/game/keep';
 import { ORCHARD_SPOTS, spotAction } from '../../src/game/orchard';
@@ -490,6 +491,8 @@ export class Player {
       // old road is cleared and its milestone set whenever nothing else is open, and the first meadow house ends the game.
       { id: 'town-bridge', shown: state => bridgeOpen(state) && townSpots(state).length === 0, done: state => bridgeDone(state.town.bridge), step: () => this.buildBridge() },
       { id: 'meadow-road', shown: state => roadSpot(state) !== null && townSpots(state).length === 0, done: state => milestoneDone(state.town.road), step: () => this.workRoad() },
+      // On the first market day, out to the square to see it, and to whoever has the lens.
+      { id: 'market', shown: state => firstMarketDay(state) !== null && state.day >= firstMarketDay(state)!, done: townDone, step: () => this.goToMarket() },
       { id: 'castle-moat-fills', shown: state => state.castle.moat.stretches >= NEEDS.moat, done: state => moatFill(state) === 1, step: () => false },
       { id: 'mine', shown: state => progress(state).pickaxeCrafted, done: state => progress(state).mineBuilt, step: () => this.buildMine() },
       ...(['basket', 'cairn'] as const).map(site => ({
@@ -618,6 +621,20 @@ export class Player {
     const good = stage === 'arch' && bridge.beams < BRIDGE_NEEDS.arch.beams ? 'beams' : stage === 'parapet' && bridge.stone >= BRIDGE_STONE ? 'fittings' : null;
     if (good === null) return this.stoneStep(spot, action);
     return this.state.castle.goods[good] > 0 && this.goTo(spot.area) && this.walkTo(spot) && this.act(action);
+  }
+
+  /** Up to the glass trader's cart on the first market day, or to the bread stall after it. EASTER EGG: the town. */
+  private goToMarket(): boolean {
+    const first = this.state.day === firstMarketDay(this.state);
+    const spot = first ? { x: TRADER_CART_SPOTS.glass.x, y: TRADER_CART_SPOTS.glass.y + 1.5 } : { x: STALL_SPOTS.bread.x, y: STALL_SPOTS.bread.y + 1.5 };
+    if (!this.goTo('hills') || !this.walkTo(spot)) return false;
+    // Waiting by the cart for the trader to come up the street, then a step to meet them.
+    const trader = traderSpot(this.state, 'glass');
+    if (first && (!trader || trader.walking)) {
+      this.wait(5);
+      return true;
+    }
+    return this.act({ type: 'move', dx: 0, dy: -0.1 });
   }
 
   /** The old road a go at a time, then the milestone's stone carried over in the bag. EASTER EGG: the town. */
@@ -997,6 +1014,6 @@ const houseHasGoods = (state: GameState, good: 'beams' | 'fittings'): boolean =>
 };
 const allStalls = (state: GameState): boolean => STALL_IDS.every(id => pieceDone(state.town.square, id));
 const MILESTONES_THAT_END = ['keep-finished', 'keep-night', 'keep-climbed', 'castle-finished', 'castle-home', 'town-traveller', 'town-neighbour', 'town-house', 'town-house-2', 'town-house-3', 'square-marked', 'square-paved', 'square-well', 'square-stalls',
-  'bridge-piers', 'bridge', 'meadow', 'meadow-road', 'milestone', 'meadow-house'];
-/** The first meadow house and the milestone are where the scripted game's town stops now. EASTER EGG: the town. */
-const townDone = (state: GameState): boolean => state.town.houses[12]?.doneDay != null && milestoneDone(state.town.road);
+  'bridge-piers', 'bridge', 'meadow', 'meadow-road', 'milestone', 'meadow-house', 'square-open', 'market-day', 'lens'];
+/** The glass lens from the first market is where the scripted game's town ends, as the town itself does. EASTER EGG: the town. */
+const townDone = (state: GameState): boolean => state.town.market.lensDay !== null;

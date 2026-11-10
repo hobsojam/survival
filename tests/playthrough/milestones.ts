@@ -1,6 +1,7 @@
 import { STALL_IDS, pieceDone, squareMarked } from '../../src/game/square';
 import { bridgeDone } from '../../src/game/bridge';
 import { milestoneDone, roadDone } from '../../src/game/meadow';
+import { firstMarketDay } from '../../src/game/market';
 import { NEEDS, TOWERS, castleFinished, hallFinished, isRevealed, moatFill, towerFinished, wallFinished } from '../../src/game/castle';
 import { KEEP_DOOR_AT, keepFinished } from '../../src/game/keep';
 import type { GameState, StructureId } from '../../src/game/state';
@@ -80,5 +81,8 @@ export const MILESTONES: readonly Milestone[] = [
   { id: 'meadow', label: 'Crossed to the meadow', reached: state => state.progress.meadowFound },
   { id: 'meadow-road', label: 'Cleared the old road', reached: state => roadDone(state.town.road) },
   { id: 'milestone', label: 'Set the milestone', reached: state => milestoneDone(state.town.road) },
-  { id: 'meadow-house', label: 'Built the first house in the meadow', reached: state => state.town.houses[12]?.doneDay != null }
+  { id: 'meadow-house', label: 'Built the first house in the meadow', reached: state => state.town.houses[12]?.doneDay != null },
+  { id: 'square-open', label: 'Opened the square for market day', reached: state => state.town.market.openDay !== null },
+  { id: 'market-day', label: 'Saw the first market day', reached: state => { const first = firstMarketDay(state); return first !== null && state.day >= first; } },
+  { id: 'lens', label: 'Was given the glass lens', reached: state => state.town.market.lensDay !== null }
 ];
