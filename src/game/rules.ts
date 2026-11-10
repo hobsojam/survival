@@ -435,9 +435,11 @@ const move: ActionHandler<'move'> = (state, action) => {
   const rawX = state.player.x + action.dx * factor;
   const rawY = state.player.y + action.dy * factor;
   const crossed = crossing(state, rawX, rawY);
+  // Someone already lower than the bank allows, from an older save, stays where they are rather than being lifted up it.
+  const lowest = Math.max(lowestY(state, rawX), state.player.y);
   const player = crossed
     ? { ...state.player, x: crossed.x, y: crossed.y }
-    : { ...state.player, x: Math.max(0, Math.min(BALANCE.mapWidth - 1, rawX)), y: Math.max(0, Math.min(lowestY(state, rawX), rawY)) };
+    : { ...state.player, x: Math.max(0, Math.min(BALANCE.mapWidth - 1, rawX)), y: Math.max(0, Math.min(lowest, rawY)) };
   const moved = settleChickens(pickUpKeepsake({ ...state, ...(crossed ? { area: crossed.area } : {}), player }));
   const startled = { ...moved };
   startlePony(startled);

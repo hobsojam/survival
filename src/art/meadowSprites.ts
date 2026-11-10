@@ -8,15 +8,17 @@ import type { SpriteDef } from './sprites';
 const legend: Record<string, PaletteKey> = {
   a: 'stone0', b: 'stone1', c: 'stone2', d: 'stone3', k: 'shadow', W: 'paper', I: 'frost',
   s: 'storm', l: 'flower4', t: 'wood1', u: 'wood2', q: 'wood3',
-  g: 'grass1', h: 'grass2', G: 'grass3', e: 'earth1', r: 'earth2', R: 'earth3'
+  g: 'grass1', h: 'grass2', G: 'grass3', n: 'grass0', e: 'earth1', r: 'earth2', R: 'earth3'
 };
 
 const BRIDGE_W = 56;
-const BRIDGE_H = 40;
+/** Tall enough to reach from the bank to the map's bottom edge, so the deck runs on off it. */
+const BRIDGE_H = 44;
 /** The deck runs down the middle, three tiles of walking width, between two parapets. */
 const DECK = { left: 8, right: 48 };
 const PIERS = [{ x: 8, w: 9 }, { x: 39, w: 9 }];
-const WATER_TOP = 33;
+/** Where the stream's water starts, level with the bank row's water on the map, so the bridge leaves the bank and runs out over it. */
+const WATER_TOP = 20;
 
 /** Rough coursed stone over a box, joints staggered row by row. */
 function coursed(g: Grid, x: number, y: number, w: number, h: number): void {
@@ -32,37 +34,42 @@ function coursed(g: Grid, x: number, y: number, w: number, h: number): void {
 /** The stream running under the bridge, with ripples, or ice in winter. */
 function water(g: Grid, winter: boolean): void {
   box(g, 0, WATER_TOP, BRIDGE_W, BRIDGE_H - WATER_TOP, winter ? 'I' : 's');
-  for (let x = 2; x < BRIDGE_W; x += 9) box(g, x, WATER_TOP + 2 + (x % 3), 3, 1, winter ? 'W' : 'l');
+  for (let x = 2; x < BRIDGE_W; x += 9) box(g, x, WATER_TOP + 4 + (x % 3) * 3, 3, 1, winter ? 'W' : 'l');
 }
 
+/** The two piers standing in the water, each with a pointed cutwater upstream and its shadow on the water downstream. */
 function piers(g: Grid, winter: boolean): void {
   for (const pier of PIERS) {
-    box(g, pier.x - 1, BRIDGE_H - 2, pier.w + 2, 2, 'k');
-    coursed(g, pier.x, WATER_TOP - 6, pier.w, BRIDGE_H - WATER_TOP + 4);
-    if (winter) box(g, pier.x, WATER_TOP - 6, pier.w, 1, 'W');
+    box(g, pier.x + 1, WATER_TOP + 1, pier.w, BRIDGE_H - WATER_TOP - 1, 'k');
+    coursed(g, pier.x, WATER_TOP - 2, pier.w, BRIDGE_H - WATER_TOP - 2);
+    for (let i = 0; i < 3; i++) box(g, pier.x + 1 + i, BRIDGE_H - 4 + i, pier.w - 2 - i * 2, 1, 'c');
+    if (winter) box(g, pier.x, WATER_TOP - 2, pier.w, 1, 'W');
   }
 }
 
-/** The timber centering the arch is turned on, beams across between the piers. */
+/** The timber centering the arch is turned on, beams across the water between the piers. */
 function centering(g: Grid): void {
-  for (const y of [WATER_TOP - 5, WATER_TOP - 2]) box(g, PIERS[0].x + PIERS[0].w, y, PIERS[1].x - PIERS[0].x - PIERS[0].w, 2, 'u');
-  for (let x = PIERS[0].x + PIERS[0].w + 2; x < PIERS[1].x; x += 5) box(g, x, WATER_TOP - 5, 1, 5, 'q');
+  const [from, to] = [PIERS[0].x + PIERS[0].w, PIERS[1].x];
+  for (const y of [WATER_TOP + 4, WATER_TOP + 10]) box(g, from, y, to - from, 2, 'u');
+  for (let x = from + 2; x < to; x += 5) box(g, x, WATER_TOP + 4, 1, 8, 'q');
 }
 
-/** The deck from the bank down over the arch, with the arch's dark opening over the water. */
+/** The deck from the bank out over the water and on off the map's edge, its shadow on the water beside it. */
 function deck(g: Grid, winter: boolean): void {
-  coursed(g, DECK.left, 2, DECK.right - DECK.left, WATER_TOP - 2);
-  oval(g, 28, WATER_TOP + 2, 11, 5, 'k');
-  box(g, DECK.left + 4, 2, DECK.right - DECK.left - 8, WATER_TOP - 6, 'R');
-  for (let y = 5; y < WATER_TOP - 4; y += 4) box(g, DECK.left + 6 + (y % 8), y, 6, 1, 'r');
-  if (winter) for (let y = 4; y < WATER_TOP - 4; y += 6) box(g, DECK.left + 5, y, DECK.right - DECK.left - 10, 1, 'W');
+  box(g, DECK.left - 1, WATER_TOP, 1, BRIDGE_H - WATER_TOP, 'k');
+  box(g, DECK.right, WATER_TOP, 3, BRIDGE_H - WATER_TOP, 'k');
+  coursed(g, DECK.left, 0, DECK.right - DECK.left, BRIDGE_H);
+  box(g, DECK.left + 4, 0, DECK.right - DECK.left - 8, BRIDGE_H, 'R');
+  for (let y = 3; y < BRIDGE_H; y += 4) box(g, DECK.left + 6 + (y % 8), y, 6, 1, 'r');
+  if (winter) for (let y = 2; y < BRIDGE_H; y += 6) box(g, DECK.left + 5, y, DECK.right - DECK.left - 10, 1, 'W');
 }
 
-/** The parapets either side of the deck, capped, with snow on the caps in winter. */
+/** The parapets either side of the deck, the whole way along, capped, with snow on the caps in winter. */
 function parapets(g: Grid, winter: boolean): void {
   for (const x of [DECK.left - 2, DECK.right - 4]) {
-    coursed(g, x, 0, 6, WATER_TOP + 1);
-    box(g, x, 0, 6, 1, winter ? 'W' : 'a');
+    coursed(g, x, 0, 6, BRIDGE_H);
+    box(g, x + 1, 0, 4, 1, 'd');
+    if (winter) box(g, x + 1, 0, 4, BRIDGE_H, 'W');
   }
 }
 
@@ -72,14 +79,12 @@ function bridge(g: Grid, stage: 'piers' | 'arch' | 'deck' | 'done', winter: bool
   if (stage === 'piers') return;
   if (stage === 'arch') {
     centering(g);
-    oval(g, 28, WATER_TOP - 3, 13, 4, 'c');
-    oval(g, 28, WATER_TOP - 1, 10, 3, 'k');
-    box(g, 15, WATER_TOP - 1, 26, 3, 'u');
+    coursed(g, PIERS[0].x, WATER_TOP - 2, PIERS[1].x + PIERS[1].w - PIERS[0].x, 7);
     return;
   }
   deck(g, winter);
   if (stage === 'deck') {
-    for (const x of [DECK.left - 2, DECK.right - 4]) coursed(g, x, WATER_TOP - 6, 6, 7);
+    for (const x of [DECK.left - 2, DECK.right - 4]) coursed(g, x, 0, 6, 8);
     return;
   }
   parapets(g, winter);
@@ -88,16 +93,28 @@ function bridge(g: Grid, stage: 'piers' | 'arch' | 'deck' | 'done', winter: bool
 const ROAD_W = 104;
 const ROAD_H = 24;
 
-/** Bracken and long grass grown over a stretch of the road: thick while wild, in clumps with the old stones showing once half cleared. Rusty in autumn's place of winter, under snow. */
-function brush(g: Grid, half: boolean, winter: boolean): void {
-  for (let x = 1; x < ROAD_W - 1; x += half ? 9 : 5) {
-    const y = 9 + ((x * 7) % 5);
-    const clump = half ? 4 : 5;
-    oval(g, x + 2, y, clump, 4, winter ? 'W' : 'g');
-    oval(g, x + 1, y - 1, clump - 2, 2, winter ? 'I' : (x % 3 === 0 ? 'G' : 'h'));
-    if (!winter) for (let i = -2; i <= 2; i += 2) dot(g, x + 2 + i, y - 4 + Math.abs(i), 'G');
+/** One frond of bracken from its root, leaning as it climbs, with leaflets either side every other row and a tip in another colour. */
+function frond(g: Grid, x: number, y: number, lean: number, height: number, leaf: string, tip: string): void {
+  for (let k = 0; k < height; k++) {
+    const xx = x + Math.round((lean * k) / 4);
+    dot(g, xx, y - k, k === height - 1 ? tip : leaf);
+    if (k % 2 === 1 && k < height - 2) { dot(g, xx - 1, y - k, leaf); dot(g, xx + 1, y - k, leaf); }
   }
-  if (half) for (let x = 6; x < ROAD_W; x += 9) { box(g, x, 12, 3, 2, 'c'); dot(g, x, 12, 'a'); }
+}
+
+/** Bracken grown over a stretch of the road, waist high in thick clumps of fronds, dark at the roots; in thinner, shorter clumps with the old
+ * stones showing once half cleared; dead and rusty under snow in winter. */
+function brush(g: Grid, half: boolean, winter: boolean): void {
+  for (let x = 4, n = 0; x < ROAD_W - 6; x += half ? 17 : 10, n++) {
+    const root = 20 + (n % 2);
+    const height = (half ? 10 : 15) + ((n * 5) % 4);
+    oval(g, x + 3, root + 1, 5, 2, 'n');
+    for (const lean of [-4, 4, -2, 2, 0]) {
+      const leaf = winter ? (lean % 4 === 0 ? 'r' : 'R') : (lean % 4 === 0 ? 'h' : 'G');
+      frond(g, x + 3, root, lean, height - Math.abs(lean) / 2, leaf, winter ? 'W' : (n % 2 === 0 ? 'r' : 'g'));
+    }
+  }
+  if (half) for (let x = 15; x < ROAD_W - 6; x += 17) { box(g, x, 18, 3, 2, 'c'); dot(g, x, 18, 'a'); box(g, x + 1, 20, 3, 1, 'k'); }
 }
 
 /** The milestone: a stub of stone, then a standing stone with the road's mark cut in it. */

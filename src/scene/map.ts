@@ -238,15 +238,17 @@ function hillPlant(x: number, y: number, time: Season): string | undefined {
 /** The hills: open rolling grass, rock showing near the top, and plants that change with the season. Nothing here is gathered. */
 function buildHillsMap(time: Season, paths: readonly PathRoute[] = HILLS_PATHS): TerrainMap {
   const map = emptyMap();
-  const streamRow = BALANCE.mapHeight - 1;
+  // EASTER EGG: the town. The stream's bank row, then its open water on the last row.
+  const bankRow = BALANCE.mapHeight - 2;
   for (let y = 0; y < BALANCE.mapHeight; y++) {
     const row: string[] = [];
     for (let x = 0; x < BALANCE.mapWidth; x++) {
       // EASTER EGG: the town. The stream runs along the hills' foot, under where the bridge goes.
-      row.push(y === streamRow ? `${time === 'winter' ? 'streamIce' : 'stream'}${hash(x, y, 48) % 2}` : hillGroundTile(x, y));
-      const path = y === streamRow ? null : pathTile(x, y, paths);
+      const water = `${time === 'winter' ? 'streamIce' : 'stream'}${y === bankRow ? 'Bank' : ''}`;
+      row.push(y >= bankRow ? `${water}${hash(x, y, 48) % 2}` : hillGroundTile(x, y));
+      const path = y >= bankRow ? null : pathTile(x, y, paths);
       if (path) map.pathTiles.push({ x, y, sprite: path });
-      const sprite = y >= streamRow - 1 || hillRockAt(x, y) || moatAt(x, y) || pathDistance(x + .5, y + .5, paths) < 1.7 || nearSign(x, y, HILLS_SIGN) ? undefined : hillPlant(x, y, time);
+      const sprite = y >= bankRow - 1 || hillRockAt(x, y) || moatAt(x, y) || pathDistance(x + .5, y + .5, paths) < 1.7 || nearSign(x, y, HILLS_SIGN) ? undefined : hillPlant(x, y, time);
       // A little off the tile's middle, so the plants don't stand in rows.
       if (sprite) map.decorations.push({ x: x + (hash(x, y, 46) % 5 - 2) / 5, y: y + (hash(x, y, 47) % 5 - 2) / 5, sprite });
     }

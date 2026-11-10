@@ -70,9 +70,13 @@ describe('where the house stands', () => {
   const HILLS_PLOTS = HOUSE_PLOTS.filter(plot => plot.area === 'hills');
 
   it('lays out twelve plots on the hills below the castle, outside its walls: the street, then four around the square', () => {
-    expect(HILLS_PLOTS).toEqual([[31, 23], [26, 21], [22, 21], [27, 25], [18, 21], [23, 25], [14, 21], [19, 25], [15, 25], [3, 21], [3, 26], [13, 28]].map(([x, y]) => ({ area: 'hills', x, y })));
+    expect(HILLS_PLOTS).toEqual([[31, 23], [26, 21], [22, 21], [27, 25], [18, 21], [23, 25], [14, 21], [19, 25], [15, 25], [3, 21], [3, 26], [13, 27.5]].map(([x, y]) => ({ area: 'hills', x, y })));
     expect(HOUSE_PLOTS.slice(0, 12)).toEqual(HILLS_PLOTS);
     for (const plot of HILLS_PLOTS) expect(plot.y).toBeGreaterThan(WALLS.bottom);
+  });
+
+  it('keeps every house on the hills clear of the stream at their foot, which runs from halfway down row 28', () => {
+    for (const plot of HILLS_PLOTS) expect(px(plot, townSprites.townHouse).bottom, `${plot.x},${plot.y}`).toBeLessThanOrEqual(28.5 * 16);
   });
 
   it('lays out three more plots over the bridge, in the meadow, after the hills', () => {

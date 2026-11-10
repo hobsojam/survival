@@ -10,7 +10,7 @@ import { HOUSE_NEEDS, houseFinished, type HouseState } from './town';
 /** Where the houses stand, in the order they are built: a street of two rows on the open ground below the castle wall,
  * with a lane between them, starting south-east of the castle and growing west to the square, then four around the square. */
 export const HOUSE_PLOTS: readonly { area: AreaId; x: number; y: number }[] = [
-  ...([[31, 23], [26, 21], [22, 21], [27, 25], [18, 21], [23, 25], [14, 21], [19, 25], [15, 25], [3, 21], [3, 26], [13, 28]] as const)
+  ...([[31, 23], [26, 21], [22, 21], [27, 25], [18, 21], [23, 25], [14, 21], [19, 25], [15, 25], [3, 21], [3, 26], [13, 27.5]] as const)
     .map(([x, y]) => ({ area: 'hills' as const, x, y })),
   // Over the bridge, in the meadow, either side of the lane down to the old road.
   ...([[20, 7], [28, 7], [20, 12]] as const).map(([x, y]) => ({ area: 'meadow' as const, x, y }))
