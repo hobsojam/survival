@@ -35,6 +35,8 @@ export const PAVING_SECTION = 10;
 
 /** How many of its good a stall holds. */
 export const STALL_STOCK = 12;
+/** How many of its good make a stall look full: about what a keeper puts by between one market and the next. */
+export const STALL_FULL = 4;
 /** How many of each food a stallholder always leaves in the larder for the survivor. */
 export const STALL_RESERVE = 2;
 /** How much wool the wool stall leaves in the basket: enough for a hanging. */

@@ -1,6 +1,7 @@
 // EASTER EGG: the town, see src/game/town.ts. Market day: when the square opens, the schedule, and the stalls cleared after each market.
 import { describe, expect, it } from 'vitest';
-import { firstMarketDay, isMarketDay, isMarketEve, marketDawn, roadReady, townFull } from '../src/game/market';
+import { duskLength, nightStart } from '../src/game/calendar';
+import { firstMarketDay, isMarketDay, isMarketEve, marketDawn, marketSold, roadReady, stallFrame, townFull } from '../src/game/market';
 import { applyAction } from '../src/game/rules';
 import { SAVE_KEY, loadGame, saveGame } from '../src/game/save';
 import { STALL_IDS } from '../src/game/square';
@@ -148,5 +149,32 @@ describe('the market in the save', () => {
     if (loaded.kind !== 'loaded') return;
     expect(loaded.state.town.market).toEqual({ openDay: null, lensDay: null });
     expect(applyAction({ ...loaded.state, timeOfDay: 230 }, { type: 'sleep' }).state.town.market.openDay).toBe(101);
+  });
+});
+
+describe('the stalls on market day', () => {
+  const at = (day: number, timeOfDay: number, stock: number) => opened(100, state => {
+    state.day = day;
+    state.timeOfDay = timeOfDay;
+    state.town.square.stock = Object.fromEntries(STALL_IDS.map(id => [id, stock])) as GameState['town']['square']['stock'];
+  });
+  const dusk = (day: number) => nightStart(day) - duskLength(day);
+
+  it('sells down from dawn to the start of dusk, and only on market day', () => {
+    expect(marketSold(at(101, 100, 5))).toBe(0);
+    expect(marketSold(at(102, 0, 5))).toBe(0);
+    expect(marketSold(at(102, dusk(102) / 2, 5))).toBeCloseTo(0.5);
+    expect(marketSold(at(102, dusk(102), 5))).toBe(1);
+    expect(marketSold(at(102, nightStart(102) + 10, 5))).toBe(1);
+  });
+
+  it('shows four or more as a full stall, fewer as some, and what is left as the day goes', () => {
+    expect(stallFrame(at(101, 100, 4), 'bread')).toBe('bread-full');
+    expect(stallFrame(at(101, 100, 3), 'bread')).toBe('bread-some');
+    expect(stallFrame(at(101, 100, 0), 'bread')).toBe('bread');
+    expect(stallFrame(at(102, dusk(102) / 2, 8), 'bread')).toBe('bread-full');
+    expect(stallFrame(at(102, dusk(102) / 2, 4), 'bread')).toBe('bread-some');
+    expect(stallFrame(at(102, dusk(102), 8), 'bread')).toBe('bread');
+    expect(stallFrame(fullTown(state => { state.town.square.stalls.bread = { beams: 1, hangings: 0 }; }), 'bread')).toBe('frame');
   });
 });

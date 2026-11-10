@@ -1,4 +1,5 @@
-import { PAVING_SECTION, SQUARE_NEEDS, STALL_IDS, pieceDone, squareMarked } from '../game/square';
+import { PAVING_SECTION, SQUARE_NEEDS, STALL_IDS, squareMarked } from '../game/square';
+import { stallFrame } from '../game/market';
 import { PAVING_SPOTS, SQUARE_CENTRE, STALL_SPOTS, WELL_SPOT } from '../game/squareSites';
 import { feathersFound } from '../game/companion';
 import { stripStage } from '../game/field';
@@ -155,9 +156,7 @@ function addSquare(state: GameState, add: AddVisual): void {
   }
   for (const id of STALL_IDS) {
     if (square.stalls[id].beams === 0) continue;
-    const stock = square.stock[id];
-    const stage = !pieceDone(square, id) ? 'frame' : stock === 0 ? id : `${id}-${stock <= 6 ? 'some' : 'full'}`;
-    add(`square-stall-${id}`, `townStall:${stage}${snow}`, STALL_SPOTS[id].x, STALL_SPOTS[id].y);
+    add(`square-stall-${id}`, `townStall:${stallFrame(state, id)}${snow}`, STALL_SPOTS[id].x, STALL_SPOTS[id].y);
   }
 }
 

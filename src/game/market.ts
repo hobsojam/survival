@@ -1,7 +1,8 @@
 import { houseOpen } from './houseOpen';
 import { openJobs } from './jobs';
 import { milestoneDone, roadDone } from './meadow';
-import { STALL_IDS, STALL_JOBS } from './square';
+import { duskLength, nightStart } from './calendar';
+import { STALL_FULL, STALL_IDS, STALL_JOBS, pieceDone, type StallId } from './square';
 import type { GameState } from './state';
 
 // EASTER EGG: the town, see src/game/town.ts. Market day: once the town is as full as it can get and the meadow's old
@@ -50,4 +51,20 @@ export function marketDawn(next: GameState): void {
     next.town = { ...next.town, square: { ...square, stock: Object.fromEntries(STALL_IDS.map(id => [id, 0])) as typeof square.stock } };
   }
   if (market.openDay === null && townFull(next) && roadReady(next)) next.town = { ...next.town, market: { ...market, openDay: next.day } };
+}
+
+/** How much of the stalls' stock has gone so far today: none off market days, then a steady share from dawn until the
+ * dusk begins, when the traders take the rest. */
+export function marketSold(state: GameState): number {
+  if (!isMarketDay(state)) return 0;
+  return Math.min(1, state.timeOfDay / (nightStart(state.day) - duskLength(state.day)));
+}
+
+/** A stall's picture: its frame while it is being built, then empty, some or full by what is left on its counter. */
+export function stallFrame(state: GameState, id: StallId): string {
+  const { square } = state.town;
+  if (!pieceDone(square, id)) return 'frame';
+  const left = Math.round(square.stock[id] * (1 - marketSold(state)));
+  if (left === 0) return id;
+  return `${id}-${left >= STALL_FULL ? 'full' : 'some'}`;
 }
