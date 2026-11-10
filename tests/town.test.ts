@@ -9,7 +9,7 @@ import { createGame } from '../src/game/state';
 
 describe('the town before anyone comes', () => {
   it('starts empty, with every house unbuilt and no square', () => {
-    expect(emptyTown()).toEqual({ traveller: null, goneDay: null, namesUsed: 0, people: [], houses: Array.from({ length: 15 }, () => ({ stone: 0, beams: 0, fittings: 0, doneDay: null })), square: emptySquare(), bridge: emptyBridge(), road: emptyRoad() });
+    expect(emptyTown()).toEqual({ traveller: null, goneDay: null, namesUsed: 0, people: [], houses: Array.from({ length: 15 }, () => ({ stone: 0, beams: 0, fittings: 0, doneDay: null })), square: emptySquare(), bridge: emptyBridge(), road: emptyRoad(), market: { openDay: null, lensDay: null } });
     expect(createGame().town).toEqual(emptyTown());
   });
 

@@ -36,7 +36,15 @@ export interface TownState {
   bridge: BridgeState;
   /** The old road through the meadow and its milestone. */
   road: RoadState;
+  /** When the square opened for market day, and when the survivor was given the lens. */
+  market: MarketState;
 }
+
+/** When the square opened for market day, and when the survivor was given the lens. Everything else about market day
+ * is worked out from these: see src/game/market.ts. Kept here, not there, as the market's rules need the jobs, which need the town. */
+export interface MarketState { openDay: number | null; lensDay: number | null }
+
+export const emptyMarket = (): MarketState => ({ openDay: null, lensDay: null });
 
 /** What a house takes: stone for its footings and walls, beams for its roof, and an iron fitting for its door. */
 export const HOUSE_NEEDS = { stone: 30, beams: 4, fittings: 1 } as const;
@@ -51,7 +59,7 @@ export const TOWN_NAMES: readonly string[] = ['Ada', 'Tomas', 'Elin', 'Bram', 'M
 export const emptyHouse = (): HouseState => ({ stone: 0, beams: 0, fittings: 0, doneDay: null });
 
 export const emptyTown = (): TownState => ({ traveller: null, goneDay: null, namesUsed: 0, people: [], houses: Array.from({ length: HOUSE_COUNT }, emptyHouse), square: emptySquare(),
-  bridge: emptyBridge(), road: emptyRoad() });
+  bridge: emptyBridge(), road: emptyRoad(), market: emptyMarket() });
 
 /** Whether anyone has come yet. */
 export const townStarted = (state: GameState): boolean => state.town.traveller !== null || state.town.people.length > 0;
