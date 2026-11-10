@@ -1,5 +1,5 @@
 import { PAVING_SECTION, SQUARE_NEEDS, STALL_IDS, squareMarked } from '../game/square';
-import { SIGN_SPOT, signFace, stallFrame } from '../game/market';
+import { SIGN_SPOT, TRADERS, signFace, stallFrame, traderCartSpot, traderSpot } from '../game/market';
 import { PAVING_SPOTS, SQUARE_CENTRE, STALL_SPOTS, WELL_SPOT } from '../game/squareSites';
 import { feathersFound } from '../game/companion';
 import { stripStage } from '../game/field';
@@ -183,6 +183,16 @@ function addMeadow(state: GameState, add: AddVisual): void {
   if (road.milestone > 0) add('milestone', `milestone:${milestoneDone(road) ? 'done' : 'low'}${snow}`, MILESTONE_SITE.x, MILESTONE_SITE.y);
 }
 
+/** The traders on market day, each with their cart: walking in or out pulling it, or standing by it. EASTER EGG: the town, see src/game/town.ts. */
+function addTraders(state: GameState, timeMs: number, add: AddVisual): void {
+  for (const trader of TRADERS) {
+    const spot = traderSpot(state, trader);
+    const cart = traderCartSpot(state, trader);
+    if (cart && cart.area === state.area) add(`trader-cart-${trader}`, `traderCart:${trader}`, cart.x, cart.y);
+    if (spot && spot.area === state.area) add(`trader-${trader}`, `trader${trader}:${spot.walking ? `walk${Math.floor(timeMs / 250) % 2}` : 'stand'}`, spot.x, spot.y);
+  }
+}
+
 /** The town's people out in this area: at work, walking home, or the traveller waiting by the hall door. Each name keeps its own colours. */
 function addTownsfolk(state: GameState, timeMs: number, add: AddVisual): void {
   for (const each of townsfolkHere(state)) {
@@ -221,6 +231,7 @@ export function sceneVisuals(state: GameState, timeMs: number, gathered?: Gather
     visuals.push({ id, texture, x, y, depth: depth ?? y });
   };
   addTownsfolk(state, timeMs, add);
+  addTraders(state, timeMs, add);
   if (state.area === 'quarry') {
     let quarryTexture = state.quarryReadyDay <= state.day ? 'quarry:ready' : 'quarry:spent';
     if (state.progress.mineBuilt) {

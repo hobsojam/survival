@@ -32,3 +32,14 @@ describe('the market sign', () => {
     expect(sign(111)).toBe('marketSign:eve');
   });
 });
+
+describe('the traders and their carts', () => {
+  it('has a trader for each cart, standing and walking, and two carts that differ', () => {
+    for (const trader of ['glass', 'spice']) {
+      expect(Object.keys(sprites[`trader${trader}`].frames).sort()).toEqual(['stand', 'walk0', 'walk1']);
+    }
+    expect(Object.keys(sprites.traderCart.frames).sort()).toEqual(['glass', 'spice']);
+    expect(sprites.traderCart.frames.glass).not.toEqual(sprites.traderCart.frames.spice);
+    expect(sprites.traderglass.legend).not.toEqual(sprites.traderspice.legend);
+  });
+});

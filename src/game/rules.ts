@@ -19,6 +19,7 @@ import { bakeryDawn, millGrainBlocker, milledState, takeLoafBlocker, takenLoaf }
 import { beehiveDawn, takeHoneyBlocker, takenHoney } from './beehive';
 import { jobsDawn } from './jobs';
 import { marketDawn } from './market';
+import { lensHandover } from './lens';
 import { answeredTraveller, travellerArrives } from './traveller';
 import { doTownWork, townWorkBlocker, townWorkLine } from './townSites';
 import { doSquareWork, squareWorkBlocker, squareWorkLine } from './squareSites';
@@ -446,7 +447,10 @@ const move: ActionHandler<'move'> = (state, action) => {
   const moved = settleChickens(pickUpKeepsake({ ...state, ...(crossed ? { area: crossed.area } : {}), player }));
   const startled = { ...moved };
   startlePony(startled);
-  return withPonyArrival(state, walkedArrival(startled));
+  const arrived = withPonyArrival(state, walkedArrival(startled));
+  // EASTER EGG: the town. Coming near whoever has the glass lens for the survivor.
+  const lens = lensHandover(arrived.state);
+  return { state: lens.state, message: [arrived.message, lens.message].filter(Boolean).join(' ') };
 };
 
 const crossOver: ActionHandler<'cross'> = state => {

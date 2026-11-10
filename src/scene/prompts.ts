@@ -267,9 +267,10 @@ function housePrompt(state: GameState): string {
   return night ? 'At the campfire · Watch the stars · Feed the fire' : 'At the campfire · Feed the fire · Click an upgrade to build';
 }
 
-/** A pressed action says its line. A step says nothing, unless it crossed into another area: that's a line the player has to hear. */
+/** A pressed action says its line. A step says nothing, unless it crossed into another area or was handed the glass
+ * lens: those are lines the player has to hear. */
 export function lineToSay(before: GameState, after: GameState, message: string, announce: boolean): string {
-  return announce || before.area !== after.area ? message : '';
+  return announce || before.area !== after.area || before.town.market.lensDay !== after.town.market.lensDay ? message : '';
 }
 
 /** Going in at the finished keep's door, or the finished hall's: to bed at night, otherwise up to the top. */

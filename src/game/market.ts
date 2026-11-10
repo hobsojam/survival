@@ -1,9 +1,10 @@
+import { HILLS_BRIDGE_EXIT, MEADOW_ENTRY } from './areas';
 import { houseOpen } from './houseOpen';
 import { openJobs } from './jobs';
 import { milestoneDone, roadDone } from './meadow';
 import { duskLength, nightStart } from './calendar';
 import { STALL_FULL, STALL_IDS, STALL_JOBS, pieceDone, type StallId } from './square';
-import type { GameState } from './state';
+import { BALANCE, type AreaId, type GameState } from './state';
 
 // EASTER EGG: the town, see src/game/town.ts. Market day: once the town is as full as it can get and the meadow's old
 // road is cleared and marked, the square opens, and every fifth day after that is market day. The first brings
@@ -83,3 +84,64 @@ export const MARKET_CROWD_SPOTS: readonly { x: number; y: number }[] = [
   { x: 6, y: 23 }, { x: 7.2, y: 22.2 }, { x: 7.2, y: 24.2 }, { x: 8.5, y: 21.6 }, { x: 9.6, y: 24.6 },
   { x: 11.6, y: 22.2 }, { x: 11.8, y: 24.4 }, { x: 5.2, y: 24.4 }, { x: 9.4, y: 21.9 }, { x: 4.8, y: 22.6 }
 ];
+
+/** The two traders who come on market day, each with their own cart: one with glass and brass, one with spices. */
+export const TRADERS = ['glass', 'spice'] as const;
+export type Trader = (typeof TRADERS)[number];
+/** Where each cart stands for the day: on the street east of the square, clear of the houses and the crowd. */
+export const TRADER_CART_SPOTS: Record<Trader, { x: number; y: number }> = { glass: { x: 13, y: 23 }, spice: { x: 17, y: 23 } };
+/** Game seconds the traders take to come in from the meadow's east edge to their carts. The spice trader follows a little behind. */
+export const TRADER_ARRIVE = 30;
+const TRADER_DELAY: Record<Trader, number> = { glass: 0, spice: 8 };
+
+type Point = { x: number; y: number };
+type Leg = { area: AreaId; from: Point; to: Point };
+
+const between = (from: Point, to: Point, f: number): Point => ({ x: from.x + (to.x - from.x) * f, y: from.y + (to.y - from.y) * f });
+
+/** The way in: west along the meadow's old road, up the lane to the bridge, then up the hills' lane and along the street. */
+function traderLegs(trader: Trader): Leg[] {
+  const roadEnd = { x: BALANCE.mapWidth - 0.5, y: 18 };
+  const roadTurn = { x: MEADOW_ENTRY.x, y: 18 };
+  const street = { x: HILLS_BRIDGE_EXIT.x, y: 23 };
+  const stand = { x: TRADER_CART_SPOTS[trader].x, y: TRADER_CART_SPOTS[trader].y + 1 };
+  return [
+    { area: 'meadow', from: roadEnd, to: roadTurn }, { area: 'meadow', from: roadTurn, to: MEADOW_ENTRY },
+    { area: 'hills', from: HILLS_BRIDGE_EXIT, to: street }, { area: 'hills', from: street, to: stand }
+  ];
+}
+
+/** How far along the way in a trader is at a time of day, from 0 at the road's end to 1 at their cart, or null when they're gone. */
+function traderProgress(state: GameState, trader: Trader, timeOfDay: number): number | null {
+  if (!isMarketDay(state) || timeOfDay >= nightStart(state.day)) return null;
+  const duskStart = nightStart(state.day) - duskLength(state.day);
+  if (timeOfDay >= duskStart) {
+    // Over the dusk they go back the way they came, the spice trader setting off a little after.
+    const lag = TRADER_DELAY[trader] / TRADER_ARRIVE / 2;
+    return 1 - Math.max(0, ((timeOfDay - duskStart) / duskLength(state.day) - lag) / (1 - lag));
+  }
+  const arrived = (timeOfDay - TRADER_DELAY[trader]) / TRADER_ARRIVE;
+  return arrived < 0 ? null : Math.min(1, arrived);
+}
+
+function alongLegs(legs: Leg[], f: number): { area: AreaId; x: number; y: number } {
+  const index = Math.min(legs.length - 1, Math.floor(f * legs.length));
+  const leg = legs[index];
+  return { area: leg.area, ...between(leg.from, leg.to, f * legs.length - index) };
+}
+
+/** Where a trader is on market day: walking in, standing by their cart, or walking out over the dusk. Null when they aren't here. */
+export function traderSpot(state: GameState, trader: Trader): { area: AreaId; x: number; y: number; walking: boolean } | null {
+  const f = traderProgress(state, trader, state.timeOfDay);
+  return f === null ? null : { ...alongLegs(traderLegs(trader), f), walking: f < 1 };
+}
+
+/** Where a trader's cart is: at its spot while they stand by it, and just behind them, in the same area, while they walk. */
+export function traderCartSpot(state: GameState, trader: Trader): { area: AreaId; x: number; y: number } | null {
+  const f = traderProgress(state, trader, state.timeOfDay);
+  if (f === null) return null;
+  if (f >= 1) return { area: 'hills', ...TRADER_CART_SPOTS[trader] };
+  const here = alongLegs(traderLegs(trader), f);
+  const behind = alongLegs(traderLegs(trader), Math.max(0, f - 0.02));
+  return behind.area === here.area ? behind : null;
+}
