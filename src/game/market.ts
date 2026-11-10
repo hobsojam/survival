@@ -5,6 +5,7 @@ import { milestoneDone, roadDone } from './meadow';
 import { duskLength, nightStart } from './calendar';
 import { STALL_FULL, STALL_IDS, STALL_JOBS, pieceDone, type StallId } from './square';
 import { BALANCE, type AreaId, type GameState } from './state';
+import { TOWN_NAMES } from './town';
 
 // EASTER EGG: the town, see src/game/town.ts. Market day: once the town is as full as it can get and the meadow's old
 // road is cleared and marked, the square opens, and every fifth day after that is market day. The first brings
@@ -23,6 +24,9 @@ export function townFull(state: GameState): boolean {
   const { town, castle } = state;
   if (castle.finishedDay === null || town.people.length === 0 || town.traveller !== null) return false;
   if (town.people.some(person => person.house === null)) return false;
+  // Once every name has been given out no one else can come, so a free job or an empty plot no longer holds it up.
+  const noOneLeft = town.namesUsed >= TOWN_NAMES.length;
+  if (noOneLeft) return STALL_IDS.every(id => town.people.some(person => person.job === STALL_JOBS[id]));
   const livedIn = town.houses.every((house, plot) => house.doneDay === null || town.people.some(person => person.house === plot));
   if (!livedIn || openJobs(state).length > 0 || town.houses.some((_, plot) => houseOpen(state, plot))) return false;
   return STALL_IDS.every(id => town.people.some(person => person.job === STALL_JOBS[id]));

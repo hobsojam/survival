@@ -82,3 +82,13 @@ describe('the crowd as drawn', () => {
     expect(frames(dusk)[`townsfolk-${wood}`]).toBe('walk0');
   });
 });
+
+describe('the crowd in a town hired in the usual order', () => {
+  it('gives everyone who isn\'t a stallholder a spot of their own', () => {
+    const state = on(102);
+    const spots = state.town.people.flatMap((person, i) => (Object.values(STALL_JOBS).includes(person.job as never) ? [] : [personSpot(state, i)]))
+      .map(spot => `${spot!.x},${spot!.y}`);
+    expect(spots).toHaveLength(10);
+    expect(new Set(spots).size).toBe(10);
+  });
+});

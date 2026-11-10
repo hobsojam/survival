@@ -42,7 +42,9 @@ const keepsAStall = (job: string): boolean => STALL_IDS.some(id => STALL_JOBS[id
 /** On market day, where someone who doesn't keep a stall stands about the square instead of at their work. Their work is still done. */
 function marketSpot(state: GameState, index: number): { area: AreaId; x: number; y: number } | null {
   if (!isMarketDay(state) || keepsAStall(state.town.people[index].job)) return null;
-  return { area: 'hills', ...MARKET_CROWD_SPOTS[index % MARKET_CROWD_SPOTS.length] };
+  // Counted among those who don't keep a stall, so each of them has a spot of their own.
+  const place = state.town.people.slice(0, index).filter(person => !keepsAStall(person.job)).length;
+  return { area: 'hills', ...MARKET_CROWD_SPOTS[place % MARKET_CROWD_SPOTS.length] };
 }
 
 type Leg = { area: AreaId; from: { x: number; y: number }; to: { x: number; y: number } };

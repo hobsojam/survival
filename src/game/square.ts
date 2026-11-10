@@ -39,8 +39,9 @@ export const STALL_STOCK = 12;
 export const STALL_FULL = 4;
 /** How many of each food a stallholder always leaves in the larder for the survivor. */
 export const STALL_RESERVE = 2;
-/** How much wool the wool stall leaves in the basket: enough for a hanging. */
-export const WOOL_RESERVE = 3;
+/** How much wool the wool stall leaves in the basket: enough for the largest weave, the jumper. Once markets come, the stall
+ * takes wool every dawn, so this is what the survivor can count on. */
+export const WOOL_RESERVE = 4;
 
 export interface StallState { beams: number; hangings: number }
 

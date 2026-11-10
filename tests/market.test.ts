@@ -4,7 +4,8 @@ import { duskLength, nightStart } from '../src/game/calendar';
 import { firstMarketDay, isMarketDay, isMarketEve, marketDawn, marketSold, roadReady, SIGN_SPOT, signFace, stallFrame, townFull } from '../src/game/market';
 import { applyAction } from '../src/game/rules';
 import { SAVE_KEY, loadGame, saveGame } from '../src/game/save';
-import { STALL_IDS } from '../src/game/square';
+import { STALL_IDS, WOOL_RESERVE } from '../src/game/square';
+import { WOVEN } from '../src/game/sheep';
 import { promptFor, useKeyAction } from '../src/scene/prompts';
 import { pickTapTarget, targetAction } from '../src/scene/tapTarget';
 import type { GameState } from '../src/game/state';
@@ -175,5 +176,20 @@ describe('reading the market sign', () => {
     expect(promptFor(bySign(103))).not.toContain('Market sign');
     expect(useKeyAction(bySign(101))).toBeUndefined();
     expect(targetAction(pickTapTarget(bySign(101), SIGN_SPOT.x, SIGN_SPOT.y))).toBeNull();
+  });
+});
+
+describe('after the square opens, the keepers still leave the survivor enough', () => {
+  it('leaves enough wool in the basket for the largest weave', () => {
+    expect(WOOL_RESERVE).toBeGreaterThanOrEqual(Math.max(...Object.values(WOVEN).map(item => item.wool)));
+  });
+});
+
+describe('a town that has given out every name', () => {
+  it('counts as full once no traveller is left to come, even with a job still free', () => {
+    const noOrchardJob = JOB_IDS.filter(job => job !== 'orchard');
+    const named = fullTown(state => { state.structures.orchard = true; state.town.namesUsed = 24; }, noOrchardJob);
+    expect(townFull(named)).toBe(true);
+    expect(townFull({ ...named, town: { ...named.town, namesUsed: 23 } })).toBe(false);
   });
 });
