@@ -36,5 +36,5 @@ const seasons = <T extends string>(names: readonly T[], paint: (g: Grid, name: T
   Object.fromEntries(names.flatMap(name => [[name, (g: Grid) => paint(g, name, false)], [`${name}s`, (g: Grid) => paint(g, name, true)]]));
 
 export const marketSprites: Record<string, SpriteDef> = {
-  marketSign: define(SIGN_W, SIGN_H, seasons(['eve', 'day'] as const, (g, face, winter) => sign(g, face, winter)), [SIGN_W / 2, SIGN_H], chars)
+  marketSign: define(SIGN_W, SIGN_H, seasons(['eve', 'day'] as const, (g, face, winter) => sign(g, face, winter)), [SIGN_W / 2, SIGN_H - 1], chars)
 };
