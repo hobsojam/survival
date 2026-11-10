@@ -68,3 +68,12 @@ export function stallFrame(state: GameState, id: StallId): string {
   if (left === 0) return id;
   return `${id}-${left >= STALL_FULL ? 'full' : 'some'}`;
 }
+
+/** Where the market sign leans, by the well and clear of the stalls. */
+export const SIGN_SPOT = { x: 10, y: 23.5 } as const;
+
+/** The sign's face: the eve's, advertising tomorrow's market, or the day's. It's taken down the next dawn. */
+export function signFace(state: GameState): 'eve' | 'day' | null {
+  if (isMarketDay(state)) return 'day';
+  return isMarketEve(state) ? 'eve' : null;
+}

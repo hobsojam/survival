@@ -12,6 +12,7 @@ import { squarePrompt, squareSpots, squareWorkBlocker } from '../game/squareSite
 import { bridgePrompt, bridgeSpot, bridgeWorkBlocker } from '../game/bridgeSites';
 import { roadPrompt, roadSpot, roadWorkBlocker } from '../game/roadSites';
 import { greetingHere } from '../game/townsfolk';
+import { SIGN_SPOT, signFace } from '../game/market';
 import { KEEP_DOOR_WOOD, KEEP_SITE, KEEP_STONES, atHallDoor, keepFinished, keepNeedsDoor, keepOpen, withKeepDoor } from '../game/keep';
 import { ponyNote, ponyOfferLabel } from '../game/pony';
 import { availableWood } from '../game/wood';
@@ -356,6 +357,8 @@ function hillsChoices(state: GameState): Choice[] {
   const square = squareChoice(state);
   const bridge = bridgeChoice(state);
   const cart = cartChoice(state);
+  // EASTER EGG: the town's market sign by the well, there to read the day before a market and on the day.
+  const face = within(state, SIGN_SPOT) ? signFace(state) : null;
   // EASTER EGG: the castle's line of old stones, named only once it has been seen.
   const stones = isRevealed(state) && state.castle.frames === 0 && !castle && lineDistance(state.player) <= BALANCE.interactionRadius;
   const offer = ponyOfferLabel(state);
@@ -370,6 +373,7 @@ function hillsChoices(state: GameState): Choice[] {
     ...(square ? [square] : []),
     ...(bridge ? [bridge] : []),
     ...(cart ? [cart] : []),
+    ...(face ? [{ label: `Market sign · market ${face === 'eve' ? 'tomorrow' : 'today'}` }] : []),
     ...(stones ? [{ label: 'Old stones · a wall could run here' }] : []),
     ...(offer ? [{ label: offer, action: { type: 'offerPony' as const } }] : []),
     ...(note ? [{ label: note }] : [])

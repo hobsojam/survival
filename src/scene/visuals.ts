@@ -1,5 +1,5 @@
 import { PAVING_SECTION, SQUARE_NEEDS, STALL_IDS, squareMarked } from '../game/square';
-import { stallFrame } from '../game/market';
+import { SIGN_SPOT, signFace, stallFrame } from '../game/market';
 import { PAVING_SPOTS, SQUARE_CENTRE, STALL_SPOTS, WELL_SPOT } from '../game/squareSites';
 import { feathersFound } from '../game/companion';
 import { stripStage } from '../game/field';
@@ -158,6 +158,8 @@ function addSquare(state: GameState, add: AddVisual): void {
     if (square.stalls[id].beams === 0) continue;
     add(`square-stall-${id}`, `townStall:${stallFrame(state, id)}${snow}`, STALL_SPOTS[id].x, STALL_SPOTS[id].y);
   }
+  const face = signFace(state);
+  if (face) add('market-sign', `marketSign:${face}${snow}`, SIGN_SPOT.x, SIGN_SPOT.y);
 }
 
 /** The bridge on the hills from its first stone: the piers, the arch on its centering, the deck, and the finished parapets. EASTER EGG: the town, see src/game/town.ts. */

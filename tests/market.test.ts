@@ -1,33 +1,15 @@
 // EASTER EGG: the town, see src/game/town.ts. Market day: when the square opens, the schedule, and the stalls cleared after each market.
 import { describe, expect, it } from 'vitest';
 import { duskLength, nightStart } from '../src/game/calendar';
-import { firstMarketDay, isMarketDay, isMarketEve, marketDawn, marketSold, roadReady, stallFrame, townFull } from '../src/game/market';
+import { firstMarketDay, isMarketDay, isMarketEve, marketDawn, marketSold, roadReady, SIGN_SPOT, signFace, stallFrame, townFull } from '../src/game/market';
 import { applyAction } from '../src/game/rules';
 import { SAVE_KEY, loadGame, saveGame } from '../src/game/save';
 import { STALL_IDS } from '../src/game/square';
+import { promptFor, useKeyAction } from '../src/scene/prompts';
+import { pickTapTarget, targetAction } from '../src/scene/tapTarget';
 import type { GameState } from '../src/game/state';
-import { JOB_IDS, TOWN_NAMES, type JobId, type Person } from '../src/game/town';
-import { finishedCastleCamp, street } from './townStreet';
-
-const built = (doneDay: number) => ({ stone: 30, beams: 4, fittings: 1, doneDay });
-const STALL = { beams: 2, hangings: 1 };
-
-/** A town as full as it gets: fifteen houses lived in, every job held, the bridge done, and the road cleared and marked. */
-export const fullTown = (change: (state: GameState) => void = () => {}, jobs: readonly JobId[] = JOB_IDS): GameState => {
-  const state = finishedCastleCamp();
-  state.day = 100;
-  Object.assign(state.structures, { woodpile: true, larder: true });
-  const people: Person[] = jobs.map((job, index) => ({ name: TOWN_NAMES[index], job, house: index, arrivedDay: 10 + index }));
-  state.town = { ...state.town, namesUsed: people.length, people,
-    houses: street(...jobs.map((_, i) => built(20 + i * 2))),
-    square: { ...state.town.square, paving: 40, well: { stone: 12, fittings: 1 },
-      stalls: Object.fromEntries(STALL_IDS.map(id => [id, { ...STALL }])) as GameState['town']['square']['stalls'],
-      doneDays: { paving: 30, well: 31, bread: 32, honey: 32, wool: 32, apples: 32, eggs: 32 } },
-    bridge: { stone: 50, beams: 4, fittings: 2, doneDays: { piers: 40, arch: 45, parapet: 50 } },
-    road: { cleared: 6, work: 0, milestone: 6, doneDays: { road: 60, milestone: 62 } } };
-  change(state);
-  return state;
-};
+import { JOB_IDS } from '../src/game/town';
+import { built, fullTown, opened } from './marketTown';
 
 const dawned = (state: GameState): GameState => {
   const next = structuredClone(state);
@@ -35,9 +17,6 @@ const dawned = (state: GameState): GameState => {
   marketDawn(next);
   return next;
 };
-
-const opened = (openDay: number, change: (state: GameState) => void = () => {}): GameState =>
-  fullTown(state => { state.town.market = { openDay, lensDay: null }; change(state); });
 
 describe('when the square opens', () => {
   it('counts a town as full once everyone is housed, every stall kept and nothing more can come', () => {
@@ -176,5 +155,25 @@ describe('the stalls on market day', () => {
     expect(stallFrame(at(102, dusk(102) / 2, 4), 'bread')).toBe('bread-some');
     expect(stallFrame(at(102, dusk(102), 8), 'bread')).toBe('bread');
     expect(stallFrame(fullTown(state => { state.town.square.stalls.bread = { beams: 1, hangings: 0 }; }), 'bread')).toBe('frame');
+  });
+});
+
+describe('the market sign\'s face', () => {
+  it('advertises tomorrow\'s market on the eve and today\'s on the day, and is gone otherwise', () => {
+    const face = (day: number) => signFace(opened(100, state => { state.day = day; }));
+    expect([100, 101, 102, 103, 106, 107].map(face)).toEqual([null, 'eve', 'day', null, 'eve', 'day']);
+    expect(signFace(fullTown())).toBeNull();
+  });
+});
+
+describe('reading the market sign', () => {
+  const bySign = (day: number) => opened(100, state => { state.day = day; state.area = 'hills'; state.player = { ...state.player, x: SIGN_SPOT.x, y: SIGN_SPOT.y }; });
+
+  it('says when the market is, and offers nothing to do', () => {
+    expect(promptFor(bySign(101))).toContain('Market sign · market tomorrow');
+    expect(promptFor(bySign(102))).toContain('Market sign · market today');
+    expect(promptFor(bySign(103))).not.toContain('Market sign');
+    expect(useKeyAction(bySign(101))).toBeUndefined();
+    expect(targetAction(pickTapTarget(bySign(101), SIGN_SPOT.x, SIGN_SPOT.y))).toBeNull();
   });
 });
