@@ -77,3 +77,9 @@ export function signFace(state: GameState): 'eve' | 'day' | null {
   if (isMarketDay(state)) return 'day';
   return isMarketEve(state) ? 'eve' : null;
 }
+
+/** Where the townsfolk who don't keep a stall stand about the square on market day, clear of the well, the stalls and the sign. */
+export const MARKET_CROWD_SPOTS: readonly { x: number; y: number }[] = [
+  { x: 6, y: 23 }, { x: 7.2, y: 22.2 }, { x: 7.2, y: 24.2 }, { x: 8.5, y: 21.6 }, { x: 9.6, y: 24.6 },
+  { x: 11.6, y: 22.2 }, { x: 11.8, y: 24.4 }, { x: 5.2, y: 24.4 }, { x: 9.4, y: 21.9 }, { x: 4.8, y: 22.6 }
+];

@@ -3,6 +3,8 @@ import { afternoonStart, duskLength, nightStart, season, type Season } from './c
 import { HALL_DOOR_SPOT } from './castle';
 import { HILLS_EXIT } from './hills';
 import { JOBS } from './jobs';
+import { MARKET_CROWD_SPOTS, isMarketDay, isMarketEve, roadReady, townFull } from './market';
+import { STALL_IDS, STALL_JOBS } from './square';
 import { isRaining } from './rain';
 import type { AreaId, GameState } from './state';
 import { TOWN_NAMES } from './town';
@@ -28,11 +30,19 @@ const walkHome = (state: GameState): number | null => {
 export function personSpot(state: GameState, index: number): PersonSpot | null {
   const person = state.town.people[index];
   if (!person || state.timeOfDay >= nightStart(state.day)) return null;
-  const work = JOBS[person.job].spot;
+  const work = marketSpot(state, index) ?? JOBS[person.job].spot;
   const walk = walkHome(state);
   if (walk === null) return { ...work, walking: false };
   const home = person.house === null ? { area: 'hills' as const, ...HALL_DOOR_SPOT } : HOUSE_PLOTS[person.house];
   return { ...onTheWay(walkLegs(work, home), walk), walking: true };
+}
+
+const keepsAStall = (job: string): boolean => STALL_IDS.some(id => STALL_JOBS[id] === job);
+
+/** On market day, where someone who doesn't keep a stall stands about the square instead of at their work. Their work is still done. */
+function marketSpot(state: GameState, index: number): { area: AreaId; x: number; y: number } | null {
+  if (!isMarketDay(state) || keepsAStall(state.town.people[index].job)) return null;
+  return { area: 'hills', ...MARKET_CROWD_SPOTS[index % MARKET_CROWD_SPOTS.length] };
 }
 
 type Leg = { area: AreaId; from: { x: number; y: number }; to: { x: number; y: number } };
@@ -73,8 +83,22 @@ const SEASON_LINES: Record<Exclude<Season, 'winter'>, string> = {
   autumn: 'The leaves are turning.'
 };
 
+/** What people say of market day: tomorrow's on the eve, the crowd on the day, and, from the stallholders, what the
+ * traders wait on while the town is full but the old road isn't ready. */
+function marketLine(state: GameState, name: string): string | null {
+  if (isMarketEve(state)) return 'Market tomorrow.';
+  if (isMarketDay(state)) return 'Busy one today.';
+  const person = state.town.people.find(each => each.name === name);
+  if (person && keepsAStall(person.job) && state.town.market.openDay === null && townFull(state) && !roadReady(state)) {
+    return 'The traders won\'t come till the old road\'s clear and marked.';
+  }
+  return null;
+}
+
 function greetingLine(state: GameState, name: string): string {
   if (walkHome(state) !== null) return 'Good evening.';
+  const market = marketLine(state, name);
+  if (market) return market;
   if (isRaining(state)) return 'Wet one today.';
   const now = season(state.day);
   if (now === 'winter') return 'Cold one today.';
