@@ -1,5 +1,5 @@
-import { PAVING_SECTION, SQUARE_NEEDS, STALL_IDS, squareMarked } from '../game/square';
-import { SIGN_SPOT, TRADERS, signFace, stallFrame, traderCartSpot, traderSpot } from '../game/market';
+import { PAVING_SECTION, SQUARE_NEEDS, STALL_IDS, STALL_JOBS, squareMarked } from '../game/square';
+import { SIGN_SPOT, TRADERS, isMarketDay, signFace, stallFrame, traderCartSpot, traderSpot } from '../game/market';
 import { PAVING_SPOTS, SQUARE_CENTRE, STALL_SPOTS, WELL_SPOT } from '../game/squareSites';
 import { feathersFound } from '../game/companion';
 import { stripStage } from '../game/field';
@@ -197,7 +197,9 @@ function addTraders(state: GameState, timeMs: number, add: AddVisual): void {
 function addTownsfolk(state: GameState, timeMs: number, add: AddVisual): void {
   for (const each of townsfolkHere(state)) {
     const dress = Math.max(0, TOWN_NAMES.indexOf(each.name)) % TOWNSFOLK_DRESSES;
-    const frame = each.traveller ? 'stand' : each.walking ? `walk${Math.floor(timeMs / 250) % 2}` : 'work';
+    // On market day those who came to look stand about the square rather than work.
+    const looking = !each.traveller && !each.walking && isMarketDay(state) && !STALL_IDS.some(id => STALL_JOBS[id] === state.town.people[each.index]?.job);
+    const frame = each.traveller || looking ? 'stand' : each.walking ? `walk${Math.floor(timeMs / 250) % 2}` : 'work';
     add(each.traveller ? 'townsfolk-traveller' : `townsfolk-${each.index}`, `townsfolk${dress}:${frame}`, each.x, each.y);
   }
 }

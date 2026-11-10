@@ -38,15 +38,18 @@ const seasons = <T extends string>(names: readonly T[], paint: (g: Grid, name: T
 
 /** A trader: a townsperson's shape in a travelling cloak, under a broad hat. */
 const TRADER_DRESS: Record<'glass' | 'spice', Record<string, PaletteKey>> = {
-  glass: { a: 'hair0', f: 'bird0', g: 'bird1', h: 'bird2', k: 'scarf2', m: 'wood1', n: 'wood2' },
-  spice: { a: 'hair2', f: 'berry0', g: 'berry1', h: 'scarf2', k: 'scarf3', m: 'earth0', n: 'earth1' }
+  glass: { a: 'hair0', f: 'storm', g: 'bird1', h: 'bird2', k: 'scarf2', m: 'ink', n: 'storm', o: 'frost' },
+  spice: { a: 'hair2', f: 'berry0', g: 'berry1', h: 'scarf2', k: 'scarf3', m: 'berry0', n: 'berry2', o: 'scarf3' }
 };
 const TRADER_BASE: Record<string, PaletteKey> = { s: 'shadow', c: 'skin2', d: 'skin3', e: 'skin4', q: 'wood1', r: 'wood3', i: 'ink' };
 function trader(g: Grid, stride: number): void {
   person(g, stride, 0);
-  box(g, 1, 3, 15, 2, 'm');
-  box(g, 4, 0, 9, 3, 'n');
-  box(g, 4, 2, 9, 1, 'm');
+  // A broad-brimmed hat with a band, wider than any townsperson's head, and a cloak's collar over the shoulders.
+  box(g, 0, 4, 16, 1, 'm');
+  box(g, 1, 5, 14, 1, 'm');
+  box(g, 4, 0, 8, 4, 'n');
+  box(g, 4, 3, 8, 1, 'o');
+  box(g, 3, 11, 11, 1, 'm');
 }
 const traderFrames: Record<string, (g: Grid) => void> = { stand: g => trader(g, 0), walk0: g => trader(g, 1), walk1: g => trader(g, -1) };
 

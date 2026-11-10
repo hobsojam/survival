@@ -7,6 +7,7 @@ import { STALL_JOBS } from '../src/game/square';
 import { STALL_SPOTS, WELL_SPOT } from '../src/game/squareSites';
 import type { GameState } from '../src/game/state';
 import { greeting, personSpot } from '../src/game/townsfolk';
+import { sceneVisuals } from '../src/scene/visuals';
 import { fullTown, opened } from './marketTown';
 
 const away = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -66,5 +67,18 @@ describe('what the town says of the market', () => {
     expect(greeting(waiting, keeper)).toBe(`${keeper} · The traders won't come till the old road's clear and marked.`);
     expect(greeting(waiting, woodman)).not.toMatch(/traders/);
     expect(greeting(fullTown(state => { state.timeOfDay = 60; }), keeper)).not.toMatch(/traders/);
+  });
+});
+
+describe('the crowd as drawn', () => {
+  it('stands about the square on market day while the stallholders work, and walks home at dusk', () => {
+    const frames = (state: GameState) => Object.fromEntries(sceneVisuals(state, 0).filter(visual => visual.id.startsWith('townsfolk-')).map(visual => [visual.id, visual.texture.split(':')[1]]));
+    const day = on(102, 60, state => { state.area = 'hills'; });
+    const wood = index(day, 'wood');
+    const bread = index(day, STALL_JOBS.bread);
+    expect(frames(day)[`townsfolk-${wood}`]).toBe('stand');
+    expect(frames(day)[`townsfolk-${bread}`]).toBe('work');
+    const dusk = on(102, nightStart(102) - duskLength(102) + 1, state => { state.area = 'hills'; });
+    expect(frames(dusk)[`townsfolk-${wood}`]).toBe('walk0');
   });
 });
