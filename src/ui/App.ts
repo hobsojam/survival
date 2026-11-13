@@ -146,12 +146,12 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'dropOre' | 'feedSheep' | 'shearFlock' | 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'buildMine' | 'craftPot' | 'craftPack' | 'makeFishingLine' | 'clearGround' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'storeFood' | 'takeFood' | 'drawWater' | 'grindGrain' | 'millGrain' | 'takeLoaf' | 'takeHoney' | 'takeEgg';
+        const type = button.dataset.action as 'dropOre' | 'feedSheep' | 'shearFlock' | 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'buildMine' | 'craftPot' | 'craftPack' | 'makeFishingLine' | 'clearGround' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'storeFood' | 'takeFood' | 'storeFoodAll' | 'takeFoodAll' | 'drawWater' | 'grindGrain' | 'millGrain' | 'takeLoaf' | 'takeHoney' | 'takeEgg';
         const item = button.dataset.item as FoodItem | undefined;
         const dish = button.dataset.dish as DishId | undefined;
-        if (type === 'storeFood') {
+        if (type === 'storeFood' || type === 'storeFoodAll') {
           if (item) this.scene?.perform({ type, item });
-        } else if (type === 'takeFood') {
+        } else if (type === 'takeFood' || type === 'takeFoodAll') {
           if (item) this.scene?.perform({ type, item });
         } else if (type === 'cook') {
           this.scene?.perform(dish ? { type, dish } : { type });
@@ -546,6 +546,13 @@ export class App {
       store.title = row.storeTitle;
       take.disabled = row.takeDisabled;
       take.title = row.takeTitle;
+      const storeAll = element.querySelector<HTMLButtonElement>('[data-action="storeFoodAll"]')!, takeAll = element.querySelector<HTMLButtonElement>('[data-action="takeFoodAll"]')!;
+      storeAll.disabled = row.storeAllDisabled;
+      storeAll.title = row.storeAllTitle;
+      storeAll.textContent = `Store all (${row.storeAllCount})`;
+      takeAll.disabled = row.takeAllDisabled;
+      takeAll.title = row.takeAllTitle;
+      takeAll.textContent = `Take all (${row.takeAllCount})`;
     }
   }
 

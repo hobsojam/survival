@@ -641,7 +641,7 @@ describe('larder controls', () => {
   it('shows a row for each item in the bag or the larder, with what each button would do', () => {
     const view = larderView(stocked(true, stock(2), addFood(emptyFood(), 'honey', 3, 1)));
     expect(view.stored).toBe('Stored food 3/10');
-    expect(view.rows).toEqual([
+    expect(view.rows).toMatchObject([
       { item: 'berry', label: 'Berries', kept: 0, storeDisabled: false, storeTitle: 'Store 1 berry.', takeDisabled: true, takeTitle: 'The larder has no berries.' },
       { item: 'honey', label: 'Honey', kept: 3, storeDisabled: true, storeTitle: 'You have no honey to store.', takeDisabled: false, takeTitle: 'Take 1 honey.' }
     ]);
@@ -652,6 +652,14 @@ describe('larder controls', () => {
     expect(larderView(away).rows[0]).toMatchObject({ storeDisabled: true, takeDisabled: true, storeTitle: 'Return to camp to use the larder.' });
   });
 
+  it('shows bounded bulk counts and disables bulk controls when nothing can move', () => {
+    const view = larderView(stocked(true, stock(3), addFood(emptyFood(), 'honey', 9, 1)));
+    expect(view.rows[0]).toMatchObject({ item: 'berry', storeAllCount: 1, storeAllDisabled: false, takeAllCount: 0, takeAllDisabled: true });
+    expect(view.rows[1]).toMatchObject({ item: 'honey', storeAllCount: 0, storeAllDisabled: true, takeAllCount: 5, takeAllDisabled: false });
+    const away = { ...stocked(true, stock(1), stock(1)), player: { ...createGame().player, x: 5, y: 5 } };
+    expect(larderView(away).rows[0]).toMatchObject({ storeAllCount: 0, storeAllDisabled: true, takeAllCount: 0, takeAllDisabled: true });
+  });
+
   it('draws a hidden row with Store 1 and Take 1 for every food', () => {
     const markup = larderMarkup();
     expect(markup).toContain('id="larder-controls"');
@@ -659,6 +667,8 @@ describe('larder controls', () => {
     for (const item of ['berry', 'greens', 'hazelnut', 'honey', 'pineNeedles', 'roastedHazelnuts', 'trailFood', 'vegetables']) {
       expect(markup).toContain(`data-action="storeFood" data-item="${item}"`);
       expect(markup).toContain(`data-action="takeFood" data-item="${item}"`);
+      expect(markup).toContain(`data-action="storeFoodAll" data-item="${item}"`);
+      expect(markup).toContain(`data-action="takeFoodAll" data-item="${item}"`);
       expect(markup).toContain(`data-larder-item="${item}" hidden`);
     }
   });
