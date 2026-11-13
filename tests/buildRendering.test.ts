@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createGame } from '../src/game/state';
 import { STEP_IDS } from '../src/game/clearing';
+import { addFood } from '../src/game/food';
 import { App } from '../src/ui/App';
 
 vi.mock('phaser', () => ({ default: {} }));
@@ -27,12 +28,57 @@ function renderer() {
     querySelector: (selector: string) => {
       if (!nodes.has(selector)) nodes.set(selector, element());
       return nodes.get(selector)!;
-    }
+    },
+    querySelectorAll: (selector: string) => selector === '[data-larder-item]'
+      ? [...nodes].filter(([key]) => key.startsWith('[data-larder-item=')).map(([, node]) => node)
+      : []
   };
   const app = Object.create(App.prototype) as App;
   Object.assign(app, { root, state: createGame() });
   return { app, nodes, get: (selector: string) => root.querySelector(selector) };
 }
+
+describe('larder controls', () => {
+  it('renders bounded bulk counts and enabled buttons for food that can move', () => {
+    const { app, get } = renderer();
+    const state = createGame();
+    state.structures.larder = true;
+    state.inventory.food = addFood(state.inventory.food, 'berry', 3, state.day);
+    state.larder = addFood(state.larder, 'honey', 9, state.day);
+    Object.assign(app, { state });
+    const berry = get('[data-larder-item="berry"]');
+    const honey = get('[data-larder-item="honey"]');
+
+    app['renderLarder']();
+
+    expect(get('#larder-controls').hidden).toBe(false);
+    expect(get('#larder-stored').textContent).toBe('Stored food 9/10');
+    expect(berry.hidden).toBe(false);
+    expect(berry.querySelector('[data-action="storeFoodAll"]')).toMatchObject({ disabled: false, textContent: 'Store all (1)', title: 'Store 1 berry.' });
+    expect(berry.querySelector('[data-action="takeFoodAll"]')).toMatchObject({ disabled: true, textContent: 'Take all (0)' });
+    expect(honey.querySelector('[data-action="storeFoodAll"]')).toMatchObject({ disabled: true, textContent: 'Store all (0)' });
+    expect(honey.querySelector('[data-action="takeFoodAll"]')).toMatchObject({ disabled: false, textContent: 'Take all (5)', title: 'Take 5 honey.' });
+  });
+
+  it('disables bulk buttons away from camp and hides a row after its food is gone', () => {
+    const { app, get } = renderer();
+    const state = createGame();
+    state.structures.larder = true;
+    state.inventory.food = addFood(state.inventory.food, 'berry', 1, state.day);
+    state.player.x = 5;
+    state.player.y = 5;
+    Object.assign(app, { state });
+    const berry = get('[data-larder-item="berry"]');
+
+    app['renderLarder']();
+    expect(berry.querySelector('[data-action="storeFoodAll"]')).toMatchObject({ disabled: true, title: 'Return to camp to use the larder.' });
+    expect(berry.querySelector('[data-action="takeFoodAll"]')).toMatchObject({ disabled: true, title: 'Return to camp to use the larder.' });
+
+    state.inventory.food.berry = [];
+    app['renderLarder']();
+    expect(berry.hidden).toBe(true);
+  });
+});
 
 describe('completed Build actions', () => {
   it('hides finished tool rows and the Forest tools section when all tools are made', () => {
