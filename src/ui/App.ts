@@ -118,7 +118,7 @@ export class App {
                 <div id="ore-supply" hidden><span class="supply-icon stone">◆</span><strong id="ore-count">0</strong><small>Ore</small><small id="ore-stored" class="supply-note"></small><button type="button" class="supply-action" data-action="dropOre" data-supply="ore" aria-label="Drop one ore">Drop</button></div>
                 <div><span class="supply-icon ration">◇</span><strong id="ration-count">0</strong><small>Rations</small><button type="button" class="supply-action" data-action="eatTrailFood" data-supply="trailFood" aria-label="Eat one trail ration">Eat</button></div>
                 <div><span class="supply-icon space">◫</span><strong id="space-count">0/8</strong><small id="space-label">Carried</small></div>${bagFoodMarkup()}
-              </div><p class="keepsake-line" id="bag-pips" hidden></p><p class="keepsake-line" id="pack-hint" hidden></p><p class="keepsake-line" id="keepsake-line" hidden></p><div class="fire-status" id="fire-status">The fire is unlit</div></section>
+              </div><p class="bag-breakdown" id="space-breakdown">Bag empty</p><p class="keepsake-line" id="bag-pips" hidden></p><p class="keepsake-line" id="pack-hint" hidden></p><p class="keepsake-line" id="keepsake-line" hidden></p><div class="fire-status" id="fire-status">The fire is unlit</div></section>
               ${campStoresMarkup()}
               <section class="panel garden-panel" data-tab="camp"><p class="eyebrow">GROW WITH THE SEASONS</p><h2>Berry garden</h2><p class="garden-hint" id="garden-hint"></p><div id="garden-plots"></div></section>
               <section class="panel beds-panel" data-tab="camp" hidden><p class="eyebrow">THE WEST GROUND</p><h2>Vegetable beds</h2><p class="garden-hint" id="beds-hint"></p><div id="bed-list"></div><div class="tool-row" id="draw-water-row" hidden><button type="button" id="draw-water-button" data-action="drawWater">Draw water</button><small id="draw-water-hint"></small></div></section>
@@ -149,9 +149,13 @@ export class App {
         const type = button.dataset.action as 'dropOre' | 'feedSheep' | 'shearFlock' | 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'buildMine' | 'craftPot' | 'craftPack' | 'makeFishingLine' | 'clearGround' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'storeFood' | 'takeFood' | 'storeFoodAll' | 'takeFoodAll' | 'drawWater' | 'grindGrain' | 'millGrain' | 'takeLoaf' | 'takeHoney' | 'takeEgg';
         const item = button.dataset.item as FoodItem | undefined;
         const dish = button.dataset.dish as DishId | undefined;
-        if (type === 'storeFood' || type === 'storeFoodAll') {
+        if (type === 'storeFood') {
           if (item) this.scene?.perform({ type, item });
-        } else if (type === 'takeFood' || type === 'takeFoodAll') {
+        } else if (type === 'takeFood') {
+          if (item) this.scene?.perform({ type, item });
+        } else if (type === 'storeFoodAll') {
+          if (item) this.scene?.perform({ type, item });
+        } else if (type === 'takeFoodAll') {
           if (item) this.scene?.perform({ type, item });
         } else if (type === 'cook') {
           this.scene?.perform(dish ? { type, dish } : { type });
@@ -501,6 +505,7 @@ export class App {
       this.setText(`${item}-note`, bag.foods[item].note);
     }
     this.setText('space-count', bag.spaces);
+    this.setText('space-breakdown', bag.spaceBreakdown);
     this.setText('space-label', bag.spacesLabel);
     const packHint = this.root.querySelector<HTMLElement>('#pack-hint');
     if (packHint) packHint.hidden = !bag.packHint;

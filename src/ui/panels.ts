@@ -649,13 +649,18 @@ export function bagFoodMarkup(): string {
 export const EATABLE_FOODS = ['berry', 'trailFood', ...BAG_FOODS.filter(cell => cell.eat).map(cell => cell.item)] as const satisfies readonly FoodItem[];
 export type EatableFood = (typeof EATABLE_FOODS)[number];
 
-export interface BagView { oreAtForge: string; oreShown: boolean; foods: Record<BagFood, { count: number; shown: boolean; note: string }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; spacesLabel: string; packHint: string; prepareReady: boolean; prepareHint: string; storedAtCamp: string; woodAtCamp: string; fiberAtCamp: string; fire: string }
+export interface BagView { oreAtForge: string; oreShown: boolean; foods: Record<BagFood, { count: number; shown: boolean; note: string }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; spaceBreakdown: string; spacesLabel: string; packHint: string; prepareReady: boolean; prepareHint: string; storedAtCamp: string; woodAtCamp: string; fiberAtCamp: string; fire: string }
 
 export function bagView(state: GameState): BagView {
   const prepareBlocker = trailFoodBlocker(state);
   const pile = state.structures.stonePile;
   // The woodpile and, once the house stands, the woodshed keep one wood store between them.
   const woodStore = hasWoodStore(state);
+  const { wood, fiber, stone, ore, food } = state.inventory;
+  const spaceParts = ([
+    ['food', storeTotal(food)], ['wood', wood], ['fiber', fiber],
+    ['stone', stone * BALANCE.stoneSpaces], ['ore', ore * BALANCE.stoneSpaces]
+  ] as [string, number][]).filter(([, count]) => count > 0).map(([label, count]) => `${label} ${count}`);
   /** "(2 going soft)" for the bag's fresh pieces gone at the next dawn, or nothing. */
   const softNote = (item: FoodItem): string => {
     const soft = isFresh(item) ? goingSoft(state.inventory.food, item, state.day, BALANCE.bagFreshDays) : 0;
@@ -672,6 +677,7 @@ export function bagView(state: GameState): BagView {
     eatable,
     berries: `Berries ${foodCount(state.inventory.food, 'berry')}${softNote('berry')}`,
     spaces: `${carriedCount(state)}/${bagCapacity(state)}`,
+    spaceBreakdown: spaceParts.length ? `Spaces: ${spaceParts.join(' · ')}` : 'Bag empty',
     spacesLabel: ['Carried', ...(state.progress.packWoven ? ['woven pack'] : []), ...(ponyWith(state) ? ['the pony'] : [])].join(' · '),
     packHint: state.progress.packWoven ? '' : `Weave a pack at the toolshed to carry ${BALANCE.packCapacity}.`,
     prepareReady: !prepareBlocker,

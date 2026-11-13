@@ -309,6 +309,14 @@ describe('bag panel', () => {
     expect(bagView(game()).fire).toBe('The fire is unlit');
   });
 
+  it('explains which supplies occupy bag spaces', () => {
+    expect(bagView(game()).spaceBreakdown).toBe('Bag empty');
+    const full = game({ inventory: { wood: 1, fiber: 1, stone: 2, food: stock(2) } });
+    expect(bagView(full).spaces).toBe('8/8');
+    expect(bagView(full).spaceBreakdown).toBe('Spaces: food 2 · wood 1 · fiber 1 · stone 4');
+    expect(bagView(game({ inventory: { ore: 2 } })).spaceBreakdown).toBe('Spaces: ore 4');
+  });
+
   it('shows the stone pile once it is built', () => {
     expect(bagView(game({ structures: { stonePile: true } }, { storedStone: 3 })))
       .toMatchObject({ storedAtCamp: '+3 at camp' });
