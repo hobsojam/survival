@@ -34,7 +34,7 @@ function renderer() {
       : []
   };
   const app = Object.create(App.prototype) as App;
-  Object.assign(app, { root, state: createGame() });
+  Object.assign(app, { root, state: createGame(), find: root.querySelector });
   return { app, nodes, get: (selector: string) => root.querySelector(selector) };
 }
 
@@ -77,6 +77,24 @@ describe('larder controls', () => {
     state.inventory.food.berry = [];
     app['renderLarder']();
     expect(berry.hidden).toBe(true);
+  });
+});
+
+describe('bag space breakdown', () => {
+  it('shows weighted stone and food space, then returns to an empty message', () => {
+    const { app, get } = renderer();
+    const state = createGame();
+    state.inventory.food = addFood(state.inventory.food, 'berry', 1, state.day);
+    state.inventory.stone = 2;
+    Object.assign(app, { state });
+
+    app['renderBag']();
+    expect(get('#space-breakdown').textContent).toBe('Spaces: food 1 · stone 4');
+
+    state.inventory.food.berry = [];
+    state.inventory.stone = 0;
+    app['renderBag']();
+    expect(get('#space-breakdown').textContent).toBe('Bag empty');
   });
 });
 
