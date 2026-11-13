@@ -3,7 +3,7 @@ import { nightStart } from '../src/game/calendar';
 import { BALANCE, BUILDINGS, createGame, type GameState } from '../src/game/state';
 import { CLEARING_STEPS, STEP_IDS, inClearing, placeBranches } from '../src/game/clearing';
 import { addFood, availableFood, emptyFood, quickEatItem, reachableLarder, spendFood, spoilMessage, type FoodStore } from '../src/game/food';
-import { FULL_BAG_MESSAGE, advanceTime, applyAction, buildStatus, carriedCount, groundBlocker, trailFoodBlocker } from '../src/game/rules';
+import { FULL_BAG_MESSAGE, advanceTime, applyAction, buildStatus, carriedCount, groundBlocker, storeFoodAllCount, takeFoodAllCount, trailFoodBlocker } from '../src/game/rules';
 import { offerFor } from '../src/game/companion';
 import { buildButtonView } from '../src/ui/panels';
 import { CAMP_STRUCTURES } from '../src/scene/visuals';
@@ -108,6 +108,39 @@ describe('upgrading the larder', () => {
 });
 
 describe('storing and taking food', () => {
+  it('bulk stores only the room left, oldest fresh pieces first', () => {
+    const state = withStores(camp(), food([['berry', 1, 5], ['berry', 1, 2], ['berry', 1, 4], ['berry', 1, 3]]), food([['hazelnut', 8, 1]]));
+    expect(storeFoodAllCount(state, 'berry')).toBe(2);
+    const result = applyAction(state, { type: 'storeFoodAll', item: 'berry' });
+    expect(result.message).toContain('2');
+    expect(result.state.inventory.food.berry).toEqual([5, 4]);
+    expect(result.state.larder.berry).toEqual([2, 3]);
+    expect(storeFoodAllCount(result.state, 'berry')).toBe(0);
+  });
+
+  it('bulk takes only free bag spaces, freshest fresh pieces first', () => {
+    const base = withStores(camp(), emptyFood(), food([['berry', 1, 2], ['berry', 1, 5], ['berry', 1, 4]]));
+    const state = { ...base, inventory: { ...base.inventory, stone: 3 } };
+    expect(takeFoodAllCount(state, 'berry')).toBe(2);
+    const result = applyAction(state, { type: 'takeFoodAll', item: 'berry' });
+    expect(result.message).toContain('2');
+    expect(result.state.inventory.food.berry).toEqual([5, 4]);
+    expect(result.state.larder.berry).toEqual([2]);
+    expect(takeFoodAllCount(result.state, 'berry')).toBe(0);
+  });
+
+  it('bulk transfers kept food and refuses when no transfer is possible', () => {
+    const state = withStores(camp(), food([['hazelnut', 3, 1]]), emptyFood());
+    const stored = applyAction(state, { type: 'storeFoodAll', item: 'hazelnut' });
+    expect(stored.state.inventory.food.hazelnut).toBe(0);
+    expect(stored.state.larder.hazelnut).toBe(3);
+    const taken = applyAction(stored.state, { type: 'takeFoodAll', item: 'hazelnut' });
+    expect(taken.state.inventory.food.hazelnut).toBe(3);
+    expect(taken.state.larder.hazelnut).toBe(0);
+    expect(applyAction(taken.state, { type: 'takeFoodAll', item: 'hazelnut' }).state).toBe(taken.state);
+    expect(applyAction(away(state), { type: 'storeFoodAll', item: 'hazelnut' }).state).toEqual(away(state));
+    expect(applyAction(camp(false), { type: 'takeFoodAll', item: 'hazelnut' }).state).toEqual(camp(false));
+  });
   it('stores the bag\'s oldest piece and takes the larder\'s freshest', () => {
     const state = withStores(camp(), food([['berry', 1, 5], ['berry', 1, 3]]), food([['berry', 1, 2], ['berry', 1, 4]]));
     const stored = applyAction(state, { type: 'storeFood', item: 'berry' });

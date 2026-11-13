@@ -15,7 +15,7 @@ import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { BED_CROPS, bedSoil, bedStage, drawWaterBlocker, harvestBedBlocker, sowBedBlocker, type BedSoil, type BedStage } from '../game/beds';
 import { workSeconds } from '../game/needs';
 import { hasWoodStore, livesInHouse, woodStoreCapacity } from '../game/home';
-import { availableFiber, availableWood, isAtCamp, axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, mineBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodBlocker, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
+import { availableFiber, availableWood, isAtCamp, axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, mineBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodAllCount, storeFoodBlocker, takeFoodAllCount, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
 import { availableOre } from '../game/hills';
 import { ponyWith } from '../game/pony';
 import { GOODS, goodBlocker, goodRoom, type CastleGood } from '../game/castleSites';
@@ -649,13 +649,18 @@ export function bagFoodMarkup(): string {
 export const EATABLE_FOODS = ['berry', 'trailFood', ...BAG_FOODS.filter(cell => cell.eat).map(cell => cell.item)] as const satisfies readonly FoodItem[];
 export type EatableFood = (typeof EATABLE_FOODS)[number];
 
-export interface BagView { oreAtForge: string; oreShown: boolean; foods: Record<BagFood, { count: number; shown: boolean; note: string }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; spacesLabel: string; packHint: string; prepareReady: boolean; prepareHint: string; storedAtCamp: string; woodAtCamp: string; fiberAtCamp: string; fire: string }
+export interface BagView { oreAtForge: string; oreShown: boolean; foods: Record<BagFood, { count: number; shown: boolean; note: string }>; eatable: Record<EatableFood, boolean>; berries: string; spaces: string; spaceBreakdown: string; spacesLabel: string; packHint: string; prepareReady: boolean; prepareHint: string; storedAtCamp: string; woodAtCamp: string; fiberAtCamp: string; fire: string }
 
 export function bagView(state: GameState): BagView {
   const prepareBlocker = trailFoodBlocker(state);
   const pile = state.structures.stonePile;
   // The woodpile and, once the house stands, the woodshed keep one wood store between them.
   const woodStore = hasWoodStore(state);
+  const { wood, fiber, stone, ore, food } = state.inventory;
+  const spaceParts = ([
+    ['food', storeTotal(food)], ['wood', wood], ['fiber', fiber],
+    ['stone', stone * BALANCE.stoneSpaces], ['ore', ore * BALANCE.stoneSpaces]
+  ] as [string, number][]).filter(([, count]) => count > 0).map(([label, count]) => `${label} ${count}`);
   /** "(2 going soft)" for the bag's fresh pieces gone at the next dawn, or nothing. */
   const softNote = (item: FoodItem): string => {
     const soft = isFresh(item) ? goingSoft(state.inventory.food, item, state.day, BALANCE.bagFreshDays) : 0;
@@ -672,6 +677,7 @@ export function bagView(state: GameState): BagView {
     eatable,
     berries: `Berries ${foodCount(state.inventory.food, 'berry')}${softNote('berry')}`,
     spaces: `${carriedCount(state)}/${bagCapacity(state)}`,
+    spaceBreakdown: spaceParts.length ? `Spaces: ${spaceParts.join(' · ')}` : 'Bag empty',
     spacesLabel: ['Carried', ...(state.progress.packWoven ? ['woven pack'] : []), ...(ponyWith(state) ? ['the pony'] : [])].join(' · '),
     packHint: state.progress.packWoven ? '' : `Weave a pack at the toolshed to carry ${BALANCE.packCapacity}.`,
     prepareReady: !prepareBlocker,
@@ -701,16 +707,19 @@ const LARDER_LABELS: Record<FoodItem, string> = {
   berry: 'Berries', apple: 'Apples', egg: 'Eggs', greens: 'Greens', hazelnut: 'Hazelnuts', honey: 'Honey', pineNeedles: 'Pine needles', roastedHazelnuts: 'Roasted hazelnuts', trailFood: 'Rations', vegetables: 'Vegetables', fish: 'Fish', rabbit: 'Rabbit', flour: 'Flour', bread: 'Bread'
 };
 
-export interface LarderRowView { item: FoodItem; label: string; kept: number; storeDisabled: boolean; storeTitle: string; takeDisabled: boolean; takeTitle: string }
+export interface LarderRowView { item: FoodItem; label: string; kept: number; storeDisabled: boolean; storeTitle: string; takeDisabled: boolean; takeTitle: string; storeAllCount: number; storeAllDisabled: boolean; storeAllTitle: string; takeAllCount: number; takeAllDisabled: boolean; takeAllTitle: string }
 
 /** The larder's controls under its build button, once built: how full it is, and a row for each food in the bag or the larder. */
 export function larderView(state: GameState): { shown: boolean; stored: string; rows: LarderRowView[] } {
   const rows = FOOD_ITEMS.filter(item => foodCount(state.inventory.food, item) + foodCount(state.larder, item) > 0).map(item => {
     const storeBlocker = storeFoodBlocker(state, item), takeBlocker = takeFoodBlocker(state, item);
+    const storeAllCount = storeFoodAllCount(state, item), takeAllCount = takeFoodAllCount(state, item);
     return {
       item, label: LARDER_LABELS[item], kept: foodCount(state.larder, item),
       storeDisabled: Boolean(storeBlocker), storeTitle: storeBlocker ?? `Store 1 ${foodWord(item, 1)}.`,
-      takeDisabled: Boolean(takeBlocker), takeTitle: takeBlocker ?? `Take 1 ${foodWord(item, 1)}.`
+      takeDisabled: Boolean(takeBlocker), takeTitle: takeBlocker ?? `Take 1 ${foodWord(item, 1)}.`,
+      storeAllCount, storeAllDisabled: storeAllCount === 0, storeAllTitle: storeBlocker ?? `Store ${storeAllCount} ${foodWord(item, storeAllCount)}.`,
+      takeAllCount, takeAllDisabled: takeAllCount === 0, takeAllTitle: takeBlocker ?? `Take ${takeAllCount} ${foodWord(item, takeAllCount)}.`
     };
   });
   return { shown: state.structures.larder, stored: `Stored food ${storeTotal(state.larder)}/${foodStoreCapacity(state)}`, rows };
@@ -718,7 +727,7 @@ export function larderView(state: GameState): { shown: boolean; stored: string; 
 
 /** The larder's controls, hidden until built, with a hidden row for every food. */
 export function larderMarkup(): string {
-  const rows = FOOD_ITEMS.map(item => `<div class="larder-row" data-larder-item="${item}" hidden><span>${LARDER_LABELS[item]} <b id="larder-${item}-count">0</b></span><button type="button" data-action="storeFood" data-item="${item}">Store 1</button><button type="button" data-action="takeFood" data-item="${item}">Take 1</button></div>`).join('');
+  const rows = FOOD_ITEMS.map(item => `<div class="larder-row" data-larder-item="${item}" hidden><span>${LARDER_LABELS[item]} <b id="larder-${item}-count">0</b></span><button type="button" data-action="storeFood" data-item="${item}">Store 1</button><button type="button" data-action="storeFoodAll" data-item="${item}">Store all (0)</button><button type="button" data-action="takeFood" data-item="${item}">Take 1</button><button type="button" data-action="takeFoodAll" data-item="${item}">Take all (0)</button></div>`).join('');
   return `<div id="larder-controls" class="stone-pile-controls larder-controls" hidden><span id="larder-stored">Stored food 0/${BALANCE.larderCapacity}</span>${rows}</div>`;
 }
 

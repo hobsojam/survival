@@ -81,6 +81,8 @@ export type GameAction =
   | { type: 'eat'; item?: FoodItem }
   | { type: 'storeFood'; item: FoodItem }
   | { type: 'takeFood'; item: FoodItem }
+  | { type: 'storeFoodAll'; item: FoodItem }
+  | { type: 'takeFoodAll'; item: FoodItem }
   | { type: 'cook'; dish?: DishId }
   | { type: 'layStone' | 'hangDoor' | 'climbKeep' | 'enterKeep' | 'eatTrailFood' | 'prepareTrailFood' | 'stokeFire' | 'rest' | 'sleep' | 'stargaze' | 'repairLookout' | 'cross' | 'digOre' | 'dropOre' | 'offerPony' | 'craftAxe' | 'craftPickaxe' | 'craftPot' | 'craftPack' | 'gatherRubble' | 'digQuarry' | 'takeCartStone' | 'buildMine' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'befriend' | 'craftPillow' | 'craftCloak' | 'meetChickens' | 'leadChickens' | 'takeEgg' | 'gatherApples' | 'searchShed' }
   | { type: 'pickUpStone'; pileId: string }
@@ -792,6 +794,25 @@ export function takeFoodBlocker(state: GameState, item: FoodItem): string | null
   return null;
 }
 
+/** How many of this food can move into the larder in one action. */
+export function storeFoodAllCount(state: GameState, item: FoodItem): number {
+  if (storeFoodBlocker(state, item)) return 0;
+  return Math.min(foodCount(state.inventory.food, item), foodStoreCapacity(state) - storeTotal(state.larder));
+}
+
+/** How many of this food can move into the bag in one action. */
+export function takeFoodAllCount(state: GameState, item: FoodItem): number {
+  if (takeFoodBlocker(state, item)) return 0;
+  return Math.min(foodCount(state.larder, item), freeSpaces(state));
+}
+
+/** Repeat the existing single-piece age ordering for a bounded batch. */
+function moveMany(from: FoodStore, to: FoodStore, item: FoodItem, count: number, pick: (days: number[]) => number): { from: FoodStore; to: FoodStore } {
+  let moved = { from, to };
+  for (let i = 0; i < count; i++) moved = moveOne(moved.from, moved.to, item, pick);
+  return moved;
+}
+
 /** Puts the bag's oldest piece of an item in the larder, where it keeps longer. */
 const storeFood: ActionHandler<'storeFood'> = (state, action) => {
   const blocker = storeFoodBlocker(state, action.item);
@@ -806,6 +827,22 @@ const takeFood: ActionHandler<'takeFood'> = (state, action) => {
   if (blocker) return refuse(state, blocker);
   const moved = moveOne(state.larder, state.inventory.food, action.item, days => Math.max(...days));
   return { state: { ...state, inventory: { ...state.inventory, food: moved.to }, larder: moved.from }, message: `Took 1 ${foodWord(action.item, 1)} from the larder.` };
+};
+
+const storeFoodAll: ActionHandler<'storeFoodAll'> = (state, action) => {
+  const blocker = storeFoodBlocker(state, action.item);
+  if (blocker) return refuse(state, blocker);
+  const count = storeFoodAllCount(state, action.item);
+  const moved = moveMany(state.inventory.food, state.larder, action.item, count, days => Math.min(...days));
+  return { state: { ...state, inventory: { ...state.inventory, food: moved.from }, larder: moved.to }, message: `Stored ${count} ${foodWord(action.item, count)} in the larder.` };
+};
+
+const takeFoodAll: ActionHandler<'takeFoodAll'> = (state, action) => {
+  const blocker = takeFoodBlocker(state, action.item);
+  if (blocker) return refuse(state, blocker);
+  const count = takeFoodAllCount(state, action.item);
+  const moved = moveMany(state.larder, state.inventory.food, action.item, count, days => Math.max(...days));
+  return { state: { ...state, inventory: { ...state.inventory, food: moved.to }, larder: moved.from }, message: `Took ${count} ${foodWord(action.item, count)} from the larder.` };
 };
 
 const digOre: ActionHandler<'digOre'> = state => {
@@ -1570,7 +1607,7 @@ const HANDLERS: { [T in GameAction['type']]: ActionHandler<T> } = {
   shearFlock,
   weave,
   move, cross, gather, craftAxe, craftPickaxe, craftPot, craftPack, gatherRubble, digQuarry, takeCartStone, digOre, dropOre, offerPony, buildMine, chopTree, markClearing, clearGround, visitSite,
-  storeFood, takeFood, dropStone, dropPineNeedles, pickUpStone, burnFiber, burnPineNeedles, eat, eatTrailFood, prepareTrailFood,
+  storeFood, takeFood, storeFoodAll, takeFoodAll, dropStone, dropPineNeedles, pickUpStone, burnFiber, burnPineNeedles, eat, eatTrailFood, prepareTrailFood,
   cook, stargaze, stokeFire, repairLookout, build, decorate, plantGarden, harvestGarden, sowBed, harvestBed, drawWater, sowStrip, cutStrip, threshStrip, grindGrain, millGrain, takeLoaf, takeHoney, makeUpgrade, makeCastleGood, layStone, castleWork, hangDoor, climbKeep: offeringHall(climbKeep), enterKeep: offeringHall(enterKeep), rest, sleep: offeringHall(sleep), befriend, meetChickens, leadChickens, takeEgg, gatherApples, plantPip, pickOrchardApple, searchShed, craftPillow, craftCloak,
   makeFishingLine, fish
 };

@@ -216,6 +216,7 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
 .supply-action:disabled { opacity: .45; cursor: default; }
 .supplies .supply-note { margin-left: 3px; color: #4f6655; font-weight: 700; }
 .supplies > div[hidden] { display: none; }
+.bag-breakdown { margin: 9px 0 0; color: #4f6655; font-size: 11px; line-height: 1.45; text-align: center; overflow-wrap: anywhere; }
 .food-icon { display: block; width: 20px; height: 20px; margin: 0 auto; image-rendering: pixelated; }
 .stone-pile-controls { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 7px; margin-top: -2px; padding: 9px 10px; border: 1px solid #e2e7d9; border-radius: 10px; background: #f4f6ed; color: #4f6655; font-size: 11px; font-weight: 700; }
 .stone-pile-controls[hidden] { display: none; }
@@ -226,8 +227,10 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
 .store-lines { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; margin-bottom: 9px; }
 .store-line { margin: 0; padding: 9px 10px; border: 1px solid #e2e7d9; border-radius: 10px; background: #f4f6ed; color: #4f6655; font-size: 11px; font-weight: 700; }
 .store-line[hidden] { display: none; }
-.larder-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 7px; }
+.larder-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; gap: 7px; padding: 5px 0; }
 .larder-row[hidden] { display: none; }
+.larder-row > span { grid-column: 1 / -1; }
+.larder-row button { min-height: 44px; }
 .larder-row b { color: #8a6d4a; }
 .fire-status { margin-top: 12px; padding: 11px; border: 1px solid #f2e1c7; border-radius: 9px; background: #fff1d9; color: #95623e; text-align: center; font-size: 12px; font-weight: 700; }
 .keepsake-line { margin: 12px 0 0; color: #4f6655; font-size: 12px; font-weight: 700; text-align: center; }
