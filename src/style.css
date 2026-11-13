@@ -230,7 +230,7 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
 .larder-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; gap: 7px; padding: 5px 0; }
 .larder-row[hidden] { display: none; }
 .larder-row > span { grid-column: 1 / -1; }
-.larder-row button { min-height: 36px; }
+.larder-row button { min-height: 44px; }
 .larder-row b { color: #8a6d4a; }
 .fire-status { margin-top: 12px; padding: 11px; border: 1px solid #f2e1c7; border-radius: 9px; background: #fff1d9; color: #95623e; text-align: center; font-size: 12px; font-weight: 700; }
 .keepsake-line { margin: 12px 0 0; color: #4f6655; font-size: 12px; font-weight: 700; text-align: center; }
