@@ -69,9 +69,9 @@ interface SiteRule {
   count: (castle: CastleState) => number;
   /** The prompt for a spot that can be worked now, and for one that is short of something. */
   label: (castle: CastleState, need?: SiteNeed) => string;
-  ask: (castle: CastleState, need: SiteNeed) => string;
+  ask: (castle: CastleState, need: SiteNeed, state: GameState) => string;
   /** The refusal for the same shortage. */
-  short: (castle: CastleState, need: SiteNeed) => string;
+  short: (castle: CastleState, need: SiteNeed, state: GameState) => string;
   /** Why the section can't be worked today even with everything in hand, as its prompt and its refusal. */
   wait?: (state: GameState) => { label: string; message: string } | null;
   /** How much of a dig's time and energy a piece takes: half unless said. */
@@ -124,6 +124,7 @@ function framesRule(): SiteRule {
 
 /** One side of the curtain wall, a stone at a time, once the frames are up. */
 function wallRule(side: WallSide): SiteRule {
+  const name = `${side[0].toUpperCase()}${side.slice(1)} wall`;
   return {
     need: ({ castle }) => (castle.frames === NEEDS.frames && castle.wall[side] < NEEDS.wallSide ? { kind: 'stone' } : null),
     finished: castle => castle.wall[side] === NEEDS.wallSide,
@@ -142,8 +143,8 @@ function wallRule(side: WallSide): SiteRule {
     },
     count: castle => castle.wall[side],
     label: castle => `Lay a wall stone, ${side} side (${castle.wall[side]}/${NEEDS.wallSide})`,
-    ask: () => 'Wall · bring stone to build it',
-    short: () => 'Bring stone to build the wall.'
+    ask: castle => `${name} ${castle.wall[side]}/${NEEDS.wallSide} · bring stone`,
+    short: castle => `Bring stone to build the wall. ${name} ${castle.wall[side]}/${NEEDS.wallSide}.`
   };
 }
 
@@ -273,7 +274,7 @@ const hallStage = (castle: CastleState): 'stones' | 'beams' | 'fittings' | 'hang
 
 const HALL_NEEDS = { stones: NEEDS.hallStones, beams: NEEDS.hallBeams, fittings: NEEDS.hallFittings, hangings: NEEDS.hallHangings } as const;
 const HALL_LABELS = { stones: 'Lay a hall stone', beams: 'Set a hall beam', fittings: 'Fit iron to the hall', hangings: 'Hang a hall hanging' } as const;
-const HALL_ASKS = { stones: 'Hall · bring stone to build it', beams: 'Hall · make oak beams at the workshop', fittings: 'Hall · make iron fittings at the forge', hangings: 'Hall · weave a hanging at the loom' } as const;
+const HALL_SOURCES = { stones: 'bring stone', beams: 'make oak beams at workshop', fittings: 'make iron fittings at forge', hangings: 'weave at loom' } as const;
 const HALL_SHORTS = {
   stones: 'Bring stone to build the hall.', beams: 'Make oak beams at the workshop for the hall.',
   fittings: 'Make iron fittings at the forge for the hall.', hangings: 'Weave a hanging at the loom for the hall.'
@@ -310,8 +311,18 @@ function hallRule(): SiteRule {
     },
     count: castle => castle.hall.stones + castle.hall.beams + castle.hall.fittings + castle.hall.hangings,
     label: castle => `${HALL_LABELS[stage(castle)]} (${castle.hall[stage(castle)]}/${HALL_NEEDS[stage(castle)]})`,
-    ask: castle => HALL_ASKS[stage(castle)],
-    short: castle => HALL_SHORTS[stage(castle)]
+    ask: (castle, _need, state) => {
+      const next = stage(castle);
+      const progress = `Hall ${next} ${castle.hall[next]}/${HALL_NEEDS[next]}`;
+      const wool = next === 'hangings' ? ` · wool ${state.sheep.wool}/${GOODS.hangings.wool}` : '';
+      return `${progress}${wool} · ${HALL_SOURCES[next]}`;
+    },
+    short: (castle, _need, state) => {
+      const next = stage(castle);
+      const progress = `Hall ${next} ${castle.hall[next]}/${HALL_NEEDS[next]}`;
+      const wool = next === 'hangings' ? `; wool ${state.sheep.wool}/${GOODS.hangings.wool}` : '';
+      return `${HALL_SHORTS[next]} ${progress}${wool}.`;
+    }
   };
 }
 
@@ -468,7 +479,7 @@ const lacking = (state: GameState, need: SiteNeed, rule: SiteRule): string | nul
     food: need.kind === 'food' && foodCount(state.inventory.food, need.item) >= 1,
     portcullis: state.progress.workshop.portcullis
   };
-  return need.kind in covered && !covered[need.kind as keyof typeof covered] ? rule.short(state.castle, need) : null;
+  return need.kind in covered && !covered[need.kind as keyof typeof covered] ? rule.short(state.castle, need, state) : null;
 };
 
 /** Why a piece can't be laid at a site right now, or null if it can. */
@@ -494,7 +505,7 @@ export const castlePrompt = (state: GameState, spot: SiteSpot): string => {
   const waiting = need ? rule.wait?.(state) : null;
   if (waiting) return waiting.label;
   const short = need ? lacking(state, need, rule) : null;
-  return short && need ? rule.ask(state.castle, need) : rule.label(state.castle, need ?? undefined);
+  return short && need ? rule.ask(state.castle, need, state) : rule.label(state.castle, need ?? undefined);
 };
 
 /** The state with a need paid: stone from the cart and the bag, wood from the stores and the bag, a food from the bag alone. Goods are moved by the piece laid. */
