@@ -2057,16 +2057,16 @@ describe('the hall: when it opens and what it asks for', () => {
   });
 
   it('updates the hanging shortage with basket wool and returns to the ready prompt for a made hanging', () => {
-    const state = standAt(hallOpen({ stones: 40, beams: 12, fittings: 6, hangings: 1 }), 'hall');
-    state.sheep.wool = 2;
-    expect(castlePrompt(state, spotOf(state, 'hall'))).toBe('Hall hangings 1/2 · wool 2/3 · weave at loom');
-    expect(castleWorkBlocker(state, 'hall')).toBe('Weave a hanging at the loom for the hall. Hall hangings 1/2; wool 2/3.');
-    state.sheep.wool = 3;
-    expect(castlePrompt(state, spotOf(state, 'hall'))).toBe('Hall hangings 1/2 · wool 3/3 · weave at loom');
+    const base = standAt(hallOpen({ stones: 40, beams: 12, fittings: 6, hangings: 1 }), 'hall');
+    const short = { ...base, sheep: { ...base.sheep, wool: 2 } };
+    expect(castlePrompt(short, spotOf(short, 'hall'))).toBe('Hall hangings 1/2 · wool 2/3 · weave at loom');
+    expect(castleWorkBlocker(short, 'hall')).toBe('Weave a hanging at the loom for the hall. Hall hangings 1/2; wool 2/3.');
+    const full = { ...short, sheep: { ...short.sheep, wool: 3 } };
+    expect(castlePrompt(full, spotOf(full, 'hall'))).toBe('Hall hangings 1/2 · wool 3/3 · weave at loom');
 
-    state.castle.goods.hangings = 1;
-    expect(castlePrompt(state, spotOf(state, 'hall'))).toBe('Hang a hall hanging (1/2)');
-    expect(castleWorkBlocker(state, 'hall')).toBeNull();
+    const stocked = { ...short, castle: { ...short.castle, goods: { ...short.castle.goods, hangings: 1 } } };
+    expect(castlePrompt(stocked, spotOf(stocked, 'hall'))).toBe('Hang a hall hanging (1/2)');
+    expect(castleWorkBlocker(stocked, 'hall')).toBeNull();
   });
 
   it('refuses a tired survivor with the usual line at every stage, with the goods in hand', () => {
