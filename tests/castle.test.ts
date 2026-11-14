@@ -897,12 +897,22 @@ describe('the wall', () => {
 
   it('refuses without stone, far away, or when tired', () => {
     const state = standAt(framesUp(), 'wall-north');
-    expect(castleWorkBlocker(state, 'wall-north')).toBe('Bring stone to build the wall.');
-    expect(promptFor(state)).toBe('Wall · bring stone to build it · Cart 0/40');
+    expect(castleWorkBlocker(state, 'wall-north')).toBe('Bring stone to build the wall. North wall 0/30.');
+    expect(promptFor(state)).toBe('North wall 0/30 · bring stone · Cart 0/40');
     const stocked = { ...state, inventory: { ...state.inventory, stone: 1 } };
     expect(castleWorkBlocker({ ...stocked, player: { ...stocked.player, x: 30, y: 12 } }, 'wall-north')).toBe('Move closer to the wall.');
     expect(castleWorkBlocker({ ...stocked, player: { ...stocked.player, energy: 0 } }, 'wall-north')).toBe(TOO_TIRED_MESSAGE);
     expect(promptFor(stocked)).toBe('E  Lay a wall stone, north side (0/30) · Cart 0/40');
+  });
+
+  it('keeps a partly built side count visible while stone is missing', () => {
+    const state = standAt(framesUp({ wall: { ...ALL_WALL, west: 8, north: 0 } }), 'wall-west');
+    expect(castlePrompt(state, spotOf(state, 'wall-west'))).toBe('West wall 8/30 · bring stone');
+    expect(castleWorkBlocker(state, 'wall-west')).toBe('Bring stone to build the wall. West wall 8/30.');
+
+    const stocked = { ...state, inventory: { ...state.inventory, stone: 1 } };
+    expect(castlePrompt(stocked, spotOf(stocked, 'wall-west'))).toBe('Lay a wall stone, west side (8/30)');
+    expect(castleSpots(framesUp({ wall: ALL_WALL })).some(spot => spot.site === 'wall-west')).toBe(false);
   });
 
   it('says the first stone, the half, and the finish of each side, and leaves a morning note', () => {
@@ -2021,18 +2031,42 @@ describe('the hall: when it opens and what it asks for', () => {
   it('refuses what has not been made, saying where to make it, and spends nothing', () => {
     const ask = (hall: Partial<GameState['castle']['hall']>) => standAt(hallOpen(hall), 'hall');
     const beams = ask({ stones: 40 });
-    expect(castleWorkBlocker(beams, 'hall')).toBe('Make oak beams at the workshop for the hall.');
-    expect(promptFor(beams)).toMatch(/^Hall · make oak beams at the workshop( ·|$)/);
+    expect(castleWorkBlocker(beams, 'hall')).toBe('Make oak beams at the workshop for the hall. Hall beams 0/12.');
+    expect(promptFor(beams)).toMatch(/^Hall beams 0\/12 · make oak beams at workshop( ·|$)/);
     expect(useKeyAction(beams)).toBeUndefined();
     expect(doWork(beams, 'hall').state).toBe(beams);
-    expect(castleWorkBlocker(ask({ stones: 40, beams: 12 }), 'hall')).toBe('Make iron fittings at the forge for the hall.');
+    expect(castleWorkBlocker(ask({ stones: 40, beams: 12 }), 'hall')).toBe('Make iron fittings at the forge for the hall. Hall fittings 0/6.');
     const hangings = ask({ stones: 40, beams: 12, fittings: 6 });
-    expect(castleWorkBlocker(hangings, 'hall')).toBe('Weave a hanging at the loom for the hall.');
-    expect(promptFor(hangings)).toMatch(/^Hall · weave a hanging at the loom( ·|$)/);
+    expect(castleWorkBlocker(hangings, 'hall')).toBe('Weave a hanging at the loom for the hall. Hall hangings 0/2; wool 0/3.');
+    expect(promptFor(hangings)).toMatch(/^Hall hangings 0\/2 · wool 0\/3 · weave at loom( ·|$)/);
     expect(castleWorkBlocker(ask({}), 'hall')).toBeNull();
     const noStone = standAt(hallOpen({}, {}, { inventory: { ...game.inventory, stone: 0 } }), 'hall');
-    expect(castleWorkBlocker(noStone, 'hall')).toBe('Bring stone to build the hall.');
-    expect(promptFor(noStone)).toMatch(/^Hall · bring stone to build it( ·|$)/);
+    expect(castleWorkBlocker(noStone, 'hall')).toBe('Bring stone to build the hall. Hall stones 0/40.');
+    expect(promptFor(noStone)).toMatch(/^Hall stones 0\/40 · bring stone( ·|$)/);
+  });
+
+  it('keeps the current hall stage count visible while materials are missing', () => {
+    const missing = (hall: Partial<GameState['castle']['hall']>, stone = 3) => {
+      const state = standAt(hallOpen(hall, {}, { inventory: { ...game.inventory, stone } }), 'hall');
+      return castlePrompt(state, spotOf(state, 'hall'));
+    };
+    expect(missing({ stones: 19 }, 0)).toBe('Hall stones 19/40 · bring stone');
+    expect(missing({ stones: 40, beams: 2 })).toBe('Hall beams 2/12 · make oak beams at workshop');
+    expect(missing({ stones: 40, beams: 12, fittings: 4 })).toBe('Hall fittings 4/6 · make iron fittings at forge');
+    expect(castleSpots(hallOpen(FULL_HALL)).some(spot => spot.site === 'hall')).toBe(false);
+  });
+
+  it('updates the hanging shortage with basket wool and returns to the ready prompt for a made hanging', () => {
+    const base = standAt(hallOpen({ stones: 40, beams: 12, fittings: 6, hangings: 1 }), 'hall');
+    const short = { ...base, sheep: { ...base.sheep, wool: 2 } };
+    expect(castlePrompt(short, spotOf(short, 'hall'))).toBe('Hall hangings 1/2 · wool 2/3 · weave at loom');
+    expect(castleWorkBlocker(short, 'hall')).toBe('Weave a hanging at the loom for the hall. Hall hangings 1/2; wool 2/3.');
+    const full = { ...short, sheep: { ...short.sheep, wool: 3 } };
+    expect(castlePrompt(full, spotOf(full, 'hall'))).toBe('Hall hangings 1/2 · wool 3/3 · weave at loom');
+
+    const stocked = { ...short, castle: { ...short.castle, goods: { ...short.castle.goods, hangings: 1 } } };
+    expect(castlePrompt(stocked, spotOf(stocked, 'hall'))).toBe('Hang a hall hanging (1/2)');
+    expect(castleWorkBlocker(stocked, 'hall')).toBeNull();
   });
 
   it('refuses a tired survivor with the usual line at every stage, with the goods in hand', () => {
