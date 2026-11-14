@@ -1,4 +1,5 @@
 import { hillsPathOpen, homesteadPathOpen, pathOpen } from '../game/areas';
+import { keepFinished } from '../game/keep';
 import { SITES, type AreaId, type GameState, type SiteId } from '../game/state';
 
 interface JournalLocation {
@@ -97,8 +98,14 @@ export function journalView(state: GameState): {
     ? 'Follow the northeast path and restore the old lookout.'
     : 'Build a toolshed at camp to make tools.';
   if (state.progress.lookoutRepaired && state.structures.toolshed) {
-    if (sitesFound && state.progress.quarryFound && state.progress.homesteadFound) nextHint = 'You have followed every path. Your camp is home, and the woods are yours to wander.';
-    else if (sitesFound && !state.progress.quarryFound) nextHint = 'Follow the west path out of camp to see what lies beyond.';
+    if (sitesFound && state.progress.quarryFound && state.progress.homesteadFound) {
+      if (!state.progress.hillsFound) nextHint = 'Follow the path beyond the old quarry and see where it leads.';
+      else if (state.progress.oreFoundDay === null) nextHint = 'Explore the hills for ore to work at camp.';
+      else if (!state.structures.workshop) nextHint = 'Clear the east ground for a workshop to work the ore.';
+      else if (!state.progress.workshop.forge) nextHint = 'Add a forge to the workshop to work the ore.';
+      else if (!keepFinished(state)) nextHint = 'Return to the hills and help the keep rise, one stone at a time.';
+      else nextHint = 'The keep stands on the hills. Your camp is home, with room to wander.';
+    } else if (sitesFound && !state.progress.quarryFound) nextHint = 'Follow the west path out of camp to see what lies beyond.';
     else if (sitesFound && !state.progress.homesteadFound) nextHint = 'Follow the east path out of camp to see what lies beyond.';
     else nextHint = 'Follow an unexplored path to find another quiet place.';
   }

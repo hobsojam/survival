@@ -32,7 +32,7 @@ describe('field journal', () => {
     state.progress.quarryFound = true;
     expect(journalView(state).nextHint).toMatch(/east path/i);
     state.progress.homesteadFound = true;
-    expect(journalView(state).nextHint).toMatch(/every path/i);
+    expect(journalView(state).nextHint).toMatch(/beyond the old quarry/i);
     expect(journalView({ ...state, progress: { ...state.progress, lookoutRepaired: false } }).milestones).toHaveLength(4);
     // Once the lookout stands, the year journal takes over and the milestones step aside.
     expect(journalView(state).milestones).toEqual([]);
@@ -91,7 +91,7 @@ describe('field journal', () => {
     expect(journalView(state).nextHint).toMatch(/lookout/i);
   });
 
-  it('suggests the east path before the closing line', () => {
+  it('suggests the east path before the quarry route continues', () => {
     const state = createGame();
     state.structures.shelter = true;
     state.structures.toolshed = true;
@@ -102,7 +102,65 @@ describe('field journal', () => {
     expect(journalView(state).nextHint).toMatch(/east path/i);
     state.progress.homesteadFound = true;
     expect(journalView(state).nextHint)
-      .toBe('You have followed every path. Your camp is home, and the woods are yours to wander.');
+      .toMatch(/beyond the old quarry/i);
+  });
+
+  it('guides a discovered route through ore, workshop, forge, and the keep', () => {
+    const state = createGame();
+    state.structures.shelter = true;
+    state.structures.toolshed = true;
+    state.progress.hearthUnlocked = true;
+    state.progress.lookoutRepaired = true;
+    state.progress.discoveries = { basket: true, spring: true, cairn: true };
+    state.progress.quarryFound = true;
+    state.progress.homesteadFound = true;
+
+    expect(journalView(state).nextHint).toMatch(/beyond the old quarry/i);
+    expect(journalView(state).nextHint).not.toMatch(/hills|keep/i);
+
+    state.progress.hillsFound = true;
+    expect(journalView(state).nextHint).toMatch(/hills.*ore/i);
+
+    state.progress.oreFoundDay = state.day;
+    expect(journalView(state).nextHint).toMatch(/east ground.*workshop/i);
+
+    state.structures.workshop = true;
+    expect(journalView(state).nextHint).toMatch(/forge.*ore/i);
+
+    state.progress.workshop.forge = true;
+    expect(journalView(state).nextHint).toMatch(/hills.*keep/i);
+
+    state.keep.stones = 60;
+    expect(journalView(state).nextHint).toMatch(/keep.*stands/i);
+    expect(journalView(state).nextHint).not.toMatch(/every path|all.*finished/i);
+  });
+
+  it('keeps earlier leads when milestones happen out of order', () => {
+    const state = createGame();
+    state.structures.shelter = true;
+    state.structures.toolshed = true;
+    state.progress.hearthUnlocked = true;
+    state.progress.lookoutRepaired = true;
+    state.progress.discoveries = { basket: true, spring: true, cairn: true };
+    state.progress.quarryFound = true;
+    state.progress.hillsFound = true;
+    state.progress.oreFoundDay = state.day;
+    state.structures.workshop = true;
+    state.progress.workshop.forge = true;
+
+    expect(journalView(state).nextHint).toMatch(/east path/i);
+
+    state.progress.homesteadFound = true;
+    expect(journalView(state).nextHint).toMatch(/hills.*keep/i);
+
+    state.progress.oreFoundDay = null;
+    expect(journalView(state).nextHint).toMatch(/hills.*ore/i);
+    state.progress.oreFoundDay = state.day;
+    state.progress.workshop.forge = false;
+    state.structures.workshop = false;
+    expect(journalView(state).nextHint).toMatch(/east ground.*workshop/i);
+    state.clearing.cleared.push('east-far');
+    expect(journalView(state).nextHint).toMatch(/build a workshop on the cleared east ground/i);
   });
 
   it('asks for no stone before the cold night', () => {
