@@ -91,3 +91,32 @@ export function restUntilDusk(state: GameState): LongRestResult {
   if (stop) return { state: next, message: stop.message, notices, stop: stop.kind };
   return { state: next, message: 'You rest until dusk. Night has fallen.', notices, stop: 'nightfall' };
 }
+
+
+export interface LongRestPreview {
+  seconds: number;
+  hunger: number;
+  warmth: number;
+  fuel: number;
+  warning: string | null;
+  visitorWarning: boolean;
+}
+
+/** What an uninterrupted rest would cost by nightfall; this never changes the live state. */
+export function restUntilDuskPreview(state: GameState): LongRestPreview {
+  const seconds = Math.max(0, nightStart(state.day) - state.timeOfDay);
+  const projected = advanceTime(structuredClone(state), seconds, 'resting');
+  const fuel = fuelLeft(projected);
+  const warnings: string[] = [];
+  if (projected.player.hunger <= BALANCE.lowNeed) warnings.push('Hunger will run low');
+  if (projected.player.warmth <= BALANCE.lowNeed) warnings.push('Warmth will run low');
+  if (fuelLeft(state) > 0 && fuel <= 0) warnings.push('The fire will go out');
+  if (projected.ending) warnings.push('Your strength may give out');
+  const visitorWarning = foxAt(state.day, state.timeOfDay) !== null
+    || traderSpot(state, 'glass') !== null || traderSpot(state, 'spice') !== null
+    || state.town.traveller !== null;
+  return {
+    seconds, hunger: projected.player.hunger, warmth: projected.player.warmth, fuel,
+    warning: warnings.length ? `${warnings.join('; ')}.` : null, visitorWarning
+  };
+}

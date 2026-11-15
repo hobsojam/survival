@@ -5,7 +5,7 @@ import { foxAt } from '../src/game/wildlife';
 import { traderSpot } from '../src/game/market';
 import { isRaining } from '../src/game/rain';
 import { applyAction } from '../src/game/rules';
-import { restUntilDusk, restUntilDuskBlocker } from '../src/game/restUntilDusk';
+import { restUntilDusk, restUntilDuskBlocker, restUntilDuskPreview } from '../src/game/restUntilDusk';
 
 const home = (day = 11, timeOfDay = 0): GameState => {
   const state = createGame();
@@ -121,5 +121,35 @@ describe('rest until dusk', () => {
     const result = restUntilDusk(state);
     expect(result.state.sickness.restedWarm).toBe(true);
     expect(state).toEqual(before);
+  });
+});
+
+
+describe('rest until dusk preview', () => {
+  it('projects the same uneventful endpoint without changing the live state', () => {
+    const state = home(11, nightStart(11) - 5);
+    const before = structuredClone(state);
+    const preview = restUntilDuskPreview(state);
+    const actual = restUntilDusk(state).state;
+    expect(preview.seconds).toBe(5);
+    expect(preview.hunger).toBeCloseTo(actual.player.hunger);
+    expect(preview.warmth).toBeCloseTo(actual.player.warmth);
+    expect(preview.fuel).toBeCloseTo(actual.fireFuel);
+    expect(state).toEqual(before);
+  });
+
+  it('warns when a long rest would exhaust hunger or the campfire', () => {
+    const hungry = home();
+    hungry.player.hunger = 21;
+    expect(restUntilDuskPreview(hungry).warning).toMatch(/hunger|hungry/i);
+    const unlit = home();
+    unlit.fireFuel = 5;
+    expect(restUntilDuskPreview(unlit).warning).toMatch(/fire/i);
+  });
+
+  it('warns that a visitor already present may leave', () => {
+    const state = home(12, nightStart(12) - 19);
+    expect(foxAt(12, state.timeOfDay)).not.toBeNull();
+    expect(restUntilDuskPreview(state).visitorWarning).toBe(true);
   });
 });
