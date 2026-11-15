@@ -956,7 +956,9 @@ describe('rest until dusk panel', () => {
     const state = createGame();
     state.structures.shelter = true;
     state.player.hunger = 20;
-    expect(restUntilDuskView(state)).toMatchObject({ disabled: true, title: expect.stringMatching(/eat/i) });
+    const view = restUntilDuskView(state);
+    expect(view).toMatchObject({ disabled: true, title: expect.stringMatching(/eat/i) });
+    expect(view.preview).toMatch(/night in.*hunger.*fire/i);
   });
 
   it('explains shelter, location, and night blockers', () => {

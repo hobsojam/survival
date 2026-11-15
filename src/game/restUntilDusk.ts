@@ -110,7 +110,10 @@ export function restUntilDuskPreview(state: GameState): LongRestPreview {
   const warnings: string[] = [];
   if (projected.player.hunger <= BALANCE.lowNeed) warnings.push('Hunger will run low');
   if (projected.player.warmth <= BALANCE.lowNeed) warnings.push('Warmth will run low');
-  if (fuelLeft(state) > 0 && fuel <= 0) warnings.push('The fire will go out');
+  if (Number.isFinite(fuel) && fuel <= 0) {
+    if (fuelLeft(state) <= 0) warnings.push('The fire is already out');
+    else warnings.push('The fire will go out');
+  }
   if (projected.ending) warnings.push('Your strength may give out');
   const visitorWarning = foxAt(state.day, state.timeOfDay) !== null
     || traderSpot(state, 'glass') !== null || traderSpot(state, 'spice') !== null

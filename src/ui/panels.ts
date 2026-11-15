@@ -531,15 +531,17 @@ export function nightHint(state: GameState): string {
 export function restUntilDuskView(state: GameState): { disabled: boolean; title: string; preview: string } {
   const blocker = restUntilDuskBlocker(state);
   if (blocker) return { disabled: true, title: blocker, preview: blocker };
-  if (state.player.hunger <= BALANCE.lowNeed) return { disabled: true, title: 'Eat before resting longer.', preview: 'Hunger is low. Eat before resting longer.' };
-  if (state.player.warmth <= BALANCE.lowNeed) return { disabled: true, title: 'Warm up before resting longer.', preview: 'Warmth is low. Warm up before resting longer.' };
+  let needReason: string | null = null;
+  if (state.player.hunger <= BALANCE.lowNeed) needReason = 'Hunger is low. Eat before resting longer.';
+  else if (state.player.warmth <= BALANCE.lowNeed) needReason = 'Warmth is low. Warm up before resting longer.';
   const forecast = restUntilDuskPreview(state);
   const untilNight = formatClock(forecast.seconds / BALANCE.clockRate);
   const fire = Number.isFinite(forecast.fuel) ? `Fire ${Math.ceil(fuelLeft(state))}→${Math.ceil(forecast.fuel)}s` : 'Hall fire stays lit';
   const parts = [`If uninterrupted: night in ${untilNight}`, `Hunger ${Math.round(state.player.hunger)}→${Math.round(forecast.hunger)}`, fire];
   if (forecast.warning) parts.push(forecast.warning);
   if (forecast.visitorWarning) parts.push('A visitor may leave.');
-  return { disabled: false, title: 'Rest until nightfall, when Sleep becomes available.', preview: parts.join(' · ') };
+  if (needReason) parts.unshift(needReason);
+  return { disabled: Boolean(needReason), title: needReason ?? 'Rest until nightfall, when Sleep becomes available.', preview: parts.join(' · ') };
 }
 
 export interface ForecastView { active: boolean; title: string; copy: string; shelter: string; fire: string;

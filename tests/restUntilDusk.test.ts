@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createGame, type GameState } from '../src/game/state';
-import { nightStart } from '../src/game/calendar';
+import { afternoonStart, nightStart } from '../src/game/calendar';
 import { foxAt } from '../src/game/wildlife';
 import { traderSpot } from '../src/game/market';
 import { isRaining } from '../src/game/rain';
@@ -78,6 +78,15 @@ describe('rest until dusk', () => {
     expect(result.message).toMatch(/hunger|hungry/i);
   });
 
+  it('pauses for the cold-night warning at the start of afternoon', () => {
+    const state = home(3, afternoonStart(3) - 2);
+    state.progress.nextStormDay = 3;
+    const result = restUntilDusk(state);
+    expect(result.stop).toBe('event');
+    expect(result.state.timeOfDay).toBe(afternoonStart(3));
+    expect(result.message).toMatch(/cold wind/i);
+  });
+
   it('stops when the warming fire goes out', () => {
     const state = home();
     state.fireFuel = 5;
@@ -145,6 +154,12 @@ describe('rest until dusk preview', () => {
     const unlit = home();
     unlit.fireFuel = 5;
     expect(restUntilDuskPreview(unlit).warning).toMatch(/fire/i);
+  });
+
+  it('warns when the home fire is already out', () => {
+    const state = home();
+    state.fireFuel = 0;
+    expect(restUntilDuskPreview(state).warning).toMatch(/fire.*out/i);
   });
 
   it('warns that a visitor already present may leave', () => {
