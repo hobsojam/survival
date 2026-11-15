@@ -7,7 +7,7 @@ import { rosterLine } from '../src/game/names';
 import { BALANCE, BUILDINGS, createGame, type GameState, type StructureId } from '../src/game/state';
 import { emptyCastle } from '../src/game/castle';
 import { CLEARING_STEPS } from '../src/game/clearing';
-import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, campStoresView, chickenCoopPanelView, friendRosterView, loomItemMarkup, loomPanelView, sheepPanelView, cloakView, foodLaidByDays, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote } from '../src/ui/panels';
+import { BAG_FOODS, bagFoodMarkup, larderMarkup, larderView, axeView, clearingView, bagView, buildButtonView, buildListView, campStoresView, chickenCoopPanelView, friendRosterView, loomItemMarkup, loomPanelView, sheepPanelView, cloakView, foodLaidByDays, forecastView, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, restUntilDuskView, startNote } from '../src/ui/panels';
 import { dishBlocker } from '../src/game/cooking';
 import { cookBerryView } from '../src/ui/panels';
 import { addFood, emptyFood } from '../src/game/food';
@@ -936,5 +936,39 @@ describe('the castle goods panel', () => {
     expect(rows({ ...camp, castle: { ...camp.castle, goods: { beams: 28, fittings: 0, hangings: 0 } } }).beams.shown).toBe(false);
     const poor = rows({ ...camp, storedWood: 0 });
     expect(poor.beams).toMatchObject({ shown: true, disabled: true, copy: 'Need 8 wood for the beams.' });
+  });
+});
+
+
+describe('rest until dusk panel', () => {
+  it('shows the conditional food and fire cost before the action', () => {
+    const state = createGame();
+    state.structures.shelter = true;
+    state.fireFuel = 5;
+    const view = restUntilDuskView(state);
+    expect(view.disabled).toBe(false);
+    expect(view.preview).toMatch(/if uninterrupted/i);
+    expect(view.preview).toMatch(/hunger/i);
+    expect(view.preview).toMatch(/Fire 5→0s/);
+  });
+
+  it('does not offer a no-op long rest while already hungry', () => {
+    const state = createGame();
+    state.structures.shelter = true;
+    state.player.hunger = 20;
+    const view = restUntilDuskView(state);
+    expect(view).toMatchObject({ disabled: true, title: expect.stringMatching(/eat/i) });
+    expect(view.preview).toMatch(/night in.*hunger.*fire/i);
+  });
+
+  it('explains shelter, location, and night blockers', () => {
+    const state = createGame();
+    expect(restUntilDuskView(state)).toMatchObject({ disabled: true, title: expect.stringMatching(/shelter/i) });
+    state.structures.shelter = true;
+    state.player.x = 0;
+    expect(restUntilDuskView(state)).toMatchObject({ disabled: true, title: expect.stringMatching(/fire|home/i) });
+    state.player.x = 20;
+    state.timeOfDay = nightStart(state.day);
+    expect(restUntilDuskView(state)).toMatchObject({ disabled: true, title: expect.stringMatching(/night/i) });
   });
 });

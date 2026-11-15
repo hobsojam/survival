@@ -3,6 +3,8 @@ import type { JobId } from '../game/town';
 import { NEEDS, isRevealed, wallFinished } from '../game/castle';
 import { cutStripBlocker, grindGrainBlocker, sowStripBlocker, stripStage, threshStripBlocker, type StripStage } from '../game/field';
 import { SEASON_LENGTH, daysLeftInSeason, isSpring, isWinter, nightStart, season } from '../game/calendar';
+import { formatClock } from '../game/clock';
+import { restUntilDuskBlocker, restUntilDuskPreview } from '../game/restUntilDusk';
 import { millGrainBlocker, takeLoafBlocker } from '../game/bakehouse';
 import { takeHoneyBlocker } from '../game/beehive';
 import { takeEggBlocker } from '../game/chickens';
@@ -14,7 +16,7 @@ import { BALANCE, BUILDINGS, foodStoreCapacity, type GameState, type StructureId
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { BED_CROPS, bedSoil, bedStage, drawWaterBlocker, harvestBedBlocker, sowBedBlocker, type BedSoil, type BedStage } from '../game/beds';
 import { workSeconds } from '../game/needs';
-import { hasWoodStore, livesInHouse, woodStoreCapacity } from '../game/home';
+import { fuelLeft, hasWoodStore, livesInHouse, woodStoreCapacity } from '../game/home';
 import { availableFiber, availableWood, isAtCamp, axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, mineBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodAllCount, storeFoodBlocker, takeFoodAllCount, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
 import { availableOre } from '../game/hills';
 import { ponyWith } from '../game/pony';
@@ -523,6 +525,23 @@ export function nightHint(state: GameState): string {
   if (!isInClearing(state)) return 'Return to the clearing to cook or stargaze.';
   if (state.timeOfDay < nightStart(state.day)) return 'Cook by the fire any time. Stargazing waits for nightfall.';
   return 'Optional comforts while the night passes.';
+}
+
+/** The long-rest choice and its likely cost, visible before the player acts. */
+export function restUntilDuskView(state: GameState): { disabled: boolean; title: string; preview: string } {
+  const blocker = restUntilDuskBlocker(state);
+  if (blocker) return { disabled: true, title: blocker, preview: blocker };
+  let needReason: string | null = null;
+  if (state.player.hunger <= BALANCE.lowNeed) needReason = 'Hunger is low. Eat before resting longer.';
+  else if (state.player.warmth <= BALANCE.lowNeed) needReason = 'Warmth is low. Warm up before resting longer.';
+  const forecast = restUntilDuskPreview(state);
+  const untilNight = formatClock(forecast.seconds / BALANCE.clockRate);
+  const fire = Number.isFinite(forecast.fuel) ? `Fire ${Math.ceil(fuelLeft(state))}→${Math.ceil(forecast.fuel)}s` : 'Hall fire stays lit';
+  const parts = [`If uninterrupted: night in ${untilNight}`, `Hunger ${Math.round(state.player.hunger)}→${Math.round(forecast.hunger)}`, fire];
+  if (forecast.warning) parts.push(forecast.warning);
+  if (forecast.visitorWarning) parts.push('A visitor may leave.');
+  if (needReason) parts.unshift(needReason);
+  return { disabled: Boolean(needReason), title: needReason ?? 'Rest until nightfall, when Sleep becomes available.', preview: parts.join(' · ') };
 }
 
 export interface ForecastView { active: boolean; title: string; copy: string; shelter: string; fire: string;

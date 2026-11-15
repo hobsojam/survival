@@ -6,6 +6,7 @@ import { newsBetween } from '../game/news';
 import { coldNightMessage } from '../game/coldNight';
 import { recordJournal } from '../game/journalEntries';
 import { advanceLiveTime, applyAction, type GameAction } from '../game/rules';
+import { restUntilDusk } from '../game/restUntilDusk';
 import { TILE, worldX, worldY, drawTerrain } from './art';
 import { shownTerrainKey } from './map';
 import { sceneVisuals, playerVisualDepth, WEATHER_DEPTH } from './visuals';
@@ -305,6 +306,19 @@ export class GameScene extends Phaser.Scene {
       this.onStateChange(this.state, 'action');
       if (this.playerSprite) this.paintObjects();
     }
+  }
+
+  /** The Camp Moments button's bounded rest, with the same guards as ordinary actions. */
+  performRestUntilDusk(): void {
+    if (this.scene.isPaused() || this.nightWatch.running || this.doorFading()) return;
+    this.walkTarget = nextWalk(this.walkTarget, { kind: 'action' });
+    const before = this.state;
+    const result = restUntilDusk(before);
+    this.state = result.state;
+    if (result.state !== before) this.showActionDone({ type: 'rest' }, before);
+    this.say(...result.notices, result.message, this.needsAlert());
+    this.onStateChange(this.state, 'action');
+    if (this.playerSprite) this.paintObjects();
   }
 
   /** Plays the effect and survivor pose for an action that changed the game. */

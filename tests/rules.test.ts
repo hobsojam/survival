@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, BUILDINGS, LOOKOUT, SITES, createGame, type GameState } from '../src/game/state';
 import { QUARRY_SITE, RUBBLE_SITE } from '../src/game/areas';
-import { FULL_BAG_MESSAGE, advanceTime, isAtCamp, isInClearing, isColdNight, isFreezingNight, applyAction, buildStatus, carriedCount, freeSpaces, lookoutRepairBlocker, pickaxeBlocker, sleepBlocker } from '../src/game/rules';
+import { FULL_BAG_MESSAGE, advanceTime, isAtCamp, isInClearing, isColdNight, isFreezingNight, applyAction, buildStatus, carriedCount, freeSpaces, lookoutRepairBlocker, pickaxeBlocker, sleepBlocker, restFor } from '../src/game/rules';
 import { nightStart, seasonMessage } from '../src/game/calendar';
 import { stock } from './stock';
 import { emptyFood } from '../src/game/food';
@@ -504,6 +504,14 @@ describe('tiredness and sleep', () => {
     expect(advanceTime(state, 60, 'working').player.energy).toBe(100);
     state.player.energy = 1;
     expect(advanceTime(state, 600).player.energy).toBe(0);
+  });
+
+  it('a partial Rest recovers only for time spent', () => {
+    const state = createGame();
+    state.player.energy = 0;
+    const result = restFor(state, 5);
+    expect(result.state.timeOfDay).toBe(5);
+    expect(result.state.player.energy).toBeCloseTo(6.25);
   });
 
   it('sleeps through to dawn, letting the night play out', () => {
