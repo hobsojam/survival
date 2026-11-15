@@ -1306,16 +1306,19 @@ const decorate: ActionHandler<'decorate'> = (state, action) => {
   return { state: payAndBuild(paid, { wood: cost.wood, fiber: cost.fiber, stone: 0 }, { decorations }), message };
 };
 
-const rest: ActionHandler<'rest'> = state => {
+/** Rest for a bounded part of the day; a short final part earns its share of recovery. */
+export function restFor(state: GameState, seconds: number): ActionResult {
   if (!isAtHome(state)) return refuse(state, livesInHouse(state) ? 'Go home to rest.' : 'Move closer to the fire to rest.');
-  const rested = advanceTime(markWarmRest(state), BALANCE.restSeconds, 'resting');
+  const rested = advanceTime(markWarmRest(state), seconds, 'resting');
   const bedGain = BALANCE.bedRestEnergyGain + (state.companion.pillow ? BALANCE.pillowEnergyGain : 0) + (state.sheep.woven.blanket ? BALANCE.blanketEnergyGain : 0);
-  const gain = recovery(state, rested.structures.bed ? bedGain : BALANCE.restEnergyGain) + cakeEnergy(state);
+  const gain = recovery(state, rested.structures.bed ? bedGain : BALANCE.restEnergyGain) * seconds / BALANCE.restSeconds + cakeEnergy(state);
   return {
     state: { ...rested, player: { ...rested.player, energy: Math.min(100, rested.player.energy + gain) }, cakeBonus: false },
     message: 'You take a short rest.'
   };
-};
+}
+
+const rest: ActionHandler<'rest'> = state => restFor(state, BALANCE.restSeconds);
 
 /** Energy after a night's sleep: full in a bed, otherwise a good boost; hungry, half the boost and no more than the cap, which a pillow raises. */
 function sleptEnergy(state: GameState): number {
