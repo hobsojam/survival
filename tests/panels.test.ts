@@ -949,7 +949,7 @@ describe('rest until dusk panel', () => {
     expect(view.disabled).toBe(false);
     expect(view.preview).toMatch(/if uninterrupted/i);
     expect(view.preview).toMatch(/hunger/i);
-    expect(view.preview).toMatch(/fire/i);
+    expect(view.preview).toMatch(/Fire 5→0s/);
   });
 
   it('does not offer a no-op long rest while already hungry', () => {

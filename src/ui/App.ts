@@ -24,7 +24,7 @@ import { showBuildList, showCampStores } from './showPanels';
 import type { WovenId } from '../game/sheep';
 import { NameDialog, wireNameDialog } from './nameDialog';
 import { SaveLoader, campToReplace, clearSaveNote, wireSaveBackup, type SaveBackupPage } from './saveBackup';
-import { homeChoiceView, visitorView, cookBerryView, supplyCount, axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, decorationMarkup, decorationButtonView, DECORATION_CHOICES, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, chickenCoopPanelView, friendRosterView, sheepPanelView, loomPanelView, pipsLine, loomItemMarkup, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishMarkup, nightDishesView, nightHint, packView, pickaxeView, pillowView, potView, startNote, workshopView, castleGoodsView, castleGoodsTitle, type ActionPanelView } from './panels';
+import { homeChoiceView, visitorView, cookBerryView, supplyCount, axeView, bagFoodMarkup, bagView, BAG_FOODS, buildButtonView, buildListMarkup, buildListView, decorationMarkup, decorationButtonView, DECORATION_CHOICES, campStoresMarkup, campStoresView, type EatableFood, larderView, clearingView, cloakView, forecastView, fishingLineView, bedMarkup, bedsPanelView, fieldPanelView, granaryPanelView, windmillPanelView, bakeryPanelView, beehivePanelView, chickenCoopPanelView, friendRosterView, sheepPanelView, loomPanelView, pipsLine, loomItemMarkup, stripMarkup, gardenPanelView, gardenPlotMarkup, keepsakeView, lookoutView, mineView, nightDishMarkup, nightDishesView, nightHint, restUntilDuskView, packView, pickaxeView, pillowView, potView, startNote, workshopView, castleGoodsView, castleGoodsTitle, type ActionPanelView } from './panels';
 import { welcomeBack } from './welcomeBack';
 import type { UpgradeId } from '../game/workshop';
 import type { CastleGood } from '../game/castleSites';
@@ -58,6 +58,8 @@ export class App {
   private saveLoader: SaveLoader | null = null;
   private savePage: SaveBackupPage | null = null;
   private toastTimer?: number;
+  private longRestPreviewSecond = -1;
+  private longRestDirty = true;
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -130,7 +132,7 @@ export class App {
               <section class="panel sheep-panel" data-tab="camp" hidden><p class="eyebrow">THE EAST MEADOW</p><h2>Sheep</h2><p class="garden-hint" id="sheep-status"></p><p class="garden-hint" id="sheep-names" hidden></p><p class="garden-hint" id="sheep-stores"></p><div class="tool-row"><button type="button" id="feed-button" data-action="feedSheep">Put out feed</button><small id="feed-hint"></small></div><div class="tool-row" id="shear-row" hidden><button type="button" id="shear-button" data-action="shearFlock">Shear the flock</button><small id="shear-hint"></small></div></section>
               <section class="panel loom-panel" data-tab="build" hidden><p class="eyebrow">BESIDE THE WORKSHOP</p><h2>Loom</h2><p class="garden-hint" id="loom-note"></p><div id="loom-list"></div></section>
               <section class="panel chicken-coop-panel" data-tab="camp" hidden><p class="eyebrow">AT CAMP</p><h2>Chicken coop</h2><p class="garden-hint" id="chicken-coop-status"></p><p class="garden-hint" id="coop-names" hidden></p><p class="garden-hint" id="chicken-coop-eggs"></p><div class="tool-row"><button type="button" id="take-egg-button" data-action="takeEgg">Take an egg</button><small id="take-egg-hint"></small></div></section>
-              <section class="panel night-panel" data-tab="camp"><p class="eyebrow">CAMP MOMENTS</p><h2>Cook or unwind</h2><p class="night-hint" id="night-hint">Cook by the fire any time. Stargazing waits for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" data-dish="berries" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button>${nightDishMarkup()}</div></section>
+              <section class="panel night-panel" data-tab="camp"><p class="eyebrow">CAMP MOMENTS</p><h2>Cook or unwind</h2><p class="night-hint" id="night-hint">Cook by the fire any time. Stargazing waits for nightfall.</p><div class="night-actions"><button type="button" data-action="cook" data-dish="berries" id="cook-button"><span>♨</span><strong>Cook a berry</strong><small>1 berry · 8 seconds</small></button><button type="button" data-action="stargaze" id="stargaze-button"><span>✦</span><strong>Watch the stars</strong><small>12 seconds · a little rest</small></button>${nightDishMarkup()}</div><div class="long-rest"><button type="button" id="rest-until-dusk" data-action="restUntilDusk">Rest until dusk</button><p id="rest-until-dusk-preview" aria-live="polite"></p></div></section>
               <section class="panel build-panel" data-tab="build"><p class="eyebrow">MAKE CAMP HOME</p><h2>Little improvements</h2><p id="build-hint" class="build-hint">Stand anywhere in the clearing to build.</p><div id="build-list">${buildListMarkup()}</div><div id="decoration-group" hidden><h3 class="build-group-heading">Make it yours</h3><div id="decoration-list">${decorationMarkup()}</div></div><div id="clearing-group" hidden><h3 class="build-group-heading">Clear the land</h3><p id="clearing-progress" class="build-hint" hidden></p><div id="clearing-sides">${clearingMarkup}</div><div class="tool-row" id="clear-row"><h3 id="clear-title">Clear the ground</h3><p id="clear-copy" class="lookout-copy"></p><button type="button" id="clear-button" data-action="clearGround">Clear the ground</button><small id="clear-cost"></small></div></div></section>
               <section class="panel camp-save-panel" data-tab="camp"><p class="eyebrow">THIS CAMP</p><h2>Your save</h2><p class="garden-hint">Take this camp to another device, or bring one here.</p><div class="save-actions"><button type="button" id="save-file" class="secondary-button">Save to a file</button><button type="button" id="copy-save" class="secondary-button">Copy save code</button><button type="button" id="load-save" class="secondary-button">Load a save…</button><button type="button" id="phone-new-game" class="secondary-button">Start a new game</button></div><small id="save-note" class="save-note" aria-live="polite"></small><textarea id="save-code-out" class="save-code" readonly hidden aria-label="Your save code"></textarea></section>
             </div>
@@ -146,7 +148,7 @@ export class App {
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button => {
       button.addEventListener('click', () => {
-        const type = button.dataset.action as 'dropOre' | 'feedSheep' | 'shearFlock' | 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'buildMine' | 'craftPot' | 'craftPack' | 'makeFishingLine' | 'clearGround' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'storeFood' | 'takeFood' | 'storeFoodAll' | 'takeFoodAll' | 'drawWater' | 'grindGrain' | 'millGrain' | 'takeLoaf' | 'takeHoney' | 'takeEgg';
+        const type = button.dataset.action as 'dropOre' | 'feedSheep' | 'shearFlock' | 'eat' | 'eatTrailFood' | 'prepareTrailFood' | 'rest' | 'restUntilDusk' | 'stokeFire' | 'sleep' | 'cook' | 'stargaze' | 'repairLookout' | 'craftAxe' | 'craftPickaxe' | 'buildMine' | 'craftPot' | 'craftPack' | 'makeFishingLine' | 'clearGround' | 'burnFiber' | 'burnPineNeedles' | 'dropPineNeedles' | 'dropStone' | 'storeFood' | 'takeFood' | 'storeFoodAll' | 'takeFoodAll' | 'drawWater' | 'grindGrain' | 'millGrain' | 'takeLoaf' | 'takeHoney' | 'takeEgg';
         const item = button.dataset.item as FoodItem | undefined;
         const dish = button.dataset.dish as DishId | undefined;
         if (type === 'storeFood') {
@@ -157,6 +159,8 @@ export class App {
           if (item) this.scene?.perform({ type, item });
         } else if (type === 'takeFoodAll') {
           if (item) this.scene?.perform({ type, item });
+        } else if (type === 'restUntilDusk') {
+          this.scene?.performRestUntilDusk();
         } else if (type === 'cook') {
           this.scene?.perform(dish ? { type, dish } : { type });
         } else if (type === 'eat') {
@@ -268,6 +272,8 @@ export class App {
     this.setOpenTab(null);
     this.pause.set(false);
     this.state = state;
+    this.longRestDirty = true;
+    this.longRestPreviewSecond = -1;
     // A new camp opens its journal on today's page.
     this.journalPage = null;
     this.lastSaveAt = Date.now();
@@ -277,6 +283,7 @@ export class App {
     this.scene = new GameScene(state, (next, cause) => {
       const previous = this.state;
       this.state = next;
+      if (cause === 'action') this.longRestDirty = true;
       this.soundscape.update(next);
       this.render();
       const viewing = this.scene?.viewing() ?? false;
@@ -655,6 +662,19 @@ export class App {
 
   private renderNight(): void {
     this.setText('night-hint', nightHint(this.state));
+    const second = Math.floor(this.state.timeOfDay);
+    if (this.longRestDirty || second !== this.longRestPreviewSecond) {
+      const view = restUntilDuskView(this.state);
+      const button = this.root.querySelector<HTMLButtonElement>('#rest-until-dusk');
+      if (button) {
+        button.disabled = view.disabled;
+        button.title = view.title;
+        button.classList.toggle('ready', !view.disabled);
+      }
+      this.setText('rest-until-dusk-preview', view.preview);
+      this.longRestPreviewSecond = second;
+      this.longRestDirty = false;
+    }
     const cookBerry = this.root.querySelector<HTMLButtonElement>('#cook-button');
     if (cookBerry) {
       const view = cookBerryView(this.state);

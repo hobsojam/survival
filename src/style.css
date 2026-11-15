@@ -247,6 +247,11 @@ h2 { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 18px
 .night-actions button span { color: #a88663; font-size: 19px; line-height: 1; }
 .night-actions button strong { font-size: 11px; }
 .night-actions button small { font-size: 9px; line-height: 1.2; }
+.long-rest { margin-top: 10px; padding: 10px; border: 1px solid #dce3e1; border-radius: 9px; background: #f8faf6; }
+.long-rest button { width: 100%; min-height: 38px; border: 1px solid #9cafba; border-bottom-width: 2px; border-radius: 8px; background: #e0ebec; color: #365d65; font-size: 12px; font-weight: 700; }
+.long-rest button:disabled { opacity: .55; cursor: default; }
+.long-rest button.ready:hover { background: #d4e4e6; }
+.long-rest p { margin: 7px 0 0; color: #60736d; font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
 .build-panel h2 { margin-bottom: 7px; }
 #clear-title { font: 600 19px 'Fraunces', serif; letter-spacing: -.025em; margin: 0 0 7px; color: #2e4a38; }
 .build-hint { margin: 0 0 13px; color: #69806e; font-size: 11px; line-height: 1.45; }

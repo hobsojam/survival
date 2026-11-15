@@ -16,7 +16,7 @@ import { BALANCE, BUILDINGS, foodStoreCapacity, type GameState, type StructureId
 import { gardenPlotLabel, gardenPlotStage } from '../game/garden';
 import { BED_CROPS, bedSoil, bedStage, drawWaterBlocker, harvestBedBlocker, sowBedBlocker, type BedSoil, type BedStage } from '../game/beds';
 import { workSeconds } from '../game/needs';
-import { hasWoodStore, livesInHouse, woodStoreCapacity } from '../game/home';
+import { fuelLeft, hasWoodStore, livesInHouse, woodStoreCapacity } from '../game/home';
 import { availableFiber, availableWood, isAtCamp, axeBlocker, treeRegrowDays, bagCapacity, buildStatus, carriedCount, groundBlocker, harvestGardenBlocker, isInClearing, isColdNight, isFreezingNight, lookoutRepairBlocker, mineBlocker, packBlocker, plantGardenBlocker, pickaxeBlocker, storeFoodAllCount, storeFoodBlocker, takeFoodAllCount, takeFoodBlocker, trailFoodBlocker } from '../game/rules';
 import { availableOre } from '../game/hills';
 import { ponyWith } from '../game/pony';
@@ -535,7 +535,7 @@ export function restUntilDuskView(state: GameState): { disabled: boolean; title:
   if (state.player.warmth <= BALANCE.lowNeed) return { disabled: true, title: 'Warm up before resting longer.', preview: 'Warmth is low. Warm up before resting longer.' };
   const forecast = restUntilDuskPreview(state);
   const untilNight = formatClock(forecast.seconds / BALANCE.clockRate);
-  const fire = Number.isFinite(forecast.fuel) ? `Fire ${Math.ceil(forecast.fuel)}s` : 'Hall fire stays lit';
+  const fire = Number.isFinite(forecast.fuel) ? `Fire ${Math.ceil(fuelLeft(state))}→${Math.ceil(forecast.fuel)}s` : 'Hall fire stays lit';
   const parts = [`If uninterrupted: night in ${untilNight}`, `Hunger ${Math.round(state.player.hunger)}→${Math.round(forecast.hunger)}`, fire];
   if (forecast.warning) parts.push(forecast.warning);
   if (forecast.visitorWarning) parts.push('A visitor may leave.');
